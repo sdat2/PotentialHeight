@@ -104,8 +104,15 @@ def get_ocean():
 
     ds.to_netcdf("data/ocean.nc")
 
-get_ocean()
+#get_ocean()
 
+ocean_ds = xr.open_dataset("data/ocean.nc")
+atmos_ds = xr.open_dataset("data/atmos.nc").isel(dcpp_init_year=0)
+
+ocean_ds = ocean_ds #.interp({"": "", "": ""}, method="nearest")
+# .rename({"nlat": "lat", "nlon": "lon"})
+print("ocean_ds", ocean_ds)
+print("atmos_ds", atmos_ds)
 
 def get_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
     result = xr.apply_ufunc(
