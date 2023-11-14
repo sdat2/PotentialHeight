@@ -35,14 +35,11 @@ cat_subset = cat.search(
     experiment_id=["historical", "ssp585"],
     table_id="Amon",
     institution_id="NCAR",
-    # member_id="r10i1p1f1",
+    member_id="r10i1p1f1",
     source_id="CESM2",
     variable_id=conversion_dict.keys(),
     #grid_label="gn",
 )
-unique = cat_subset.unique()
-for i in unique["member_id"]:
-    print(i, cat_subset.search(member_id=i).unique())
 
 print("cat_subset", cat_subset)
 unique = cat_subset.unique()
