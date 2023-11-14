@@ -14,6 +14,7 @@ REQUIRED: List[str] = [
     "intake-esm",
     "intake-xarray",
     "gcsfs",
+    "xmip",
 ]
 
 setup(
