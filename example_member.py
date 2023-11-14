@@ -23,7 +23,8 @@ cat = open_catalog(PANGEO_CAT_URL)["climate"]# ["cmip6_gcs"]
 print(cat)
 
 import intake_esm
-url = intake_esm.tutorial.get_url('google_cmip6')
+# url = intake_esm.tutorial.get_url('google_cmip6')
+url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
 cat = intake.open_esm_datastore(url)
 unique = cat.unique()
 
@@ -33,9 +34,16 @@ print("unique", unique)
 cat_subset = cat.search(
     experiment_id=["historical", "ssp585"],
     table_id="Amon",
-    #variable_id="o2",
+    institution_id="NCAR",
+    # member_id="r10i1p1f1",
+    source_id="CESM2",
+    variable_id=conversion_dict.keys(),
     #grid_label="gn",
 )
+unique = cat_subset.unique()
+for i in unique["member_id"]:
+    print(i, cat_subset.search(member_id=i).unique())
+
 print("cat_subset", cat_subset)
 unique = cat_subset.unique()
 print("unique", unique)
