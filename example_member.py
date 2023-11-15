@@ -7,6 +7,7 @@ import intake_esm
 import dask
 from matplotlib import pyplot as plt
 from xmip.preprocessing import combined_preprocessing
+from sithom.time import timeit
 
 # CMIP6 equivalent names
 # tos: Sea Surface Temperature [degC] [same]
@@ -27,6 +28,7 @@ print("unique", unique)
 CKCD: float = 0.9
 
 
+@timeit
 def get_atmos():
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
@@ -45,7 +47,7 @@ def get_atmos():
     z_kwargs = {"consolidated": True, "decode_times": True}
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         dset_dict = cat_subset.to_dataset_dict(
-            zarr_kwargs=z_kwargs,  # preprocess=combined_preprocessing
+            zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
         )
 
     print(dset_dict.keys())
@@ -53,18 +55,19 @@ def get_atmos():
     ds_l = []
     for k, ds in dset_dict.items():
         if "member_id" in ds.dims:
-            ds = ds.isel(member_id=0)
+            ds = ds.isel(member_id=0, dcpp_init_year=0)
         print(k, ds)
         ds_l.append(ds)
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         ds = xr.concat(ds_l[::-1], dim="time")
 
-    print("merged ds", ds.isel(dcpp_init_year=0))
+    print("merged ds", ds)
 
     ds.to_netcdf("data/atmos.nc")
 
 
+@timeit
 def get_ocean():
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
@@ -73,7 +76,7 @@ def get_ocean():
         member_id="r10i1p1f1",
         source_id="CESM2",
         variable_id=conversion_dict.keys(),
-        #dcpp_init_year="20200528",
+        # dcpp_init_year="20200528",
         grid_label="gn",
     )
 
@@ -84,7 +87,7 @@ def get_ocean():
     z_kwargs = {"consolidated": True, "decode_times": True}
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         dset_dict = cat_subset.to_dataset_dict(
-            zarr_kwargs=z_kwargs,  # preprocess=combined_preprocessing
+            zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
         )
 
     print(dset_dict.keys())
@@ -100,21 +103,29 @@ def get_ocean():
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         ds = xr.concat(ds_l[::-1], dim="time")
 
-    print("merged ds", ds) #ds.isel(dcpp_init_year=0))
+    print("merged ds", ds)
 
     ds.to_netcdf("data/ocean.nc")
 
-#get_ocean()
 
-ocean_ds = xr.open_dataset("data/ocean.nc")
-atmos_ds = xr.open_dataset("data/atmos.nc").isel(dcpp_init_year=0)
+@timeit
+def get_data():
+    get_ocean()
+    get_atmos()
 
-ocean_ds = ocean_ds #.interp({"": "", "": ""}, method="nearest")
-# .rename({"nlat": "lat", "nlon": "lon"})
-print("ocean_ds", ocean_ds)
-print("atmos_ds", atmos_ds)
 
-def get_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
+@timeit
+def load_data():
+    ocean_ds = xr.open_dataset("data/ocean.nc")
+    atmos_ds = xr.open_dataset("data/atmos.nc")
+    ocean_ds = ocean_ds  # .interp({"": "", "": ""}, method="nearest")
+    # .rename({"nlat": "lat", "nlon": "lon"})
+    print("ocean_ds", ocean_ds)
+    print("atmos_ds", atmos_ds)
+
+
+@timeit
+def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
     result = xr.apply_ufunc(
         pi,
         ds["sst"],
@@ -140,6 +151,7 @@ def get_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         vectorize=True,
     )
 
+
     # store the result in an xarray data structure
     vmax, pmin, ifl, t0, otl = result
     out_ds = xr.Dataset(
@@ -149,12 +161,6 @@ def get_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
             "ifl": ifl,
             "t0": t0,
             "otl": otl,
-            # merge the state data into the same data structure
-            "sst": ds.sst,
-            "t": ds.t,
-            "q": ds.q,
-            "msl": ds.msl,
-            "lsm": ds.lsm,
         }
     )
 

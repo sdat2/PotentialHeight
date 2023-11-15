@@ -1,0 +1,10 @@
+xarray[complete]
+netCDF4
+dask[complete]
+requests
+intake
+aiohttp
+intake-esm
+intake-xarray
+gcsfs
+xmip
