@@ -6,6 +6,7 @@ import dask
 import xesmf as xe
 from matplotlib import pyplot as plt
 from xmip.preprocessing import combined_preprocessing
+from xmip.postprocessing import interpolate_grid_label
 from sithom.time import timeit
 from sithom.plot import feature_grid, plot_defaults
 
@@ -47,9 +48,9 @@ def get_atmos():
 
     z_kwargs = {"consolidated": True, "decode_times": True}
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        dset_dict = cat_subset.to_dataset_dict(
+        dset_dict = interpolate_grid_label(cat_subset.to_dataset_dict(
             zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
-        )
+        ), target_grid_label="gr")
 
     print(dset_dict.keys())
 
@@ -66,6 +67,47 @@ def get_atmos():
     print("merged ds", ds)
 
     ds.to_netcdf("data/atmos.nc")
+
+
+
+@timeit
+def get_all():
+    cat_subset = cat.search(
+        experiment_id=["historical", "ssp585"],
+        table_id=["Amon", "Omon"],
+        institution_id="NCAR",
+        member_id="r10i1p1f1",
+        source_id="CESM2",
+        variable_id=conversion_dict.keys(),
+        # grid_label="gn",
+    )
+
+    print("cat_subset", cat_subset)
+    unique = cat_subset.unique()
+    print("unique", unique)
+
+    z_kwargs = {"consolidated": True, "decode_times": True}
+    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
+        #dset_dict = interpolate_grid_label(
+        dset_dict = cat_subset.to_dataset_dict(
+            zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
+        )#, target_grid_label="gr", merge_kwargs={"compat": "override", "combine_attrs": "override""})
+
+    print(dset_dict.keys())
+
+    ds_l = []
+    for k, ds in dset_dict.items():
+        if "member_id" in ds.dims:
+            ds = ds.isel(member_id=0, dcpp_init_year=0)
+        print(k, ds)
+        ds_l.append(ds)
+
+    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
+        ds = xr.concat(ds_l[::-1], dim="time")
+
+    print("merged ds", ds)
+
+    ds.to_netcdf("data/all.nc")
 
 
 @timeit
@@ -127,22 +169,21 @@ def regrid_2d():
                 for x in [
                     "x",
                     "y",
-                    "lat_verticies",
-                    "lon_verticies",
-                    "lon_bounds",
-                    "time_bounds",
-                    "lat_bounds",
+                    #"lat_verticies",
+                    #"lon_verticies",
+                    #"lon_bounds",
+                    #"time_bounds",
+                    #"lat_bounds",
                     "dcpp_init_year",
                     "member_id",
                 ]
                 if x in ds
             ]
-        ).isel(y=slice(1, -1))
+        )
         return ds
 
     ocean_ds = open("data/ocean.nc")
     atmos_ds = open("data/atmos.nc").isel(dcpp_init_year=0)
-    # .rename({"nlat": "lat", "nlon": "lon"})
     print("ocean_ds", ocean_ds)
     # ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)
@@ -153,8 +194,6 @@ def regrid_2d():
         {
             "lat_o": ocean_ds.lat,
             "lon_o": ocean_ds.lon,
-            #"lat_a": atmos_ds.lat,
-            #"lon_a": atmos_ds.lon,
         }
     )
     features = [["lat_o", "lon_o"]] #, ["lat_a", "lon_a"]]
@@ -179,8 +218,6 @@ def regrid_2d():
 
     plot_ds = xr.Dataset(
         {
-            #"lat_o": ocean_ds.lat,
-            #"lon_o": ocean_ds.lon,
             "lat_a": atmos_ds.lat,
             "lon_a": atmos_ds.lon,
         }
@@ -247,7 +284,7 @@ def regrid_2d():
         figsize=(12, 6),
     )
     plt.savefig("test.png")
-    
+    plt.clf()
 
 
 @timeit
@@ -319,47 +356,6 @@ def regrid_1d(xesmf: bool = False):
     print("ocean_out", ocean_out)
     ocean_out.to_netcdf("data/ocean_regridded.nc")
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
-    
-
-
-@timeit
-def regrid_2d_diff():
-    ocean_ds = xr.open_dataset("data/ocean.nc")
-    atmos_ds = xr.open_dataset("data/atmos.nc").isel(dcpp_init_year=0)
-    ocean_ds = ocean_ds  # .interp({"": "", "": ""}, method="nearest")
-    # .rename({"nlat": "lat", "nlon": "lon"})
-    print("ocean_ds", ocean_ds)
-    ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
-    print("atmos_ds", atmos_ds)
-    new_coords = (
-        (
-            atmos_ds[["lat", "lon", "lon_bounds", "lat_bounds"]].drop_vars(
-                ["dcpp_init_year", "member_id"]
-            )
-        )
-        .rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
-        .drop_vars(["x", "y"])
-        .set_coords(["lon", "lat"])
-    )
-    print("new_coords", new_coords)
-
-    regridder = xe.Regridder(ocean_ds, new_coords, "bilinear", periodic=True)
-    print(regridder)
-    ocean_out = regridder(
-        ocean_ds.drop_vars(["x", "y"]).set_coords(["lon", "lat"]),
-        keep_attrs=True,
-        skipna=True,
-    )
-    print(ocean_out)
-    ocean_out.to_netcdf("data/ocean_regridded.nc")
-    ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
-    
-
-    # (["dcpp_init_year", "member_id"])
-    # old_coords = xr.Dataset({x: ocean_ds[x] for x in ["lat", "lon"]})
-    # ocean_ds_new = ocean_ds.interp(dict(lat=new_coords.lat, lon=new_coords.lon), method="nearest")
-    # print(ocean_ds_new)
-    # ocean_ds_new.tos.isel(time=0).plot()
 
 
 @timeit
@@ -423,5 +419,8 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
 
 
 if __name__ == "__main__":
-    # get_data()
-    regrid_2d()
+    # get_ocean()
+    # get_ocean()
+    get_all()
+    # regrid_2d()
+    # print(xr.open_dataset("data/ocean.nc"))
