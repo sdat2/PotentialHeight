@@ -48,9 +48,12 @@ def get_atmos():
 
     z_kwargs = {"consolidated": True, "decode_times": True}
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        dset_dict = interpolate_grid_label(cat_subset.to_dataset_dict(
-            zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
-        ), target_grid_label="gr")
+        dset_dict = interpolate_grid_label(
+            cat_subset.to_dataset_dict(
+                zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
+            ),
+            target_grid_label="gr",
+        )
 
     print(dset_dict.keys())
 
@@ -67,7 +70,6 @@ def get_atmos():
     print("merged ds", ds)
 
     ds.to_netcdf("data/atmos.nc")
-
 
 
 @timeit
@@ -88,10 +90,10 @@ def get_all():
 
     z_kwargs = {"consolidated": True, "decode_times": True}
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        #dset_dict = interpolate_grid_label(
+        # dset_dict = interpolate_grid_label(
         dset_dict = cat_subset.to_dataset_dict(
             zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
-        )#, target_grid_label="gr", merge_kwargs={"compat": "override", "combine_attrs": "override""})
+        )  # , target_grid_label="gr", merge_kwargs={"compat": "override", "combine_attrs": "override""})
 
     print(dset_dict.keys())
 
@@ -162,8 +164,7 @@ def regrid_2d_1degree():
     plot_defaults()
 
     def open(name):
-        ds = xr.open_dataset(name, chunks={"time": 100}
-                             )
+        ds = xr.open_dataset(name, chunks={"time": 100})
         ds = ds.drop_vars(
             [
                 x
@@ -190,14 +191,17 @@ def regrid_2d_1degree():
         keep_attrs=True,
         skipna=True,
     )
-    regridder = xe.Regridder(atmos_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True)
-    print(regridder)
-    atmos_out = regridder(
+    regridder = xe.Regridder(
+        atmos_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True
+    )
+    regridder(
         atmos_ds,
         keep_attrs=True,
         skipna=True,
-    )
-    xr.merge([ocean_out, atmos_out], compat="override").to_netcdf("data/all_regridded.nc", engine="h5netcdf")
+    ).to_netcdf("data/atmos_regridded.nc") # , engine="h5netcdf")
+    # xr.merge([ocean_out, atmos_out], compat="override").to_netcdf(
+    #    "data/all_regridded.nc", engine="h5netcdf"
+    # )
 
     print("ocean_out", ocean_out)
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
@@ -218,11 +222,11 @@ def regrid_2d():
                 for x in [
                     "x",
                     "y",
-                    #"lat_verticies",
-                    #"lon_verticies",
-                    #"lon_bounds",
-                    #"time_bounds",
-                    #"lat_bounds",
+                    # "lat_verticies",
+                    # "lon_verticies",
+                    # "lon_bounds",
+                    # "time_bounds",
+                    # "lat_bounds",
                     "dcpp_init_year",
                     "member_id",
                 ]
@@ -245,11 +249,8 @@ def regrid_2d():
             "lon_o": ocean_ds.lon,
         }
     )
-    features = [["lat_o", "lon_o"]] #, ["lat_a", "lon_a"]]
-    names = [
-        ["lat", "lon"]
-        for x in range(len(features))
-    ]
+    features = [["lat_o", "lon_o"]]  # , ["lat_a", "lon_a"]]
+    names = [["lat", "lon"] for x in range(len(features))]
     units = [[None for y in range(len(features[x]))] for x in range(len(features))]
     vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
     super_titles = ["lat", "lon"]
@@ -271,11 +272,8 @@ def regrid_2d():
             "lon_a": atmos_ds.lon,
         }
     )
-    features = [["lat_a", "lon_a"]] #, ["lat_a", "lon_a"]]
-    names = [
-        ["lat", "lon"]
-        for x in range(len(features))
-    ]
+    features = [["lat_a", "lon_a"]]  # , ["lat_a", "lon_a"]]
+    names = [["lat", "lon"] for x in range(len(features))]
     units = [[None for y in range(len(features[x]))] for x in range(len(features))]
     vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
     super_titles = ["lat", "lon"]
@@ -291,7 +289,6 @@ def regrid_2d():
     plt.savefig("a_coords.png")
     plt.clf()
 
-
     regridder = xe.Regridder(ocean_ds, new_coords, "bilinear", periodic=True)
     print(regridder)
     ocean_out = regridder(
@@ -302,7 +299,7 @@ def regrid_2d():
     print("ocean_out", ocean_out)
     ocean_out.to_netcdf("data/ocean_regridded.nc")
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
-    
+
     ocean_out.tos.isel(time=0).plot()
 
     atmos_ds["tos"] = ocean_out["tos"]
@@ -341,9 +338,9 @@ def regrid_1d(xesmf: bool = False):
     def open_1d(name):
         ds = xr.open_dataset(name)
         # plt.imshow(ds.lat.values)
-        # 
+        #
         # plt.imshow(ds.lon.values)
-        # 
+        #
         # print("ds", name, ds)
         ds = ds.drop_vars(
             [
@@ -371,23 +368,22 @@ def regrid_1d(xesmf: bool = False):
     ocean_ds = open_1d("data/ocean.nc")
     print("ocean_ds", ocean_ds)
     ocean_ds.isel(time=0).tos.plot(x="lon", y="lat")
-    
+
     atmos_ds = open_1d("data/atmos.nc").isel(dcpp_init_year=0)
     print("atmos_ds", atmos_ds)
     atmos_ds.isel(time=0).psl.plot(x="lon", y="lat")
-    
+
     new_coords = atmos_ds[["lon", "lat"]]
     print("new_coords", new_coords)
     plt.plot(new_coords.lat.values, label="new")
     plt.plot(ocean_ds.lat.values, label="ocean")
     plt.legend()
     plt.title("lat")
-    
+
     plt.plot(new_coords.lon.values, label="new")
     plt.plot(ocean_ds.lon.values, label="ocean")
     plt.legend()
     plt.title("lon")
-    
 
     if xesmf:
         regridder = xe.Regridder(ocean_ds, new_coords, "nearest_s2d", periodic=True)
@@ -466,10 +462,11 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
     )
     return out_ds
 
+
 @timeit
 def calc_pi_example():
-    ds = xr.open_dataset("data/all_regridded.nc", engine="h5netcdf") 
-    input = ds.isel(time=slice(0, 5)) # .bfill("plev").ffill("plev")
+    ds = xr.open_dataset("data/all_regridded.nc", engine="h5netcdf")
+    input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
     input.tos.isel(time=0).plot(x="lon", y="lat")
     plt.show()
@@ -485,7 +482,11 @@ if __name__ == "__main__":
     # get_ocean()
     # get_ocean()
     # get_all()
-    # regrid_2d_1degree()
-    calc_pi_example()
+    regrid_2d_1degree()
+    # calc_pi_example()
+    ds = xr.open_dataset("data/ocean_regridded.nc")
+    ds.tos.isel(time=0).plot(x="lon", y="lat")
+    plt.show()
+    # calc_pi_example()
     # regrid_2d()
     # print(xr.open_dataset("data/ocean.nc"))
