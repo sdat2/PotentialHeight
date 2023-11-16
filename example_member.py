@@ -2,9 +2,8 @@ from typing import Dict
 import xarray as xr
 from tcpyPI import pi
 import intake
-from intake import open_catalog
-import intake_esm
 import dask
+import xesmf as xe
 from matplotlib import pyplot as plt
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit
@@ -122,8 +121,10 @@ def load_data():
     # .rename({"nlat": "lat", "nlon": "lon"})
     print("ocean_ds", ocean_ds)
     print("atmos_ds", atmos_ds)
-    new_coords = atmos_ds[["lat", "lon"]]
-    old_coords = ocean_ds[["lat", "lon"]]
+    new_coords = ocean_ds[["lat", "lon"]].drop_vars(["dcpp_init_year", "member_id"]).reset_coords(["lat", "lon"])
+    
+    # (["dcpp_init_year", "member_id"])
+    old_coords = xr.Dataset({x: ocean_ds[x] for x in ["lat", "lon"]})
     print("new_coords", new_coords)
     print("old_coords", old_coords)
     #ocean_ds_new = ocean_ds.interp(dict(lat=new_coords.lat, lon=new_coords.lon), method="nearest")
