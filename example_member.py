@@ -117,11 +117,20 @@ def get_data():
 @timeit
 def load_data():
     ocean_ds = xr.open_dataset("data/ocean.nc")
-    atmos_ds = xr.open_dataset("data/atmos.nc")
+    atmos_ds = xr.open_dataset("data/atmos.nc").isel(dcpp_init_year=0)
     ocean_ds = ocean_ds  # .interp({"": "", "": ""}, method="nearest")
     # .rename({"nlat": "lat", "nlon": "lon"})
     print("ocean_ds", ocean_ds)
     print("atmos_ds", atmos_ds)
+    new_coords = atmos_ds[["lat", "lon"]]
+    old_coords = ocean_ds[["lat", "lon"]]
+    print("new_coords", new_coords)
+    print("old_coords", old_coords)
+    #ocean_ds_new = ocean_ds.interp(dict(lat=new_coords.lat, lon=new_coords.lon), method="nearest")
+    #print(ocean_ds_new)
+    #ocean_ds_new.tos.isel(time=0).plot()
+    plt.show()
+
 
 
 @timeit
@@ -183,3 +192,8 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
         "hPa",
     )
     return out_ds
+
+
+if __name__ == "__main__":
+    # get_data()
+    load_data()
