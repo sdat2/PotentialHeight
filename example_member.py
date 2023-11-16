@@ -120,18 +120,27 @@ def load_data():
     ocean_ds = ocean_ds  # .interp({"": "", "": ""}, method="nearest")
     # .rename({"nlat": "lat", "nlon": "lon"})
     print("ocean_ds", ocean_ds)
+    ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)
-    new_coords = ocean_ds[["lat", "lon"]].drop_vars(["dcpp_init_year", "member_id"]).reset_coords(["lat", "lon"])
-    
-    # (["dcpp_init_year", "member_id"])
-    old_coords = xr.Dataset({x: ocean_ds[x] for x in ["lat", "lon"]})
+    new_coords = (
+        atmos_ds[["lat", "lon", "lon_bounds", "lat_bounds"]]
+        .drop_vars(["dcpp_init_year", "member_id"])
+    ).rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"}).drop_vars(["x", "y"]).set_coords(["lon", "lat"])
     print("new_coords", new_coords)
-    print("old_coords", old_coords)
-    #ocean_ds_new = ocean_ds.interp(dict(lat=new_coords.lat, lon=new_coords.lon), method="nearest")
-    #print(ocean_ds_new)
-    #ocean_ds_new.tos.isel(time=0).plot()
+
+    regridder = xe.Regridder(ocean_ds, new_coords, "conservative", periodic=True)
+    print(regridder)
+    ocean_out = regridder(ocean_ds, keep_attrs=True, skipna=True)
+    print(ocean_out)
+    ocean_out.to_netcdf("data/ocean_regridded.nc")
+    ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
     plt.show()
 
+    # (["dcpp_init_year", "member_id"])
+    # old_coords = xr.Dataset({x: ocean_ds[x] for x in ["lat", "lon"]})
+    # ocean_ds_new = ocean_ds.interp(dict(lat=new_coords.lat, lon=new_coords.lon), method="nearest")
+    # print(ocean_ds_new)
+    # ocean_ds_new.tos.isel(time=0).plot()
 
 
 @timeit
@@ -160,7 +169,6 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
         output_core_dims=[[], [], [], [], []],
         vectorize=True,
     )
-
 
     # store the result in an xarray data structure
     vmax, pmin, ifl, t0, otl = result
