@@ -7,6 +7,8 @@ import xesmf as xe
 from matplotlib import pyplot as plt
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit
+from sithom.plot import feature_grid, plot_defaults
+
 
 # CMIP6 equivalent names
 # tos: Sea Surface Temperature [degC] [same]
@@ -115,6 +117,8 @@ def get_data():
 
 @timeit
 def regrid_2d():
+    plot_defaults()
+
     def open(name):
         ds = xr.open_dataset(name)
         ds = ds.drop_vars(
@@ -142,24 +146,58 @@ def regrid_2d():
     print("ocean_ds", ocean_ds)
     # ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)
-    new_coords = (atmos_ds[["lat", "lon"]]).set_coords(["lon", "lat"])
+    new_coords = atmos_ds[["lat", "lon"]]
     print("new_coords", new_coords)
+
+    plot_ds = xr.Dataset(
+        {
+            "lat_o": ocean_ds.lat,
+            "lon_o": ocean_ds.lon,
+            #"lat_a": atmos_ds.lat,
+            #"lon_a": atmos_ds.lon,
+        }
+    )
+    features = [["lat_o", "lon_o"]] #, ["lat_a", "lon_a"]]
+    names = [
+        ["lat", "lon"]
+        for x in range(len(features))
+    ]
+    units = [["None" for y in range(len(features[x]))] for x in range(len(features))]
+    vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
+    super_titles = ["lat", "lon"]
+    feature_grid(
+        plot_ds,
+        features,
+        units,
+        names,
+        vlim,
+        super_titles,
+        figsize=(12, 6),
+    )
+    plt.savefig("coords.png")
+    plt.clf()
 
     regridder = xe.Regridder(ocean_ds, new_coords, "bilinear", periodic=True)
     print(regridder)
     ocean_out = regridder(
-        ocean_ds.set_coords(["lon", "lat"]),
+        ocean_ds,
         keep_attrs=True,
         skipna=True,
-    ).set_coords(["lon", "lat"])
+    )
     print("ocean_out", ocean_out)
     ocean_out.to_netcdf("data/ocean_regridded.nc")
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
     plt.show()
+
+    ocean_out.tos.isel(time=0).plot()
+    plt.show()
+
     atmos_ds["tos"] = ocean_out["tos"]
     print(atmos_ds)
 
-    plot_ds = atmos_ds.isel(time=5, plev=0)
+    plot_ds = atmos_ds.isel(
+        time=5, plev=0
+    )  # .sel(lon=slice(0, 360), lat=slice(-90, 90))
     features = [["tos", "psl"], ["ta", "hus"]]
     names = [
         [plot_ds[features[x][y]].attrs["long_name"] for y in range(len(features[x]))]
@@ -171,7 +209,6 @@ def regrid_2d():
     ]
     vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
     super_titles = ["" for x in range(len(features))]
-    from sithom.plot import feature_grid
 
     feature_grid(
         plot_ds,
@@ -182,6 +219,7 @@ def regrid_2d():
         super_titles,
         figsize=(12, 6),
     )
+    plt.savefig("test.png")
     plt.show()
 
 
