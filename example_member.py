@@ -164,7 +164,7 @@ def regrid_2d_1degree():
     plot_defaults()
 
     def open(name):
-        ds = xr.open_dataset(name, chunks={"time": 100})
+        ds = xr.open_dataset(name, chunks={"time": 40})
         ds = ds.drop_vars(
             [
                 x
@@ -198,7 +198,17 @@ def regrid_2d_1degree():
         atmos_ds,
         keep_attrs=True,
         skipna=True,
-    ).to_netcdf("data/atmos_regridded.nc") # , engine="h5netcdf")
+    ).to_netcdf(
+        "data/atmos_new_regridded.nc",
+        format="NETCDF4",
+        engine="h5netcdf",
+        encoding={
+            var: {"dtype": "float32", "zlib": True, "complevel": 9}
+            for var in conversion_dict.keys()
+            if var in atmos_ds
+        },
+    )
+
     # xr.merge([ocean_out, atmos_out], compat="override").to_netcdf(
     #    "data/all_regridded.nc", engine="h5netcdf"
     # )
@@ -486,6 +496,10 @@ if __name__ == "__main__":
     # calc_pi_example()
     ds = xr.open_dataset("data/ocean_regridded.nc")
     ds.tos.isel(time=0).plot(x="lon", y="lat")
+    plt.show()
+
+    ds = xr.open_dataset("data/atmos_new_regridded.nc")
+    ds.psl.isel(time=0).plot(x="lon", y="lat")
     plt.show()
     # calc_pi_example()
     # regrid_2d()
