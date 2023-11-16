@@ -99,7 +99,7 @@ def get_all():
     for k, ds in dset_dict.items():
         if "member_id" in ds.dims:
             ds = ds.isel(member_id=0, dcpp_init_year=0)
-        print(k, ds)
+        print(k)
         ds_l.append(ds)
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
@@ -144,7 +144,7 @@ def get_ocean():
         ds.isel(dcpp_init_year=0).to_netcdf(f"data/ocean-{i}.nc")
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        ds = xr.concat(ds_l[::-1], dim="time")
+        ds = xr.concat(ds_l[::-1])
 
     print("merged ds", ds)
 
@@ -155,6 +155,55 @@ def get_ocean():
 def get_data():
     get_ocean()
     get_atmos()
+
+
+@timeit
+def regrid_2d_1degree():
+    plot_defaults()
+
+    def open(name):
+        ds = xr.open_dataset(name, chunks={"time": 100}
+                             )
+        ds = ds.drop_vars(
+            [
+                x
+                for x in [
+                    "x",
+                    "y",
+                    "dcpp_init_year",
+                    "member_id",
+                ]
+                if x in ds
+            ]
+        )
+        return ds
+
+    ocean_ds = open("data/ocean.nc")
+    atmos_ds = open("data/atmos.nc").isel(dcpp_init_year=0)
+
+    new_coords = xe.util.grid_global(1, 1)
+
+    regridder = xe.Regridder(ocean_ds, new_coords, "bilinear", periodic=True)
+    print(regridder)
+    ocean_out = regridder(
+        ocean_ds,
+        keep_attrs=True,
+        skipna=True,
+    )
+    regridder = xe.Regridder(atmos_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True)
+    print(regridder)
+    atmos_out = regridder(
+        atmos_ds,
+        keep_attrs=True,
+        skipna=True,
+    )
+    xr.merge([ocean_out, atmos_out], compat="override").to_netcdf("data/all_regridded.nc", engine="h5netcdf")
+
+    print("ocean_out", ocean_out)
+    ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
+    plt.show()
+    ocean_out.tos.isel(time=0).plot()
+    plt.show()
 
 
 @timeit
@@ -421,6 +470,8 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
 if __name__ == "__main__":
     # get_ocean()
     # get_ocean()
-    get_all()
+    # get_all()
+    # regrid_2d_1degree()
+    print(xr.open_dataset("data/all_regridded.nc", engine="h5netcdf"))
     # regrid_2d()
     # print(xr.open_dataset("data/ocean.nc"))
