@@ -115,35 +115,73 @@ def get_data():
 
 @timeit
 def regrid_2d():
-    ocean_ds = xr.open_dataset("data/ocean.nc")
-    atmos_ds = xr.open_dataset("data/atmos.nc").isel(dcpp_init_year=0)
-    ocean_ds = ocean_ds  # .interp({"": "", "": ""}, method="nearest")
+    def open(name):
+        ds = xr.open_dataset(name)
+        ds = ds.drop_vars(
+            [
+                x
+                for x in [
+                    "x",
+                    "y",
+                    "lat_verticies",
+                    "lon_verticies",
+                    "lon_bounds",
+                    "time_bounds",
+                    "lat_bounds",
+                    "dcpp_init_year",
+                    "member_id",
+                ]
+                if x in ds
+            ]
+        ).isel(y=slice(1, -1))
+        return ds
+
+    ocean_ds = open("data/ocean.nc")
+    atmos_ds = open("data/atmos.nc").isel(dcpp_init_year=0)
     # .rename({"nlat": "lat", "nlon": "lon"})
     print("ocean_ds", ocean_ds)
-    ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
+    # ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)
-    new_coords = (
-        (
-            atmos_ds[["lat", "lon", "lon_bounds", "lat_bounds"]].drop_vars(
-                ["dcpp_init_year", "member_id"]
-            )
-        )
-        .rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
-        .drop_vars(["x", "y"])
-        .set_coords(["lon", "lat"])
-    )
+    new_coords = (atmos_ds[["lat", "lon"]]).set_coords(["lon", "lat"])
     print("new_coords", new_coords)
 
     regridder = xe.Regridder(ocean_ds, new_coords, "bilinear", periodic=True)
     print(regridder)
     ocean_out = regridder(
-        ocean_ds.drop_vars(["x", "y"]).set_coords(["lon", "lat"]),
+        ocean_ds.set_coords(["lon", "lat"]),
         keep_attrs=True,
         skipna=True,
-    )
-    print(ocean_out)
+    ).set_coords(["lon", "lat"])
+    print("ocean_out", ocean_out)
     ocean_out.to_netcdf("data/ocean_regridded.nc")
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
+    plt.show()
+    atmos_ds["tos"] = ocean_out["tos"]
+    print(atmos_ds)
+
+    plot_ds = atmos_ds.isel(time=5, plev=0)
+    features = [["tos", "psl"], ["ta", "hus"]]
+    names = [
+        [plot_ds[features[x][y]].attrs["long_name"] for y in range(len(features[x]))]
+        for x in range(len(features))
+    ]
+    units = [
+        [plot_ds[features[x][y]].attrs["units"] for y in range(len(features[x]))]
+        for x in range(len(features))
+    ]
+    vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
+    super_titles = ["" for x in range(len(features))]
+    from sithom.plot import feature_grid
+
+    feature_grid(
+        plot_ds,
+        features,
+        units,
+        names,
+        vlim,
+        super_titles,
+        figsize=(12, 6),
+    )
     plt.show()
 
 
@@ -151,6 +189,11 @@ def regrid_2d():
 def regrid_1d(xesmf: bool = False):
     def open_1d(name):
         ds = xr.open_dataset(name)
+        # plt.imshow(ds.lat.values)
+        # plt.show()
+        # plt.imshow(ds.lon.values)
+        # plt.show()
+        # print("ds", name, ds)
         ds = ds.drop_vars(
             [
                 x
@@ -167,7 +210,7 @@ def regrid_1d(xesmf: bool = False):
                 ]
                 if x in ds
             ]
-        )  # .rename({"x": "lon", "y": "lat"})
+        ).isel(y=slice(1, -1))
         if xesmf:
             ds = ds.assign_coords({"lon": ds["x"], "lat": ds["y"]})
             return ds.drop_vars(["x", "y"])
@@ -184,6 +227,17 @@ def regrid_1d(xesmf: bool = False):
     plt.show()
     new_coords = atmos_ds[["lon", "lat"]]
     print("new_coords", new_coords)
+    plt.plot(new_coords.lat.values, label="new")
+    plt.plot(ocean_ds.lat.values, label="ocean")
+    plt.legend()
+    plt.title("lat")
+    plt.show()
+    plt.plot(new_coords.lon.values, label="new")
+    plt.plot(ocean_ds.lon.values, label="ocean")
+    plt.legend()
+    plt.title("lon")
+    plt.show()
+
     if xesmf:
         regridder = xe.Regridder(ocean_ds, new_coords, "nearest_s2d", periodic=True)
         print(regridder)
@@ -194,7 +248,8 @@ def regrid_1d(xesmf: bool = False):
         )
     else:
         ocean_out = ocean_ds.interp(
-            {"lon": new_coords.lon.values, "lat": new_coords.lat.values}, method="nearest"
+            {"lon": new_coords.lon.values, "lat": new_coords.lat.values},
+            method="nearest",
         )
     print("ocean_out", ocean_out)
     ocean_out.to_netcdf("data/ocean_regridded.nc")
@@ -203,7 +258,7 @@ def regrid_1d(xesmf: bool = False):
 
 
 @timeit
-def regrid_2d():
+def regrid_2d_diff():
     ocean_ds = xr.open_dataset("data/ocean.nc")
     atmos_ds = xr.open_dataset("data/atmos.nc").isel(dcpp_init_year=0)
     ocean_ds = ocean_ds  # .interp({"": "", "": ""}, method="nearest")
@@ -304,4 +359,4 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
 
 if __name__ == "__main__":
     # get_data()
-    regrid_1d()
+    regrid_2d()
