@@ -411,11 +411,11 @@ def regrid_1d(xesmf: bool = False):
 def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
     result = xr.apply_ufunc(
         pi,
-        ds["sst"],
-        ds["msl"],
+        ds["tos"],
+        ds["psl"] / 100,
         ds[dim],
-        ds["t"],
-        ds["q"],
+        ds["ta"],
+        ds["hus"] * 1000,
         kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=50, miss_handle=1),
         input_core_dims=[
             [],
@@ -466,12 +466,26 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
     )
     return out_ds
 
+@timeit
+def calc_pi_example():
+    ds = xr.open_dataset("data/all_regridded.nc", engine="h5netcdf") 
+    input = ds.isel(time=slice(0, 5)) # .bfill("plev").ffill("plev")
+    print("input", input)
+    input.tos.isel(time=0).plot(x="lon", y="lat")
+    plt.show()
+    input.hus.isel(time=0, plev=0).plot(x="lon", y="lat")
+    plt.show()
+    pi_ds = calculate_pi(input, dim="plev")
+    print(pi_ds)
+    pi_ds.vmax.plot(x="lon", y="lat", col="time", col_wrap=2)
+    plt.show()
+
 
 if __name__ == "__main__":
     # get_ocean()
     # get_ocean()
     # get_all()
     # regrid_2d_1degree()
-    print(xr.open_dataset("data/all_regridded.nc", engine="h5netcdf"))
+    calc_pi_example()
     # regrid_2d()
     # print(xr.open_dataset("data/ocean.nc"))
