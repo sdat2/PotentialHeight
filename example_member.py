@@ -488,6 +488,54 @@ def calc_pi_example():
     plt.show()
 
 
+def plot_features(plot_ds: xr.Dataset, features, units=None, names=None, vlim=None, super_titles=None) -> None:
+    if names is None:
+        names = [
+            [plot_ds[features[x][y]].attrs["long_name"] for y in range(len(features[x]))]
+            for x in range(len(features))
+        ]
+    if units is None:
+        units = [
+            [plot_ds[features[x][y]].attrs["units"] for y in range(len(features[x]))]
+            for x in range(len(features))
+        ]
+    if vlim is None:
+        vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
+    if super_titles is None:
+        super_titles = ["" for x in range(len(features))]
+
+    feature_grid(
+        plot_ds,
+        features,
+        units,
+        names,
+        vlim,
+        super_titles,
+        figsize=(12, 6),
+    )
+
+
+def plot_combined(time: str = "2015-01-15"):
+    plot_defaults()
+    ds = combined_data_timestep(time=time)
+    plot_features(ds.isel(plev=0,y=slice(20, -20)), [["tos", "ta"], ["psl", "hus"]], super_titles=["", "Pressure level = 1000 hPa"])
+    plt.savefig(f"img/combined-{time}.png")
+    plt.title()
+    plt.clf()
+
+
+def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
+    def open(name: str) -> xr.Dataset:
+        ds = (
+            xr.open_dataset(name, engine="h5netcdf").sel(time=time).isel(time=0)
+        )
+        return ds.drop_vars([x for x in ["time", "time_bounds", "nbnd"] if x in ds])
+
+    atmos_ds = open("data/atmos_new_regridded.nc")
+    ocean_ds = open("data/ocean_regridded.nc")
+    return xr.merge([ocean_ds, atmos_ds])
+
+
 if __name__ == "__main__":
     # get_ocean()
     # get_ocean()
@@ -497,17 +545,11 @@ if __name__ == "__main__":
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
-    def open(name):
-        ds = xr.open_dataset(name, engine="h5netcdf").sel(time="2015-01-15").isel(time=0)
-        return ds.drop_vars([x for x in ["time", "time_bounds", "nbnd"] if x in ds])
-
-    atmos_ds = open("data/atmos_new_regridded.nc")
-    ocean_ds = open("data/ocean_regridded.nc")
-    print(atmos_ds)
-    print(ocean_ds)
-    combined_ds = xr.merge([ocean_ds, atmos_ds])
-    print(combined_ds)
-    combined_ds.to_netcdf("data/combined.nc")
+    for times in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
+        plot_combined(time=times)
+    #print(combined_data_timestep(time="2015-01-15"))
+    #print(combined_data_timestep(time="1850-01-15"))
+    #print(combined_data_timestep(time="2099-01-15"))
 
     # atmos_ds.psl.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
