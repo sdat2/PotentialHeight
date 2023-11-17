@@ -422,7 +422,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
         ds[dim],
         ds["ta"],
         ds["hus"] * 1000,
-        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=50, miss_handle=1),
+        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=100, miss_handle=1),
         input_core_dims=[
             [],
             [],
@@ -492,15 +492,26 @@ if __name__ == "__main__":
     # get_ocean()
     # get_ocean()
     # get_all()
-    regrid_2d_1degree()
+    # regrid_2d_1degree()
     # calc_pi_example()
-    ds = xr.open_dataset("data/ocean_regridded.nc")
-    ds.tos.isel(time=0).plot(x="lon", y="lat")
-    plt.show()
+    # ds = xr.open_dataset("data/ocean_regridded.nc")
+    # ds.tos.isel(time=0).plot(x="lon", y="lat")
+    # plt.show()
+    def open(name):
+        ds = xr.open_dataset(name, engine="h5netcdf").sel(time="2015-01-15").isel(time=0)
+        return ds.drop_vars([x for x in ["time", "time_bounds", "nbnd"] if x in ds])
 
-    ds = xr.open_dataset("data/atmos_new_regridded.nc")
-    ds.psl.isel(time=0).plot(x="lon", y="lat")
-    plt.show()
+    atmos_ds = open("data/atmos_new_regridded.nc")
+    ocean_ds = open("data/ocean_regridded.nc")
+    print(atmos_ds)
+    print(ocean_ds)
+    combined_ds = xr.merge([ocean_ds, atmos_ds])
+    print(combined_ds)
+    combined_ds.to_netcdf("data/combined.nc")
+
+    # atmos_ds.psl.isel(time=0).plot(x="lon", y="lat")
+    # plt.show()
+
     # calc_pi_example()
     # regrid_2d()
     # print(xr.open_dataset("data/ocean.nc"))
