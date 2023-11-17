@@ -47,7 +47,7 @@ def convert(ds: xr.Dataset) -> xr.Dataset:
         ds = ds.set_coords(["plev"])
         ds["plev"] = ds["plev"] / 100
         ds["plev"].attrs["units"] = "hPa"
-        ds.rename({"plev": "p"}).to_netcdf("data/combined.nc")
+        ds = ds.rename({"plev": "p"})
     return ds
 
 
@@ -446,15 +446,15 @@ def regrid_1d(xesmf: bool = False):
 
 
 @timeit
-def calculate_pi(ds: xr.Dataset, dim: str = "plev") -> xr.Dataset:
+def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
     result = xr.apply_ufunc(
         pi,
-        ds["tos"],
-        ds["psl"] / 100,
+        ds["sst"],
+        ds["msl"],
         ds[dim],
-        ds["ta"],
-        ds["hus"] * 1000,
-        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=100, miss_handle=1),
+        ds["t"],
+        ds["q"],
+        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=50, miss_handle=1),
         input_core_dims=[
             [],
             [],
@@ -564,6 +564,25 @@ def plot_combined(time: str = "2015-01-15"):
     plt.clf()
 
 
+def plot_pi(time: str = "2015-01-15"):
+    plot_defaults()
+    ds = convert(combined_data_timestep(time=time))
+    print(ds)
+    pi_ds = calculate_pi(ds, dim="p")
+    for var in pi_ds:
+        if "standard_name" in pi_ds[var].attrs:
+            pi_ds[var].attrs["long_name"] = pi_ds[var].attrs["standard_name"]
+    print(pi_ds)
+    plot_features(
+        pi_ds.isel(y=slice(20, -20)),
+        [["vmax", "pmin"], ["t0", "otl"]],
+        super_titles=["", ""],
+    )
+    plt.suptitle(time)
+    plt.savefig(f"img/pi-{time}.png")
+    plt.clf()
+
+
 @timeit
 def plot_example():
     plot_defaults()
@@ -574,8 +593,17 @@ def plot_example():
     print(ds)
     plot_features(ds, [["sst", "t"], ["msl", "q"]], super_titles=["", ""])
     plt.suptitle("month=9")
-    plt.savefig(f"img/sample-tcpypi.png")
-
+    plt.savefig(f"img/sample-input.png")
+    plt.clf()
+    ds = xr.open_dataset("../tcpypi/data/sample_data.nc").isel(month=9)
+    pi_ds = calculate_pi(ds, dim="p")
+    for var in pi_ds:
+        if "standard_name" in pi_ds[var].attrs:
+            pi_ds[var].attrs["long_name"] = pi_ds[var].attrs["standard_name"]
+    print(pi_ds)
+    plot_features(pi_ds, [["vmax", "pmin"], ["t0", "otl"]], super_titles=["", ""])
+    plt.suptitle("month=9")
+    plt.savefig(f"img/sample-pi.png")
     plt.clf()
 
 
@@ -602,7 +630,7 @@ if __name__ == "__main__":
 
     for time in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
         # print(convert(combined_data_timestep(time=time)))
-        plot_combined(time=time)
+        plot_pi(time=time)
     # print(combined_data_timestep(time="2015-01-15"))
     # print(combined_data_timestep(time="1850-01-15"))
     # print(combined_data_timestep(time="2099-01-15"))
