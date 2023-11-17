@@ -1,6 +1,7 @@
 from typing import Dict
 import xarray as xr
 from tcpyPI import pi
+from typing import Tuple
 import intake
 import dask
 import xesmf as xe
@@ -583,6 +584,56 @@ def plot_pi(time: str = "2015-01-15"):
     plt.clf()
 
 
+def elevate_standards(ds: xr.Dataset) -> xr.Dataset:
+    for var in ds:
+        if "standard_name" in ds[var].attrs:
+            ds[var].attrs["long_name"] = ds[var].attrs["standard_name"]
+    return ds
+
+
+def propagate_names(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
+    for var in ds_old:
+        if var in ds_new:
+            if "units" in ds_old[var].attrs:
+                ds_new[var].attrs["units"] = ds_old[var].attrs["units"]
+            elif "units" not in ds_new[var].attrs:
+                ds_new[var].attrs["units"] = ""
+            if "long_name" in ds_old[var].attrs:
+                ds_new[var].attrs["long_name"] = ds_old[var].attrs["long_name"]
+            if "standard_name" in ds_old[var].attrs:
+                ds_new[var].attrs["standard_name"] = ds_old[var].attrs["standard_name"]
+    return ds_new
+
+
+@timeit
+def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")):
+    plot_defaults()
+    ds_l = [convert(combined_data_timestep(time=time)) for time in times]
+    pi_ds_l = [elevate_standards(calculate_pi(ds, dim="p")) for ds in ds_l]
+    diff_ds = ds_l[1] - ds_l[0]
+    pi_diff_ds = pi_ds_l[1] - pi_ds_l[0]
+    diff_ds = propagate_names(ds_l[0], diff_ds)
+    pi_diff_ds = propagate_names(pi_ds_l[0], pi_diff_ds)
+    print(diff_ds)
+    print(pi_diff_ds)
+    plot_features(
+        pi_diff_ds.isel(y=slice(20, -20)),
+        [["vmax", "pmin"], ["t0", "otl"]],
+        super_titles=["", ""],
+    )
+    plt.suptitle(f"{times[1]}-{times[0]}")
+    plt.savefig(f"img/pi-diff-{times[1]}-{times[0]}.png")
+    plt.clf()
+    plot_features(
+        diff_ds.isel(y=slice(20, -20)).isel(p=0),
+        [["sst", "t"], ["msl", "q"]],
+        super_titles=["", ""],
+    )
+    plt.suptitle(f"{times[1]}-{times[0]}")
+    plt.savefig(f"img/diff-{times[1]}-{times[0]}.png")
+    plt.clf()
+
+
 @timeit
 def plot_example():
     plot_defaults()
@@ -626,11 +677,13 @@ if __name__ == "__main__":
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
-    plot_example()
+    # plot_example()
 
-    for time in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
-        # print(convert(combined_data_timestep(time=time)))
-        plot_pi(time=time)
+    plot_diffs()
+
+    #for time in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
+    #    # print(convert(combined_data_timestep(time=time)))
+    #    plot_pi(time=time)
     # print(combined_data_timestep(time="2015-01-15"))
     # print(combined_data_timestep(time="1850-01-15"))
     # print(combined_data_timestep(time="2099-01-15"))
