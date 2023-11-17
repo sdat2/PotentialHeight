@@ -17,7 +17,26 @@ from sithom.plot import feature_grid, plot_defaults
 # ta: Air Temperature [K] [to degC]
 # psl: Sea Level Pressure [Pa] [to hPa]
 # calculate PI over the whole data set using the xarray universal function
-conversion_dict: Dict[str, str] = {"tos": "sst", "hus": "q", "ta": "t", "psl": "msl"}
+conversion_names: Dict[str, str] = {"tos": "sst", "hus": "q", "ta": "t", "psl": "msl"}
+conversion_multiples: Dict[str, float] = {"hus": 1000, "psl": 0.01, #"plev": 0.01
+                                          }
+conversion_additions: Dict[str, float] = {"ta": -273.15}
+conversion_units: Dict[str, str] = {"hus": "g/kg", "psl": "hPa", "tos": "degC", "ta": "degC", #"plev": "hPa"
+                                    }
+
+@timeit
+def convert(ds: xr.Dataset) -> xr.Dataset:
+    for var in conversion_multiples:
+        if var in ds:
+            ds[var] *= conversion_multiples[var]
+    for var in conversion_additions:
+        if var in ds:
+            ds[var] += conversion_additions[var]
+    for var in conversion_units:
+        if var in ds:
+            ds[var].attrs["units"] = conversion_units[var]
+    ds = ds.rename(conversion_names)
+    return ds
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
 url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
@@ -38,7 +57,7 @@ def get_atmos():
         institution_id="NCAR",
         member_id="r10i1p1f1",
         source_id="CESM2",
-        variable_id=conversion_dict.keys(),
+        variable_id=conversion_names.keys(),
         # grid_label="gn",
     )
 
@@ -80,7 +99,7 @@ def get_all():
         institution_id="NCAR",
         member_id="r10i1p1f1",
         source_id="CESM2",
-        variable_id=conversion_dict.keys(),
+        variable_id=conversion_names.keys(),
         # grid_label="gn",
     )
 
@@ -120,7 +139,7 @@ def get_ocean():
         institution_id="NCAR",
         member_id="r10i1p1f1",
         source_id="CESM2",
-        variable_id=conversion_dict.keys(),
+        variable_id=conversion_names.keys(),
         # dcpp_init_year="20200528",
         grid_label="gn",
     )
@@ -204,7 +223,7 @@ def regrid_2d_1degree():
         engine="h5netcdf",
         encoding={
             var: {"dtype": "float32", "zlib": True, "complevel": 9}
-            for var in conversion_dict.keys()
+            for var in conversion_names.keys()
             if var in atmos_ds
         },
     )
@@ -515,12 +534,13 @@ def plot_features(plot_ds: xr.Dataset, features, units=None, names=None, vlim=No
     )
 
 
+@timeit
 def plot_combined(time: str = "2015-01-15"):
     plot_defaults()
-    ds = combined_data_timestep(time=time)
-    plot_features(ds.isel(plev=0,y=slice(20, -20)), [["tos", "ta"], ["psl", "hus"]], super_titles=["", "Pressure level = 1000 hPa"])
+    ds = convert(combined_data_timestep(time=time).isel(plev=0))
+    plot_features(ds.isel(y=slice(20, -20)), [["sst", "t"], ["msl", "q"]], super_titles=["", ""])
     plt.savefig(f"img/combined-{time}.png")
-    plt.title()
+    plt.title(time)
     plt.clf()
 
 
@@ -545,8 +565,9 @@ if __name__ == "__main__":
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
-    for times in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
-        plot_combined(time=times)
+    for time in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
+        # print(convert(combined_data_timestep(time=time)))
+        plot_combined(time=time)
     #print(combined_data_timestep(time="2015-01-15"))
     #print(combined_data_timestep(time="1850-01-15"))
     #print(combined_data_timestep(time="2099-01-15"))
