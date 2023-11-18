@@ -236,7 +236,7 @@ def regrid_2d_1degree():
         format="NETCDF4",
         engine="h5netcdf",
         encoding={
-            var: {"dtype": "float32", "zlib": True, "complevel": 9}
+            var: {"dtype": "float32", "zlib": True, "complevel": 6}
             for var in conversion_names.keys()
             if var in atmos_ds
         },
@@ -669,17 +669,18 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
 
 
 if __name__ == "__main__":
+    # python example_member.py
     # get_ocean()
     # get_ocean()
     # get_all()
-    # regrid_2d_1degree()
+    regrid_2d_1degree()
     # calc_pi_example()
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
     # plot_example()
 
-    plot_diffs()
+    # plot_diffs()
 
     #for time in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
     #    # print(convert(combined_data_timestep(time=time)))
