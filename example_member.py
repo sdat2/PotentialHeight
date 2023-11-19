@@ -64,7 +64,7 @@ CKCD: float = 0.9
 
 
 @timeit
-def get_atmos():
+def get_atmos() -> None:
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
         table_id=["Amon"],  # , "Omon"],
@@ -106,7 +106,7 @@ def get_atmos():
 
 
 @timeit
-def get_all():
+def get_all() -> None:
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
         table_id=["Amon", "Omon"],
@@ -146,7 +146,7 @@ def get_all():
 
 
 @timeit
-def get_ocean():
+def get_ocean() -> None:
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
         table_id=["Omon"],
@@ -187,13 +187,13 @@ def get_ocean():
 
 
 @timeit
-def get_data():
+def get_data() -> None:
     get_ocean()
     get_atmos()
 
 
 @timeit
-def regrid_2d_1degree():
+def regrid_2d_1degree() -> None:
     plot_defaults()
 
     def open(name):
@@ -254,7 +254,7 @@ def regrid_2d_1degree():
 
 
 @timeit
-def regrid_2d():
+def regrid_2d() -> None:
     plot_defaults()
 
     def open(name):
@@ -377,7 +377,7 @@ def regrid_2d():
 
 
 @timeit
-def regrid_1d(xesmf: bool = False):
+def regrid_1d(xesmf: bool = False) -> None:
     def open_1d(name):
         ds = xr.open_dataset(name)
         # plt.imshow(ds.lat.values)
@@ -507,7 +507,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
 
 
 @timeit
-def calc_pi_example():
+def calc_pi_example() -> None:
     ds = xr.open_dataset("data/all_regridded.nc", engine="h5netcdf")
     input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
@@ -554,7 +554,7 @@ def plot_features(
 
 
 @timeit
-def plot_combined(time: str = "2015-01-15"):
+def plot_combined(time: str = "2015-01-15") -> None:
     plot_defaults()
     ds = convert(combined_data_timestep(time=time).isel(plev=0))
     plot_features(
@@ -565,7 +565,7 @@ def plot_combined(time: str = "2015-01-15"):
     plt.clf()
 
 
-def plot_pi(time: str = "2015-01-15"):
+def plot_pi(time: str = "2015-01-15") -> None:
     plot_defaults()
     ds = convert(combined_data_timestep(time=time))
     print(ds)
@@ -606,7 +606,7 @@ def propagate_names(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
 
 
 @timeit
-def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")):
+def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")) -> None:
     plot_defaults()
     ds_l = [convert(combined_data_timestep(time=time)) for time in times]
     pi_ds_l = [elevate_standards(calculate_pi(ds, dim="p")) for ds in ds_l]
@@ -635,7 +635,7 @@ def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")):
 
 
 @timeit
-def plot_example():
+def plot_example() -> None:
     plot_defaults()
     ds = xr.open_dataset("../tcpypi/data/sample_data.nc").isel(p=0, month=9)
     for var in ds:
