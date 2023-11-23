@@ -59,6 +59,7 @@ def plot_w22_func():
 
 if __name__ == "__main__":
     # python ps.py
+    # 
     bi = bisection(g, 1, 10, 1e-5)
     print(bi, g(bi))
     bi = bisection(wang_diff(), 0.01, 3, 1e-5)
