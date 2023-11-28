@@ -3,20 +3,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-
 def g(y):
     return 5 * y - np.exp(y)
+
 
 def w22_func(a: float = 0.062, b: float = 0.031, c: float = 0.008) -> Callable:
     def f(y: float) -> float:
         return np.exp(a * y + b * np.log(y) * y + c)
-    return f
 
+    return f
 
 
 def wang_diff(a: float = 0.062, b: float = 0.031, c: float = 0.008) -> Callable:
     def f(y: float) -> float:
         return y - np.exp(a * y + b * np.log(y) * y + c)
+
     return f
 
 
@@ -57,15 +58,91 @@ def plot_w22_func():
     plt.show()
 
 
+def a_param(
+    near_surface_saturation_vapour_presure: float,
+    near_surface_air_temperature: float,
+    latent_heat_of_vaporization: float,
+    gas_constant_for_water_vapor: float,
+    beta_lift_parameterization,
+    carnot_efficiency: float,
+    efficiency_relative_to_carnot: float,
+    pressure_at_inflow: float,
+) -> float:
+    return (
+        near_surface_saturation_vapour_presure
+        / pressure_at_inflow
+        * efficiency_relative_to_carnot
+        * carnot_efficiency
+        * (
+            latent_heat_of_vaporization / gas_constant_for_water_vapor
+            - near_surface_air_temperature
+        )
+        / (
+            (
+                beta_lift_parameterization
+                - efficiency_relative_to_carnot * carnot_efficiency
+            )
+            * near_surface_air_temperature
+        )
+    )
+
+
+def b_param(
+    near_surface_saturation_vapour_presure: float,
+    beta_lift_parameterization,
+    carnot_efficiency: float,
+    efficiency_relative_to_carnot: float,
+    pressure_at_inflow: float,
+) -> float:
+    return (
+        near_surface_saturation_vapour_presure
+        / pressure_at_inflow
+        / (
+            beta_lift_parameterization
+            - efficiency_relative_to_carnot * carnot_efficiency
+        )
+    )
+
+
+def c_param(
+    near_surface_air_temperature: float,
+    gas_constant: float,
+    coriolis_parameter: float,
+    carnot_efficiency: float,
+    efficiency_relative_to_carnot: float,
+    beta_lift_parameterization: float,
+    maximum_wind_speed: float,
+    radius_of_inflow: float,
+    radius_of_outflow: float,
+    absolute_angular_momentum_at_outflow: float,
+    absolute_angular_momentum_at_vmax: float,
+) -> float:
+    return (beta_lift_parameterization *(
+        0.5 * maximum_wind_speed ** 2
+        - 0.25* coriolis_parameter **2 * 
+        radius_of_inflow **2 
+        +  (absolute_angular_momentum_at_outflow**2 - absolute_angular_momentum_at_vmax**2) / radius_of_outflow ** 2
+        + 0.5 * coriolis_parameter * absolute_angular_momentum_at_vmax
+        )
+        / (
+            (
+                beta_lift_parameterization
+                - efficiency_relative_to_carnot * carnot_efficiency
+            )
+            * near_surface_air_temperature * gas_constant
+        )
+    )
+
+
 if __name__ == "__main__":
     # python ps.py
-    # 
+    #
     bi = bisection(g, 1, 10, 1e-5)
     print(bi, g(bi))
     bi = bisection(wang_diff(), 0.01, 3, 1e-5)
     if bi is not None:
         print(bi, wang_diff()(bi))
-    
+
     bi = bisection(wang_diff(), 6, 21, 1e-5)
     if bi is not None:
         print(bi, wang_diff()(bi))
