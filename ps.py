@@ -58,42 +58,60 @@ def plot_w22_func():
     plt.show()
 
 
+def buck(temp: float) -> float:  # temp in K -> saturation vapour pressure in Pa
+    # https://en.wikipedia.org/wiki/Arden_Buck_equation
+    temp = temp - 273.15
+    return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
+
+
+def carnot(temp_hot: float, temp_cold: float) -> float:
+    return (temp_hot - temp_cold) / temp_hot
+
+
+def absolute_angular_momentum(v: float, r: float, f: float) -> float:
+    return v * r + 0.5 * f * r**2
+
+
 def a_param(
-    near_surface_saturation_vapour_presure: float,
     near_surface_air_temperature: float,
     latent_heat_of_vaporization: float,
     gas_constant_for_water_vapor: float,
     beta_lift_parameterization,
-    carnot_efficiency: float,
+    outflow_temperature: float,
     efficiency_relative_to_carnot: float,
     pressure_dry_at_inflow: float,
 ) -> float:
+    near_surface_saturation_vapour_presure = buck(near_surface_air_temperature)
+    carnot_efficiency = carnot(near_surface_air_temperature, outflow_temperature)
     return (
         near_surface_saturation_vapour_presure
         / pressure_dry_at_inflow
-        * efficiency_relative_to_carnot
-        * carnot_efficiency
         * (
-            latent_heat_of_vaporization / gas_constant_for_water_vapor
-            - near_surface_air_temperature
+            efficiency_relative_to_carnot
+            * carnot_efficiency
+            * latent_heat_of_vaporization
+            / gas_constant_for_water_vapor
+            / near_surface_air_temperature
+            - 1
         )
         / (
             (
                 beta_lift_parameterization
                 - efficiency_relative_to_carnot * carnot_efficiency
             )
-            * near_surface_air_temperature
         )
     )
 
 
 def b_param(
-    near_surface_saturation_vapour_presure: float,
+    near_surface_air_temperature: float,
     beta_lift_parameterization,
-    carnot_efficiency: float,
+    outflow_temperature: float,
     efficiency_relative_to_carnot: float,
     pressure_dry_at_inflow: float,
 ) -> float:
+    near_surface_saturation_vapour_presure = buck(near_surface_air_temperature)
+    carnot_efficiency = carnot(near_surface_air_temperature, outflow_temperature)
     return (
         near_surface_saturation_vapour_presure
         / pressure_dry_at_inflow
@@ -108,7 +126,7 @@ def c_param(
     near_surface_air_temperature: float,
     gas_constant: float,
     coriolis_parameter: float,
-    carnot_efficiency: float,
+    outflow_temperature: float,
     efficiency_relative_to_carnot: float,
     beta_lift_parameterization: float,
     maximum_wind_speed: float,
@@ -117,23 +135,31 @@ def c_param(
     absolute_angular_momentum_at_outflow: float,
     absolute_angular_momentum_at_vmax: float,
 ) -> float:
-    return (beta_lift_parameterization *(
-        0.5 * maximum_wind_speed ** 2
-        - 0.25* coriolis_parameter **2 * 
-        radius_of_inflow **2 
-        +  (absolute_angular_momentum_at_outflow**2 - absolute_angular_momentum_at_vmax**2) / radius_of_outflow ** 2
-        + 0.5 * coriolis_parameter * absolute_angular_momentum_at_vmax
+    carnot_efficiency = carnot(near_surface_air_temperature, outflow_temperature)
+    return (
+        beta_lift_parameterization
+        * (
+            0.5 * maximum_wind_speed**2
+            - 0.25 * coriolis_parameter**2 * radius_of_inflow**2
+            + (
+                absolute_angular_momentum_at_outflow**2
+                - absolute_angular_momentum_at_vmax**2
+            )
+            / radius_of_outflow**2
+            + 0.5 * coriolis_parameter * absolute_angular_momentum_at_vmax
         )
         / (
             (
                 beta_lift_parameterization
                 - efficiency_relative_to_carnot * carnot_efficiency
             )
-            * near_surface_air_temperature * gas_constant
+            * near_surface_air_temperature
+            * gas_constant
         )
     )
 
-# w_cool = 0.002 [m/s] 
+
+# w_cool = 0.002 [m/s]
 # relative_humidity_environment = 0.9 [dimensionless]
 # supergradient_wind = 1.2 [dimensionless]
 # r_0 = np.inf [m]
@@ -149,13 +175,16 @@ def c_param(
 # vmax = 83 [m/s]
 # v_max = supergradient_wind * emanuel_vp
 
+
+print("buck299", buck(299))
+print("buck300", buck(300))
+
 a = a_param(
-    near_surface_saturation_vapour_presure=2586, # not given, chosen to fit
     near_surface_air_temperature=299,
     latent_heat_of_vaporization=2.27e6,
     gas_constant_for_water_vapor=461,
     beta_lift_parameterization=1.25,
-    carnot_efficiency= (299 - 200) / 299,
+    outflow_temperature=200,
     efficiency_relative_to_carnot=0.5,
     pressure_dry_at_inflow=985 * 100,
 )
@@ -164,9 +193,9 @@ print("a", a)
 print("0.062/a", 0.062 / a)
 
 b = b_param(
-    near_surface_saturation_vapour_presure=2586, # not given, chosen to fit
+    near_surface_air_temperature=299,
     beta_lift_parameterization=1.25,
-    carnot_efficiency= (299 - 200) / 299,
+    outflow_temperature=200,
     efficiency_relative_to_carnot=0.5,
     pressure_dry_at_inflow=985 * 100,
 )
@@ -176,17 +205,20 @@ c = c_param(
     near_surface_air_temperature=299,
     gas_constant=287,
     coriolis_parameter=5e-5,
-    carnot_efficiency= (299 - 200) / 299,
+    outflow_temperature=200,
     efficiency_relative_to_carnot=0.5,
     beta_lift_parameterization=1.25,
     maximum_wind_speed=83,
     radius_of_inflow=2193 * 1000,
     radius_of_outflow=np.inf,
     absolute_angular_momentum_at_outflow=0,
-    absolute_angular_momentum_at_vmax=83*64*1000 + 0.5*5e-5*(64*1000)**2 , # Vmax*rmax + f*rmax**2
+    absolute_angular_momentum_at_vmax=absolute_angular_momentum(83, 64 * 1000, 5e-5),
+    # 83 * 64 * 1000 + 0.5 * 5e-5 * (64 * 1000) ** 2,  # Vmax*rmax + f*rmax**2
 )
 
+
 print("c", c)
+
 
 # Run TCPI -> get emanuel_vp
 
