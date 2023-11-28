@@ -219,7 +219,66 @@ c = c_param(
 
 print("c", c)
 
+def abc(near_surface_air_temperature=299, # K
+        outflow_temperature=200, # K
+        latent_heat_of_vaporization=2.27e6, # J/kg
+        gas_constant_for_water_vapor=461, # J/kg/K
+        gas_constant=287, # J/kg/K
+        beta_lift_parameterization=1.25, # dimensionless
+        efficiency_relative_to_carnot=0.5,
+        pressure_dry_at_inflow=985 * 100,
+        coriolis_parameter=5e-5,
+        maximum_wind_speed=83,
+        radius_of_inflow=2193 * 1000,
+        radius_of_max_wind=64 * 1000,
+        ):
+    absolute_angular_momentum_at_vmax = absolute_angular_momentum(maximum_wind_speed, radius_of_max_wind, coriolis_parameter)
+    carnot_efficiency = carnot(near_surface_air_temperature, outflow_temperature)
+    near_surface_saturation_vapour_presure = buck(near_surface_air_temperature)
 
+    return ((
+        near_surface_saturation_vapour_presure
+        / pressure_dry_at_inflow
+        * (
+            efficiency_relative_to_carnot
+            * carnot_efficiency
+            * latent_heat_of_vaporization
+            / gas_constant_for_water_vapor
+            / near_surface_air_temperature
+            - 1
+        )
+        / (
+            (
+                beta_lift_parameterization
+                - efficiency_relative_to_carnot * carnot_efficiency
+            )
+        )
+    ), 
+            (
+            near_surface_saturation_vapour_presure
+            / pressure_dry_at_inflow
+            / (
+                beta_lift_parameterization
+                - efficiency_relative_to_carnot * carnot_efficiency
+            )
+        ),
+        (beta_lift_parameterization
+        * (
+            0.5 * maximum_wind_speed**2
+            - 0.25 * coriolis_parameter**2 * radius_of_inflow**2
+            + 0.5 * coriolis_parameter * absolute_angular_momentum_at_vmax
+        )
+        / (
+            (
+                beta_lift_parameterization
+                - efficiency_relative_to_carnot * carnot_efficiency
+            )
+            * near_surface_air_temperature
+            * gas_constant
+        ))
+    )
+
+print("abc", abc())
 # Run TCPI -> get emanuel_vp
 
 if __name__ == "__main__":
