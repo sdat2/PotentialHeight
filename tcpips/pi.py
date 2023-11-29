@@ -5,7 +5,7 @@ import xarray as xr
 from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
-from sithom.plot import feature_grid, plot_defaults
+from sithom.plot import feature_grid, plot_defaults, get_dim, axis_formatter
 from tcpips.constants import FIGURE_PATH
 from tcpips.pangeo import convert, regrid_2d_1degree
 
@@ -238,7 +238,7 @@ def gom() -> None:
     print("pi_ds", pi_ds)
 
     plot_defaults()
-    fig, axs = plt.subplots(1, 2, sharey=True)
+    fig, axs = plt.subplots(1, 2, sharey=True, figsize=get_dim(width=500, fraction_of_line_width=0.6, ratio=0.6180/0.6))
 
     axs[0].invert_yaxis()
     markers = ["x"] * 4 + ["+"] * 4 + ["*"] * 4
@@ -250,14 +250,39 @@ def gom() -> None:
         axs[0].plot(pi_ds.t0.isel(month=month) - 273.15, pi_ds.otl.isel(month=month), markers[month], color=colors[month], label="$T_{o}$ " + f"{months[month]}" )
         axs[1].plot(ds.q.isel(month=month), ds.p, lines[month], color=colors[month], label=months[month])  # , label="q")
 
-    axs[0].legend()
+    # axs[0].legend()
     axs[0].set_ylabel("Pressure [hPa]")
     axs[0].set_xlabel("Air Temperature, $T_a$ [$^{\circ}$C]")
     axs[1].set_xlabel("Specific Humidity, $q$ [g/kg]")
-    axs[0].legend()
+    # axs[0].legend()
     axs[1].legend()
     axs[1].set_ylim(1000, 0)
     plt.savefig(os.path.join(FIGURE_PATH, "sample-profile.png"))
+    plt.clf()
+    fig, axs = plt.subplots(4, 1, sharex=True, figsize=get_dim(width=500,fraction_of_line_width=0.5, ratio=0.6180/0.5))
+    axs[0].plot(ds.month-1, pi_ds.vmax, color="black")
+    axs[0].set_ylabel("$V_{\mathrm{max}}$ [m/s]")
+    axs[1].plot(ds.month-1, pi_ds.pmin, color="black")
+    axs[1].set_ylabel("$P_{\mathrm{min}}$ [hPa]")
+    #axs[2].plot(ds.month, pi_ds.t0 - 273.15, color="black")
+    # axs[3].plot(ds.month, pi_ds.otl, color="black")
+    axs[3].plot(ds.month-1, ds.sst, color="black")
+    axs[3].set_ylabel("$T_{\mathrm{SST}}$ [$^{\circ}$C]")
+    axs[2].plot(ds.month-1, ds.msl, color="black")
+    axs[2].set_ylabel("$P_s$ [hPa]")
+    axs[3].set_xlabel("Month")
+    axs[0].set_xlim(0,11)
+    axs[0].set_xticks(range(0,12), months)
+    for month in range(0, 12):
+        axs[0].plot(month, pi_ds.vmax.isel(month=month), markers[month], color=colors[month])
+        axs[1].plot(month, pi_ds.pmin.isel(month=month), markers[month], color=colors[month])
+        axs[3].plot(month, ds.sst.isel(month=month), markers[month], color=colors[month])
+        axs[2].plot(month, ds.msl.isel(month=month), markers[month], color=colors[month])
+    # format y ticks to scientific notation
+    #axs[1].yaxis.set_major_formatter(axis_formatter())
+    # axs[2].yaxis.set_major_formatter(axis_formatter())
+    plt.savefig(os.path.join(FIGURE_PATH, "sample-seasons.png"))
+    plt.clf()
 
 
 def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
