@@ -261,7 +261,7 @@ def gom() -> None:
     plt.clf()
     fig, axs = plt.subplots(4, 1, sharex=True, figsize=get_dim(width=500,fraction_of_line_width=0.5, ratio=0.6180/0.5))
     axs[0].plot(ds.month-1, pi_ds.vmax, color="black")
-    axs[0].set_ylabel("$V_{\mathrm{max}}$ [m/s]")
+    axs[0].set_ylabel("$V_{\mathrm{max}}$ [m s$^{-1}$]")
     axs[1].plot(ds.month-1, pi_ds.pmin, color="black")
     axs[1].set_ylabel("$P_{\mathrm{min}}$ [hPa]")
     #axs[2].plot(ds.month, pi_ds.t0 - 273.15, color="black")

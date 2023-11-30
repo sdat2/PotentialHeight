@@ -352,7 +352,7 @@ def ER11E04_nondim_r0input(
         r0, fcor, Cdvary, C_d, w_cool, Nr
     )
 
-    M0_E04 = 0.5 * fcor * r0**2
+    M0_E04 = 0.5 * fcor * r0**2 # why doesn't velocity appear here?
     print(M0_E04, type(M0_E04))
 
     # Step 2: Converge rmaxr0 geometrically until ER11 M/M0 has tangent point
