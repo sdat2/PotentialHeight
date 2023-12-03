@@ -58,6 +58,7 @@ unique = cat.unique()
 print("cat", cat)
 print("unique", unique)
 
+
 @timeit
 def get_atmos() -> None:
     cat_subset = cat.search(

@@ -112,7 +112,8 @@ while(soln_converged==0)
     iter = 0;
     rfracrm_min = 0;   %[-]; start at r=0
     rfracrm_max = 50;    %[-]; extend out to many rmaxs
-    while(abs(drmaxr0)>=drmaxr0_thresh)  %keep looping til changes in estimate are very small
+    while(abs(drmaxr0)>=drmaxr0_thresh)  
+        % keep looping til changes in estimate are very small
 
         iter = iter + 1;
 

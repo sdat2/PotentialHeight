@@ -11,6 +11,7 @@ from tcpips.pangeo import convert, regrid_2d_1degree
 
 CKCD: float = 0.9
 
+
 @timeit
 def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
     result = xr.apply_ufunc(
@@ -225,9 +226,8 @@ def plot_example() -> None:
 
 def gom() -> None:
     GOM = (25.443701, -90.013120)
-    ds = (
-        xr.open_dataset("../tcpypi/data/sample_data.nc")
-        .sel(lon=GOM[1], lat=GOM[0], method="nearest")
+    ds = xr.open_dataset("../tcpypi/data/sample_data.nc").sel(
+        lon=GOM[1], lat=GOM[0], method="nearest"
     )
     print("ds", ds)
 
@@ -238,17 +238,49 @@ def gom() -> None:
     print("pi_ds", pi_ds)
 
     plot_defaults()
-    fig, axs = plt.subplots(1, 2, sharey=True, figsize=get_dim(width=500, fraction_of_line_width=0.6, ratio=0.6180/0.6))
+    fig, axs = plt.subplots(
+        1,
+        2,
+        sharey=True,
+        figsize=get_dim(width=500, fraction_of_line_width=0.6, ratio=0.6180 / 0.6),
+    )
 
     axs[0].invert_yaxis()
     markers = ["x"] * 4 + ["+"] * 4 + ["*"] * 4
-    lines = ["-"]* 4 + ["--"] * 4 + [":"] * 4
+    lines = ["-"] * 4 + ["--"] * 4 + [":"] * 4
     colors = ["C0", "C1", "C2", "C3", "C4", "C5"] * 2
-    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    ]
     for month in range(0, 12):
-        axs[0].plot(ds.t.isel(month=month), ds.p, lines[month], color=colors[month])  # , label="t")
-        axs[0].plot(pi_ds.t0.isel(month=month) - 273.15, pi_ds.otl.isel(month=month), markers[month], color=colors[month], label="$T_{o}$ " + f"{months[month]}" )
-        axs[1].plot(ds.q.isel(month=month), ds.p, lines[month], color=colors[month], label=months[month])  # , label="q")
+        axs[0].plot(
+            ds.t.isel(month=month), ds.p, lines[month], color=colors[month]
+        )  # , label="t")
+        axs[0].plot(
+            pi_ds.t0.isel(month=month) - 273.15,
+            pi_ds.otl.isel(month=month),
+            markers[month],
+            color=colors[month],
+            label="$T_{o}$ " + f"{months[month]}",
+        )
+        axs[1].plot(
+            ds.q.isel(month=month),
+            ds.p,
+            lines[month],
+            color=colors[month],
+            label=months[month],
+        )  # , label="q")
 
     # axs[0].legend()
     axs[0].set_ylabel("Pressure [hPa]")
@@ -259,27 +291,40 @@ def gom() -> None:
     axs[1].set_ylim(1000, 0)
     plt.savefig(os.path.join(FIGURE_PATH, "sample-profile.png"))
     plt.clf()
-    fig, axs = plt.subplots(4, 1, sharex=True, figsize=get_dim(width=500,fraction_of_line_width=0.5, ratio=0.6180/0.5))
-    axs[0].plot(ds.month-1, pi_ds.vmax, color="black")
+    fig, axs = plt.subplots(
+        4,
+        1,
+        sharex=True,
+        figsize=get_dim(width=500, fraction_of_line_width=0.5, ratio=0.6180 / 0.5),
+    )
+    axs[0].plot(ds.month - 1, pi_ds.vmax, color="black")
     axs[0].set_ylabel("$V_{\mathrm{max}}$ [m s$^{-1}$]")
-    axs[1].plot(ds.month-1, pi_ds.pmin, color="black")
+    axs[1].plot(ds.month - 1, pi_ds.pmin, color="black")
     axs[1].set_ylabel("$P_{\mathrm{min}}$ [hPa]")
-    #axs[2].plot(ds.month, pi_ds.t0 - 273.15, color="black")
+    # axs[2].plot(ds.month, pi_ds.t0 - 273.15, color="black")
     # axs[3].plot(ds.month, pi_ds.otl, color="black")
-    axs[3].plot(ds.month-1, ds.sst, color="black")
+    axs[3].plot(ds.month - 1, ds.sst, color="black")
     axs[3].set_ylabel("$T_{\mathrm{SST}}$ [$^{\circ}$C]")
-    axs[2].plot(ds.month-1, ds.msl, color="black")
+    axs[2].plot(ds.month - 1, ds.msl, color="black")
     axs[2].set_ylabel("$P_s$ [hPa]")
     axs[3].set_xlabel("Month")
-    axs[0].set_xlim(0,11)
-    axs[0].set_xticks(range(0,12), months)
+    axs[0].set_xlim(0, 11)
+    axs[0].set_xticks(range(0, 12), months)
     for month in range(0, 12):
-        axs[0].plot(month, pi_ds.vmax.isel(month=month), markers[month], color=colors[month])
-        axs[1].plot(month, pi_ds.pmin.isel(month=month), markers[month], color=colors[month])
-        axs[3].plot(month, ds.sst.isel(month=month), markers[month], color=colors[month])
-        axs[2].plot(month, ds.msl.isel(month=month), markers[month], color=colors[month])
+        axs[0].plot(
+            month, pi_ds.vmax.isel(month=month), markers[month], color=colors[month]
+        )
+        axs[1].plot(
+            month, pi_ds.pmin.isel(month=month), markers[month], color=colors[month]
+        )
+        axs[3].plot(
+            month, ds.sst.isel(month=month), markers[month], color=colors[month]
+        )
+        axs[2].plot(
+            month, ds.msl.isel(month=month), markers[month], color=colors[month]
+        )
     # format y ticks to scientific notation
-    #axs[1].yaxis.set_major_formatter(axis_formatter())
+    # axs[1].yaxis.set_major_formatter(axis_formatter())
     # axs[2].yaxis.set_major_formatter(axis_formatter())
     plt.savefig(os.path.join(FIGURE_PATH, "sample-seasons.png"))
     plt.clf()
