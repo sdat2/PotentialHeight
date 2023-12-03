@@ -41,6 +41,6 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips"],
-    package_dir={"tcpips": "tcpips"},
+    packages=["tcpips", "chavas15"],
+    package_dir={"tcpips": "tcpips", "chavas15": "chavas15"},
 )
