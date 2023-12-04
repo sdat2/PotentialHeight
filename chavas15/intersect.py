@@ -66,10 +66,10 @@ def curveintersect(
 
 if __name__ == "__main__":
     # Example usage
-    x1 = np.random.rand(10)
-    y1 = np.random.rand(10)
-    x2 = np.random.rand(10)
-    y2 = np.random.rand(10)
+    x1 = np.random.rand(50)
+    y1 = np.random.rand(50)
+    x2 = np.random.rand(50)
+    y2 = np.random.rand(50)
 
     import matplotlib.pyplot as plt
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     plt.plot(x2, y2, color="blue")
 
     x, y = curveintersect(x1, y1, x2, y2)
-    print(x)
+    print(x, len(x))
     plt.plot(x, y, "o", color="black")
     plt.xlabel("x")
     plt.ylabel("y")

@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.interpolate import pchip_interpolate
-from .radprof_raw import ER11_radprof_raw
+from chavas15.er11.radprof_raw import ER11_radprof_raw
 
 
 def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
@@ -53,4 +53,13 @@ def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
 # Example usage
 # V_ER11, r_out = ER11_radprof(Vmax_ER11, r0_ER11, 'r0', fcor, CkCd, rr_mean)
 
-# Note: You will need to define the function `ER11_radprof_raw` in Python as well.
+if __name__ == "__main__":
+    # python chavas15/er11/radprof.py
+    # some made up inputs (not currently working).
+    Vmax_ER11 = 80  # [m s-1]
+    r0_ER11 = 2500 * 1000  # [m]
+    CkCd = 0.9  # [dimensionless]
+    fcor = 5e-5  # [s-1]
+    rr_mean = np.linspace(1000, 2500 * 1000, num=100)
+
+    V_ER11, r_out = ER11_radprof(Vmax_ER11, r0_ER11, "r0", fcor, CkCd, rr_mean)

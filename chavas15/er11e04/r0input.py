@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
+from chavas15.e04.outerwind_r0input_MM0 import E04_outerwind_r0input_nondim_MM0
+from chavas15.er11.radprof import ER11_radprof
 
 
 def ER11E04_nondim_r0input(
@@ -39,19 +41,19 @@ def ER11E04_nondim_r0input(
     # MMfracM0 = interpolator(rrfracr0)
 
     # Return the calculated values
-    # return rr, VV, rmax, rmerge, Vmerge, rrfracr0, MMfracM0, rmaxr0, MmM0, rmerger0, MmergeM0
-
-
-# Placeholder for the sub-function, needs to be defined
-def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr):
-    # Implement the logic for this function
-    pass
-
-
-# Placeholder for the sub-function, needs to be defined
-def ER11_radprof(Vmax, rmax, rmax_or_r0, fcor, CkCd, rr):
-    # Implement the logic for this function
-    pass
+    return (
+        rr,
+        VV,
+        rmax,
+        rmerge,
+        Vmerge,
+        rrfracr0,
+        MMfracM0,
+        rmaxr0,
+        MmM0,
+        rmerger0,
+        MmergeM0,
+    )
 
 
 # Example usage

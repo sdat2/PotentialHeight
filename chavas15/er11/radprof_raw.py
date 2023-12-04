@@ -3,17 +3,21 @@ from scipy.optimize import fsolve
 from scipy.interpolate import pchip_interpolate
 
 
-def ER11_radprof_raw(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
+def ER11_radprof_raw(
+    Vmax: float, r_in: float, rmax_or_r0: str, fcor: float, CkCd: float, rr_ER11
+):
     fcor = abs(fcor)
     r_out = None
 
     if rmax_or_r0 == "r0":
         r0 = r_in
+        # Assume V>>fr (ER11, e.q. 38)
         rmax_simple = ((0.5 * fcor * r0**2) / Vmax) * (
             (0.5 * CkCd) ** (1 / (2 - CkCd))
         )
 
         def equation(rmax_var):
+            # Full solution for rmax-r0 relationship (ER11 Eq. 37 with M_max including fcor term).
             left_side = (
                 (0.5 * fcor * r0**2) / (Vmax * rmax_var + 0.5 * fcor * rmax_var**2)
             ) ** (2 - CkCd)
