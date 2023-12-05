@@ -47,6 +47,13 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
         MfracM0_temp -= dMfracM0_drfracr0_temp * drfracr0
         MMfracM0[-ii - 1] = MfracM0_temp
 
+    if True:
+        import matplotlib.pyplot as plt
+        plt.plot(rrfracr0, MMfracM0)
+        plt.xlabel("rrfracr0")
+        plt.ylabel("MMfracM0")
+        plt.savefig("e04_r0input_MM0.pdf")
+
     return rrfracr0, MMfracM0
 
 

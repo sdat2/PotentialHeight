@@ -1,17 +1,28 @@
 import numpy as np
 from scipy.interpolate import interp1d
+from sithom.time import timeit
 from chavas15.e04.outerwind_r0input_MM0 import E04_outerwind_r0input_nondim_MM0
 from chavas15.er11.radprof import ER11_radprof
 from chavas15.intersect import curveintersect
 
 
+@timeit
 def ER11E04_nondim_r0input(
-    Vmax, r0, fcor, Cdvary, C_d, w_cool, CkCdvary, CkCd, eye_adj, alpha_eye
+    Vmax: float,
+    r0: float,
+    fcor: float,
+    Cdvary: float,
+    C_d: float,
+    w_cool: float,
+    CkCdvary: bool,
+    CkCd: float,
+    eye_adj: bool,
+    alpha_eye: bool,
 ):
     fcor = abs(fcor)
 
     # Overwrite CkCd if want varying (quadratic fit to Vmax from Chavas et al. 2015)
-    if CkCdvary == 1:
+    if CkCdvary:
         CkCd_coefquad = 5.5041e-04
         CkCd_coeflin = -0.0259
         CkCd_coefcnst = 0.7627
@@ -34,6 +45,9 @@ def ER11E04_nondim_r0input(
     # This step involves several iterations and calls to other functions like ER11_radprof
     # The detailed implementation of this step will depend on the logic and calculation specifics of the original MATLAB code
 
+    rmerger0 = None
+    var = None
+
     soln_converged = False
     while not soln_converged:
         # break up into 3 points, take 2 between which intersection vanishes, repat until this converges.
@@ -49,11 +63,13 @@ def ER11E04_nondim_r0input(
         while abs(drmaxr0) >= drmaxr0_thresh:
             i += 1
             rmax = rmaxr0_new * r0
-            drfacrm = 0.01
+            drfracrm = 0.01
             if rmax > 100 * 1000:  # large storm > 100km to rmax
                 drfracrm = drfracrm / 10  # extra precision for large storm
             rrfracrm_ER11 = np.linspace(
-                rfracrm_min, rfracrm_max, num=(rfracrm_max - rfracrm_min) // drfacrm
+                rfracrm_min,
+                rfracrm_max,
+                num=int((rfracrm_max - rfracrm_min) // drfracrm),
             )
             rr_ER11 = rrfracrm_ER11 * rmax
             rmax_or_r0 = "rmax"
@@ -85,6 +101,7 @@ def ER11E04_nondim_r0input(
             soln_converged = False
             CkCd = CkCd + 0.1
             print("Adjusting CkCd to find convergence.")
+
     M0 = 0.5 * fcor * r0**2
     Mm = 0.5 * fcor * rmax**2 + rmax * Vmax
     MmM0 = Mm / M0
@@ -97,13 +114,14 @@ def ER11E04_nondim_r0input(
 
     # Final Step: Implement interpolation and calculation of final outputs
     # This will involve using the interp1d function from SciPy and the results from the previous steps
+
     drfracrm = 0.01
     rfracrm_min = 0
     rfracrm_max = r0 / rmax
     rrfracrm = np.linspace(
         rfracrm_min,
         rfracrm_max + drfracrm,
-        num=(rfracrm_max, +drfacrm - rfracrm_min) // drfracrm,
+        num=int((rfracrm_max, +drfracrm - rfracrm_min) // drfracrm),
     )
 
     MMfracMm = interp1d(
@@ -119,10 +137,12 @@ def ER11E04_nondim_r0input(
 
     VV = (Mm / rmax) * (MMfracMm / rrfracrm) - 0.5 * fcor * rmax * rrfracrm
     rr = rrfracrm * rmax
-    VV[0] = 0
 
-    rmerge = rmerger0 * r0
-    Vmerge = (M0 / r0) * ((MmergeM0 / rmerger0) - rmerger0)
+    # Make sure V-0 at r=0
+    VV[rr == 0] = 0
+
+    rmerge = rmerger0 * r0  # [m]
+    Vmerge = (M0 / r0) * ((MmergeM0 / rmerger0) - rmerger0)  # [m s-1]
 
     # Return the calculated values
     return (

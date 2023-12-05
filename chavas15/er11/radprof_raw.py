@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.optimize import fsolve
 from scipy.interpolate import pchip_interpolate
+from sithom.time import timeit
 
 
+@timeit
 def ER11_radprof_raw(
     Vmax: float, r_in: float, rmax_or_r0: str, fcor: float, CkCd: float, rr_ER11
 ):
@@ -47,7 +49,18 @@ def ER11_radprof_raw(
 
     elif rmax_or_r0 == "rmax":
         i_rmax = np.argmax(V_ER11)
-        r0_profile = pchip_interpolate(V_ER11[i_rmax + 1 :], rr_ER11[i_rmax + 1 :], 0)
+        if True:
+            import matplotlib.pyplot as plt
+            plt.plot(rr_ER11[i_rmax + 1 :], V_ER11[i_rmax + 1 :])
+            print(rr_ER11[i_rmax + 1 :])
+            plt.xlabel("rr_ER11")
+            plt.ylabel("V_ER11")
+            plt.savefig("er11_raw_test.pdf")
+            plt.clf()
+            plt.plot(rr_ER11[i_rmax + 1 :-1] - rr_ER11[i_rmax + 2 :])
+            plt.savefig("er11_raw_test2.pdf")
+            plt.clf()
+        r0_profile = pchip_interpolate(V_ER11[i_rmax + 1 :][::-1], rr_ER11[i_rmax + 1 :][::-1], [0])
         r_out = r0_profile
 
     return V_ER11, r_out

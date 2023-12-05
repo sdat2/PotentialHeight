@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.interpolate import pchip_interpolate
+from sithom.time import timeit
 from chavas15.er11.radprof_raw import ER11_radprof_raw
 
 
+@timeit
 def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
     dr = rr_ER11[1] - rr_ER11[0]
 
