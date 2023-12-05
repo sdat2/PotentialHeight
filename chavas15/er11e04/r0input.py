@@ -92,13 +92,37 @@ def ER11E04_nondim_r0input(
     ii_E04 = rrfracr0_E04 >= rmerger0 and MMfracM0_E04 > MmergeM0
     rrfracr0_temp = np.concat([rrfracr0_ER11(ii_ER11), rrfracr0_E04(ii_E04)])
     MMfracM0_temp = np.concat([MMfracM0_ER11(ii_ER11), MMfracM0_E04(ii_E04)])
+    del ii_E04
+    del ii_ER11
 
     # Final Step: Implement interpolation and calculation of final outputs
     # This will involve using the interp1d function from SciPy and the results from the previous steps
+    drfracrm = 0.01
+    rfracrm_min = 0
+    rfracrm_max = r0 / rmax
+    rrfracrm = np.linspace(
+        rfracrm_min,
+        rfracrm_max + drfracrm,
+        num=(rfracrm_max, +drfacrm - rfracrm_min) // drfracrm,
+    )
+
+    MMfracMm = interp1d(
+        rrfracr0_temp * (r0 / rmax), MMfracM0_temp * (M0 / Mm), rrfracrm, "pchip"
+    )
+
+    rrfracr0 = rrfracrm * rmax / r0
+    MMfracM0 = MMfracMm * Mm / M0
 
     # Example of interpolation (details depend on the actual data and logic)
     # interpolator = interp1d(rrfracr0_temp, MMfracM0_temp, kind='cubic')
     # MMfracM0 = interpolator(rrfracr0)
+
+    VV = (Mm / rmax) * (MMfracMm / rrfracrm) - 0.5 * fcor * rmax * rrfracrm
+    rr = rrfracrm * rmax
+    VV[0] = 0
+
+    rmerge = rmerger0 * r0
+    Vmerge = (M0 / r0) * ((MmergeM0 / rmerger0) - rmerger0)
 
     # Return the calculated values
     return (
