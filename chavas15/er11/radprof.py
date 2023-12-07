@@ -6,9 +6,10 @@ from chavas15.er11.radprof_raw import ER11_radprof_raw
 
 @timeit
 def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
+    # find increment in rr_ER11 vector
     dr = rr_ER11[1] - rr_ER11[0]
 
-    # Call ER11_radprof_raw (This function needs to be defined in Python)
+    # Call ER11_radprof_raw to get velocity profile and the radius not given as input.
     V_ER11, r_out = ER11_radprof_raw(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11)
 
     # Calculate error in r_in
@@ -24,12 +25,16 @@ def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
     r_in_save = r_in
     Vmax_save = Vmax
 
+    # r_in first
     n_iter = 0
-    while abs(drin_temp) > dr / 2 or abs(dVmax_temp / Vmax_save) >= 1e-2:
+    while (
+        abs(drin_temp) > dr / 2 or abs(dVmax_temp / Vmax_save) >= 1e-2 and n_iter < 21
+    ):
         n_iter += 1
         if n_iter > 20:
             # Convergence not achieved, return NaNs
-            return np.full_like(rr_ER11, np.nan), np.nan
+            V_ER11 = np.full_like(rr_ER11, np.nan)
+            r_out = np.nan
 
         r_in += drin_temp
 
@@ -44,6 +49,7 @@ def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
         V_ER11, r_out = ER11_radprof_raw(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11)
         Vmax_prof = np.max(V_ER11)
         dVmax_temp = Vmax_save - Vmax_prof
+
         if rmax_or_r0 == "rmax":
             drin_temp = r_in_save - rr_ER11[np.argmax(V_ER11 == Vmax_prof)]
         elif rmax_or_r0 == "r0":

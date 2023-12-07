@@ -70,7 +70,8 @@ hold off
 
 %%r_in first
 n_iter = 0;
-while(abs(drin_temp)>dr/2 || abs(dVmax_temp/Vmax_save)>=10^-2) %if error is sufficiently large; NOTE: FIRST ARGUMENT MUST BE ">" NOT ">=" or else rmax values at exactly dr/2 intervals (e.g. 10.5 for dr=1 km) will not converge
+while(abs(drin_temp)>dr/2 || abs(dVmax_temp/Vmax_save) >= 10^-2) 
+    %if error is sufficiently large; NOTE: FIRST ARGUMENT MUST BE ">" NOT ">=" or else rmax values at exactly dr/2 intervals (e.g. 10.5 for dr=1 km) will not converge
 
     %drin_temp/1000
     

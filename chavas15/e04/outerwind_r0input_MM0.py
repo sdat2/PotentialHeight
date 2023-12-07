@@ -49,6 +49,7 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
 
     if True:
         import matplotlib.pyplot as plt
+
         plt.plot(rrfracr0, MMfracM0)
         plt.xlabel("rrfracr0")
         plt.ylabel("MMfracM0")

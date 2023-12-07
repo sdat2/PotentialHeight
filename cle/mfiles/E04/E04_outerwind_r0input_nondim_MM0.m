@@ -87,7 +87,7 @@ linear_slope = (C_d_highV-C_d_lowV)/(V_thresh2-V_thresh1);
 
 %% Integrate inwards from r0 to obtain profile of M/M0 vs. r/r0
 for ii=1:Nr-2   %first two nodes already done above
-                
+
     %% Calculate C_d varying with V, if desired
     if(Cdvary==1)
 
@@ -102,9 +102,9 @@ for ii=1:Nr-2   %first two nodes already done above
         else
             C_d = C_d_lowV + linear_slope*(V_temp-V_thresh1);
         end
-        
+    
     end
-        
+    
     %% Calculate model parameter, gamma
     gam = C_d*fcor*r0/w_cool;   %[]; non-dimensional model parameter
 
@@ -120,7 +120,6 @@ for ii=1:Nr-2   %first two nodes already done above
     %% Save updated values
     MMfracM0(end-ii-1) = MfracM0_temp;
 
-        
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

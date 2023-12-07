@@ -86,7 +86,7 @@ switch rmax_or_r0
 %         end
         
     otherwise
-        assert('rmax_or_r0 must be set to either "r0" or "rmax"')
+        error('rmax_or_r0 must be set to either "r0" or "rmax"')
 end
 
 %% CALCULATE Emanuel and Rotunno (2011) theoretical profile

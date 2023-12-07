@@ -52,7 +52,7 @@ M0 = .5*fcor*r0.^2; %[m2/s]; M at outer radius
 
 drfracr0 = .001;
 if(r0>2500*1000)
-    drfracr0 = drfracr0/10; %extra precision for very large storm to avoid funny bumps near r0 (though rest of solution is stable!)
+    drfracr0 = drfracr0/10; % extra precision for very large storm to avoid funny bumps near r0 (though rest of solution is stable!)
 end
 
 switch nargin

@@ -18,6 +18,7 @@ def ER11E04_nondim_r0input(
     CkCd: float,
     eye_adj: bool,
     alpha_eye: bool,
+    Nr: int = 100000,
 ):
     fcor = abs(fcor)
 
@@ -33,7 +34,6 @@ def ER11E04_nondim_r0input(
         print("Ck/Cd is capped at 1.9 and has been set to this value.")
 
     # Step 1: Calculate E04 M/M0 vs. r/r0
-    Nr = 100000
     # Define the function E04_outerwind_r0input_nondim_MM0
     rrfracr0_E04, MMfracM0_E04 = E04_outerwind_r0input_nondim_MM0(
         r0, fcor, Cdvary, C_d, w_cool, Nr
@@ -42,8 +42,6 @@ def ER11E04_nondim_r0input(
     M0_E04 = 0.5 * fcor * r0**2
 
     # Step 2: Converge rmaxr0 geometrically until ER11 M/M0 has tangent point with E04 M/M0
-    # This step involves several iterations and calls to other functions like ER11_radprof
-    # The detailed implementation of this step will depend on the logic and calculation specifics of the original MATLAB code
 
     rmerger0 = None
     var = None
@@ -97,6 +95,7 @@ def ER11E04_nondim_r0input(
 
         if np.isnan(max(VV_ER11)) and rmerger0 is not None and var is not None:
             soln_converged = True
+            print("Convergence achieved.")
         else:
             soln_converged = False
             CkCd = CkCd + 0.1
