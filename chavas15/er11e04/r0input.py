@@ -44,7 +44,6 @@ def ER11E04_nondim_r0input(
     # Step 2: Converge rmaxr0 geometrically until ER11 M/M0 has tangent point with E04 M/M0
 
     rmerger0 = None
-    var = None
 
     soln_converged = False
     while not soln_converged:
@@ -87,22 +86,25 @@ def ER11E04_nondim_r0input(
 
                 plot_defaults()
 
-                plt.plot(rrfracr0_ER11, MMfracM0_ER11, "black")
-                plt.plot(rrfracr0_E04, MMfracM0_E04, "blue")
+                plt.plot(rrfracr0_ER11, MMfracM0_ER11, "black", label="ER11")
+                plt.plot(rrfracr0_E04, MMfracM0_E04, "blue", label="E04")
                 plt.xlabel("$r$/$r_0$")
                 plt.ylabel("$M$/$M_0$")
+                plt.legend()
                 plt.savefig("tester11e041.png")
                 plt.close()
 
-                plt.plot(rr_ER11 / 1000, VV_ER11, "k")
+                plt.plot(rr_ER11 / 1000, VV_ER11, "k", label="ER11")
                 rr_temp = rrfracr0_E04 * r0
-                print("rr_temp.shape", rr_temp.shape)
-                print("MMfracM0_E04.shape", MMfracM0_E04.shape)
+                # print("rr_temp.shape", rr_temp.shape)
+                # print("MMfracM0_E04.shape", MMfracM0_E04.shape)
                 VV_temp = MMfracM0_E04 * M0_E04 / rr_temp - 0.5 * fcor * rr_temp
-                plt.plot(rr_temp / 1000, VV_temp, "blue")
+                plt.plot(rr_temp / 1000, VV_temp, "blue", label="E04")
                 plt.xlabel("r [km]")
-                plt.ylabel("E04, V [m/s]")
+                plt.ylabel("V [m/s]")
+                plt.legend()
                 plt.savefig("tester11e0412.png")
+                plt.close()
 
                 x0, y0 = curveintersect(
                     rrfracr0_E04, MMfracM0_E04, rrfracr0_ER11, MMfracM0_ER11
@@ -168,6 +170,17 @@ def ER11E04_nondim_r0input(
 
     rmerge = rmerger0 * r0  # [m]
     Vmerge = (M0 / r0) * ((MmergeM0 / rmerger0) - rmerger0)  # [m s-1]
+
+    if True:
+        from matplotlib import pyplot as plt
+        from sithom.plot import plot_defaults
+
+        plt.plot(rr / 1000, VV, "blue")
+        plt.plot(rmerge / 1000, Vmerge, "r*")
+        plt.xlabel("r [km]")
+        plt.ylabel("V [m/s]")
+        plt.title("ER11E04")
+        plt.savefig("test.png")
 
     # Return the calculated values
     return (

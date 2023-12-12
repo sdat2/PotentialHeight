@@ -255,7 +255,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%TESTING: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs %%%%%%
-%{
+
 figure(1009)
 plot(rrfracr0,MMfracM0,'b')
 hold on
@@ -272,7 +272,7 @@ plot(rmerge/1000,Vmerge,'rx')
 plot(rmax/1000,Vmax,'rx')
 xlabel('r [km]');
 ylabel('V [m/s]');
-%}
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 end

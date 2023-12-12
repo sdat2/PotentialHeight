@@ -106,10 +106,10 @@ for ii=1:Nr-2   %first two nodes already done above
     end
     
     %% Calculate model parameter, gamma
-    gam = C_d*fcor*r0/w_cool;   %[]; non-dimensional model parameter
+    gamma = C_d*fcor*r0/w_cool;   %[]; non-dimensional model parameter
 
     %% Update dMfracM0_drfracr0 at next step inwards
-    dMfracM0_drfracr0_temp = gam*((MfracM0_temp-rfracr0_temp.^2).^2)/(1-rfracr0_temp.^2);
+    dMfracM0_drfracr0_temp = gamma*((MfracM0_temp-rfracr0_temp.^2).^2)/(1-rfracr0_temp.^2);
     
     %% Integrate M/M0 radially inwards
     MfracM0_temp = MfracM0_temp - dMfracM0_drfracr0_temp*drfracr0;
@@ -124,22 +124,21 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TESTING: M/M0 vs. r/r0 %%%%%%
-%{
+
 figure(98)
 hold off
 plot(rrfracr0,MMfracM0,'b','LineWidth',2)
 hold on
 plot(1,1,'r*','MarkerSize',14,'LineWidth',2)
-xlabel('r/r_0')
-ylabel('M/M_0')
+xlabel('r/r_0 [dimensionless]')
+ylabel('M/M_0 [dimensionless]')
 input_title = sprintf('r_0 = %5.0f [km]',r0/1000);
 title(input_title)
-%}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+saveas(gcf, 'E04_r0input_nondim.pdf', 'pdf')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TESTING: Make plot of radial profile %%%%%%
-%{
+
 figure(99)
 hold off
 plot(rr/1000,VV,'b','LineWidth',2)
@@ -149,8 +148,10 @@ xlabel('r [km]')
 ylabel('V [m/s]')
 input_title = sprintf('r_0 = %5.0f [km]',r0/1000);
 title(input_title)
-%}
+saveas(gcf, 'E04_r0input.pdf', 'pdf')
+close(99)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 end
 %------------- END OF CODE --------------

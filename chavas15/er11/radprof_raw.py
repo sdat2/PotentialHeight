@@ -8,11 +8,11 @@ from sithom.time import timeit
 def ER11_radprof_raw(
     Vmax: float, r_in: float, rmax_or_r0: str, fcor: float, CkCd: float, rr_ER11
 ):
-    fcor = abs(fcor)
-    r_out = None  # will return None
+    fcor = abs(fcor)  # [s^-1]
+    r_out = None  # will return None as default
 
     if rmax_or_r0 == "r0":
-        r0 = r_in
+        r0 = r_in  # [m]
         # Assume V>>fr (ER11, e.q. 38)
         rmax_simple = ((0.5 * fcor * r0**2) / Vmax) * (
             (0.5 * CkCd) ** (1 / (2 - CkCd))
@@ -58,15 +58,17 @@ def ER11_radprof_raw(
         if True:
             import matplotlib.pyplot as plt
 
-            plt.plot(rr_ER11[i_rmax + 1 :], V_ER11[i_rmax + 1 :])
+            plt.plot(rr_ER11[i_rmax + 1 :] / 1000, V_ER11[i_rmax + 1 :])
             print(rr_ER11[i_rmax + 1 :])
-            plt.xlabel("rr_ER11")
-            plt.ylabel("V_ER11")
+            plt.xlabel("ER11 $r$ [km]")
+            plt.ylabel("ER11 $V$ [m/s]")
             plt.savefig("er11_raw_test.pdf")
             plt.clf()
             plt.plot(rr_ER11[i_rmax + 1 : -1] - rr_ER11[i_rmax + 2 :])
+            plt.ylabel("ER11 $r$ [km]")
             plt.savefig("er11_raw_test2.pdf")
             plt.clf()
+            plt.close()
         r0_profile = pchip_interpolate(
             V_ER11[i_rmax + 1 :][::-1], rr_ER11[i_rmax + 1 :][::-1], [0]
         )
