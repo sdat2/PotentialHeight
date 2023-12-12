@@ -81,4 +81,4 @@ if __name__ == "__main__":
     plt.plot(x, y, "o", color="black")
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.savefig("intersect.pdf")
+    plt.savefig("test/intersect.pdf")

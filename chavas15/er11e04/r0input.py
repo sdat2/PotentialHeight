@@ -91,7 +91,7 @@ def ER11E04_nondim_r0input(
                 plt.xlabel("$r$/$r_0$")
                 plt.ylabel("$M$/$M_0$")
                 plt.legend()
-                plt.savefig("tester11e041.png")
+                plt.savefig("test/tester11e041.png")
                 plt.close()
 
                 plt.plot(rr_ER11 / 1000, VV_ER11, "k", label="ER11")
@@ -103,7 +103,7 @@ def ER11E04_nondim_r0input(
                 plt.xlabel("r [km]")
                 plt.ylabel("V [m/s]")
                 plt.legend()
-                plt.savefig("tester11e0412.png")
+                plt.savefig("test/tester11e0412.png")
                 plt.close()
 
                 x0, y0 = curveintersect(
@@ -180,7 +180,7 @@ def ER11E04_nondim_r0input(
         plt.xlabel("r [km]")
         plt.ylabel("V [m/s]")
         plt.title("ER11E04")
-        plt.savefig("test.png")
+        plt.savefig("test/test.png")
 
     # Return the calculated values
     return (

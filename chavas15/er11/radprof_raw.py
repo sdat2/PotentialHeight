@@ -62,11 +62,11 @@ def ER11_radprof_raw(
             print(rr_ER11[i_rmax + 1 :])
             plt.xlabel("ER11 $r$ [km]")
             plt.ylabel("ER11 $V$ [m/s]")
-            plt.savefig("er11_raw_test.pdf")
+            plt.savefig("test/er11_raw_test.pdf")
             plt.clf()
             plt.plot(rr_ER11[i_rmax + 1 : -1] - rr_ER11[i_rmax + 2 :])
             plt.ylabel("ER11 $r$ [km]")
-            plt.savefig("er11_raw_test2.pdf")
+            plt.savefig("test/er11_raw_test2.pdf")
             plt.clf()
             plt.close()
         r0_profile = pchip_interpolate(

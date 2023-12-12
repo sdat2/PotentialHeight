@@ -73,7 +73,7 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
         plt.xlabel("$r$/$r_0$ [dimensionless]")
         plt.ylabel("$M$/$M_0$ [dimensionless]")
         plt.title("E04 outer wind model, r0={:.0f} km".format(r0 / 1000))
-        plt.savefig("e04_r0input_nondim.pdf")
+        plt.savefig("test/e04_r0input_nondim.pdf")
         plt.close()
 
     return rrfracr0, MMfracM0
