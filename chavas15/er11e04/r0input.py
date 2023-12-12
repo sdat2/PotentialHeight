@@ -60,9 +60,11 @@ def ER11E04_nondim_r0input(
         rfracrm_max = 50  # [dimensionless] # many rmaxs away
         while abs(drmaxr0) >= drmaxr0_thresh:
             i += 1
+            # dimensionalize rmax
             rmax = rmaxr0_new * r0
             drfracrm = 0.01
             if rmax > 100 * 1000:  # large storm > 100km to rmax
+                print("Large storm detected. Increasing drfracrm.")
                 drfracrm = drfracrm / 10  # extra precision for large storm
             rrfracrm_ER11 = np.linspace(
                 rfracrm_min,
@@ -76,16 +78,19 @@ def ER11E04_nondim_r0input(
             # what does this mean in matlab?
             if ~np.isnan(np.nanmax(VV_ER11)):  # ER11_radprof converged.
                 # nondimensionalize?
-                rrfracr0_ER11 = rr_ER11 / r0
+                rrfracr0_ER11 = rr_ER11 / r0  # divide by outer radius
                 MMfracM0_ER11 = (rr_ER11 * VV_ER11 + 0.5 * fcor * rr_ER11) / M0_E04
 
                 # Testing: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs
                 from matplotlib import pyplot as plt
+                from sithom.plot import plot_defaults
 
-                plt.plot(rrfracr0_ER11, MMfracM0_ER11, "k")
+                plot_defaults()
+
+                plt.plot(rrfracr0_ER11, MMfracM0_ER11, "black")
                 plt.plot(rrfracr0_E04, MMfracM0_E04, "blue")
-                plt.xlabel("r/r0")
-                plt.ylabel("M/M0")
+                plt.xlabel("$r$/$r_0$")
+                plt.ylabel("$M$/$M_0$")
                 plt.savefig("tester11e041.png")
                 plt.close()
 
@@ -96,7 +101,7 @@ def ER11E04_nondim_r0input(
                 VV_temp = MMfracM0_E04 * M0_E04 / rr_temp - 0.5 * fcor * rr_temp
                 plt.plot(rr_temp / 1000, VV_temp, "blue")
                 plt.xlabel("r [km]")
-                plt.ylabel("V [m/s]")
+                plt.ylabel("E04, V [m/s]")
                 plt.savefig("tester11e0412.png")
 
                 x0, y0 = curveintersect(

@@ -49,7 +49,7 @@ fcor = abs(fcor);
 M0 = .5*fcor*r0.^2; %[m2/s]; M at outer radius
 
 drfracr0 = .001;
-if(r0>2500*1000 | r0<200*1000)
+if(r0>2500*1000 || r0<200*1000)
     drfracr0 = drfracr0/10; %extra precision for very large storm to avoid funny bumps near r0 (though rest of solution is stable!)
 end                         %or for tiny storm that requires E04 extend to very small radii to match with ER11
 
