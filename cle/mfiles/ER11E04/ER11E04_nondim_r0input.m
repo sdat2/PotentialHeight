@@ -142,7 +142,7 @@ while(soln_converged==0)
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%TESTING: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs %%%%%%
-            %{
+            
             figure(1008)
             plot(rrfracr0_ER11,MMfracM0_ER11,'b')
             hold on
@@ -150,17 +150,25 @@ while(soln_converged==0)
             axis([0 1 0 1])
             xlabel('r/r_0');
             ylabel('M/M_0');
-            
+            saveas(gcf, 'radprofAE04.pdf', 'pdf')
+            close(gcf)
+
             figure(1009)
             plot(rr_ER11/1000,VV_ER11,'b')
             hold on
             rr_temp=rrfracr0_E04*r0;
+            fprintf('size(rrfracr0_E04) is %s\n', mat2str(size(rrfracr0_E04)))
+            fprintf('size(MMfracM0_E04) is %s\n', mat2str(size(rrfracr0_E04)))
             VV_temp = (MMfracM0_E04*M0_E04)./rr_temp - .5*fcor*rr_temp;
             plot(rr_temp/1000,VV_temp,'Color',[1 0 0]/iter)
             axis([0 r0/1000 0 2*Vmax])
             xlabel('r [km]');
             ylabel('V [ms-1]');
-            %}
+            % close figure 
+            saveas(gcf, 'radprofE04.pdf', 'pdf')
+            close(gcf)
+
+
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
             [X0,Y0] = curveintersect(rrfracr0_E04,MMfracM0_E04,rrfracr0_ER11,MMfracM0_ER11);

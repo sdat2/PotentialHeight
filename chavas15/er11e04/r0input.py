@@ -74,9 +74,30 @@ def ER11E04_nondim_r0input(
             VV_ER11, _ = ER11_radprof(Vmax, rmax, rmax_or_r0, fcor, CkCd, rr_ER11)
 
             # what does this mean in matlab?
-            if np.isnan(max(VV_ER11)):  # ER11_radprof converged.
+            if ~np.isnan(np.nanmax(VV_ER11)):  # ER11_radprof converged.
+                # nondimensionalize?
                 rrfracr0_ER11 = rr_ER11 / r0
                 MMfracM0_ER11 = (rr_ER11 * VV_ER11 + 0.5 * fcor * rr_ER11) / M0_E04
+
+                # Testing: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs
+                from matplotlib import pyplot as plt
+
+                plt.plot(rrfracr0_ER11, MMfracM0_ER11, "k")
+                plt.plot(rrfracr0_E04, MMfracM0_E04, "blue")
+                plt.xlabel("r/r0")
+                plt.ylabel("M/M0")
+                plt.savefig("tester11e041.png")
+                plt.close()
+
+                plt.plot(rr_ER11 / 1000, VV_ER11, "k")
+                rr_temp = rrfracr0_E04 * r0
+                print("rr_temp.shape", rr_temp.shape)
+                print("MMfracM0_E04.shape", MMfracM0_E04.shape)
+                VV_temp = MMfracM0_E04 * M0_E04 / rr_temp - 0.5 * fcor * rr_temp
+                plt.plot(rr_temp / 1000, VV_temp, "blue")
+                plt.xlabel("r [km]")
+                plt.ylabel("V [m/s]")
+                plt.savefig("tester11e0412.png")
 
                 x0, y0 = curveintersect(
                     rrfracr0_E04, MMfracM0_E04, rrfracr0_ER11, MMfracM0_ER11
@@ -93,7 +114,7 @@ def ER11E04_nondim_r0input(
             rmaxr0 = rmaxr0_new
             rmaxr0_new = rmaxr0_new + drmaxr0
 
-        if np.isnan(max(VV_ER11)) and rmerger0 is not None and var is not None:
+        if np.isnan(np.nanmax(VV_ER11)) and rmerger0 is not None:
             soln_converged = True
             print("Convergence achieved.")
         else:
