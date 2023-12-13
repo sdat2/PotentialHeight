@@ -96,6 +96,18 @@ end
 Nr = 100000;
 [rrfracr0_E04,MMfracM0_E04] = E04_outerwind_r0input_nondim_MM0(r0,fcor,Cdvary,C_d,w_cool,Nr);
 
+figure(105)
+plot(rrfracr0_E04, MMfracM0_E04, 'b')
+hold on
+axis([0 1 0 1])
+xlabel('r/r_0');
+ylabel('M/M_0');
+saveas(gcf, 'radprofE04.pdf', 'pdf')
+close(gcf)
+
+
+
+
 M0_E04 = .5*fcor*r0.^2;
 
 %% Step 2: Converge rmaxr0 geometrically until ER11 M/M0 has tangent point with E04 M/M0
@@ -171,7 +183,7 @@ while(soln_converged==0)
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-            [X0,Y0] = curveintersect(rrfracr0_E04,MMfracM0_E04,rrfracr0_ER11,MMfracM0_ER11);
+            [X0,Y0] = curveintersect(rrfracr0_E04, MMfracM0_E04, rrfracr0_ER11,MMfracM0_ER11);
             if(numel(X0)==0)    %no intersections -- rmaxr0 too small
                 drmaxr0 = abs(drmaxr0)/2;
             else    %at least one intersection -- rmaxr0 too large

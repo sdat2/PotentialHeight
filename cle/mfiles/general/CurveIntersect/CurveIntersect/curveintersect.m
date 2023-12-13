@@ -30,6 +30,7 @@ function [x,y]=curveintersect(varargin)
 x=[]; y=[];
 [x1,y1,x2,y2]=local_parseinputs(varargin{:});
 ind_x1=sign(diff(x1)); ind_x2=sign(diff(x2));
+echo 
 
 ind1=1;
 while ind1<length(x1)

@@ -38,6 +38,15 @@ def ER11E04_nondim_r0input(
     rrfracr0_E04, MMfracM0_E04 = E04_outerwind_r0input_nondim_MM0(
         r0, fcor, Cdvary, C_d, w_cool, Nr
     )
+    from matplotlib import pyplot as plt
+
+    plt.plot(rrfracr0_E04, MMfracM0_E04, "blue", label="E04")
+    plt.xlabel("$r$/$r_0$ [dimensionless]")
+    plt.ylabel("$M$/$M_0$ [dimensionless]")
+    plt.legend()
+    plt.title("Initial E04 outer wind model, r0={:.0f} km".format(r0 / 1000))
+    plt.savefig("test/e04_r0input_nondim.png")
+    plt.close()
 
     M0_E04 = 0.5 * fcor * r0**2
 
@@ -82,14 +91,13 @@ def ER11E04_nondim_r0input(
 
                 # Testing: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs
                 from matplotlib import pyplot as plt
-                from sithom.plot import plot_defaults
-
-                plot_defaults()
 
                 plt.plot(rrfracr0_ER11, MMfracM0_ER11, "black", label="ER11")
                 plt.plot(rrfracr0_E04, MMfracM0_E04, "blue", label="E04")
                 plt.xlabel("$r$/$r_0$ [dimensionless]")
                 plt.ylabel("$M$/$M_0$ [dimensionless]")
+                plt.xlim([0, 1])
+                plt.ylim([0, 1])
                 plt.legend()
                 plt.title("Matching up ER11 and E04 absolute angular momentum profiles")
                 plt.savefig("test/tester11e041.png")
@@ -104,11 +112,19 @@ def ER11E04_nondim_r0input(
                 plt.xlabel("$r$ [km]")
                 plt.ylabel("$V$ [m/s]")
                 plt.legend()
+                plt.title(
+                    "$r_0$={:.0f} km, $r_{{max}}$={:.0f} km".format(
+                        r0 / 1000, rmax / 1000
+                    )
+                )
                 plt.savefig("test/tester11e0412.png")
                 plt.close()
 
                 x0, y0 = curveintersect(
-                    rrfracr0_E04, MMfracM0_E04, rrfracr0_ER11, MMfracM0_ER11
+                    rrfracr0_E04,
+                    MMfracM0_E04,
+                    rrfracr0_ER11[rrfracr0_ER11 < 1],
+                    MMfracM0_ER11[rrfracr0_ER11 < 1],
                 )
                 if len(x0) == 0:
                     drmaxr0 = abs(drmaxr0) / 2

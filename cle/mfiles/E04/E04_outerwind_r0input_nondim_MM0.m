@@ -138,7 +138,7 @@ saveas(gcf, 'E04_r0input_nondim.pdf', 'pdf')
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TESTING: Make plot of radial profile %%%%%%
-
+%{
 figure(99)
 hold off
 plot(rr/1000,VV,'b','LineWidth',2)
@@ -150,6 +150,7 @@ input_title = sprintf('r_0 = %5.0f [km]',r0/1000);
 title(input_title)
 saveas(gcf, 'E04_r0input.pdf', 'pdf')
 close(99)
+%}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

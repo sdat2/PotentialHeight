@@ -17,6 +17,9 @@ def curveintersect(
     Returns:
     Tuple[List[float], List[float]]: intersections x and y coordinates.
     """
+    assert len(x1) == len(y1)
+    assert len(x2) == len(y2)
+    print("intersection sizes", len(x1), len(x2), len(x1) * len(x2))
 
     def line_intersect(p1, p2, q1, q2):
         """Check if line segments p1p2 and q1q2 intersect."""

@@ -24,6 +24,8 @@ def ER11_radprof_raw(
             (0.5 * CkCd) ** (1 / (2 - CkCd))
         )
 
+        # Define equation to solve for rmax
+
         def equation(rmax_var: float) -> float:
             # Full solution for rmax-r0 relationship (ER11 Eq. 37 with M_max including fcor term).
             left_side = (
