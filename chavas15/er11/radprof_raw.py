@@ -1,3 +1,4 @@
+from typing import Tuple
 import numpy as np
 from scipy.optimize import fsolve
 from scipy.interpolate import pchip_interpolate
@@ -6,8 +7,13 @@ from sithom.time import timeit
 
 @timeit
 def ER11_radprof_raw(
-    Vmax: float, r_in: float, rmax_or_r0: str, fcor: float, CkCd: float, rr_ER11
-):
+    Vmax: float,
+    r_in: float,
+    rmax_or_r0: str,
+    fcor: float,
+    CkCd: float,
+    rr_ER11: np.ndarray,
+) -> Tuple[np.ndarray, float]:
     fcor = abs(fcor)  # [s^-1]
     r_out = None  # will return None as default
 

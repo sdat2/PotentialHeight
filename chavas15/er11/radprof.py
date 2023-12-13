@@ -1,3 +1,4 @@
+from typing import Tuple
 import numpy as np
 from scipy.interpolate import pchip_interpolate
 from sithom.time import timeit
@@ -5,7 +6,9 @@ from chavas15.er11.radprof_raw import ER11_radprof_raw
 
 
 @timeit
-def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
+def ER11_radprof(
+    Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11
+) -> Tuple[np.ndarray, float]:
     # find increment in rr_ER11 vector
     dr = rr_ER11[1] - rr_ER11[0]
 
@@ -52,9 +55,30 @@ def ER11_radprof(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11):
 
         if rmax_or_r0 == "rmax":
             drin_temp = r_in_save - rr_ER11[np.argmax(V_ER11 == Vmax_prof)]
+
+            from matplotlib import pyplot as plt
+
+            plt.plot(rr_ER11, V_ER11, "k")
+            plt.plot(r_in, 0, "r*")
+            plt.xlabel("$r$ [m]")
+            plt.ylabel("$V$ [m/s]")
+            plt.title("ER11 inner radial profile")
+            plt.savefig("test/er11_test.pdf")
+            plt.clf()
+            plt.close()
+
         elif rmax_or_r0 == "r0":
             drin_temp = r_in_save - pchip_interpolate(V_ER11[2:], rr_ER11[2:], 0)
+            from matplotlib import pyplot as plt
 
+            plt.plot(rr_ER11, V_ER11, "k")
+            plt.plot(r_in, 0, "r*")
+            plt.xlabel("$r$ [m]")
+            plt.ylabel("$V$ [m/s]")
+            plt.title("ER11 inner radial profile")
+            plt.savefig("test/er11_test.pdf")
+            plt.clf()
+            plt.close()
     return V_ER11, r_out
 
 

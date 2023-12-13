@@ -148,8 +148,8 @@ while(soln_converged==0)
             hold on
             plot(rrfracr0_E04,MMfracM0_E04,'Color',[1 0 0]/iter)
             axis([0 1 0 1])
-            xlabel('r/r_0');
-            ylabel('M/M_0');
+            xlabel('r/r_0 [-]');
+            ylabel('M/M_0 [-]');
             saveas(gcf, 'radprofAE04.pdf', 'pdf')
             close(gcf)
 
@@ -162,8 +162,8 @@ while(soln_converged==0)
             VV_temp = (MMfracM0_E04*M0_E04)./rr_temp - .5*fcor*rr_temp;
             plot(rr_temp/1000,VV_temp,'Color',[1 0 0]/iter)
             axis([0 r0/1000 0 2*Vmax])
-            xlabel('r [km]');
-            ylabel('V [ms-1]');
+            xlabel('$r$ [km]');
+            ylabel('$V$ [ms-1]');
             % close figure 
             saveas(gcf, 'radprofE04.pdf', 'pdf')
             close(gcf)

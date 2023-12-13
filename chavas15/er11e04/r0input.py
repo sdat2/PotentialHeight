@@ -88,9 +88,10 @@ def ER11E04_nondim_r0input(
 
                 plt.plot(rrfracr0_ER11, MMfracM0_ER11, "black", label="ER11")
                 plt.plot(rrfracr0_E04, MMfracM0_E04, "blue", label="E04")
-                plt.xlabel("$r$/$r_0$")
-                plt.ylabel("$M$/$M_0$")
+                plt.xlabel("$r$/$r_0$ [dimensionless]")
+                plt.ylabel("$M$/$M_0$ [dimensionless]")
                 plt.legend()
+                plt.title("Matching up ER11 and E04 absolute angular momentum profiles")
                 plt.savefig("test/tester11e041.png")
                 plt.close()
 
@@ -100,8 +101,8 @@ def ER11E04_nondim_r0input(
                 # print("MMfracM0_E04.shape", MMfracM0_E04.shape)
                 VV_temp = MMfracM0_E04 * M0_E04 / rr_temp - 0.5 * fcor * rr_temp
                 plt.plot(rr_temp / 1000, VV_temp, "blue", label="E04")
-                plt.xlabel("r [km]")
-                plt.ylabel("V [m/s]")
+                plt.xlabel("$r$ [km]")
+                plt.ylabel("$V$ [m/s]")
                 plt.legend()
                 plt.savefig("test/tester11e0412.png")
                 plt.close()
@@ -173,14 +174,13 @@ def ER11E04_nondim_r0input(
 
     if True:
         from matplotlib import pyplot as plt
-        from sithom.plot import plot_defaults
 
         plt.plot(rr / 1000, VV, "blue")
         plt.plot(rmerge / 1000, Vmerge, "r*")
-        plt.xlabel("r [km]")
-        plt.ylabel("V [m/s]")
+        plt.xlabel("$r$ [km]")
+        plt.ylabel("$V$ [m/s]")
         plt.title("ER11E04")
-        plt.savefig("test/test.png")
+        plt.savefig("test/er11e04test.png")
 
     # Return the calculated values
     return (

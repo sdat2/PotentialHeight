@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from er11e04.r0input import ER11E04_nondim_r0input
+from sithom.plot import plot_defaults
+
+plot_defaults()
 
 # Assuming the function ER11E04_nondim_r0input is already defined in Python
 
