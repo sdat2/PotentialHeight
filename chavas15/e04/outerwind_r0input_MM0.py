@@ -1,23 +1,33 @@
-from typing import Tuple
+from typing import Tuple, Union
 import numpy as np
+from sithom.time import timeit
+from typeguard import typechecked
+from chavas15.cd import cd_donelan
 
 
+@timeit
+@typechecked
 def E04_outerwind_r0input_nondim_MM0(
-    r0: float, fcor: float, Cdvary: bool, C_d: float, w_cool: float, Nr: int = 100000
+    r0: float,
+    fcor: float,
+    Cdvary: Union[int, bool],
+    C_d: float,
+    w_cool: float,
+    Nr: int = 10000,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate the outer wind profile for a given storm size, r0, using the E04 model.
 
     Args:
-        r0 (float): _description_
-        fcor (float): _description_
-        Cdvary (bool): _description_
-        C_d (float): _description_
-        w_cool (float): _description_
-        Nr (int, optional): _description_. Defaults to 100000.
+        r0 (float): Outer radius [m]
+        fcor (float): Coriolis parameter [s^-1]
+        Cdvary (bool): Whether to vary C_d with V or not.
+        C_d (float): Drag coefficient [dimensionless]
+        w_cool (float): Cooling rate [m/s]
+        Nr (int, optional): Number of radii. Defaults to 10000.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: _description_
+        Tuple[np.ndarray, np.ndarray]: rrfracr0, MMfracM0
     """
     # intialisation
     fcor = abs(fcor)  # [s^-1]
@@ -33,36 +43,27 @@ def E04_outerwind_r0input_nondim_MM0(
 
     rfracr0_max = 1  # [dimensionless]; start at r0, move radially inwards
     rfracr0_min = rfracr0_max - (Nr - 1) * drfracr0  # [dimensionless]
-    rrfracr0 = np.linspace(rfracr0_min, rfracr0_max, Nr)  # [dimensionless] r/r0 vector
-    MMfracM0 = np.full_like(rrfracr0, np.nan)  # [dimensionless] M/M0 vector
+    rrfracr0 = np.arange(
+        rfracr0_min,
+        rfracr0_max + drfracr0,
+        drfracr0,
+    )  # [dimensionless] r/r0 vector
+    MMfracM0 = np.full_like(
+        rrfracr0, np.nan
+    )  # [dimensionless] M/M0 vector full of NaNs
     MMfracM0[-1] = 1  # M/M0 = 1 at r/r0 = 1
 
     rrfracr0_temp = rrfracr0[-2]  # one step in from outer radius
     # d(M/M0)/d(r/r0)=0 at r/r0 = 1
     MfracM0_temp = MMfracM0[-1]
-    MMfracM0[-2] = MfracM0_temp
-
-    # Variable C_d parameters from Donelan et al. (2004)
-    # This function could be stored somewhere else.
-    C_d_lowV = 6.2e-4  # [dimensionless]
-    V_thresh1 = 6  # [m/s]
-    V_thresh2 = 35.4  # [m/s]
-    C_d_highV = 2.35e-3  # [dimensionless]
-    linear_slope = (C_d_highV - C_d_lowV) / (V_thresh2 - V_thresh1)  # [s/m]
+    MMfracM0[-2] = MfracM0_temp  # go in one and copy value
 
     # Integrate inwards from r0 to obtain profile of M/M0 vs. r/r0
-    for i in range(0, Nr - 2):
+    for i in range(1, Nr - 3):
         # Calculate C_d varying with V, if desired
         if Cdvary:
-            # V_temp = (M0 / r0) * (MfracM0_temp / rrfracr0[-i] - rrfracr0[-i])
             V_temp = (M0 / r0) * (MfracM0_temp / rrfracr0_temp - rrfracr0_temp)
-
-            if V_temp <= V_thresh1:
-                C_d = C_d_lowV
-            elif V_temp > V_thresh2:
-                C_d = C_d_highV
-            else:
-                C_d = C_d_lowV + linear_slope * (V_temp - V_thresh1)
+            C_d = cd_donelan(C_d, V_temp)
 
         # Calculate model parameter, gamma
         gamma = C_d * fcor * r0 / w_cool  # [dimensionless]
@@ -82,6 +83,8 @@ def E04_outerwind_r0input_nondim_MM0(
         # used in next round of integration
 
         # save updated values
+        # Seeks to replicate MMfracM0(end-i-1) = MfracM0_temp; from matlab.
+        # -1 = end, i = new index
         MMfracM0[-1 - i - 1] = MfracM0_temp
 
     if True:
