@@ -49,8 +49,8 @@ plot(1,1,'r*','MarkerSize',14,'LineWidth',2)
 % hpl(2) = plot(rrfracr0_compare,MMfracM0_compare,'g--','LineWidth',2);
 plot(ruserfracr0,MuserfracM0,'r*','MarkerSize',14,'LineWidth',2)
 %input_legend{2} = 'Dim V soln';
-xlabel('r/r_0')
-ylabel('M/M_0')
+xlabel('r/r_0 [-]')
+ylabel('M/M_0 [-]')
 input_title = sprintf('r_0 = %5.0f [km]',r0/1000);
 title(input_title)
 legend(hpl,input_legend,'Location','NorthWest'); legend boxoff
