@@ -274,8 +274,8 @@ hold on
 plot(rmerger0,MmergeM0,'rx')
 plot(rmaxr0,MmM0,'rx')
 axis([0 1 0 1])
-xlabel('r/r_0');
-ylabel('M/M_0');
+xlabel('r/r_0 [-]');
+ylabel('M/M_0 [-]');
 
 figure(1010)
 plot(rr/1000,VV,'b')

@@ -62,7 +62,7 @@ def ER11_radprof(
             plt.plot(r_in, 0, "r*")
             plt.xlabel("$r$ [m]")
             plt.ylabel("$V$ [m/s]")
-            plt.title("ER11 inner radial profile")
+            plt.title("ER11 inner radial profile, iteration={}".format(n_iter))
             plt.savefig("test/er11_test.pdf")
             plt.clf()
             plt.close()

@@ -1,7 +1,24 @@
+from typing import Tuple
 import numpy as np
 
 
-def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
+def E04_outerwind_r0input_nondim_MM0(
+    r0: float, fcor: float, Cdvary: bool, C_d: float, w_cool: float, Nr: int = 100000
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Generate the outer wind profile for a given storm size, r0, using the E04 model.
+
+    Args:
+        r0 (float): _description_
+        fcor (float): _description_
+        Cdvary (bool): _description_
+        C_d (float): _description_
+        w_cool (float): _description_
+        Nr (int, optional): _description_. Defaults to 100000.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: _description_
+    """
     # intialisation
     fcor = abs(fcor)  # [s^-1]
     M0 = 0.5 * fcor * r0**2  # M at outer radius
@@ -26,6 +43,7 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
     MMfracM0[-2] = MfracM0_temp
 
     # Variable C_d parameters from Donelan et al. (2004)
+    # This function could be stored somewhere else.
     C_d_lowV = 6.2e-4  # [dimensionless]
     V_thresh1 = 6  # [m/s]
     V_thresh2 = 35.4  # [m/s]
@@ -35,7 +53,7 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
     # Integrate inwards from r0 to obtain profile of M/M0 vs. r/r0
     for i in range(0, Nr - 2):
         # Calculate C_d varying with V, if desired
-        if Cdvary == 1:
+        if Cdvary:
             # V_temp = (M0 / r0) * (MfracM0_temp / rrfracr0[-i] - rrfracr0[-i])
             V_temp = (M0 / r0) * (MfracM0_temp / rrfracr0_temp - rrfracr0_temp)
 
@@ -61,6 +79,7 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
 
         # update r/r0 to follow M/M0
         rrfracr0_temp -= drfracr0  # dimensionless - move one step inwards
+        # used in next round of integration
 
         # save updated values
         MMfracM0[-1 - i - 1] = MfracM0_temp
@@ -69,10 +88,18 @@ def E04_outerwind_r0input_nondim_MM0(r0, fcor, Cdvary, C_d, w_cool, Nr=100000):
         import matplotlib.pyplot as plt
 
         plt.plot(rrfracr0, MMfracM0, "blue")
-        plt.plot(1, 1, "r*")
+        plt.plot(1, 1, "r*", label="M0")
         plt.xlabel("$r$/$r_0$ [dimensionless]")
         plt.ylabel("$M$/$M_0$ [dimensionless]")
-        plt.title("E04 outer wind model, r0={:.0f} km".format(r0 / 1000))
+        plt.title(
+            "E04 outer wind model, r0={:.0f} km, wcool={:.3e}, fcor={:.2e}".format(
+                r0 / 1000,
+                w_cool,
+                fcor,
+            ),
+        )
+        plt.xlim([0, 1])
+        plt.ylim([0, 1])
         plt.savefig("test/e04_r0input_nondim.pdf")
         plt.close()
 

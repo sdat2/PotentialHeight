@@ -67,7 +67,7 @@ def ER11E04_nondim_r0input(
         rfracrm_min = 0  # [dimensionless] # start at r=0
         rfracrm_max = 50  # [dimensionless] # many rmaxs away
         while abs(drmaxr0) >= drmaxr0_thresh:
-            i += 1
+            i += 1  # this was just used to change the color
             # dimensionalize rmax
             rmax = rmaxr0_new * r0
             drfracrm = 0.01
@@ -99,7 +99,11 @@ def ER11E04_nondim_r0input(
                 plt.xlim([0, 1])
                 plt.ylim([0, 1])
                 plt.legend()
-                plt.title("Matching up ER11 and E04 absolute angular momentum profiles")
+                plt.title(
+                    "Matching up ER11 and E04 absolute angular momentum profiles, i={}".format(
+                        i
+                    )
+                )
                 plt.savefig("test/tester11e041.png")
                 plt.close()
 
@@ -113,8 +117,8 @@ def ER11E04_nondim_r0input(
                 plt.ylabel("$V$ [m/s]")
                 plt.legend()
                 plt.title(
-                    "$r_0$={:.0f} km, $r_{{max}}$={:.0f} km".format(
-                        r0 / 1000, rmax / 1000
+                    "$r_0$={:.0f} km, $r_{{max}}$={:.0f} km, i={}".format(
+                        r0 / 1000, rmax / 1000, i
                     )
                 )
                 plt.savefig("test/tester11e0412.png")
@@ -191,8 +195,9 @@ def ER11E04_nondim_r0input(
     if True:
         from matplotlib import pyplot as plt
 
-        plt.plot(rr / 1000, VV, "blue")
-        plt.plot(rmerge / 1000, Vmerge, "r*")
+        plt.plot(rr / 1000, VV, "blue", label="ER11E04")
+        plt.plot(rmerge / 1000, Vmerge, "r*", label="r_merge")
+        plt.plot(r0 / 1000, 0, "r.", label="$r_0$ (input)")
         plt.xlabel("$r$ [km]")
         plt.ylabel("$V$ [m/s]")
         plt.title("ER11E04")
