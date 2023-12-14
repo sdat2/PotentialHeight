@@ -19,11 +19,11 @@ Cd = 1.5e-3
 w_cool = 2 / 1000  # [ms-1]
 
 # Inner region
-CkCdvary = 0
+CkCdvary = False
 CkCd = 1
 
 # Eye adjustment
-eye_adj = 0
+eye_adj = False
 alpha_eye = 0.15
 
 # Get profile

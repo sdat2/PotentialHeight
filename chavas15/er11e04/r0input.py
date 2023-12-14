@@ -17,21 +17,13 @@ def ER11E04_nondim_r0input(
     CkCdvary: bool,
     CkCd: float,
     eye_adj: bool,
-    alpha_eye: bool,
+    alpha_eye: float,
     Nr: int = 100000,
 ):
     fcor = abs(fcor)
+    from chavas15.cd import ck_cd
 
-    # Overwrite CkCd if want varying (quadratic fit to Vmax from Chavas et al. 2015)
-    if CkCdvary:
-        CkCd_coefquad = 5.5041e-04
-        CkCd_coeflin = -0.0259
-        CkCd_coefcnst = 0.7627
-        CkCd = CkCd_coefquad * Vmax**2 + CkCd_coeflin * Vmax + CkCd_coefcnst
-
-    if CkCd > 1.9:
-        CkCd = 1.9
-        print("Ck/Cd is capped at 1.9 and has been set to this value.")
+    CkCd = ck_cd(Vmax, CkCd, CkCdvary)
 
     # Step 1: Calculate E04 M/M0 vs. r/r0
     # Define the function E04_outerwind_r0input_nondim_MM0

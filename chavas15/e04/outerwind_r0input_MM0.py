@@ -14,6 +14,7 @@ def E04_outerwind_r0input_nondim_MM0(
     C_d: float,
     w_cool: float,
     Nr: int = 10000,
+    test: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate the outer wind profile for a given storm size, r0, using the E04 model.
@@ -25,6 +26,7 @@ def E04_outerwind_r0input_nondim_MM0(
         C_d (float): Drag coefficient [dimensionless]
         w_cool (float): Cooling rate [m/s]
         Nr (int, optional): Number of radii. Defaults to 10000.
+        test (bool, optional): Whether to plot the output or not. Defaults to False.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: rrfracr0, MMfracM0
@@ -87,7 +89,7 @@ def E04_outerwind_r0input_nondim_MM0(
         # -1 = end, i = new index
         MMfracM0[-1 - i - 1] = MfracM0_temp
 
-    if True:
+    if test:
         import matplotlib.pyplot as plt
 
         plt.plot(rrfracr0, MMfracM0, "blue")

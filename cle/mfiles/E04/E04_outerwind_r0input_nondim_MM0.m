@@ -77,7 +77,7 @@ MMfracM0(end-1) = MfracM0_temp;
     
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Variable C_d: code from Cd_Donelan04.m (function call is slow) %%%%%%
-%%Piecewise linear fit parameters estimated from Donelan2004_fit.m
+%% Piecewise linear fit parameters estimated from Donelan2004_fit.m
 C_d_lowV = 6.2e-4;
 V_thresh1 = 6;  %m/s; transition from constant to linear increasing
 V_thresh2 = 35.4;  %m/s; transition from linear increasing to constant
