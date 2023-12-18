@@ -7,10 +7,16 @@ from chavas15.er11.radprof_raw import ER11_radprof_raw
 
 @timeit
 def ER11_radprof(
-    Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11
+    Vmax: float,
+    r_in: float,
+    rmax_or_r0: str,
+    fcor: float,
+    CkCd: float,
+    rr_ER11: np.ndarray,
 ) -> Tuple[np.ndarray, float]:
     # find increment in rr_ER11 vector
     dr = rr_ER11[1] - rr_ER11[0]
+    print("dr = ", dr)
 
     # Call ER11_radprof_raw to get velocity profile and the radius not given as input.
     V_ER11, r_out = ER11_radprof_raw(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11)
@@ -33,6 +39,8 @@ def ER11_radprof(
     while (
         abs(drin_temp) > dr / 2 or abs(dVmax_temp / Vmax_save) >= 1e-2 and n_iter < 21
     ):
+        #
+        # limit to 20 iterations
         n_iter += 1
         if n_iter > 20:
             # Convergence not achieved, return NaNs
@@ -43,6 +51,7 @@ def ER11_radprof(
 
         while abs(dVmax_temp / Vmax) >= 1e-2:
             Vmax += dVmax_temp
+            # print("Vmax = ", Vmax)
             V_ER11, r_out = ER11_radprof_raw(
                 Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_ER11
             )
