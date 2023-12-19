@@ -55,7 +55,11 @@ p[-1] = p0
 for j in range(len(rr) - 1):
     i = -j - 2
     # Assume Coriolis force and pressure-gradient balance centripetal force.
-    p[i] = p[i + 1] - rho0 * (vv[i] ** 2 / (rr[i + 1] - rr[i]) - fcor * vv[i])
+    p[i] = p[i + 1] - rho0 * (
+        vv[i] ** 2
+        / (rr[i + 1] / 2 + rr[i] / 2)
+        # + fcor * vv[i]
+    ) * (rr[i + 1] - rr[i])
     # centripetal pushes out, pressure pushes inward, coriolis pushes inward
 
 plt.plot(rr / 1000, p / 100, "k")
