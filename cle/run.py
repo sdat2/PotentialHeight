@@ -34,3 +34,38 @@ plt.xlabel("Radius, $r$, [km]")
 plt.ylabel("Rotating wind speed, $V$, [m s$^{-1}$]")
 plt.title("CLE15 Wind Profile")
 plt.savefig("r0_pm.pdf", format="pdf")
+plt.clf()
+
+# integrate the wind profile to get the pressure profile
+# assume wind-pressure gradient balance
+p0 = 1005 * 100  # [Pa]
+rho0 = 1.15  # [kg m-3]
+fcor = ins["fcor"]
+r0 = ins["r0"]
+rmax = ou["rmax"]
+rmerge = ou["rmerge"]
+vmax = ins["Vmax"]
+vmerge = ou["Vmerge"]
+rr = np.array(ou["rr"])
+vv = np.array(ou["VV"])
+p = np.zeros(rr.shape)
+# rr ascending
+assert np.all(rr == np.sort(rr))
+p[-1] = p0
+for j in range(len(rr) - 1):
+    i = -j - 2
+    # Assume Coriolis force and pressure-gradient balance centripetal force.
+    p[i] = p[i + 1] - rho0 * (vv[i] ** 2 / (rr[i + 1] - rr[i]) - fcor * vv[i])
+    # centripetal pushes out, pressure pushes inward, coriolis pushes inward
+
+plt.plot(rr / 1000, p / 100, "k")
+plt.xlabel("Radius, $r$, [km]")
+plt.ylabel("Pressure, $p$, [hPa]")
+plt.title("CLE15 Pressure Profile")
+plt.ylim([np.min(p) / 100, np.max(p) * 1.0005 / 100])
+plt.xlim([0, rr[-1] / 1000])
+plt.savefig("r0_pmp.pdf", format="pdf")
+
+# plot the pressure profile
+
+pc = p[0]  # central pressure [Pa]
