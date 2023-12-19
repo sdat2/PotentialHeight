@@ -18,7 +18,6 @@ in.r0
 [rr, VV, rmax, rmerge, Vmerge] = ...
     ER11E04_nondim_r0input(in.Vmax, in.r0, in.fcor, in.Cdvary, in.Cd, in.w_cool, in.CkCdvary, in.CkCd, in.eye_adj, in.alpha_eye);
 
-
 out.rr = rr;
 out.VV = VV;
 out.rmax = rmax;
