@@ -245,6 +245,7 @@ def find_solution():
     plt.legend()
     plt.savefig("r0_pc_joint.pdf")
     plt.clf()
+    run_cle15(inputs={"r0": intersect[0][0]}, plot=True)
 
 
 if __name__ == "__main__":
