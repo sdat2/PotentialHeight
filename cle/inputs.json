@@ -1,12 +1,12 @@
 {
-    "r0": 900000,
-    "Vmax": 50,
-    "fcor": 0.00005,
-    "Cdvary": 0,
-    "Cd": 0.0015,
-    "CkCdvary": 0,
-    "CkCd": 1,
-    "w_cool": 0.002,
-    "eye_adj": 0,
-    "alpha_eye": 0.15
+    "Cd":0.0015,
+    "Cdvary":0,
+    "CkCd":1,
+    "CkCdvary":0,
+    "Vmax":50,
+    "alpha_eye":0.15,
+    "eye_adj":0,
+    "fcor":5e-05,
+    "r0":2000000.0,
+    "w_cool":0.002
 }
