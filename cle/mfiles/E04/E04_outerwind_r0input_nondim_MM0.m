@@ -125,6 +125,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TESTING: M/M0 vs. r/r0 %%%%%%
 
+%{
 figure(98)
 hold off
 plot(rrfracr0,MMfracM0,'b','LineWidth',2)
@@ -135,6 +136,7 @@ ylabel('M/M_0 [dimensionless]')
 input_title = sprintf('r_0 = %5.0f [km]',r0/1000);
 title(input_title)
 saveas(gcf, 'E04_r0input_nondim.pdf', 'pdf')
+%}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% TESTING: Make plot of radial profile %%%%%%

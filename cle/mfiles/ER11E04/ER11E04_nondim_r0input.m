@@ -95,7 +95,7 @@ end
 %% Step 1: Calculate E04 M/M0 vs. r/r0
 Nr = 100000;
 [rrfracr0_E04,MMfracM0_E04] = E04_outerwind_r0input_nondim_MM0(r0,fcor,Cdvary,C_d,w_cool,Nr);
-
+%{
 figure(105)
 plot(rrfracr0_E04, MMfracM0_E04, 'b')
 hold on
@@ -105,7 +105,7 @@ ylabel('M/M_0');
 saveas(gcf, 'radprofE04.pdf', 'pdf')
 close(gcf)
 
-
+%}
 
 
 M0_E04 = .5*fcor*r0.^2;
@@ -154,7 +154,7 @@ while(soln_converged==0)
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
             %%TESTING: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs %%%%%%
-            
+            %{
             figure(1008)
             plot(rrfracr0_ER11,MMfracM0_ER11,'b')
             hold on
@@ -179,6 +179,7 @@ while(soln_converged==0)
             % close figure 
             saveas(gcf, 'radprofE04.pdf', 'pdf')
             close(gcf)
+            %}
 
 
             %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -267,7 +268,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%TESTING: Plot radial profile, mark rrad, and plot E04 model fits and rmaxs %%%%%%
-
+%{
 figure(1009)
 plot(rrfracr0,MMfracM0,'b')
 hold on
@@ -284,7 +285,7 @@ plot(rmerge/1000,Vmerge,'rx')
 plot(rmax/1000,Vmax,'rx')
 xlabel('r [km]');
 ylabel('V [m/s]');
-
+%}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 end

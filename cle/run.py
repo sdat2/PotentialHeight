@@ -1,21 +1,24 @@
 """Run the CLE15 model with json files."""
-
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 from sithom.io import read_json
 from sithom.plot import plot_defaults
+from sithom.time import timeit
 
 plot_defaults()
 
 
-def run_cle15(plot: bool = False) -> float:
+@timeit
+def run_cle15(execute: bool = True, plot: bool = False) -> float:
     ins = read_json("inputs.json")
     print(ins)
 
     # Storm parameters
 
     # run octave file r0_pm.m
-    # os.system("octave r0_pm.m")
+    if execute:
+        os.system("octave r0_pm.m")
 
     # read in the output from r0_pm.m
     ou = read_json("outputs.json")
