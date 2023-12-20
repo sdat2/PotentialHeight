@@ -73,9 +73,7 @@ def run_cle15(
         i = -j - 2
         # Assume Coriolis force and pressure-gradient balance centripetal force.
         p[i] = p[i + 1] - rho0 * (
-            vv[i] ** 2
-            / (rr[i + 1] / 2 + rr[i] / 2)
-            # + fcor * vv[i]
+            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + ins["fcor"] * vv[i]
         ) * (rr[i + 1] - rr[i])
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
 
@@ -204,7 +202,7 @@ def wang_consts(
 
 
 if __name__ == "__main__":
-    r0s = np.linspace(200, 2000, num=50) * 1000
+    r0s = np.linspace(200, 5000, num=50) * 1000
     pcs = []
     for r0 in r0s:
         pcs += [run_cle15(plot=False, inputs={"r0": r0})]
