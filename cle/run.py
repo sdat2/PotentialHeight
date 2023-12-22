@@ -2,6 +2,7 @@
 from typing import Callable, Tuple, Optional, Dict
 import os
 import numpy as np
+from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
@@ -14,9 +15,8 @@ plot_defaults()
 @timeit
 def run_cle15(
     execute: bool = True, plot: bool = False, inputs: Optional[Dict[str, any]] = None
-) -> float:
+) -> Tuple[float, float]:  # pm, rmax
     ins = read_json("inputs.json")
-    print(ins)
     if inputs is not None:
         for key in inputs:
             if key in ins:
@@ -34,7 +34,7 @@ def run_cle15(
     ou = read_json("outputs.json")
 
     if plot:
-        print(ou)
+        # print(ou)
         # plot the output
         rr = np.array(ou["rr"]) / 1000
         rmerge = ou["rmerge"] / 1000
@@ -63,7 +63,6 @@ def run_cle15(
     # assume wind-pressure gradient balance
     p0 = 1005 * 100  # [Pa]
     rho0 = 1.15  # [kg m-3]
-    rmerge = ou["rmerge"]
     rr = np.array(ou["rr"])
     vv = np.array(ou["VV"])
     p = np.zeros(rr.shape)
@@ -90,7 +89,7 @@ def run_cle15(
 
     # plot the pressure profile
 
-    return p[0]  # central pressure [Pa]
+    return interp1d(rr, p)(ou["rmax"]), ou["rmax"]  # p[0]  # central pressure [Pa]
 
 
 def wang_diff(a: float = 0.062, b: float = 0.031, c: float = 0.008) -> Callable:
@@ -107,7 +106,7 @@ def bisection(f: Callable, left: float, right: float, tol: float) -> float:
     fright = f(right)
     if fleft * fright > 0:
         print("Error: f(left) and f(right) must have opposite signs.")
-        return None
+        return np.nan
 
     while fleft * fright < 0 and right - left > tol:
         mid = (left + right) / 2
@@ -145,7 +144,7 @@ def wang_consts(
     efficiency_relative_to_carnot=0.5,
     pressure_dry_at_inflow=985 * 100,
     coriolis_parameter=5e-5,
-    maximum_wind_speed=83,
+    maximum_wind_speed=50,
     radius_of_inflow=2193 * 1000,
     radius_of_max_wind=64 * 1000,
 ) -> Tuple[float, float, float]:
@@ -203,10 +202,10 @@ def wang_consts(
 
 
 def vary_r0_c15(r0s: np.ndarray):
-    pcs = np.array([run_cle15(plot=False, inputs={"r0": r0}) for r0 in r0s])
+    pcs = np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
     plt.plot(r0s / 1000, pcs / 100, "k")
     plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Central pressure, $p_c$, [hPa]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.savefig("r0_pc.pdf")
     plt.clf()
     return pcs
@@ -222,10 +221,48 @@ def vary_r0_w22(r0s: np.ndarray):
     pms = (1005 * 100 - buck(299)) / ys + buck(299)
     plt.plot(r0s / 1000, np.array(pms) / 100, "r")
     plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Central pressure, $p_c$, [hPa]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.savefig("r0_pc_wang.pdf")
     plt.clf()
     return pms
+
+
+def find_solution_rmaxv():
+    r0s = np.linspace(200, 5000, num=30) * 1000
+    pcs = []
+    pcw = []
+    for r0 in r0s:
+        pm_cle, rmax_cle = run_cle15(plot=True, inputs={"r0": r0})
+
+        pm_car = bisection(
+            wang_diff(
+                *wang_consts(
+                    radius_of_max_wind=rmax_cle,
+                    radius_of_inflow=r0,
+                )
+            ),
+            0.9,
+            1.2,
+            1e-6,
+        )
+        pcs.append(pm_cle)
+        pcw.append(pm_car)
+
+        print(r0, pm_cle, pm_car)
+    pcs = np.array(pcs)
+    pcw = np.array(pcw)
+
+    plt.plot(r0s / 1000, pcs / 100, "k", label="CLE15")
+    plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
+    intersect = curveintersect(r0s, pcs, r0s, pcw)
+    print("intersect", intersect)
+    # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
+    plt.xlabel("Radius, $r_a$, [km]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.legend()
+    plt.savefig("r0_pc_rmaxadj.pdf")
+    plt.clf()
+    return pcs, pcw
 
 
 @timeit
@@ -235,13 +272,12 @@ def find_solution():
     pcs = vary_r0_c15(r0s)
     pcw = vary_r0_w22(r0s)
 
-    intersect = curveintersect(r0s, pcs, r0s, pcw)
-
     plt.plot(r0s / 1000, pcs / 100, "k", label="CLE15")
     plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
+    intersect = curveintersect(r0s, pcs, r0s, pcw)
     plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
     plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Central pressure, $p_c$, [hPa]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.legend()
     plt.savefig("r0_pc_joint.pdf")
     plt.clf()
@@ -250,3 +286,4 @@ def find_solution():
 
 if __name__ == "__main__":
     find_solution()
+    # find_solution_rmaxv()
