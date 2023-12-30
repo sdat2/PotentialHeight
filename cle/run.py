@@ -231,26 +231,30 @@ def find_solution_rmaxv():
     r0s = np.linspace(200, 5000, num=30) * 1000
     pcs = []
     pcw = []
+    rmaxs = []
     for r0 in r0s:
         pm_cle, rmax_cle = run_cle15(plot=True, inputs={"r0": r0})
 
-        pm_car = bisection(
+        ys = bisection(
             wang_diff(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
                 )
             ),
-            0.9,
+            0.3,
             1.2,
             1e-6,
         )
+        pm_car = (1005 * 100 - buck(299)) / ys + buck(299)
+
         pcs.append(pm_cle)
         pcw.append(pm_car)
-
-        print(r0, pm_cle, pm_car)
+        rmaxs.append(rmax_cle)
+        print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
     pcs = np.array(pcs)
     pcw = np.array(pcw)
+    rmaxs = np.array(rmaxs)
 
     plt.plot(r0s / 1000, pcs / 100, "k", label="CLE15")
     plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
@@ -259,10 +263,25 @@ def find_solution_rmaxv():
     # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
     plt.xlabel("Radius, $r_a$, [km]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
     plt.legend()
     plt.savefig("r0_pc_rmaxadj.pdf")
     plt.clf()
+    plt.plot(r0s / 1000, rmaxs / 1000, "k")
+    plt.xlabel("Radius, $r_a$, [km]")
+    plt.ylabel("Radius of maximum winds, $r_m$, [km]")
+    plt.savefig("r0_rmax.pdf")
+    plt.clf()
     return pcs, pcw
+
+
+def check_w22():
+    wd = wang_diff(
+        *wang_consts(
+            radius_of_max_wind=64 * 1000,
+            radius_of_inflow=2193 * 1000,
+        )
+    )
 
 
 @timeit
@@ -285,5 +304,5 @@ def find_solution():
 
 
 if __name__ == "__main__":
-    find_solution()
-    # find_solution_rmaxv()
+    # find_solution()
+    find_solution_rmaxv()
