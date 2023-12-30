@@ -15,7 +15,7 @@ plot_defaults()
 @timeit
 def run_cle15(
     execute: bool = True, plot: bool = False, inputs: Optional[Dict[str, any]] = None
-) -> Tuple[float, float]:  # pm, rmax
+) -> Tuple[float, float, float]:  # pm, rmax, vmax
     ins = read_json("inputs.json")
     if inputs is not None:
         for key in inputs:
@@ -89,7 +89,11 @@ def run_cle15(
 
     # plot the pressure profile
 
-    return interp1d(rr, p)(ou["rmax"]), ou["rmax"]  # p[0]  # central pressure [Pa]
+    return (
+        interp1d(rr, p)(ou["rmax"]),
+        ou["rmax"],
+        ins["Vmax"],
+    )  # p[0]  # central pressure [Pa]
 
 
 def wang_diff(a: float = 0.062, b: float = 0.031, c: float = 0.008) -> Callable:
@@ -144,7 +148,7 @@ def wang_consts(
     efficiency_relative_to_carnot=0.5,
     pressure_dry_at_inflow=985 * 100,
     coriolis_parameter=5e-5,
-    maximum_wind_speed=50,
+    maximum_wind_speed=83,
     radius_of_inflow=2193 * 1000,
     radius_of_max_wind=64 * 1000,
 ) -> Tuple[float, float, float]:
@@ -233,16 +237,17 @@ def find_solution_rmaxv():
     pcw = []
     rmaxs = []
     for r0 in r0s:
-        pm_cle, rmax_cle = run_cle15(plot=True, inputs={"r0": r0})
+        pm_cle, rmax_cle, vmax = run_cle15(plot=True, inputs={"r0": r0})
 
         ys = bisection(
             wang_diff(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
+                    maximum_wind_speed=vmax,
                 )
             ),
-            0.3,
+            0.9,
             1.2,
             1e-6,
         )
