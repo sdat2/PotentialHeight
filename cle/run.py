@@ -11,6 +11,9 @@ from chavas15.intersect import curveintersect
 
 plot_defaults()
 
+BACKGROUND_PRESSURE = 1015 * 100  # [Pa]
+TEMP_0K = 273.15  # [K]
+
 
 @timeit
 def run_cle15(
@@ -61,7 +64,7 @@ def run_cle15(
 
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
-    p0 = 1005 * 100  # [Pa]
+    p0 = BACKGROUND_PRESSURE  # [Pa]
     rho0 = 1.15  # [kg m-3]
     rr = np.array(ou["rr"])
     vv = np.array(ou["VV"])
@@ -126,7 +129,7 @@ def bisection(f: Callable, left: float, right: float, tol: float) -> float:
 
 def buck(temp: float) -> float:  # temp in K -> saturation vapour pressure in Pa
     # https://en.wikipedia.org/wiki/Arden_Buck_equation
-    temp = temp - 273.15
+    temp = temp - TEMP_0K
     return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
 
 
@@ -205,7 +208,7 @@ def wang_consts(
     )
 
 
-def vary_r0_c15(r0s: np.ndarray):
+def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
     pcs = np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
     plt.plot(r0s / 1000, pcs / 100, "k")
     plt.xlabel("Radius, $r_a$, [km]")
@@ -215,14 +218,14 @@ def vary_r0_c15(r0s: np.ndarray):
     return pcs
 
 
-def vary_r0_w22(r0s: np.ndarray):
+def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
     ys = np.array(
         [
             bisection(wang_diff(*wang_consts(radius_of_inflow=r0)), 0.3, 1.2, 1e-6)
             for r0 in r0s
         ]
     )
-    pms = (1005 * 100 - buck(299)) / ys + buck(299)
+    pms = (BACKGROUND_PRESSURE - buck(299)) / ys + buck(299)
     plt.plot(r0s / 1000, np.array(pms) / 100, "r")
     plt.xlabel("Radius, $r_a$, [km]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
@@ -231,7 +234,7 @@ def vary_r0_w22(r0s: np.ndarray):
     return pms
 
 
-def find_solution_rmaxv():
+def find_solution_rmaxv() -> Tuple[np.ndarray, np.ndarray]:
     r0s = np.linspace(200, 5000, num=30) * 1000
     pcs = []
     pcw = []
@@ -251,7 +254,7 @@ def find_solution_rmaxv():
             1.2,
             1e-6,
         )
-        pm_car = (1005 * 100 - buck(299)) / ys + buck(299)
+        pm_car = (BACKGROUND_PRESSURE - buck(299)) / ys + buck(299)
 
         pcs.append(pm_cle)
         pcw.append(pm_car)
@@ -277,6 +280,7 @@ def find_solution_rmaxv():
     plt.ylabel("Radius of maximum winds, $r_m$, [km]")
     plt.savefig("r0_rmax.pdf")
     plt.clf()
+    run_cle15(inputs={"r0": intersect[0][0], "Vmax": 86}, plot=True)
     return pcs, pcw
 
 
