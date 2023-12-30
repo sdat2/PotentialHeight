@@ -54,7 +54,16 @@ def run_cle15(
             label="$r_{\mathrm{merge}}$ (input)",
         )
         plt.plot(ins["r0"] / 1000, 0, "r.", label="$r_a$ (input)")
-        plt.ylim([0, 55])  # np.nanmax(out["VV"]) * 1.05])
+
+        def _f(x: any) -> float:
+            if isinstance(x, float):
+                return x
+            else:
+                return np.nan
+
+        plt.ylim(
+            [0, np.nanmax([_f(v) for v in vv]) * 1.10]
+        )  # np.nanmax(out["VV"]) * 1.05])
         plt.legend()
         plt.xlabel("Radius, $r$, [km]")
         plt.ylabel("Rotating wind speed, $V$, [m s$^{-1}$]")
