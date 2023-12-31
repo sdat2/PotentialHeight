@@ -21,3 +21,18 @@ CONFIG_PATH = os.path.join(SRC_PATH, "config")
 
 # General data from e.g. paper or cmip etc.
 DATA_PATH = PROJECT_PATH / "data"
+GOM = (25.443701, -90.013120)  # Centre of Gulf of Mexico, lat, lon
+MONTHS = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]

@@ -440,3 +440,10 @@ def regrid_1d(xesmf: bool = False) -> None:
     print("ocean_out", ocean_out)
     ocean_out.to_netcdf("data/ocean_regridded.nc")
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
+
+
+if __name__ == "__main__":
+    # tcpips/pangeo.py
+    # regrid_2d()
+    regrid_1d(xesmf=True)
+    # regrid_2d_1degree()

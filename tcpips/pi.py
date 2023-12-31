@@ -6,7 +6,7 @@ from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
 from sithom.plot import feature_grid, plot_defaults, get_dim, axis_formatter
-from tcpips.constants import FIGURE_PATH
+from tcpips.constants import FIGURE_PATH, GOM, MONTHS
 from tcpips.pangeo import convert, regrid_2d_1degree
 
 CKCD: float = 0.9
@@ -225,7 +225,6 @@ def plot_example() -> None:
 
 
 def gom() -> None:
-    GOM = (25.443701, -90.013120)
     ds = xr.open_dataset("../tcpypi/data/sample_data.nc").sel(
         lon=GOM[1], lat=GOM[0], method="nearest"
     )
@@ -249,20 +248,7 @@ def gom() -> None:
     markers = ["x"] * 4 + ["+"] * 4 + ["*"] * 4
     lines = ["-"] * 4 + ["--"] * 4 + [":"] * 4
     colors = ["C0", "C1", "C2", "C3", "C4", "C5"] * 2
-    months = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-    ]
+
     for month in range(0, 12):
         axs[0].plot(
             ds.t.isel(month=month), ds.p, lines[month], color=colors[month]
@@ -272,14 +258,14 @@ def gom() -> None:
             pi_ds.otl.isel(month=month),
             markers[month],
             color=colors[month],
-            label="$T_{o}$ " + f"{months[month]}",
+            label="$T_{o}$ " + f"{MONTHS[month]}",
         )
         axs[1].plot(
             ds.q.isel(month=month),
             ds.p,
             lines[month],
             color=colors[month],
-            label=months[month],
+            label=MONTHS[month],
         )  # , label="q")
 
     # axs[0].legend()
@@ -309,7 +295,7 @@ def gom() -> None:
     axs[2].set_ylabel("$P_s$ [hPa]")
     axs[3].set_xlabel("Month")
     axs[0].set_xlim(0, 11)
-    axs[0].set_xticks(range(0, 12), months)
+    axs[0].set_xticks(range(0, 12), MONTHS)
     for month in range(0, 12):
         axs[0].plot(
             month, pi_ds.vmax.isel(month=month), markers[month], color=colors[month]
@@ -341,13 +327,18 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
 
 
 if __name__ == "__main__":
-    gom()
     # python tcpips/pi.py
-    # get_ocean()
-    # get_ocean()
-    # get_all()
+    # gom()
     # regrid_2d_1degree()
-    # calc_pi_example()
+    print(combined_data_timestep(time="2015-01-15"))
+    ds = combined_data_timestep(time="2015-01-15")
+    lats = ds.lat.values
+    lons = ds.lon.values
+    ds = ds.drop_vars(["lat", "lon"])
+    ds = ds.assign_coords({"lat": ("y", lats[:, 0]), "lon": ("x", lons[0, :])})
+    print(ds)
+    ds = ds.sel(lat=GOM[0], lon=GOM[1], method="nearest")
+    print(ds)
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()

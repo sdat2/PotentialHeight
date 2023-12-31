@@ -227,6 +227,9 @@ def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
     return pcs
 
 
+DEFAULT_SURF_TEMP = 299  # K
+
+
 def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
     ys = np.array(
         [
@@ -234,7 +237,7 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
             for r0 in r0s
         ]
     )
-    pms = (BACKGROUND_PRESSURE - buck(299)) / ys + buck(299)
+    pms = (BACKGROUND_PRESSURE - buck(DEFAULT_SURF_TEMP)) / ys + buck(DEFAULT_SURF_TEMP)
     plt.plot(r0s / 1000, np.array(pms) / 100, "r")
     plt.xlabel("Radius, $r_a$, [km]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
@@ -263,7 +266,9 @@ def find_solution_rmaxv() -> Tuple[np.ndarray, np.ndarray]:
             1.2,
             1e-6,
         )
-        pm_car = (BACKGROUND_PRESSURE - buck(299)) / ys + buck(299)
+        pm_car = (BACKGROUND_PRESSURE - buck(DEFAULT_SURF_TEMP)) / ys + buck(
+            DEFAULT_SURF_TEMP
+        )
 
         pcs.append(pm_cle)
         pcw.append(pm_car)
