@@ -74,7 +74,7 @@ def run_cle15(
 
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
-    p0 = ins[p0]  # [Pa]
+    p0 = ins["p0"] * 100  # [Pa]
     rho0 = 1.15  # [kg m-3]
     rr = np.array(ou["rr"])
     vv = np.array(ou["VV"])
@@ -268,6 +268,7 @@ def find_solution_rmaxv(
                 "Vmax": vmax_pi,
                 "w_cool": w_cool,
                 "fcor": coriolis_parameter,
+                "p0": background_pressure / 100,
             },
         )
 
@@ -309,7 +310,10 @@ def find_solution_rmaxv(
         # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
         plt.xlabel("Radius, $r_a$, [km]")
         plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-        plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
+        if len(intersect) > 0:
+            plt.plot(
+                intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution"
+            )
         plt.legend()
         plt.savefig("r0_pc_rmaxadj.pdf")
         plt.clf()
@@ -319,7 +323,7 @@ def find_solution_rmaxv(
         plt.savefig("r0_rmax.pdf")
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
-    return intersect[0]
+    return intersect[0][0]
 
 
 @timeit
@@ -342,17 +346,35 @@ def find_solution():
     run_cle15(inputs={"r0": intersect[0][0]}, plot=True)
 
 
-if __name__ == "__main__":
+def gom_time(time: str = "1850-09-15", plot=False) -> np.ndarray:
     # find_solution()
     # find_solution_rmaxv()
-    ds = get_gom(time="2017-09-15 00:00:00", verbose=True)
+    ds = get_gom(time="1850-09-15 00:00:00", verbose=True)
     print(ds)
     soln = find_solution_rmaxv(
         vmax_pi=ds["vmax"].values,
         outflow_temperature=ds["t0"].values,
-        near_surface_air_temperature=ds["sst"].values + TEMP_0K,
+        near_surface_air_temperature=ds["sst"].values + TEMP_0K - 1,
         coriolis_parameter=2 * 7.2921e-5 * np.sin(np.deg2rad(ds["lat"].values)),
-        background_pressure=ds["msl"].values,
-        plot=False,
+        background_pressure=ds["msl"].values * 100,
+        plot=plot,
     )
     print(soln)
+    return soln
+
+
+if __name__ == "__main__":
+    # python run.py
+    # find_solution()
+    # find_solution_rmaxv()
+    solns = []
+    times = [1850, 1900, 1950, 2000, 2050, 2099]
+
+    for time in [str(t) + "-09-15" for t in times]:
+        solns += gom_time(time=time, plot=False)
+
+    solns = np.array(solns)
+    print("solns", solns)
+    plt.plot(times, solns / 1000, "k")
+    plt.xlabel("Year")
+    plt.ylabel("Radius of maximum winds, $r_m$, [km]")
