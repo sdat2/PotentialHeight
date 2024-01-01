@@ -8,6 +8,7 @@ from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
+from tcpips.pi import get_gom
 
 plot_defaults()
 
@@ -328,4 +329,5 @@ def find_solution():
 
 if __name__ == "__main__":
     # find_solution()
-    find_solution_rmaxv()
+    # find_solution_rmaxv()
+    get_gom()

@@ -6,7 +6,7 @@ from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
 from sithom.plot import feature_grid, plot_defaults, get_dim, axis_formatter
-from tcpips.constants import FIGURE_PATH, GOM, MONTHS
+from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
 from tcpips.pangeo import convert, regrid_2d_1degree
 
 CKCD: float = 0.9
@@ -74,7 +74,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
 
 @timeit
 def calc_pi_example() -> None:
-    ds = xr.open_dataset("data/all_regridded.nc", engine="h5netcdf")
+    ds = xr.open_dataset(os.path.join(DATA_PATH, "all_regridded.nc"), engine="h5netcdf")
     input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
     input.tos.isel(time=0).plot(x="lon", y="lat")
@@ -321,28 +321,39 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
         ds = xr.open_dataset(name, engine="h5netcdf").sel(time=time).isel(time=0)
         return ds.drop_vars([x for x in ["time", "time_bounds", "nbnd"] if x in ds])
 
-    atmos_ds = open("data/atmos_new_regridded.nc")
-    ocean_ds = open("data/ocean_regridded.nc")
+    atmos_ds = open(os.path.join(DATA_PATH, "atmos_new_regridded.nc"))
+    ocean_ds = open(os.path.join(DATA_PATH, "ocean_regridded.nc"))
     return xr.merge([ocean_ds, atmos_ds])
+
+
+def get_gom(time="2015-01-15", verbose=False) -> xr.Dataset:
+    ds = combined_data_timestep(time=time)
+    lats = ds.lat.values
+    lons = ds.lon.values
+    ds = ds.drop_vars(["lat", "lon"])
+    ds = ds.assign_coords({"lat": ("y", lats[:, 0]), "lon": ("x", lons[0, :])})
+    if verbose:
+        print("ds with 1d coords", ds)
+    ds = ds.swap_dims({"y": "lat", "x": "lon"})
+    if verbose:
+        print(ds)
+    ds = ds.sel(lat=GOM[0], lon=GOM[1], method="nearest")
+    ds = convert(ds)
+    pi = calculate_pi(ds, dim="p")
+    if verbose:
+        print(pi)
+    return xr.merge([ds, pi])
 
 
 if __name__ == "__main__":
     # python tcpips/pi.py
     # gom()
     # regrid_2d_1degree()
-    print(combined_data_timestep(time="2015-01-15"))
-    ds = combined_data_timestep(time="2015-01-15")
-    lats = ds.lat.values
-    lons = ds.lon.values
-    ds = ds.drop_vars(["lat", "lon"])
-    ds = ds.assign_coords({"lat": ("y", lats[:, 0]), "lon": ("x", lons[0, :])})
-    print(ds)
-    ds = ds.sel(lat=GOM[0], lon=GOM[1], method="nearest")
-    print(ds)
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
     # plot_example()
+    print(get_gom())
 
     # plot_diffs()
 
