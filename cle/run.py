@@ -74,7 +74,7 @@ def run_cle15(
 
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
-    p0 = BACKGROUND_PRESSURE  # [Pa]
+    p0 = ins[p0]  # [Pa]
     rho0 = 1.15  # [kg m-3]
     rr = np.array(ou["rr"])
     vv = np.array(ou["VV"])
@@ -247,13 +247,29 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
     return pms
 
 
-def find_solution_rmaxv() -> Tuple[np.ndarray, np.ndarray]:
+def find_solution_rmaxv(
+    vmax_pi: float = 86,
+    coriolis_parameter: float = 5e-5,
+    background_pressure: float = BACKGROUND_PRESSURE,
+    near_surface_air_temperature: float = DEFAULT_SURF_TEMP,
+    w_cool: float = 0.002,
+    outflow_temperature: float = 200,
+    plot: bool = False,
+) -> Tuple[np.ndarray, np.ndarray]:
     r0s = np.linspace(200, 5000, num=30) * 1000
     pcs = []
     pcw = []
     rmaxs = []
     for r0 in r0s:
-        pm_cle, rmax_cle, vmax = run_cle15(plot=True, inputs={"r0": r0})
+        pm_cle, rmax_cle, vmax = run_cle15(
+            plot=True,
+            inputs={
+                "r0": r0,
+                "Vmax": vmax_pi,
+                "w_cool": w_cool,
+                "fcor": coriolis_parameter,
+            },
+        )
 
         ys = bisection(
             wang_diff(
@@ -261,14 +277,20 @@ def find_solution_rmaxv() -> Tuple[np.ndarray, np.ndarray]:
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
                     maximum_wind_speed=vmax,
+                    coriolis_parameter=coriolis_parameter,
+                    pressure_dry_at_inflow=background_pressure
+                    - buck(near_surface_air_temperature),
+                    near_surface_air_temperature=near_surface_air_temperature,
+                    outflow_temperature=outflow_temperature,
                 )
             ),
             0.9,
             1.2,
             1e-6,
         )
-        pm_car = (BACKGROUND_PRESSURE - buck(DEFAULT_SURF_TEMP)) / ys + buck(
-            DEFAULT_SURF_TEMP
+        # convert solution to pressure
+        pm_car = (background_pressure - buck(near_surface_air_temperature)) / ys + buck(
+            near_surface_air_temperature
         )
 
         pcs.append(pm_cle)
@@ -278,39 +300,32 @@ def find_solution_rmaxv() -> Tuple[np.ndarray, np.ndarray]:
     pcs = np.array(pcs)
     pcw = np.array(pcw)
     rmaxs = np.array(rmaxs)
-
-    plt.plot(r0s / 1000, pcs / 100, "k", label="CLE15")
-    plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
     intersect = curveintersect(r0s, pcs, r0s, pcw)
-    print("intersect", intersect)
-    # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
-    plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
-    plt.legend()
-    plt.savefig("r0_pc_rmaxadj.pdf")
-    plt.clf()
-    plt.plot(r0s / 1000, rmaxs / 1000, "k")
-    plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Radius of maximum winds, $r_m$, [km]")
-    plt.savefig("r0_rmax.pdf")
-    plt.clf()
-    run_cle15(inputs={"r0": intersect[0][0], "Vmax": 86}, plot=True)
-    return pcs, pcw
 
-
-def check_w22():
-    wd = wang_diff(
-        *wang_consts(
-            radius_of_max_wind=64 * 1000,
-            radius_of_inflow=2193 * 1000,
-        )
-    )
+    if plot:
+        plt.plot(r0s / 1000, pcs / 100, "k", label="CLE15")
+        plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
+        print("intersect", intersect)
+        # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
+        plt.xlabel("Radius, $r_a$, [km]")
+        plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+        plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
+        plt.legend()
+        plt.savefig("r0_pc_rmaxadj.pdf")
+        plt.clf()
+        plt.plot(r0s / 1000, rmaxs / 1000, "k")
+        plt.xlabel("Radius, $r_a$, [km]")
+        plt.ylabel("Radius of maximum winds, $r_m$, [km]")
+        plt.savefig("r0_rmax.pdf")
+        plt.clf()
+        run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
+    return intersect[0]
 
 
 @timeit
 def find_solution():
-    r0s = np.linspace(200, 5000, num=30) * 1000
+    # without rmax adjustment
+    r0s = np.linspace(200, 5000, num=30) * 1000  # [m]
 
     pcs = vary_r0_c15(r0s)
     pcw = vary_r0_w22(r0s)
@@ -330,4 +345,14 @@ def find_solution():
 if __name__ == "__main__":
     # find_solution()
     # find_solution_rmaxv()
-    get_gom()
+    ds = get_gom(time="2017-09-15 00:00:00", verbose=True)
+    print(ds)
+    soln = find_solution_rmaxv(
+        vmax_pi=ds["vmax"].values,
+        outflow_temperature=ds["t0"].values,
+        near_surface_air_temperature=ds["sst"].values + TEMP_0K,
+        coriolis_parameter=2 * 7.2921e-5 * np.sin(np.deg2rad(ds["lat"].values)),
+        background_pressure=ds["msl"].values,
+        plot=False,
+    )
+    print(soln)
