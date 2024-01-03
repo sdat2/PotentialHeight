@@ -592,6 +592,7 @@ def ds_solns(num: int = 50, verbose: bool = False) -> None:
 
 def plot_from_ds() -> None:
     ds = xr.open_dataset("gom_soln_all.nc")
+    print("ds", ds)
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(ds["time"], ds["r0"] / 1000, "k")
     axs[1].plot(ds["time"], ds["vmax"], "k")
@@ -601,6 +602,28 @@ def plot_from_ds() -> None:
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.savefig("rmax_time_new.pdf")
+    plt.clf()
+
+    im = plt.scatter(
+        ds["vmax"].values, ds["r0"].values / 1000, c=ds["time"], marker="x"
+    )
+    plt.colorbar(im, label="Year", shrink=0.5)
+    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.ylabel("Radius of outer winds, $r_a$, [km]")
+    plt.savefig("rmax_vmax.pdf")
+    plt.clf()
+    from sithom.plot import pairplot
+
+    vars = ["r0", "vmax", "pm", "sst", "msl", "t0"]  # , "time"]
+
+    pairplot(ds[vars].to_dataframe()[vars])
+    plt.savefig("pairplot.pdf")
+    plt.clf()
+
+    vars = ["t", "q", "vmax", "r0", "pm", "t0"]
+    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
+    plt.savefig("pairplot2.pdf")
+    plt.clf()
 
 
 if __name__ == "__main__":
