@@ -564,16 +564,13 @@ def plot_gom_solns():
 
 
 @timeit
-def ds_solns(num: int = 50, verbose: bool = False) -> xr.Dataset:
+def ds_solns(num: int = 50, verbose: bool = False) -> None:
     """
     Record all the details of the GOM solution for a range of times.
 
     Args:
         num (int, optional): Number of years to calculate for. Defaults to 50.
-        verbose (bool, optional): _description_. Defaults to False.
-
-    Returns:
-        xr.Dataset:
+        verbose (bool, optional): Verbose. Defaults to False.
     """
     times = [int(x) for x in np.linspace(1850, 2099, num=num)]
     ds_list = []
@@ -593,10 +590,24 @@ def ds_solns(num: int = 50, verbose: bool = False) -> xr.Dataset:
     ds.to_netcdf("gom_soln_all.nc")
 
 
+def plot_from_ds() -> None:
+    ds = xr.open_dataset("gom_soln_all.nc")
+    fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+    axs[0].plot(ds["time"], ds["r0"] / 1000, "k")
+    axs[1].plot(ds["time"], ds["vmax"], "k")
+    axs[2].plot(ds["time"], ds["pm"] / 100, "k")
+    plt.xlabel("Year")
+    axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.savefig("rmax_time_new.pdf")
+
+
 if __name__ == "__main__":
     # python run.py
     # find_solution()
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
     # plot_gom_solns()
-    ds_solns(num=100, verbose=True)
+    # ds_solns(num=100, verbose=True)
+    plot_from_ds()
