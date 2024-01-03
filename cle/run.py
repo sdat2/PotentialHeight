@@ -274,12 +274,12 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
 
 
 def find_solution_rmaxv(
-    vmax_pi: float = 86,
-    coriolis_parameter: float = 5e-5,
-    background_pressure: float = BACKGROUND_PRESSURE,
-    near_surface_air_temperature: float = DEFAULT_SURF_TEMP,
+    vmax_pi: float = 86,  # m/s
+    coriolis_parameter: float = 5e-5,  # s-1
+    background_pressure: float = BACKGROUND_PRESSURE,  # Pa
+    near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
     w_cool: float = 0.002,
-    outflow_temperature: float = 200,
+    outflow_temperature: float = 200,  # K
     plot: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     r0s = np.linspace(200, 5000, num=30) * 1000
