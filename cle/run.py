@@ -139,12 +139,33 @@ def bisection(f: Callable, left: float, right: float, tol: float) -> float:
 
 
 def buck(temp: float) -> float:  # temp in K -> saturation vapour pressure in Pa
+    """
+    Arden Buck equation.
+
+    https://en.wikipedia.org/wiki/Arden_Buck_equation
+
+    Args:
+        temp (float): temperature in Kelvin.
+
+    Returns:
+        float: saturation vapour pressure in Pa.
+    """
     # https://en.wikipedia.org/wiki/Arden_Buck_equation
     temp = temp - TEMP_0K
     return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
 
 
 def carnot(temp_hot: float, temp_cold: float) -> float:
+    """
+    Calculate carnot factor.
+
+    Args:
+        temp_hot (float): _description_
+        temp_cold (float): _description_
+
+    Returns:
+        float: _description_
+    """
     return (temp_hot - temp_cold) / temp_hot
 
 
@@ -327,6 +348,97 @@ def find_solution_rmaxv(
     return intersect[0][0], vmax_pi, intersect[1][0]
 
 
+def find_solution_ds(ds: xr.Dataset, plot: bool = False) -> xr.Dataset:
+    r0s = np.linspace(200, 5000, num=30) * 1000  # [m] try different outer radii
+    pcs = []
+    pcw = []
+    rmaxs = []
+    near_surface_air_temperature = ds["sst"].values + TEMP_0K - 1
+    outflow_temperature = ds["t0"].values
+    coriolis_parameter = 2 * 7.2921e-5 * np.sin(np.deg2rad(ds["lat"].values))
+
+    for r0 in r0s:
+        pm_cle, rmax_cle, vmax = run_cle15(
+            plot=True,
+            inputs={
+                "r0": r0,
+                "Vmax": ds["vmax"].values,
+                "w_cool": 0.002,
+                "fcor": coriolis_parameter,
+                "p0": ds["msl"].values,
+            },
+        )
+
+        ys = bisection(
+            wang_diff(
+                *wang_consts(
+                    radius_of_max_wind=rmax_cle,
+                    radius_of_inflow=r0,
+                    maximum_wind_speed=vmax,
+                    coriolis_parameter=coriolis_parameter,
+                    pressure_dry_at_inflow=ds["msl"].values * 100
+                    - buck(near_surface_air_temperature),
+                    near_surface_air_temperature=near_surface_air_temperature,
+                    outflow_temperature=outflow_temperature,
+                )
+            ),
+            0.9,
+            1.2,
+            1e-6,
+        )
+        # convert solution to pressure
+        pm_car = (
+            ds["msl"].values * 100 - buck(near_surface_air_temperature)
+        ) / ys + buck(near_surface_air_temperature)
+
+        pcs.append(pm_cle)
+        pcw.append(pm_car)
+        rmaxs.append(rmax_cle)
+        print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
+    pcs = np.array(pcs)
+    pcw = np.array(pcw)
+    rmaxs = np.array(rmaxs)
+    intersect = curveintersect(r0s, pcs, r0s, pcw)
+
+    if plot:
+        plt.plot(r0s / 1000, pcs / 100, "k", label="CLE15")
+        plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
+        print("intersect", intersect)
+        # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
+        plt.xlabel("Radius, $r_a$, [km]")
+        plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+        if len(intersect) > 0:
+            plt.plot(
+                intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution"
+            )
+        plt.legend()
+        plt.savefig("r0_pc_rmaxadj.pdf")
+        plt.clf()
+        plt.plot(r0s / 1000, rmaxs / 1000, "k")
+        plt.xlabel("Radius, $r_a$, [km]")
+        plt.ylabel("Radius of maximum winds, $r_m$, [km]")
+        plt.savefig("r0_rmax.pdf")
+        plt.clf()
+        pm_cle, rmax_cle, vmax = run_cle15(
+            inputs={"r0": intersect[0][0], "Vmax": ds["vmax"].values}, plot=True
+        )
+
+    ds["r0"] = intersect[0][0]
+    ds["pm"] = intersect[1][0]
+    ds["rmax"] = rmax_cle
+
+    pm_ds = xr.Dataset(
+        data_vars={
+            "pm_cle": ("r0s", pcs, {"units": "Pa"}),
+            "pm_car": ("r0s", pcw, {"units": "Pa"}),
+            "rmaxs": ("r0s", rmaxs, {"units": "m"}),
+        },
+        coords={"r0s": r0s},
+    )
+
+    return xr.merge([ds, pm_ds])
+
+
 @timeit
 def find_solution():
     # without rmax adjustment
@@ -364,7 +476,7 @@ def gom_time(time: str = "1850-09-15", plot=False) -> np.ndarray:
     return soln
 
 
-def plot_gom():
+def plot_gom() -> None:
     solns = []
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
     times = [int(x) for x in range(1850, 2100, 20)]
@@ -385,10 +497,12 @@ def plot_gom():
     plt.savefig("rmax_time.pdf")
 
 
-def calc_solns_for_times(num: int = 10) -> np.ndarray:
+@timeit
+def calc_solns_for_times(num: int = 50) -> None:
+    print("NUM", num)
     solns = []
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
-    times = [int(x) for x in range(1850, 2100, num)]
+    times = [int(x) for x in range(1850, 2100, num - 1)] + [2099]
 
     for time in [str(t) + "-08-15" for t in times]:
         solns += [gom_time(time=time, plot=False)]
@@ -407,6 +521,7 @@ def calc_solns_for_times(num: int = 10) -> np.ndarray:
     ds.to_netcdf("gom_solns.nc")
 
 
+@timeit
 def plot_gom_solns():
     ds = xr.open_dataset("gom_solns.nc")
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -424,5 +539,5 @@ if __name__ == "__main__":
     # python run.py
     # find_solution()
     # find_solution_rmaxv()
-    # calc_solns_for_times(num=20)
+    calc_solns_for_times(num=50)
     plot_gom_solns()
