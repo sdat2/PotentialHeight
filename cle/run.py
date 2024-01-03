@@ -323,7 +323,7 @@ def find_solution_rmaxv(
         plt.savefig("r0_rmax.pdf")
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
-    return intersect[0][0]
+    return intersect[0][0], vmax_pi, intersect[0][1]
 
 
 @timeit
@@ -349,7 +349,7 @@ def find_solution():
 def gom_time(time: str = "1850-09-15", plot=False) -> np.ndarray:
     # find_solution()
     # find_solution_rmaxv()
-    ds = get_gom(time="1850-09-15 00:00:00", verbose=True)
+    ds = get_gom(time=time, verbose=True)
     print(ds)
     soln = find_solution_rmaxv(
         vmax_pi=ds["vmax"].values,
@@ -370,11 +370,16 @@ if __name__ == "__main__":
     solns = []
     times = [1850, 1900, 1950, 2000, 2050, 2099]
 
-    for time in [str(t) + "-09-15" for t in times]:
-        solns += gom_time(time=time, plot=False)
+    for time in [str(t) + "-08-15" for t in times]:
+        solns += [gom_time(time=time, plot=False)]
 
     solns = np.array(solns)
     print("solns", solns)
-    plt.plot(times, solns / 1000, "k")
+    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    axs[0].plot(times, solns[:, 0] / 1000, "k")
+    axs[1].plot(times, solns[:, 1] / 1000, "k")
+    axs[2].plot(times, solns[:, 2] / 1000, "k")
     plt.xlabel("Year")
-    plt.ylabel("Radius of maximum winds, $r_m$, [km]")
+    axs[0].ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[1].ylabel("Radius of maximum winds, $r_m$, [km]")
+    plt.savefig("rmax_time.pdf")

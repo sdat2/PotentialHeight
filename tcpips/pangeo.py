@@ -52,11 +52,15 @@ def convert(ds: xr.Dataset) -> xr.Dataset:
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
 url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
-cat = intake.open_esm_datastore(url)
-unique = cat.unique()
-
-print("cat", cat)
-print("unique", unique)
+try:
+    cat = intake.open_esm_datastore(url)
+    unique = cat.unique()
+    print("cat", cat)
+    print("unique", unique)
+except Exception as e:
+    print(e)
+    cat = None
+    unique = None
 
 
 @timeit
