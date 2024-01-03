@@ -424,5 +424,5 @@ if __name__ == "__main__":
     # python run.py
     # find_solution()
     # find_solution_rmaxv()
-    calc_solns_for_times(num=20)
+    # calc_solns_for_times(num=20)
     plot_gom_solns()
