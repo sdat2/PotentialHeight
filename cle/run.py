@@ -33,6 +33,8 @@ def run_cle15(
 
     # run octave file r0_pm.m
     if execute:
+        # disabling gui leads to one order of magnitude speedup
+        # also the pop-up window makes me feel sick due to the screen moving about.
         os.system("octave --no-gui --no-gui-libs r0_pm.m")
 
     # read in the output from r0_pm.m
@@ -104,9 +106,11 @@ def run_cle15(
     # plot the pressure profile
 
     return (
-        interp1d(rr, p)(ou["rmax"]),
-        ou["rmax"],
-        ins["Vmax"],
+        interp1d(rr, p)(
+            ou["rmax"]
+        ),  # find the pressure at the maximum wind speed radius [Pa]
+        ou["rmax"],  # rmax radius [m]
+        ins["Vmax"],  # maximum wind speed [m/s]
     )  # p[0]  # central pressure [Pa]
 
 
@@ -284,7 +288,7 @@ def find_solution_rmaxv(
     rmaxs = []
     for r0 in r0s:
         pm_cle, rmax_cle, vmax = run_cle15(
-            plot=True,
+            plot=False,
             inputs={
                 "r0": r0,
                 "Vmax": vmax_pi,
@@ -476,7 +480,7 @@ def gom_time(time: str = "1850-09-15", plot=False) -> np.ndarray:
     return soln
 
 
-def plot_gom() -> None:
+def plot_and_calc_gom() -> None:
     solns = []
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
     times = [int(x) for x in range(1850, 2100, 20)]
@@ -502,7 +506,7 @@ def calc_solns_for_times(num: int = 50) -> None:
     print("NUM", num)
     solns = []
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
-    times = [int(x) for x in range(1850, 2100, num - 1)] + [2099]
+    times = [int(x) for x in np.linspace(1850, 2099, num=num)]
 
     for time in [str(t) + "-08-15" for t in times]:
         solns += [gom_time(time=time, plot=False)]
@@ -519,6 +523,8 @@ def calc_solns_for_times(num: int = 50) -> None:
         coords={"year": times},
     )
     ds.to_netcdf("gom_solns.nc")
+
+    print("NUM", num)
 
 
 @timeit
