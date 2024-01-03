@@ -15,6 +15,7 @@ plot_defaults()
 
 BACKGROUND_PRESSURE = 1015 * 100  # [Pa]
 TEMP_0K = 273.15  # [K]
+DEFAULT_SURF_TEMP = 299  # [K]
 
 
 @timeit
@@ -115,7 +116,7 @@ def run_cle15(
 
 
 def wang_diff(a: float = 0.062, b: float = 0.031, c: float = 0.008) -> Callable:
-    def f(y: float) -> float:
+    def f(y: float) -> float:  # y = exp(a*y + b*log(y)*y + c)
         return y - np.exp(a * y + b * np.log(y) * y + c)
 
     return f
@@ -123,7 +124,20 @@ def wang_diff(a: float = 0.062, b: float = 0.031, c: float = 0.008) -> Callable:
 
 @timeit
 def bisection(f: Callable, left: float, right: float, tol: float) -> float:
-    # https://en.wikipedia.org/wiki/Root-finding_algorithms#Bisection_method
+    """
+    Bisection method.
+
+    https://en.wikipedia.org/wiki/Root-finding_algorithms#Bisection_method
+
+    Args:
+        f (Callable): Function to find root of.
+        left (float): Left boundary.
+        right (float): Right boundary.
+        tol (float): tolerance for convergence.
+
+    Returns:
+        float: x such that |f(x)| < tol.
+    """
     fleft = f(left)
     fright = f(right)
     if fleft * fright > 0:
@@ -164,32 +178,43 @@ def carnot(temp_hot: float, temp_cold: float) -> float:
     Calculate carnot factor.
 
     Args:
-        temp_hot (float): _description_
-        temp_cold (float): _description_
+        temp_hot (float): Temperature of hot reservoir [K].
+        temp_cold (float): Temperature of cold reservoir [K].
 
     Returns:
-        float: _description_
+        float: Carnot factor [dimensionless].
     """
     return (temp_hot - temp_cold) / temp_hot
 
 
 def absolute_angular_momentum(v: float, r: float, f: float) -> float:
+    """
+    Calculate absolute angular momentum.
+
+    Args:
+        v (float): Azimuthal wind speed [m/s].
+        r (float): Radius from storm centre [m].
+        f (float): Coriolis parameter [s-1].
+
+    Returns:
+        float: Absolute angular momentum [m2/s].
+    """
     return v * r + 0.5 * f * r**2
 
 
 def wang_consts(
-    near_surface_air_temperature=299,  # K
-    outflow_temperature=200,  # K
-    latent_heat_of_vaporization=2.27e6,  # J/kg
-    gas_constant_for_water_vapor=461,  # J/kg/K
-    gas_constant=287,  # J/kg/K
-    beta_lift_parameterization=1.25,  # dimensionless
-    efficiency_relative_to_carnot=0.5,
-    pressure_dry_at_inflow=985 * 100,
-    coriolis_parameter=5e-5,
-    maximum_wind_speed=83,
-    radius_of_inflow=2193 * 1000,
-    radius_of_max_wind=64 * 1000,
+    near_surface_air_temperature: float = 299,  # K
+    outflow_temperature: float = 200,  # K
+    latent_heat_of_vaporization: float = 2.27e6,  # J/kg
+    gas_constant_for_water_vapor: float = 461,  # J/kg/K
+    gas_constant: float = 287,  # J/kg/K
+    beta_lift_parameterization: float = 1.25,  # dimensionless
+    efficiency_relative_to_carnot: float = 0.5,
+    pressure_dry_at_inflow: float = 985 * 100,
+    coriolis_parameter: float = 5e-5,
+    maximum_wind_speed: float = 83,
+    radius_of_inflow: float = 2193 * 1000,
+    radius_of_max_wind: float = 64 * 1000,
 ) -> Tuple[float, float, float]:
     # a, b, c
     absolute_angular_momentum_at_vmax = absolute_angular_momentum(
@@ -252,9 +277,6 @@ def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
     plt.savefig("r0_pc.pdf")
     plt.clf()
     return pcs
-
-
-DEFAULT_SURF_TEMP = 299  # K
 
 
 def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
@@ -369,7 +391,7 @@ def find_solution_ds(ds: xr.Dataset, plot: bool = False) -> xr.Dataset:
                 "Vmax": ds["vmax"].values,
                 "w_cool": 0.002,
                 "fcor": coriolis_parameter,
-                "p0": ds["msl"].values,
+                "p0": float(ds["msl"].values),
             },
         )
 
@@ -541,9 +563,40 @@ def plot_gom_solns():
     plt.savefig("rmax_time.pdf")
 
 
+@timeit
+def ds_solns(num: int = 50, verbose: bool = False) -> xr.Dataset:
+    """
+    Record all the details of the GOM solution for a range of times.
+
+    Args:
+        num (int, optional): Number of years to calculate for. Defaults to 50.
+        verbose (bool, optional): _description_. Defaults to False.
+
+    Returns:
+        xr.Dataset:
+    """
+    times = [int(x) for x in np.linspace(1850, 2099, num=num)]
+    ds_list = []
+
+    # Calculate for monthly average centered on August 15th each year.
+    dates = [str(t) + "-08-15" for t in times]
+    for i, date in enumerate(dates):
+        print(i, date)
+        ds = find_solution_ds(get_gom(time=date, verbose=True), plot=True)
+        ds = ds.expand_dims("time", axis=-1)
+        ds.coords["time"] = ("time", [times[i]])
+        ds_list.append(ds)
+
+    ds = xr.concat(ds_list, dim="time")
+    if verbose:
+        print(ds)
+    ds.to_netcdf("gom_soln_all.nc")
+
+
 if __name__ == "__main__":
     # python run.py
     # find_solution()
     # find_solution_rmaxv()
-    calc_solns_for_times(num=50)
-    plot_gom_solns()
+    # calc_solns_for_times(num=50)
+    # plot_gom_solns()
+    ds_solns(num=100, verbose=True)
