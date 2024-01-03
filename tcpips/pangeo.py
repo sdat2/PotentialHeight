@@ -8,7 +8,7 @@ from xmip.preprocessing import combined_preprocessing
 from xmip.postprocessing import interpolate_grid_label
 from sithom.plot import feature_grid, plot_defaults
 from sithom.time import timeit
-from tcpips.constants import FIGURE_PATH
+from tcpips.constants import FIGURE_PATH, DATA_PATH
 
 # CMIP6 equivalent names
 # tos: Sea Surface Temperature [degC] [same]

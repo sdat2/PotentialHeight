@@ -3,6 +3,7 @@ from typing import Callable, Tuple, Optional, Dict
 import os
 import numpy as np
 from scipy.interpolate import interp1d
+import xarray as xr
 from matplotlib import pyplot as plt
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
@@ -323,7 +324,7 @@ def find_solution_rmaxv(
         plt.savefig("r0_rmax.pdf")
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
-    return intersect[0][0], vmax_pi, intersect[0][1]
+    return intersect[0][0], vmax_pi, intersect[1][0]
 
 
 @timeit
@@ -363,23 +364,65 @@ def gom_time(time: str = "1850-09-15", plot=False) -> np.ndarray:
     return soln
 
 
-if __name__ == "__main__":
-    # python run.py
-    # find_solution()
-    # find_solution_rmaxv()
+def plot_gom():
     solns = []
-    times = [1850, 1900, 1950, 2000, 2050, 2099]
+    # times = [1850, 1900, 1950, 2000, 2050, 2099]
+    times = [int(x) for x in range(1850, 2100, 20)]
 
     for time in [str(t) + "-08-15" for t in times]:
         solns += [gom_time(time=time, plot=False)]
 
     solns = np.array(solns)
     print("solns", solns)
-    fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+    fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(times, solns[:, 0] / 1000, "k")
-    axs[1].plot(times, solns[:, 1] / 1000, "k")
-    axs[2].plot(times, solns[:, 2] / 1000, "k")
+    axs[1].plot(times, solns[:, 1], "k")
+    axs[2].plot(times, solns[:, 2] / 100, "k")
     plt.xlabel("Year")
-    axs[0].ylabel("Radius of outer winds, $r_a$, [km]")
-    axs[1].ylabel("Radius of maximum winds, $r_m$, [km]")
+    axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.savefig("rmax_time.pdf")
+
+
+def calc_solns_for_times(num: int = 10) -> np.ndarray:
+    solns = []
+    # times = [1850, 1900, 1950, 2000, 2050, 2099]
+    times = [int(x) for x in range(1850, 2100, num)]
+
+    for time in [str(t) + "-08-15" for t in times]:
+        solns += [gom_time(time=time, plot=False)]
+
+    solns = np.array(solns)
+    print("solns", solns)
+
+    ds = xr.Dataset(
+        data_vars={
+            "r0": ("year", solns[:, 0]),
+            "vmax": ("year", solns[:, 1]),
+            "pm": ("year", solns[:, 2]),
+        },
+        coords={"year": times},
+    )
+    ds.to_netcdf("gom_solns.nc")
+
+
+def plot_gom_solns():
+    ds = xr.open_dataset("gom_solns.nc")
+    fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+    axs[0].plot(ds["year"], ds["r0"] / 1000, "k")
+    axs[1].plot(ds["year"], ds["vmax"], "k")
+    axs[2].plot(ds["year"], ds["pm"] / 100, "k")
+    plt.xlabel("Year")
+    axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.savefig("rmax_time.pdf")
+
+
+if __name__ == "__main__":
+    # python run.py
+    # find_solution()
+    # find_solution_rmaxv()
+    calc_solns_for_times(num=20)
+    plot_gom_solns()
