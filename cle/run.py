@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 import xarray as xr
 from matplotlib import pyplot as plt
 from sithom.io import read_json, write_json
-from sithom.plot import plot_defaults
+from sithom.plot import plot_defaults, pairplot
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from tcpips.pi import get_gom
@@ -302,6 +302,7 @@ def find_solution_rmaxv(
     near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
     w_cool: float = 0.002,
     outflow_temperature: float = 200,  # K
+    supergradient_factor: float = 1.2,
     plot: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     r0s = np.linspace(200, 5000, num=30) * 1000
@@ -325,7 +326,7 @@ def find_solution_rmaxv(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
-                    maximum_wind_speed=vmax,
+                    maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=background_pressure
                     - buck(near_surface_air_temperature),
@@ -374,7 +375,9 @@ def find_solution_rmaxv(
     return intersect[0][0], vmax_pi, intersect[1][0]
 
 
-def find_solution_ds(ds: xr.Dataset, plot: bool = False) -> xr.Dataset:
+def find_solution_ds(
+    ds: xr.Dataset, plot: bool = False, supergradient_factor=1.2
+) -> xr.Dataset:
     r0s = np.linspace(200, 5000, num=30) * 1000  # [m] try different outer radii
     pcs = []
     pcw = []
@@ -400,7 +403,7 @@ def find_solution_ds(ds: xr.Dataset, plot: bool = False) -> xr.Dataset:
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
-                    maximum_wind_speed=vmax,
+                    maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=ds["msl"].values * 100
                     - buck(near_surface_air_temperature),
@@ -564,7 +567,7 @@ def plot_gom_solns():
 
 
 @timeit
-def ds_solns(num: int = 50, verbose: bool = False) -> None:
+def ds_solns(num: int = 10, verbose: bool = False) -> None:
     """
     Record all the details of the GOM solution for a range of times.
 
@@ -587,7 +590,7 @@ def ds_solns(num: int = 50, verbose: bool = False) -> None:
     ds = xr.concat(ds_list, dim="time")
     if verbose:
         print(ds)
-    ds.to_netcdf("gom_soln_all.nc")
+    ds.to_netcdf("gom_soln_new.nc")
 
 
 def plot_from_ds() -> None:
@@ -612,15 +615,14 @@ def plot_from_ds() -> None:
     plt.ylabel("Radius of outer winds, $r_a$, [km]")
     plt.savefig("rmax_vmax.pdf")
     plt.clf()
-    from sithom.plot import pairplot
-
-    vars = ["r0", "vmax", "pm", "sst", "msl", "t0"]  # , "time"]
+    ds["year"] = ("time", ds["time"].values)
+    vars = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]  # , "time"]
 
     pairplot(ds[vars].to_dataframe()[vars])
     plt.savefig("pairplot.pdf")
     plt.clf()
 
-    vars = ["t", "q", "vmax", "r0", "pm", "t0"]
+    vars = ["t", "q", "vmax", "r0", "pm", "t0", "year"]
     pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
     plt.savefig("pairplot2.pdf")
     plt.clf()
@@ -632,5 +634,5 @@ if __name__ == "__main__":
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
     # plot_gom_solns()
-    # ds_solns(num=100, verbose=True)
-    plot_from_ds()
+    ds_solns(num=10, verbose=True)
+    # plot_from_ds()
