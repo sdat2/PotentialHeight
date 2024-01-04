@@ -628,6 +628,17 @@ def plot_from_ds() -> None:
     plt.savefig(folder + "/pairplot2.pdf")
     plt.clf()
 
+    # do a line plot of sst, vmax, and r0
+    fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
+    axs[0].plot(ds["time"], ds["sst"], "k")
+    axs[1].plot(ds["time"], ds["vmax"], "k")
+    axs[2].plot(ds["time"], ds["r0"] / 1000, "k")
+    plt.xlabel("Year")
+    axs[0].set_ylabel("Sea surface temperature, $T_s$, [$^\circ$C]")
+    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[2].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    plt.savefig(folder + "/sst_vmax_rmax.pdf")
+
 
 if __name__ == "__main__":
     # python run.py
@@ -635,5 +646,5 @@ if __name__ == "__main__":
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
     # plot_gom_solns()
-    ds_solns(num=200, verbose=True)
+    # ds_solns(num=200, verbose=True)
     plot_from_ds()
