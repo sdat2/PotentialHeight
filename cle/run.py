@@ -594,7 +594,8 @@ def ds_solns(num: int = 10, verbose: bool = False) -> None:
 
 
 def plot_from_ds() -> None:
-    ds = xr.open_dataset("gom_soln_all.nc")
+    ds = xr.open_dataset("gom_soln_new.nc")
+    folder = "sup"
     print("ds", ds)
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(ds["time"], ds["r0"] / 1000, "k")
@@ -604,7 +605,7 @@ def plot_from_ds() -> None:
     axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig("rmax_time_new.pdf")
+    plt.savefig(folder + "/rmax_time_new.pdf")
     plt.clf()
 
     im = plt.scatter(
@@ -619,12 +620,12 @@ def plot_from_ds() -> None:
     vars = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]  # , "time"]
 
     pairplot(ds[vars].to_dataframe()[vars])
-    plt.savefig("pairplot.pdf")
+    plt.savefig(folder + "/pairplot.pdf")
     plt.clf()
 
     vars = ["t", "q", "vmax", "r0", "pm", "t0", "year"]
     pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
-    plt.savefig("pairplot2.pdf")
+    plt.savefig(folder + "/pairplot2.pdf")
     plt.clf()
 
 
@@ -634,5 +635,5 @@ if __name__ == "__main__":
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
     # plot_gom_solns()
-    ds_solns(num=10, verbose=True)
-    # plot_from_ds()
+    ds_solns(num=200, verbose=True)
+    plot_from_ds()
