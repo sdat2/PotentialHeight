@@ -183,6 +183,12 @@ def propagate_names(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
 
 @timeit
 def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")) -> None:
+    """
+    Plot the difference maps between two dates.
+
+    Args:
+        times (Tuple[str, str], optional): Defaults to ("1850-09-15", "2099-09-15").
+    """
     plot_defaults()
     ds_l = [convert(combined_data_timestep(time=time)) for time in times]
     pi_ds_l = [elevate_standards(calculate_pi(ds, dim="p")) for ds in ds_l]
@@ -353,6 +359,7 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
 
 
 def get_gom(time="2015-01-15", verbose=False) -> xr.Dataset:
+    """Get the Gulf of Mexico centre data at a given time."""
     ds = combined_data_timestep(time=time)
     lats = ds.lat.values
     lons = ds.lon.values
