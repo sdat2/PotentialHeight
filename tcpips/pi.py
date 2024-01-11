@@ -14,6 +14,15 @@ CKCD: float = 0.9
 
 @timeit
 def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
+    """Calculate the potential intensity using the tcpyPI package.
+
+    Args:
+        ds (xr.Dataset): xarray dataset containing the necessary variables.
+        dim (str, optional): Vertical dimension. Defaults to "p".
+
+    Returns:
+        xr.Dataset: xarray dataset containing the calculated variables.
+    """
     result = xr.apply_ufunc(
         pi,
         ds["sst"],
@@ -69,6 +78,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         "Outflow Temperature Level",
         "hPa",
     )
+
     return out_ds
 
 
@@ -202,6 +212,9 @@ def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")) -> None:
 
 @timeit
 def plot_example() -> None:
+    """
+    Plot example data from the sample_data.nc file.
+    """
     plot_defaults()
     ds = xr.open_dataset("../tcpypi/data/sample_data.nc").isel(p=0, month=9)
     for var in ds:
@@ -225,6 +238,9 @@ def plot_example() -> None:
 
 
 def gom() -> None:
+    """
+    Process sample data for the Gulf of Mexico.
+    """
     ds = xr.open_dataset("../tcpypi/data/sample_data.nc").sel(
         lon=GOM[1], lat=GOM[0], method="nearest"
     )
@@ -317,6 +333,16 @@ def gom() -> None:
 
 
 def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
+    """
+    Combined data from the ocean and atmosphere datasets at a given time.
+
+    Args:
+        time (str, optional): _description_. Defaults to "2015-01-15".
+
+    Returns:
+        xr.Dataset: combined dataset.
+    """
+
     def open(name: str) -> xr.Dataset:
         ds = xr.open_dataset(name, engine="h5netcdf").sel(time=time).isel(time=0)
         return ds.drop_vars([x for x in ["time", "time_bounds", "nbnd"] if x in ds])

@@ -448,13 +448,18 @@ def find_solution_ds(
         plt.ylabel("Radius of maximum winds, $r_m$, [km]")
         plt.savefig("r0_rmax.pdf")
         plt.clf()
+        # run the model with the solution
         pm_cle, rmax_cle, vmax = run_cle15(
             inputs={"r0": intersect[0][0], "Vmax": ds["vmax"].values}, plot=True
         )
+        # read the solution
+        out = read_json("outputs.json")
 
     ds["r0"] = intersect[0][0]
     ds["pm"] = intersect[1][0]
     ds["rmax"] = rmax_cle
+    ds["radii"] = ("r", out["rr"], {"units": "m"})
+    ds["velocities"] = ("r", out["VV"], {"units": "m s-1"})
 
     pm_ds = xr.Dataset(
         data_vars={
@@ -567,7 +572,9 @@ def plot_gom_solns():
 
 
 @timeit
-def ds_solns(num: int = 10, verbose: bool = False) -> None:
+def ds_solns(
+    num: int = 10, verbose: bool = False, ds_name: str = "gom_soln_new.nc"
+) -> None:
     """
     Record all the details of the GOM solution for a range of times.
 
@@ -585,16 +592,17 @@ def ds_solns(num: int = 10, verbose: bool = False) -> None:
         ds = find_solution_ds(get_gom(time=date, verbose=True), plot=True)
         ds = ds.expand_dims("time", axis=-1)
         ds.coords["time"] = ("time", [times[i]])
+        ds = ds.rename({"r": str(f"r{i+1}")})  # radii can be different lengths
         ds_list.append(ds)
 
     ds = xr.concat(ds_list, dim="time")
     if verbose:
         print(ds)
-    ds.to_netcdf("gom_soln_new.nc")
+    ds.to_netcdf(ds_name)
 
 
-def plot_from_ds() -> None:
-    ds = xr.open_dataset("gom_soln_new.nc")
+def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
+    ds = xr.open_dataset(ds_name)
     folder = "sup"
     print("ds", ds)
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -666,5 +674,5 @@ if __name__ == "__main__":
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
     # plot_gom_solns()
-    # ds_solns(num=200, verbose=True)
-    plot_from_ds()
+    ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
+    plot_from_ds(ds_name="gom_soln_2.nc")
