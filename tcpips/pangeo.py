@@ -32,6 +32,15 @@ conversion_units: Dict[str, str] = {
 
 @timeit
 def convert(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Convert CMIP6 variables to be PI input variables
+
+    Args:
+        ds (xr.Dataset): CMIP6 dataset.
+
+    Returns:
+        xr.Dataset: PI dataset.
+    """
     for var in conversion_multiples:
         if var in ds:
             ds[var] *= conversion_multiples[var]

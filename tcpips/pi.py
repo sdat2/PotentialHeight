@@ -9,6 +9,7 @@ from sithom.plot import feature_grid, plot_defaults, get_dim, axis_formatter
 from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
 from tcpips.pangeo import convert, regrid_2d_1degree
 
+TCPYPI_SAMPLE_DATA: str = "../tcpypi/data/sample_data.nc"
 CKCD: float = 0.9
 
 
@@ -84,6 +85,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
 
 @timeit
 def calc_pi_example() -> None:
+    """Calculate the potential intensity using the tcpyPI package."""
     ds = xr.open_dataset(os.path.join(DATA_PATH, "all_regridded.nc"), engine="h5netcdf")
     input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
@@ -161,6 +163,15 @@ def plot_pi(time: str = "2015-01-15") -> None:
 
 
 def elevate_standards(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Turn the standard_name attribute into a long_name attribute.
+
+    Args:
+        ds (xr.Dataset): dataset with standard_name attributes.
+
+    Returns:
+        xr.Dataset: dataset with long_name attributes.
+    """
     for var in ds:
         if "standard_name" in ds[var].attrs:
             ds[var].attrs["long_name"] = ds[var].attrs["standard_name"]
@@ -168,6 +179,17 @@ def elevate_standards(ds: xr.Dataset) -> xr.Dataset:
 
 
 def propagate_names(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
+    """
+    Propagate the standard_name and units attributes from one dataset to another.
+
+    Args:
+        ds_old (xr.Dataset): dataset with standard_name and units attributes.
+        ds_new (xr.Dataset): dataset with standard_name and units attributes.
+
+    Returns:
+        xr.Dataset: dataset with standard_name and units attributes.
+    """
+
     for var in ds_old:
         if var in ds_new:
             if "units" in ds_old[var].attrs:
@@ -222,7 +244,7 @@ def plot_example() -> None:
     Plot example data from the sample_data.nc file.
     """
     plot_defaults()
-    ds = xr.open_dataset("../tcpypi/data/sample_data.nc").isel(p=0, month=9)
+    ds = xr.open_dataset(TCPYPI_SAMPLE_DATA).isel(p=0, month=9)
     for var in ds:
         if "standard_name" in ds[var].attrs:
             ds[var].attrs["long_name"] = ds[var].attrs["standard_name"]
@@ -231,7 +253,7 @@ def plot_example() -> None:
     plt.suptitle("month=9")
     plt.savefig(os.path.join(FIGURE_PATH, "sample-input.png"))
     plt.clf()
-    ds = xr.open_dataset("../tcpypi/data/sample_data.nc").isel(month=9)
+    ds = xr.open_dataset(TCPYPI_SAMPLE_DATA).isel(month=9)
     pi_ds = calculate_pi(ds, dim="p")
     for var in pi_ds:
         if "standard_name" in pi_ds[var].attrs:
@@ -247,7 +269,7 @@ def gom() -> None:
     """
     Process sample data for the Gulf of Mexico.
     """
-    ds = xr.open_dataset("../tcpypi/data/sample_data.nc").sel(
+    ds = xr.open_dataset(TCPYPI_SAMPLE_DATA).sel(
         lon=GOM[1], lat=GOM[0], method="nearest"
     )
     print("ds", ds)
@@ -358,8 +380,16 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
     return xr.merge([ocean_ds, atmos_ds])
 
 
-def get_gom(time="2015-01-15", verbose=False) -> xr.Dataset:
-    """Get the Gulf of Mexico centre data at a given time."""
+def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
+    """Get the Gulf of Mexico centre data at a given time.
+
+    Args:
+        time (str, optional): Defaults to "2015-01-15".
+        verbose (bool, optional): Defaults to False.
+
+    Returns:
+        xr.Dataset: Gulf of Mexico centre data at a given time.
+    """
     ds = combined_data_timestep(time=time)
     lats = ds.lat.values
     lons = ds.lon.values
@@ -370,6 +400,7 @@ def get_gom(time="2015-01-15", verbose=False) -> xr.Dataset:
     ds = ds.swap_dims({"y": "lat", "x": "lon"})
     if verbose:
         print(ds)
+    # select point closest to GOM centre
     ds = ds.sel(lat=GOM[0], lon=GOM[1], method="nearest")
     ds = convert(ds)
     pi = calculate_pi(ds, dim="p")
