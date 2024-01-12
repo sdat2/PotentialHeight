@@ -706,11 +706,26 @@ def plot_soln_curves(ds_name: str = "gom_soln_new.nc") -> None:
     )
     plt.colorbar(im, label="Year", shrink=0.5)
 
-    plt.xlabel("Radius, $r_a$, [km]")
+    plt.xlabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
     plt.xlim([1000, 3000])
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.ylim([875, 1000])
     plt.savefig(folder + "/r0_solns.pdf")
+    plt.clf()
+
+    im = plt.scatter(ds.vmax, ds.r0 / 1000, c=ds.pm / 100, marker="x", linewidth=0.5)
+    plt.colorbar(im, label="Pressure at maximum winds, $p_m$, [hPa]", shrink=0.5)
+    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.ylabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
+    plt.savefig(folder + "/r0_vmax_pm.pdf")
+    plt.clf()
+
+    im = plt.scatter(ds.vmax, ds.r0 / 1000, c=ds.time, marker="x", linewidth=0.5)
+    plt.colorbar(im, label="Year", shrink=0.5)
+    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.ylabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
+    plt.savefig(folder + "/r0_vmax_time.pdf")
+    plt.clf()
 
 
 if __name__ == "__main__":
