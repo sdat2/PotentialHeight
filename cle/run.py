@@ -668,11 +668,57 @@ def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
     plt.clf()
 
 
+def plot_soln_curves(ds_name: str = "gom_soln_new.nc") -> None:
+    plot_defaults()
+    ds = xr.open_dataset(ds_name)
+    folder = "sup"
+    print("ds", ds)
+    for time in range(len(ds.time.values)):
+        dst = ds.isel(time=time)
+        plt.plot(
+            dst["r0s"] / 1000,
+            dst["pm_cle"] / 100,
+            "b",
+            label="CLE15 Dynamics",
+            alpha=0.5,
+            linewidth=0.5,
+        )
+        plt.plot(
+            dst["r0s"] / 1000,
+            dst["pm_car"] / 100,
+            "r",
+            alpha=0.5,
+            label="W22 Thermodynamics",
+            linewidth=0.5,
+        )
+
+        if time == 0:
+            plt.legend()
+
+    im = plt.scatter(
+        ds["r0"] / 1000,
+        ds["pm"] / 100,
+        c=ds["time"],
+        marker="x",
+        label="Solution",
+        linewidth=0.5,
+        zorder=100,
+    )
+    plt.colorbar(im, label="Year", shrink=0.5)
+
+    plt.xlabel("Radius, $r_a$, [km]")
+    plt.xlim([1000, 3000])
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.ylim([875, 1000])
+    plt.savefig(folder + "/r0_solns.pdf")
+
+
 if __name__ == "__main__":
     # python run.py
     # find_solution()
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
     # plot_gom_solns()
-    ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
-    plot_from_ds(ds_name="gom_soln_2.nc")
+    # ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
+    # plot_from_ds()  # ds_name="gom_soln_2.nc")
+    plot_soln_curves()
