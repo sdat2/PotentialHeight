@@ -1,5 +1,5 @@
 """Run the CLE15 model with json files."""
-from typing import Callable, Tuple, Optional, Dict
+from typing import Callable, Tuple, Optional, Dict, List
 import os
 import numpy as np
 from scipy.interpolate import interp1d
@@ -21,7 +21,18 @@ DEFAULT_SURF_TEMP = 299  # [K]
 @timeit
 def run_cle15(
     execute: bool = True, plot: bool = False, inputs: Optional[Dict[str, any]] = None
-) -> Tuple[float, float, float]:  # pm, rmax, vmax
+) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
+    """
+    Run the CLE15 model.
+
+    Args:
+        execute (bool, optional): Execute the model. Defaults to True.
+        plot (bool, optional): Plot the output. Defaults to False.
+        inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
+
+    Returns:
+        Tuple[float, float, float, float]: pm, rmax, vmax, pc
+    """
     ins = read_json("inputs.json")
     if inputs is not None:
         for key in inputs:
@@ -112,6 +123,7 @@ def run_cle15(
         ),  # find the pressure at the maximum wind speed radius [Pa]
         ou["rmax"],  # rmax radius [m]
         ins["Vmax"],  # maximum wind speed [m/s]
+        p[0],
     )  # p[0]  # central pressure [Pa]
 
 
@@ -310,7 +322,7 @@ def find_solution_rmaxv(
     pcw = []
     rmaxs = []
     for r0 in r0s:
-        pm_cle, rmax_cle, vmax = run_cle15(
+        pm_cle, rmax_cle, vmax, pc = run_cle15(
             plot=False,
             inputs={
                 "r0": r0,
@@ -493,7 +505,7 @@ def find_solution():
     run_cle15(inputs={"r0": intersect[0][0]}, plot=True)
 
 
-def gom_time(time: str = "1850-09-15", plot=False) -> np.ndarray:
+def gom_time(time: str = "1850-09-15", plot: bool = False) -> np.ndarray:
     # find_solution()
     # find_solution_rmaxv()
     ds = get_gom(time=time, verbose=True)
@@ -625,7 +637,7 @@ def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
     plt.savefig("rmax_vmax.pdf")
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
-    vars = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]  # , "time"]
+    vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]  # , "time"]
 
     pairplot(ds[vars].to_dataframe()[vars])
     plt.savefig(folder + "/pairplot.pdf")
@@ -740,7 +752,7 @@ def plot_soln_curves(ds_name: str = "gom_soln_new.nc") -> None:
     plt.clf()
 
 
-def plot_profiles(ds_name="gom_soln_2.nc"):
+def plot_profiles(ds_name: str = "gom_soln_2.nc") -> None:
     plot_defaults()
     ds = xr.open_dataset(ds_name)
     folder = "sup"
@@ -775,6 +787,14 @@ def plot_gom_bbox() -> None:
     plt.ylabel(r"Latitude, $\phi$, [$^\circ$]")
     plt.savefig(folder + "/gom_bbox_pi.pdf")
     plt.clf()
+    ds.sst.plot()
+    plt.xlabel(r"Longitude, $\lambda$, [$^\circ$]")
+    plt.ylabel(r"Latitude, $\phi$, [$^\circ$]")
+    plt.savefig(folder + "/gom_bbox_sst.pdf")
+    plt.clf()
+
+    for i in range(len(ds.lon.values)):
+        for i in range(len(ds.lat.values)):
 
 
 if __name__ == "__main__":
