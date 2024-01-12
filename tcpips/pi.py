@@ -6,6 +6,7 @@ from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
 from sithom.plot import feature_grid, plot_defaults, get_dim, axis_formatter
+from sithom.place import Point, BoundingBox
 from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
 from tcpips.pangeo import convert, regrid_2d_1degree
 
@@ -380,16 +381,7 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
     return xr.merge([ocean_ds, atmos_ds])
 
 
-def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
-    """Get the Gulf of Mexico centre data at a given time.
-
-    Args:
-        time (str, optional): Defaults to "2015-01-15".
-        verbose (bool, optional): Defaults to False.
-
-    Returns:
-        xr.Dataset: Gulf of Mexico centre data at a given time.
-    """
+def processed_timestep(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
     ds = combined_data_timestep(time=time)
     lats = ds.lat.values
     lons = ds.lon.values
@@ -400,8 +392,38 @@ def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
     ds = ds.swap_dims({"y": "lat", "x": "lon"})
     if verbose:
         print(ds)
+    return ds
+
+
+def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
+    """Get the Gulf of Mexico centre data at a given time.
+
+    Args:
+        time (str, optional): Defaults to "2015-01-15".
+        verbose (bool, optional): Defaults to False.
+
+    Returns:
+        xr.Dataset: Gulf of Mexico centre data at a given time.
+    """
+    ds = processed_timestep(time=time, verbose=verbose)
     # select point closest to GOM centre
     ds = ds.sel(lat=GOM[0], lon=GOM[1], method="nearest")
+    ds = convert(ds)
+    pi = calculate_pi(ds, dim="p")
+    if verbose:
+        print(pi)
+    return xr.merge([ds, pi])
+
+
+@timeit
+def get_gom_bbox(
+    time: str = "2015-01-15", verbose: bool = False, pad: float = 5
+) -> xr.Dataset:
+    GOM_BBOX: BoundingBox = Point(GOM[1], GOM[0], desc="Gulf of Mexico Centre").bbox(
+        pad
+    )
+    ds = processed_timestep(time=time, verbose=verbose)
+    ds = ds.sel(lon=slice(*GOM_BBOX.lon), lat=slice(*GOM_BBOX.lat))
     ds = convert(ds)
     pi = calculate_pi(ds, dim="p")
     if verbose:
@@ -417,7 +439,10 @@ if __name__ == "__main__":
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
     # plot_example()
-    print(get_gom())
+
+    print(get_gom_bbox(time="2015-01-15", verbose=True, pad=5))
+
+    # print(get_gom())
 
     # plot_diffs()
 
