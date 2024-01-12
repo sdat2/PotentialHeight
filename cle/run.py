@@ -727,6 +727,55 @@ def plot_soln_curves(ds_name: str = "gom_soln_new.nc") -> None:
     plt.savefig(folder + "/r0_vmax_time.pdf")
     plt.clf()
 
+    im = plt.scatter(ds.vmax, ds.pm / 100, c=ds.r0, marker="x", linewidth=0.5)
+    plt.colorbar(im, label="Outer Radius of Tropical Cyclone, $r_a$, [km]", shrink=0.5)
+    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    # add in pearson correlation coefficient
+    from scipy.stats import pearsonr
+
+    r = pearsonr(ds.vmax, ds.pm / 100)[0]
+    plt.title(r"$\rho$ " + f"= {r:.2f}")
+    plt.savefig(folder + "/pm_vmax_r0.pdf")
+    plt.clf()
+
+
+def plot_profiles(ds_name="gom_soln_2.nc"):
+    plot_defaults()
+    ds = xr.open_dataset(ds_name)
+    folder = "sup"
+    print("ds", ds)
+    for time in range(len(ds.time.values)):
+        dst = ds.isel(time=time)
+        plt.plot(
+            dst["radii"] / 1000,
+            dst["velocities"],
+            alpha=0.5,
+            linewidth=0.5,
+            # label=f"{[1850, 2099][time]}",
+        )
+
+    plt.legend()
+    plt.xlabel("Radius, $r$, [km]")
+    plt.ylabel("Wind speed, $V$, [m s$^{-1}$]")
+    plt.savefig(folder + "/profiles.pdf")
+    plt.clf()
+
+
+from tcpips.pi import get_gom_bbox
+
+
+def plot_gom_bbox() -> None:
+    plot_defaults()
+    ds = get_gom_bbox(pad=10)
+    folder = "sup"
+    print(ds)
+    ds.vmax.plot()
+    plt.xlabel(r"Longitude, $\lambda$, [$^\circ$]")
+    plt.ylabel(r"Latitude, $\phi$, [$^\circ$]")
+    plt.savefig(folder + "/gom_bbox_pi.pdf")
+    plt.clf()
+
 
 if __name__ == "__main__":
     # python run.py
@@ -736,4 +785,5 @@ if __name__ == "__main__":
     # plot_gom_solns()
     # ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
     # plot_from_ds()  # ds_name="gom_soln_2.nc")
-    plot_soln_curves()
+    # plot_soln_curves()
+    plot_gom_bbox()
