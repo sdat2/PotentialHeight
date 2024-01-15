@@ -779,7 +779,7 @@ from tcpips.pi import get_gom_bbox
 
 def plot_gom_bbox() -> None:
     plot_defaults()
-    ds = get_gom_bbox(pad=10)
+    ds = get_gom_bbox(time="2015-01-15", pad=10)
     folder = "sup"
     print(ds)
     ds.vmax.plot()
@@ -792,9 +792,16 @@ def plot_gom_bbox() -> None:
     plt.ylabel(r"Latitude, $\phi$, [$^\circ$]")
     plt.savefig(folder + "/gom_bbox_sst.pdf")
     plt.clf()
+    ds_list = []
 
-    for i in range(len(ds.lon.values)):
-        for i in range(len(ds.lat.values)):
+    for i in range(len(ds.lat.values)):
+        for j in range(len(ds.lon.values)):
+            print(i, j)
+            dsp = ds.isel(lat=i, lon=j)
+            print(dsp)
+            if i == 5 and j == 5:
+                ds2 = find_solution_ds(dsp, plot=False)
+                print(ds2)
 
 
 if __name__ == "__main__":
