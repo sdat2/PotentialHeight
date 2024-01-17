@@ -399,7 +399,7 @@ def find_solution_ds(
     coriolis_parameter = 2 * 7.2921e-5 * np.sin(np.deg2rad(ds["lat"].values))
 
     for r0 in r0s:
-        pm_cle, rmax_cle, vmax = run_cle15(
+        pm_cle, rmax_cle, vmax, pc = run_cle15(
             plot=True,
             inputs={
                 "r0": r0,
@@ -461,11 +461,13 @@ def find_solution_ds(
         plt.savefig("r0_rmax.pdf")
         plt.clf()
         # run the model with the solution
-        pm_cle, rmax_cle, vmax = run_cle15(
-            inputs={"r0": intersect[0][0], "Vmax": ds["vmax"].values}, plot=True
-        )
-        # read the solution
-        out = read_json("outputs.json")
+
+    pm_cle, rmax_cle, vmax, pc = run_cle15(
+        inputs={"r0": intersect[0][0], "Vmax": ds["vmax"].values}, plot=True
+    )
+    # read the solution
+
+    out = read_json("outputs.json")
 
     ds["r0"] = intersect[0][0]
     ds["pm"] = intersect[1][0]
@@ -796,10 +798,12 @@ def plot_gom_bbox() -> None:
 
     for i in range(len(ds.lat.values)):
         for j in range(len(ds.lon.values)):
-            print(i, j)
+            print(i, j)  # zoom through grid.
             dsp = ds.isel(lat=i, lon=j)
             print(dsp)
             if i == 5 and j == 5:
+                # ok, let's just try it for one example
+                # it is a big problem
                 ds2 = find_solution_ds(dsp, plot=False)
                 print(ds2)
 
