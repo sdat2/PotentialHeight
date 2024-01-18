@@ -797,15 +797,20 @@ def plot_gom_bbox() -> None:
     ds_list = []
 
     for i in range(len(ds.lat.values)):
+        ds_list_lon = []
         for j in range(len(ds.lon.values)):
             print(i, j)  # zoom through grid.
             dsp = ds.isel(lat=i, lon=j)
             print(dsp)
-            if i == 5 and j == 5:
+            if i == 5:
                 # ok, let's just try it for one example
                 # it is a big problem
                 ds2 = find_solution_ds(dsp, plot=False)
-                print(ds2)
+                ds_list_lon.append(ds2)
+        if i == 5:
+            ds_lon = xr.concat(ds_list_lon, dim="lon")
+            ds_list.append(ds_lon)
+    print("ds_list", ds_list)
 
 
 if __name__ == "__main__":
