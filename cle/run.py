@@ -885,20 +885,37 @@ def plot_gom_bbox_soln() -> None:
     ds = xr.open_dataset("gom_soln_bbox.nc")
     folder = "sup"
     print("ds", ds)
-    fig, axs = plt.subplots(1, 3, figsize=(12, 3), sharex=True)
+    ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
+    ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+    fig, axs = plt.subplots(2, 3, figsize=(12, 6), sharex=True)
     # axs[0].plot(ds["lat"], ds["r0"] / 1000, "k")
-    ds["r0"].plot(ax=axs[0], cbar_kwargs={"label": "Potential size, $r_a$, [km]"})
+    axs = axs.T
+    ds["sst"].plot(
+        ax=axs[0, 0], cbar_kwargs={"label": "Sea surface temperature, $T_s$"}
+    )
+    ds["t0"].plot(ax=axs[1, 0], cbar_kwargs={"label": "Outflow temperature, $T_0$"})
+    ds["msl"].plot(
+        ax=axs[2, 0], cbar_kwargs={"label": "Mean sea level pressure, $p_0$"}
+    )
+
+    ds["r0"].plot(ax=axs[0, 1], cbar_kwargs={"label": "Potential size, $r_a$, [km]"})
     ds["vmax"].plot(
-        ax=axs[1],
+        ax=axs[1, 1],
         cbar_kwargs={"label": "Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]"},
     )
     ds["pm"].plot(
-        ax=axs[2], cbar_kwargs={"label": "Pressure at maximum winds, $p_m$, [hPa]"}
+        ax=axs[2, 1], cbar_kwargs={"label": "Pressure at maximum winds, $p_m$, [hPa]"}
     )
-    label_subplots(axs)
+    for i in range(3):
+        for j in range(2):
+            if j != 1:
+                axs[i, j].set_xlabel("")
+            if i != 0:
+                axs[i, j].set_ylabel("")
+    label_subplots(axs, override="outside")
     # axs[1].plot(ds["lat"], ds["vmax"], "k")
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
-    plt.savefig(folder + "/bbox_r0_pm_rmax.pdf")
+    plt.savefig(folder + "/gom_bbox_r0_pm_rmax.pdf")
 
 
 if __name__ == "__main__":
