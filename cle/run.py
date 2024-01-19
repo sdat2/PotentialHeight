@@ -6,7 +6,7 @@ from scipy.interpolate import interp1d
 import xarray as xr
 from matplotlib import pyplot as plt
 from sithom.io import read_json, write_json
-from sithom.plot import plot_defaults, pairplot
+from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from tcpips.pi import get_gom
@@ -806,6 +806,7 @@ from tcpips.pi import get_gom_bbox
 def plot_gom_bbox() -> None:
     """Try and calculate the solution for the GOM bbox."""
     plot_defaults()
+
     ds = get_gom_bbox(time="2015-01-15", pad=10)
     folder = "sup"
     print(ds)
@@ -832,17 +833,27 @@ def plot_gom_bbox() -> None:
     for i in range(len(ds.lat.values)):
         ds_list_lon = []
         for j in range(len(ds.lon.values)):
-            #  print(i, j)  # zoom through grid.
+            print(i, j)  # zoom through grid.
             dsp = ds.isel(lat=i, lon=j)
 
-            def add_nan():
+            def add_nan() -> None:
+                nonlocal ds_list_lon
+                nonlocal dsp
                 for var in new_var:
                     dsp[var] = np.nan
                 ds_list_lon.append(dsp)
 
-            def add_ok():
-                ds2 = find_solution_ds(dsp, plot=False)
-                ds_list_lon.append(ds2[new_var + [var for var in dsp]])
+            def add_rmax() -> None:
+                nonlocal ds_list_lon
+                nonlocal dsp
+                ds2 = find_solution_ds(dsp, plot=False)[new_var + [var for var in dsp]]
+                for var in new_var:
+                    dsp[var] = ds2[var]
+                print("dsp", dsp)
+                print([var for var in dsp])
+                del dsp["radii"]
+                del dsp["velocities"]
+                ds_list_lon.append(dsp)
 
             # print(dsp)
             if True:
@@ -859,7 +870,7 @@ def plot_gom_bbox() -> None:
                     print("vmax too low")
                     add_nan()
                 else:
-                    add_ok()
+                    add_rmax()
         # if i == 5:
         ds_lon = xr.concat(ds_list_lon, dim="lon")
         ds_list.append(ds_lon)
@@ -867,6 +878,27 @@ def plot_gom_bbox() -> None:
     ds = xr.concat(ds_list, dim="lat")
     print("ds_list", ds_list)
     ds.to_netcdf("gom_soln_bbox.nc")
+
+
+def plot_gom_bbox_soln() -> None:
+    plot_defaults()
+    ds = xr.open_dataset("gom_soln_bbox.nc")
+    folder = "sup"
+    print("ds", ds)
+    fig, axs = plt.subplots(1, 3, figsize=(12, 3), sharex=True)
+    # axs[0].plot(ds["lat"], ds["r0"] / 1000, "k")
+    ds["r0"].plot(ax=axs[0], cbar_kwargs={"label": "Potential size, $r_a$, [km]"})
+    ds["vmax"].plot(
+        ax=axs[1],
+        cbar_kwargs={"label": "Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]"},
+    )
+    ds["pm"].plot(
+        ax=axs[2], cbar_kwargs={"label": "Pressure at maximum winds, $p_m$, [hPa]"}
+    )
+    label_subplots(axs)
+    # axs[1].plot(ds["lat"], ds["vmax"], "k")
+    # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
+    plt.savefig(folder + "/bbox_r0_pm_rmax.pdf")
 
 
 if __name__ == "__main__":
@@ -878,4 +910,5 @@ if __name__ == "__main__":
     # ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
     # plot_from_ds()  # ds_name="gom_soln_2.nc")
     # plot_soln_curves()
-    plot_gom_bbox()
+    # plot_gom_bbox()
+    plot_gom_bbox_soln()
