@@ -470,10 +470,19 @@ def find_solution_ds(
     out = read_json("outputs.json")
 
     ds["r0"] = intersect[0][0]
+    ds["r0"].attrs = {"units": "m", "long_name": "Outer radius of tropical cyclone"}
     ds["pm"] = intersect[1][0]
+    ds["pm"].attrs = {"units": "Pa", "long_name": "Pressure at maximum winds"}
+    ds["pc"] = pc
+    ds["pc"].attrs = {"units": "Pa", "long_name": "Central pressure"}
     ds["rmax"] = rmax_cle
-    ds["radii"] = ("r", out["rr"], {"units": "m"})
-    ds["velocities"] = ("r", out["VV"], {"units": "m s-1"})
+    ds["rmax"].attrs = {"units": "m", "long_name": "Radius of maximum winds"}
+    ds["radii"] = ("r", out["rr"], {"units": "m", "long_name": "Radius"})
+    ds["velocities"] = (
+        "r",
+        out["VV"],
+        {"units": "m s-1", "long_name": "Azimuthal Velocity"},
+    )
 
     pm_ds = xr.Dataset(
         data_vars={
@@ -578,7 +587,7 @@ def calc_solns_for_times(num: int = 50) -> None:
 
 
 @timeit
-def plot_gom_solns():
+def plot_gom_solns() -> None:
     ds = xr.open_dataset("gom_solns.nc")
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(ds["year"], ds["r0"] / 1000, "k")
@@ -622,6 +631,9 @@ def ds_solns(
 
 
 def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
+    """
+    Plot the relationships between the variables.
+    """
     ds = xr.open_dataset(ds_name)
     folder = "sup"
     print("ds", ds)
@@ -689,6 +701,12 @@ def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
 
 
 def plot_soln_curves(ds_name: str = "gom_soln_new.nc") -> None:
+    """
+    Plot the solution curves for different.
+
+    Args:
+        ds_name (str, optional): Defaults to "gom_soln_new.nc".
+    """
     plot_defaults()
     ds = xr.open_dataset(ds_name)
     folder = "sup"
@@ -786,6 +804,7 @@ from tcpips.pi import get_gom_bbox
 
 
 def plot_gom_bbox() -> None:
+    """Try and calculate the solution for the GOM bbox."""
     plot_defaults()
     ds = get_gom_bbox(time="2015-01-15", pad=10)
     folder = "sup"
@@ -800,24 +819,54 @@ def plot_gom_bbox() -> None:
     plt.ylabel(r"Latitude, $\phi$, [$^\circ$]")
     plt.savefig(folder + "/gom_bbox_sst.pdf")
     plt.clf()
+
+    new_var = [
+        "rmax",
+        "pm",
+        "pc",
+        "r0",
+    ]
+
     ds_list = []
 
     for i in range(len(ds.lat.values)):
         ds_list_lon = []
         for j in range(len(ds.lon.values)):
-            print(i, j)  # zoom through grid.
+            #  print(i, j)  # zoom through grid.
             dsp = ds.isel(lat=i, lon=j)
-            print(dsp)
-            if i == 5 and j == 5:
+
+            def add_nan():
+                for var in new_var:
+                    dsp[var] = np.nan
+                ds_list_lon.append(dsp)
+
+            def add_ok():
+                ds2 = find_solution_ds(dsp, plot=False)
+                ds_list_lon.append(ds2[new_var + [var for var in dsp]])
+
+            # print(dsp)
+            if True:
                 # ok, let's just try it for one example
                 # it is a big problem
-                ds2 = find_solution_ds(dsp, plot=False)
-                print(ds2)
-                ds_list_lon.append(ds2)
+                # we should check if vmax is in a reasonable range and non nan before running the calculation.
+                if np.isnan(dsp.vmax.values):
+                    print("nan vmax")
+                    add_nan()
+                elif dsp.vmax.values > 100:
+                    print("vmax too high")
+                    add_nan()
+                elif dsp.vmax.values < 40:
+                    print("vmax too low")
+                    add_nan()
+                else:
+                    add_ok()
         # if i == 5:
-        # ds_lon = xr.concat(ds_list_lon, dim="lon")
-        #    ds_list.append(ds_lon)
+        ds_lon = xr.concat(ds_list_lon, dim="lon")
+        ds_list.append(ds_lon)
+
+    ds = xr.concat(ds_list, dim="lat")
     print("ds_list", ds_list)
+    ds.to_netcdf("gom_soln_bbox.nc")
 
 
 if __name__ == "__main__":
