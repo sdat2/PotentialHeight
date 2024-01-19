@@ -547,6 +547,12 @@ def plot_and_calc_gom() -> None:
 
 @timeit
 def calc_solns_for_times(num: int = 50) -> None:
+    """
+    Calculate a timeseries of solutions for the GOM midpoint.
+
+    Args:
+        num (int, optional): How many timesteps to process. Defaults to 50.
+    """
     print("NUM", num)
     solns = []
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
@@ -802,14 +808,15 @@ def plot_gom_bbox() -> None:
             print(i, j)  # zoom through grid.
             dsp = ds.isel(lat=i, lon=j)
             print(dsp)
-            if i == 5:
+            if i == 5 and j == 5:
                 # ok, let's just try it for one example
                 # it is a big problem
                 ds2 = find_solution_ds(dsp, plot=False)
+                print(ds2)
                 ds_list_lon.append(ds2)
-        if i == 5:
-            ds_lon = xr.concat(ds_list_lon, dim="lon")
-            ds_list.append(ds_lon)
+        # if i == 5:
+        # ds_lon = xr.concat(ds_list_lon, dim="lon")
+        #    ds_list.append(ds_lon)
     print("ds_list", ds_list)
 
 
