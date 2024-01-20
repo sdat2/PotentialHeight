@@ -890,7 +890,7 @@ def plot_gom_bbox_soln() -> None:
 
     fig, axs = plt.subplots(2, 3, figsize=(12, 6), sharex=True)
     axs = axs.T
-    ds["sst"].where(np.isnan(ds["t0"])).plot(
+    ds["sst"].where(~np.isnan(ds["t0"])).plot(
         ax=axs[0, 0],
         cbar_kwargs={
             "label": "Sea surface temperature, $T_s$ [$^\circ$C]",
@@ -899,7 +899,7 @@ def plot_gom_bbox_soln() -> None:
     ds["t0"].plot(
         ax=axs[1, 0], cbar_kwargs={"label": "Outflow temperature, $T_0$, [K]"}
     )
-    ds["msl"].plot(
+    ds["msl"].where(~np.isnan(ds["t0"])).plot(
         ax=axs[2, 0], cbar_kwargs={"label": "Mean sea level pressure, $P_0$, [hPa]"}
     )
     ds["r0"].plot(ax=axs[0, 1], cbar_kwargs={"label": "Potential size, $r_a$, [km]"})
@@ -920,6 +920,11 @@ def plot_gom_bbox_soln() -> None:
     # axs[1].plot(ds["lat"], ds["vmax"], "k")
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
     plt.savefig(folder + "/gom_bbox_r0_pm_rmax.pdf")
+
+    vars = ["t", "q", "vmax", "r0", "pc", "t0"]
+    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
+    plt.savefig(folder + "/gom_bbox_pairplot2.pdf")
+    plt.clf()
 
 
 if __name__ == "__main__":
