@@ -887,24 +887,28 @@ def plot_gom_bbox_soln() -> None:
     print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
-    fig, axs = plt.subplots(2, 3, figsize=(12, 6), sharex=True)
-    # axs[0].plot(ds["lat"], ds["r0"] / 1000, "k")
-    axs = axs.T
-    ds["sst"].plot(
-        ax=axs[0, 0], cbar_kwargs={"label": "Sea surface temperature, $T_s$"}
-    )
-    ds["t0"].plot(ax=axs[1, 0], cbar_kwargs={"label": "Outflow temperature, $T_0$"})
-    ds["msl"].plot(
-        ax=axs[2, 0], cbar_kwargs={"label": "Mean sea level pressure, $p_0$"}
-    )
 
+    fig, axs = plt.subplots(2, 3, figsize=(12, 6), sharex=True)
+    axs = axs.T
+    ds["sst"].where(np.isnan(ds["t0"])).plot(
+        ax=axs[0, 0],
+        cbar_kwargs={
+            "label": "Sea surface temperature, $T_s$ [$^\circ$C]",
+        },
+    )
+    ds["t0"].plot(
+        ax=axs[1, 0], cbar_kwargs={"label": "Outflow temperature, $T_0$, [K]"}
+    )
+    ds["msl"].plot(
+        ax=axs[2, 0], cbar_kwargs={"label": "Mean sea level pressure, $P_0$, [hPa]"}
+    )
     ds["r0"].plot(ax=axs[0, 1], cbar_kwargs={"label": "Potential size, $r_a$, [km]"})
     ds["vmax"].plot(
         ax=axs[1, 1],
-        cbar_kwargs={"label": "Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]"},
+        cbar_kwargs={"label": "Potential intensity, $V_{\mathrm{max}}$, [m s$^{-1}$]"},
     )
     ds["pm"].plot(
-        ax=axs[2, 1], cbar_kwargs={"label": "Pressure at maximum winds, $p_m$, [hPa]"}
+        ax=axs[2, 1], cbar_kwargs={"label": "Pressure at maximum winds, $P_m$, [hPa]"}
     )
     for i in range(3):
         for j in range(2):
