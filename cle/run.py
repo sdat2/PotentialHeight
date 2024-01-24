@@ -866,7 +866,7 @@ def plot_gom_bbox() -> None:
                 elif dsp.vmax.values > 100:
                     print("vmax too high")
                     add_nan()
-                elif dsp.vmax.values < 40:
+                elif dsp.vmax.values < 20:
                     print("vmax too low")
                     add_nan()
                 else:
@@ -921,7 +921,7 @@ def plot_gom_bbox_soln() -> None:
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
     plt.savefig(folder + "/gom_bbox_r0_pm_rmax.pdf")
 
-    vars = ["t", "q", "vmax", "r0", "pc", "t0"]
+    vars: List[str] = ["t", "q", "vmax", "r0", "pc", "t0"]
     pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
     plt.savefig(folder + "/gom_bbox_pairplot2.pdf")
     plt.clf()
@@ -936,5 +936,5 @@ if __name__ == "__main__":
     # ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
     # plot_from_ds()  # ds_name="gom_soln_2.nc")
     # plot_soln_curves()
-    # plot_gom_bbox()
+    plot_gom_bbox()
     plot_gom_bbox_soln()
