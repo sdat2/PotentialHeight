@@ -3,6 +3,7 @@ from typing import List
 
 REQUIRED: List[str] = [
     "xarray[complete]",
+    "xarray-datatree",
     "netCDF4",
     "dask[complete]",
     "uncertainties",
