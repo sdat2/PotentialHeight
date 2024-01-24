@@ -1,12 +1,13 @@
 """Fort.22.nc file reader and writer."""
+from typing import Optional
 import os
 import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
-from tcpips.constants import DATA_PATH
+from tcpips.constants import DATA_PATH, FIGURE_PATH
 
 
-def read_fort22(fort22_path: str = None) -> xr.Dataset:
+def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
     """Read fort.22.nc file.
 
     Parameters
@@ -25,8 +26,7 @@ def read_fort22(fort22_path: str = None) -> xr.Dataset:
     return dt.open_datatree(fort22_path)
 
 
-if __name__ == "__main__":
-    # python -m tcpips.fort22
+def trim_fort22():
     fort22 = read_fort22()
     g1 = fort22.groups[1]
     g2 = fort22.groups[2]
@@ -43,3 +43,8 @@ if __name__ == "__main__":
     print(ds)
     print(ds.groups["TC"])
     print(ds.groups["Main"])
+
+
+if __name__ == "__main__":
+    # python -m tcpips.fort22
+    trim_fort22()
