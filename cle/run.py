@@ -92,9 +92,9 @@ def run_cle15(
     # assume wind-pressure gradient balance
     p0 = ins["p0"] * 100  # [Pa]
     rho0 = 1.15  # [kg m-3]
-    rr = np.array(ou["rr"])
-    vv = np.array(ou["VV"])
-    p = np.zeros(rr.shape)
+    rr = np.array(ou["rr"])  # [m]
+    vv = np.array(ou["VV"])  # [m/s]
+    p = np.zeros(rr.shape)  # [Pa]
     # rr ascending
     assert np.all(rr == np.sort(rr))
     p[-1] = p0
