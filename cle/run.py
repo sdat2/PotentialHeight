@@ -9,7 +9,8 @@ from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
-from tcpips.pi import get_gom
+from tcpips.pi import get_gom, get_gom_bbox
+
 
 plot_defaults()
 
@@ -779,6 +780,12 @@ def plot_soln_curves(ds_name: str = "gom_soln_new.nc") -> None:
 
 
 def plot_profiles(ds_name: str = "gom_soln_2.nc") -> None:
+    """
+    Plot the azimuthal wind profiles for different times.
+
+    Args:
+        ds_name (str, optional): _description_. Defaults to "gom_soln_2.nc".
+    """
     plot_defaults()
     ds = xr.open_dataset(ds_name)
     folder = "sup"
@@ -798,9 +805,6 @@ def plot_profiles(ds_name: str = "gom_soln_2.nc") -> None:
     plt.ylabel("Wind speed, $V$, [m s$^{-1}$]")
     plt.savefig(folder + "/profiles.pdf")
     plt.clf()
-
-
-from tcpips.pi import get_gom_bbox
 
 
 def plot_gom_bbox() -> None:
