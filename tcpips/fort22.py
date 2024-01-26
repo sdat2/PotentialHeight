@@ -12,6 +12,8 @@ import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
 from tcpips.constants import DATA_PATH, FIGURE_PATH
+from sithom.time import timeit
+from sithom.plot import plot_defaults
 
 
 def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
@@ -35,9 +37,6 @@ def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
 
 def trim_fort22():
     fort22 = read_fort22()
-    g1 = fort22.groups[1]
-    g2 = fort22.groups[2]
-    # print(g1, g2)
     print(fort22)
     f22 = fort22.drop_nodes(["2004223N11301", "2004227N09314"])
     print(fort22.groups)
@@ -59,6 +58,45 @@ def trim_fort22():
     print(ds.groups["Main"])
 
 
+@timeit
+def blank_fort22():
+    plot_defaults()
+    fort22 = read_fort22()
+    print(fort22)
+    f22 = fort22.drop_nodes(["2004223N11301", "2004227N09314"])
+    print(fort22.groups)
+    print(f22.groups)
+    key = "2004217N13306"
+    f22[key]["PSFC"][:] = f22[key]["PSFC"].mean()
+
+    f22["2004217N13306"].name = "TC1"
+    f22[""].attrs["group_order"] = "Main TC1"
+    f22[""].attrs["institution"] = "Oceanweather Inc. (OWI)"
+    f22[""].attrs["conventions"] = "CF-1.6 OWI-NWS13"
+    f22["Main"]["PSFC"][:] = f22["Main"]["PSFC"].mean()
+    print(f22)
+    # f22["TC1"]["PSFC"][:] = f22["TC1"]["PSFC"].mean()
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(1, 2, sharey=True)
+    f22["Main"]["PSFC"].isel(time=0).plot(ax=axs[0],x="lon", y="lat")
+    f22[f22.groups[1]].isel(time=0)["PSFC"].plot(ax=axs[1],x="lon", y="lat")
+    plt.savefig(os.path.join(FIGURE_PATH, "blank.png"))
+    plt.clf()
+
+    # f22.rename({"2004217N13306": "TC"})
+    f22.to_netcdf(os.path.join(DATA_PATH, "blank.nc"))
+    ds = Dataset(os.path.join(DATA_PATH, "blank.nc"))
+
+    print(ds)
+    print(ds.groups["TC1"])
+    print(ds.groups["Main"])
+
+    ds = Dataset(os.path.join(DATA_PATH, "fort.22.nc"))
+    print(ds)
+    print(ds.groups["Main"])
+
+
 if __name__ == "__main__":
     # python -m tcpips.fort22
-    trim_fort22()
+    # trim_fort22()
+    blank_fort22()
