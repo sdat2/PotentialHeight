@@ -81,9 +81,10 @@ def blank_fort22():
     print(f22)
     # f22["TC1"]["PSFC"][:] = f22["TC1"]["PSFC"].mean()
     import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(1, 2, sharey=True)
-    f22["Main"]["PSFC"].isel(time=0).plot(ax=axs[0],x="lon", y="lat")
-    f22[f22.groups[1]].isel(time=0)["PSFC"].plot(ax=axs[1],x="lon", y="lat")
+    f22["Main"]["PSFC"].isel(time=0).plot(ax=axs[0], x="lon", y="lat")
+    f22[f22.groups[1]].isel(time=0)["PSFC"].plot(ax=axs[1], x="lon", y="lat")
     plt.savefig(os.path.join(FIGURE_PATH, "blank.png"))
     plt.clf()
 
@@ -106,6 +107,8 @@ class Trajectory:
         point: Point,
         angle: float,
         trans_speed: float,
+        impact_time: np.datetime64 = np.datetime64("2005-08-29T12", "ns"),
+
     ) -> None:
         """
         Tropical cylone to hit coast at point.
@@ -115,12 +118,17 @@ class Trajectory:
             angle (float): Angle to point [degrees].
             trans_speed (float): Translation speed [m s**-1].
         """
-        # print(angle, trans_speed)
+        # print(point, angle, trans_speed)
         self.point = point
         self.angle = angle
         self.trans_speed = trans_speed
-        self.time_delta = datetime.timedelta(hours=3)
-        self.impact_time = datetime.datetime(year=2005, month=8, day=29, hour=12)
+        self.impact_time = impact_time
+
+        # time axis to fill in
+        self.time_delta: Optional[
+            np.datetime64
+        ] = None  # = datetime.timedelta(hours=3)
+        self.time_axis: any = None
 
     def __repr__(self) -> str:
         return str(
@@ -150,7 +158,17 @@ class Trajectory:
             self.point.lat + np.cos(np.radians(self.angle)) * distance / 111e3,
         ]
 
-    def trajectory(self, run_up=1e6, run_down=3.5e5) -> Tuple[np.ndarray, np.ndarray]:
+    def timeseries_to_timedelta(self, timeseries: np.ndarray) -> np.ndarray:
+        print(timeseries)
+        return timeseries - self.impact_time
+
+
+    def trajectory_from_distances(
+        self,
+        run_up: float = 1e6,
+        run_down: float = 3.5e5,
+        time_delta=np.timedelta64(3, "h"),
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Trajectory.
 
@@ -158,25 +176,30 @@ class Trajectory:
             run_up (int, optional): Run up afterwards. Defaults to 1000 km in meteres.
             run_down (int, optional): Run down after point. Defaults to 350 km im meters.
         """
+        self.time_delta = time_delta
         distance_per_timestep = (
-            self.trans_speed * self.time_delta / datetime.timedelta(seconds=1)
+            self.trans_speed * self.time_delta / np.timedelta64(1, "s")
         )
+
+        # let's change this.
         time_steps_before = int(abs(run_up) / distance_per_timestep)
         time_steps_after = int(abs(run_down) / distance_per_timestep)
-        # print(self.point, self.angle, run_up, run_down)
-        point_list = [
-            self.new_point(dist)
-            for dist in range(-int(run_up), int(run_down), int(distance_per_timestep))
-        ]
         time_list = [
-            self.impact_time + x * self.time_delta
+            self.impact_time + np.linspace(-time_steps_before, time_steps_after + 1) * self.time_delta
             for x in range(
                 -time_steps_before,
                 time_steps_after + 1,
                 1,
             )
         ]
+        self.time_axis = time_list
         print(time_steps_before + time_steps_after + 1)
+
+        point_list = [
+            self.new_point(dist)
+            for dist in range(-int(run_up), int(run_down), int(distance_per_timestep))
+        ]
+
         return np.array(point_list), np.array(time_list)
 
     # def time_traj(self, )
@@ -191,7 +214,7 @@ class Trajectory:
         Returns:
             xr.Dataset: trajectory dataset with variables lon, lat and time.
         """
-        traj, dates = self.trajectory(run_up=run_up, run_down=run_down)
+        traj, dates = self.trajectory_from_distances(run_up=run_up, run_down=run_down)
         print(traj.shape)
         print(dates.shape)
         return xr.Dataset(
@@ -244,11 +267,17 @@ class Trajectory:
 if __name__ == "__main__":
     # python -m tcpips.fort22
     # trim_fort22()
-    tj = Trajectory(Point(-90, 40), 0, 2)
+    tj = Trajectory(Point(-90, 40), 0, 2, impact_time=datetime.datetime(year=2004, month=8,day=12))
     tj_ds = tj.trajectory_ds()
     tj_ds.to_netcdf(os.path.join(DATA_PATH, "traj.nc"))
-    print(tj_ds)
-    f22_ds = read_fort22()
-    print(f22_ds)
+    # print(tj_ds)
+
+    f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    #print(f22_dt)
+    # dt1 = datetime.datetime(year=2004, month=8, day=12)
+    dt1 = np.datetime64("2004-08-12", "ns")
+    print(dt1)
+    timedeltas = tj.timeseries_to_timedelta(f22_dt["Main"]["time"].values)
+    # print(timedeltas)
 
     # blank_fort22()
