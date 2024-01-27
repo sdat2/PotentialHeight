@@ -476,7 +476,13 @@ if __name__ == "__main__":
 
     sc = static_coords_from_tj(f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_new)
 
-    sc.to_netcdf(os.path.join(DATA_PATH, "sc.nc"))
+    # sc.to_netcdf(os.path.join(DATA_PATH, "sc.nc"))
+
+    node0 = dt.DataTree(name=None)
+    node1 = dt.DataTree(name="Main", parent=node0, data=sc)
+    node2 = dt.DataTree(name="TC1", parent=node0, data=sc)
+
+    print(node0)
 
     # print(chavas_profile)
     # print(timedeltas)
