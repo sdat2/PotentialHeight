@@ -184,24 +184,32 @@ class Trajectory:
             -time_steps_before,
             time_steps_after,
             num=time_steps_before + time_steps_after + 1,
-            dtype="int16"
+            dtype="int16",
         )
         print("indices", indices)
         print("time_delta", time_delta, type(time_delta), time_delta.dtype)
-        time_deltas = (indices * np.array(time_delta)) # .astype("timedelta64[h]")
+        time_deltas = indices * np.array(time_delta)  # .astype("timedelta64[h]")
         print("time_delta_list", time_deltas, type(time_deltas), time_deltas.dtype)
         print("impact_time", self.impact_time, type(self.impact_time))
         time_array = np.array(self.impact_time) + time_deltas
-        print("time_list", time_array[:4] ,type(time_array), time_array.dtype)
+        print("time_list", time_array[:4], type(time_array), time_array.dtype)
         self.time_axis = time_array
         print(time_steps_before + time_steps_after + 1)
 
-        point_list = [
-            self.new_point(dist)
-            for dist in range(-int(run_up), int(run_down), int(distance_per_timestep))
-        ]
+        # work out point array assuming flat world (pretty terrible, but fast,
+        # should change) TODO: The world is round.
+        long_angles = indices * distance_per_timestep / 111e3
+        point = np.array([[self.point.lon], [self.point.lat]])
+        slope = np.array([[np.sin(np.radians(self.angle))], [np.cos(np.radians(self.angle))]])
+        print(slope, slope.dtype)
 
-        return np.array(point_list), time_array
+        point_array = (point+
+            slope
+            * long_angles
+        ).T
+        print("point_array", point_array.shape, point_array[0:4, :], point_array.dtype)
+
+        return point_array, time_array
 
     # def time_traj(self, )
     def trajectory_ds(self, run_up=1e6, run_down=3.5e5) -> xr.Dataset:
@@ -269,7 +277,7 @@ if __name__ == "__main__":
     # python -m tcpips.fort22
     # trim_fort22()
     tj = Trajectory(
-        Point(-90, 40), 0, 2, impact_time=np.datetime64("2005-08-29T12", "ns")
+        Point(-90, 40), 30, 2, impact_time=np.datetime64("2005-08-29T12", "ns")
     )
     tj_ds = tj.trajectory_ds()
     tj_ds.to_netcdf(os.path.join(DATA_PATH, "traj.nc"))
@@ -279,8 +287,8 @@ if __name__ == "__main__":
     # print(f22_dt)
     # dt1 = datetime.datetime(year=2004, month=8, day=12)
     # dt1 = np.datetime64("2004-08-12", "ns")
-    #print(dt1)
-    #timedeltas = tj.timeseries_to_timedelta(f22_dt["Main"]["time"].values)
+    # print(dt1)
+    # timedeltas = tj.timeseries_to_timedelta(f22_dt["Main"]["time"].values)
     # print(timedeltas)
 
     # blank_fort22()
