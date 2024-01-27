@@ -163,7 +163,7 @@ class Trajectory:
         self,
         run_up: float = 1e6,
         run_down: float = 3.5e5,
-        time_delta=np.timedelta64(3, "h"),
+        time_delta: np.timedelta64 = np.timedelta64(3, "h"),
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Trajectory.
@@ -200,13 +200,12 @@ class Trajectory:
         # should change) TODO: The world is round.
         long_angles = indices * distance_per_timestep / 111e3
         point = np.array([[self.point.lon], [self.point.lat]])
-        slope = np.array([[np.sin(np.radians(self.angle))], [np.cos(np.radians(self.angle))]])
+        slope = np.array(
+            [[np.sin(np.radians(self.angle))], [np.cos(np.radians(self.angle))]]
+        )
         print(slope, slope.dtype)
 
-        point_array = (point+
-            slope
-            * long_angles
-        ).T
+        point_array = (point + slope * long_angles).T
         print("point_array", point_array.shape, point_array[0:4, :], point_array.dtype)
 
         return point_array, time_array
@@ -223,19 +222,57 @@ class Trajectory:
         Returns:
             xr.Dataset: trajectory dataset with variables lon, lat and time.
         """
-        traj, dates = self.trajectory_from_distances(run_up=run_up, run_down=run_down)
-        print(traj.shape)
+        point_array, dates = self.trajectory_from_distances(
+            run_up=run_up, run_down=run_down
+        )
+        print(point_array.shape)
         print(dates.shape)
         return xr.Dataset(
             data_vars=dict(
-                clon=(["time"], traj[:, 0]),
-                clat=(["time"], traj[:, 1]),
+                clon=(["time"], point_array[:, 0]),
+                clat=(["time"], point_array[:, 1]),
             ),
             coords=dict(
                 time=dates,
                 # reference_time=self.impact_time,
             ),
-            attrs=dict(description="Tropcial Cylone trajectory."),
+            attrs=dict(description="Tropcial Cyclone trajectory."),
+        )
+
+    @timeit
+    def trajectory_ds_from_time(self, time_array: np.datetime64) -> xr.Dataset:
+        """
+        Create a trajectory dataset for the center eye of the tropical cylone.
+
+        Args:
+            run_up (float, optional): How many meters to run up. Defaults to 1e6.
+            run_down (float, optional): How many meters to run down. Defaults to 3.5e5.
+
+        Returns:
+            xr.Dataset: trajectory dataset with variables lon, lat and time.
+        """
+        long_angles = (
+            (time_array - self.impact_time) / np.timedelta64(1, "s") * self.trans_speed
+        ) / 111e3
+        point = np.array([[self.point.lon], [self.point.lat]])
+        slope = np.array(
+            [[np.sin(np.radians(self.angle))], [np.cos(np.radians(self.angle))]]
+        )
+        print(slope, slope.dtype)
+
+        point_array = (point + slope * long_angles).T
+
+        print(point_array.shape)
+        return xr.Dataset(
+            data_vars=dict(
+                clon=(["time"], point_array[:, 0]),
+                clat=(["time"], point_array[:, 1]),
+            ),
+            coords=dict(
+                time=time_array,
+                # reference_time=self.impact_time,
+            ),
+            attrs=dict(description="Tropcial Cyclone trajectory."),
         )
 
     def angle_at_points(
@@ -273,22 +310,59 @@ class Trajectory:
         return np.sin(angle) * windspeed, np.cos(angle) * windspeed
 
 
+@timeit
+def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
+    coords.lon[:] = coords.lon[:] - coords.lon.mean()
+    coords.lat[:] = coords.lat[:] - coords.lat.mean()
+    lats = np.expand_dims(coords.lon.values, -1) + tj.clon.values.reshape(1, 1, -1)
+    lons = np.expand_dims(coords.lon.values, -1) + tj.clat.values.reshape(1, 1, -1)
+    # print(lats, lons)
+    return xr.Dataset(
+        data_vars=dict(
+            clon=(["time"], tj.clon.values),
+            clat=(["time"], tj.clat.values),
+        ),
+        coords=dict(
+            lon=(["xi", "yi", "time"], lons),
+            lat=(["xi", "yi", "time"], lats),
+            time=tj.time.values,
+            # reference_time=self.impact_time,
+        ),
+        attrs=dict(description="Tropcial cyclone moving grid."),
+    )
+
+
 if __name__ == "__main__":
     # python -m tcpips.fort22
     # trim_fort22()
     tj = Trajectory(
-        Point(-90, 40), 30, 2, impact_time=np.datetime64("2005-08-29T12", "ns")
+        Point(-90, 40), 30, 2, impact_time=np.datetime64("2004-08-19T12", "ns")
     )
     tj_ds = tj.trajectory_ds()
     tj_ds.to_netcdf(os.path.join(DATA_PATH, "traj.nc"))
     # print(tj_ds)
 
-    # f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
     # print(f22_dt)
     # dt1 = datetime.datetime(year=2004, month=8, day=12)
     # dt1 = np.datetime64("2004-08-12", "ns")
     # print(dt1)
-    # timedeltas = tj.timeseries_to_timedelta(f22_dt["Main"]["time"].values)
+    tj_ds_new = tj.trajectory_ds_from_time(f22_dt["Main"]["time"].values)
+    print("new_tj", tj_ds_new)
+    mc = moving_coords_from_tj(
+        f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_new
+    )
+    print(mc)
+
+    from sithom.io import read_json
+
+    chavas_profile = read_json("cle/outputs.json")
+    print(chavas_profile.keys())
+    radii = np.array(chavas_profile["rr"])
+    velocities = np.array(chavas_profile["VV"])
+    print(radii[0:10], velocities[0:10])
+    # print(chavas_profile)
+
     # print(timedeltas)
 
     # blank_fort22()
