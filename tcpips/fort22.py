@@ -310,25 +310,93 @@ class Trajectory:
         return np.sin(angle) * windspeed, np.cos(angle) * windspeed
 
 
+def pressures_profile(profile: dict) -> dict:
+    # integrate the wind profile to get the pressure profile
+    # assume wind-pressure gradient balance
+    fcor = 5e-5
+    p0 = 1015 * 100  # [Pa]
+    rho0 = 1.15  # [kg m-3]
+    rr = np.array(profile["rr"])  # [m]
+    vv = np.array(profile["VV"])  # [m/s]
+    p = np.zeros(rr.shape)  # [Pa]
+    # rr ascending
+    assert np.all(rr == np.sort(rr))
+    p[-1] = p0
+    for j in range(len(rr) - 1):
+        i = -j - 2
+        # Assume Coriolis force and pressure-gradient balance centripetal force.
+        p[i] = p[i + 1] - rho0 * (
+            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
+        ) * (rr[i + 1] - rr[i])
+        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
+
+    profile["p"] = p / 100
+
+    return profile
+
+
+def gen_ps_f() -> callable:
+    from sithom.io import read_json
+
+    chavas_profile = read_json("cle/outputs.json")
+    # print(chavas_profile.keys())
+    chavas_profile = pressures_profile(chavas_profile)
+    radii = np.array(chavas_profile["rr"], dtype="float32")
+    velocities = np.array(chavas_profile["VV"], dtype="float32")
+    pressures = np.array(chavas_profile["p"], dtype="float32")
+    # print(radii[0:10], velocities[0:10], pressures[0:10])
+
+    def f(distances):
+        pressure_cube = np.interp(distances, radii, pressures)
+        velo_cube = np.interp(distances, radii, velocities)
+        return pressure_cube, velo_cube
+
+    return f
+
+
 @timeit
 def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     coords.lon[:] = coords.lon[:] - coords.lon.mean()
     coords.lat[:] = coords.lat[:] - coords.lat.mean()
-    lats = np.expand_dims(coords.lon.values, -1) + tj.clon.values.reshape(1, 1, -1)
-    lons = np.expand_dims(coords.lon.values, -1) + tj.clat.values.reshape(1, 1, -1)
+    clon = tj.clon.values.reshape(-1, 1, 1)
+    clat = tj.clat.values.reshape(-1, 1, 1)
+    lats = np.expand_dims(coords.lat.values, 0) + clon
+    lons = np.expand_dims(coords.lon.values, 0) + clat
+
+    f = gen_ps_f()
+
+    dist = np.sqrt((lats - clon) ** 2 + (lats - clat) ** 2) / 111e3
+    psfc, u = f(dist)
+
+    rad = (
+        np.arctan2(np.radians(lons - clon), np.radians(lats - clat))
+        - np.pi / 2
+    )
+    u10, v10 = np.sin(rad) * u, np.cos(rad) * u
+
     # print(lats, lons)
     return xr.Dataset(
         data_vars=dict(
             clon=(["time"], tj.clon.values),
             clat=(["time"], tj.clat.values),
+            PSFC=(
+                [
+                    "time",
+                    "yi",
+                    "xi",
+                ],
+                psfc.astype("float32"),
+            ),
+            U10=(["time", "yi", "xi"], u10.astype("float32")),
+            V10=(["time", "yi", "xi"], v10.astype("float32")),
         ),
         coords=dict(
-            lon=(["xi", "yi", "time"], lons),
-            lat=(["xi", "yi", "time"], lats),
+            lon=(["time", "yi", "xi"], lons),
+            lat=(["time", "yi", "xi"], lats),
             time=tj.time.values,
             # reference_time=self.impact_time,
         ),
-        attrs=dict(description="Tropcial cyclone moving grid."),
+        attrs=dict(description="Tropical cyclone moving grid."),
     )
 
 
@@ -343,6 +411,7 @@ if __name__ == "__main__":
     # print(tj_ds)
 
     f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    print("f22_dt", f22_dt)
     # print(f22_dt)
     # dt1 = datetime.datetime(year=2004, month=8, day=12)
     # dt1 = np.datetime64("2004-08-12", "ns")
@@ -353,16 +422,9 @@ if __name__ == "__main__":
         f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_new
     )
     print(mc)
+    mc.to_netcdf(os.path.join(DATA_PATH, "mov.nc"))
 
-    from sithom.io import read_json
-
-    chavas_profile = read_json("cle/outputs.json")
-    print(chavas_profile.keys())
-    radii = np.array(chavas_profile["rr"])
-    velocities = np.array(chavas_profile["VV"])
-    print(radii[0:10], velocities[0:10])
     # print(chavas_profile)
-
     # print(timedeltas)
 
     # blank_fort22()
