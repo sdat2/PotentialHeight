@@ -480,7 +480,16 @@ if __name__ == "__main__":
 
     node0 = dt.DataTree(name=None)
     node1 = dt.DataTree(name="Main", parent=node0, data=sc)
-    node2 = dt.DataTree(name="TC1", parent=node0, data=sc)
+    node2 = dt.DataTree(name="TC1", parent=node0, data=mc)
+
+    node0[""].attrs["group_order"] = "Main TC1"
+    node0[""].attrs["institution"] = "Oceanweather Inc. (OWI)"
+    node0[""].attrs["conventions"] = "CF-1.6 OWI-NWS13"
+
+
+    node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
+
+
 
     print(node0)
 
