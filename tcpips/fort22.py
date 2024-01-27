@@ -393,8 +393,6 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
             ),
             U10=(["time", "xi", "yi"], u10.astype("float32")),
             V10=(["time", "xi", "yi"], v10.astype("float32")),
-            D=(["time", "xi", "yi"], distances.astype("float32")),
-            U=(["time", "xi", "yi"], u.astype("float32")),
         ),
         coords=dict(
             lon=(["time", "xi", "yi"], lons),
@@ -403,6 +401,49 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
             # reference_time=self.impact_time,
         ),
         attrs=dict(description="Tropical cyclone moving grid."),
+    )
+
+
+@timeit
+def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
+    lats = np.expand_dims(orig.lat.values, 0)
+    lons = np.expand_dims(orig.lon.values, 0)
+    clon = tj.clon.values.reshape(-1, 1, 1)
+    clat = tj.clat.values.reshape(-1, 1, 1)
+
+    f = gen_ps_f()
+
+    distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
+    psfc, u = f(distances)
+
+    rad = (
+        np.arctan2(np.radians(lons - clon), np.radians(lats - clat))
+        - np.pi / 2
+    )
+    u10, v10 = np.sin(rad) * u, np.cos(rad) * u
+
+    # print(lats, lons)
+    return xr.Dataset(
+        data_vars=dict(
+            clon=(["time"], tj.clon.values),
+            clat=(["time"], tj.clat.values),
+            PSFC=(
+                [
+                    "time",
+                    "yi", "xi",
+                ],
+                psfc.astype("float32"),
+            ),
+            U10=(["time", "yi", "xi"], u10.astype("float32")),
+            V10=(["time", "yi", "xi"], v10.astype("float32")),
+        ),
+        coords=dict(
+            lon=(["yi", "xi"], orig.lon.values),
+            lat=(["yi", "xi"], orig.lat.values),
+            time=tj.time.values,
+            # reference_time=self.impact_time,
+        ),
+        attrs=dict(description="Tropical cyclone static grid."),
     )
 
 
@@ -422,13 +463,20 @@ if __name__ == "__main__":
     # dt1 = datetime.datetime(year=2004, month=8, day=12)
     # dt1 = np.datetime64("2004-08-12", "ns")
     # print(dt1)
-    tj_ds_new = tj.trajectory_ds_from_time(f22_dt["Main"]["time"].values)
+    tj_ds_new = tj.trajectory_ds_from_time(f22_dt["TC1"]["time"].values)
     print("new_tj", tj_ds_new)
     mc = moving_coords_from_tj(
         f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_new
     )
+
     print(mc)
-    mc.to_netcdf(os.path.join(DATA_PATH, "mov.nc"))
+    # mc.to_netcdf(os.path.join(DATA_PATH, "mov.nc"))
+
+    tj_ds_new = tj.trajectory_ds_from_time(f22_dt["Main"]["time"].values)
+
+    sc = static_coords_from_tj(f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_new)
+
+    sc.to_netcdf(os.path.join(DATA_PATH, "sc.nc"))
 
     # print(chavas_profile)
     # print(timedeltas)
