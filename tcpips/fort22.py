@@ -108,7 +108,6 @@ class Trajectory:
         angle: float,
         trans_speed: float,
         impact_time: np.datetime64 = np.datetime64("2005-08-29T12", "ns"),
-
     ) -> None:
         """
         Tropical cylone to hit coast at point.
@@ -125,9 +124,7 @@ class Trajectory:
         self.impact_time = impact_time
 
         # time axis to fill in
-        self.time_delta: Optional[
-            np.datetime64
-        ] = None  # = datetime.timedelta(hours=3)
+        self.time_delta: Optional[np.datetime64] = None  # = datetime.timedelta(hours=3)
         self.time_axis: any = None
 
     def __repr__(self) -> str:
@@ -162,7 +159,6 @@ class Trajectory:
         print(timeseries)
         return timeseries - self.impact_time
 
-
     def trajectory_from_distances(
         self,
         run_up: float = 1e6,
@@ -184,15 +180,20 @@ class Trajectory:
         # let's change this.
         time_steps_before = int(abs(run_up) / distance_per_timestep)
         time_steps_after = int(abs(run_down) / distance_per_timestep)
-        time_list = [
-            self.impact_time + np.linspace(-time_steps_before, time_steps_after + 1) * self.time_delta
-            for x in range(
-                -time_steps_before,
-                time_steps_after + 1,
-                1,
-            )
-        ]
-        self.time_axis = time_list
+        indices = np.linspace(
+            -time_steps_before,
+            time_steps_after,
+            num=time_steps_before + time_steps_after + 1,
+            dtype="int16"
+        )
+        print("indices", indices)
+        print("time_delta", time_delta, type(time_delta), time_delta.dtype)
+        time_deltas = (indices * np.array(time_delta)) # .astype("timedelta64[h]")
+        print("time_delta_list", time_deltas, type(time_deltas), time_deltas.dtype)
+        print("impact_time", self.impact_time, type(self.impact_time))
+        time_array = np.array(self.impact_time) + time_deltas
+        print("time_list", time_array[:4] ,type(time_array), time_array.dtype)
+        self.time_axis = time_array
         print(time_steps_before + time_steps_after + 1)
 
         point_list = [
@@ -200,7 +201,7 @@ class Trajectory:
             for dist in range(-int(run_up), int(run_down), int(distance_per_timestep))
         ]
 
-        return np.array(point_list), np.array(time_list)
+        return np.array(point_list), time_array
 
     # def time_traj(self, )
     def trajectory_ds(self, run_up=1e6, run_down=3.5e5) -> xr.Dataset:
@@ -267,17 +268,19 @@ class Trajectory:
 if __name__ == "__main__":
     # python -m tcpips.fort22
     # trim_fort22()
-    tj = Trajectory(Point(-90, 40), 0, 2, impact_time=datetime.datetime(year=2004, month=8,day=12))
+    tj = Trajectory(
+        Point(-90, 40), 0, 2, impact_time=np.datetime64("2005-08-29T12", "ns")
+    )
     tj_ds = tj.trajectory_ds()
     tj_ds.to_netcdf(os.path.join(DATA_PATH, "traj.nc"))
     # print(tj_ds)
 
-    f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
-    #print(f22_dt)
+    # f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    # print(f22_dt)
     # dt1 = datetime.datetime(year=2004, month=8, day=12)
-    dt1 = np.datetime64("2004-08-12", "ns")
-    print(dt1)
-    timedeltas = tj.timeseries_to_timedelta(f22_dt["Main"]["time"].values)
+    # dt1 = np.datetime64("2004-08-12", "ns")
+    #print(dt1)
+    #timedeltas = tj.timeseries_to_timedelta(f22_dt["Main"]["time"].values)
     # print(timedeltas)
 
     # blank_fort22()
