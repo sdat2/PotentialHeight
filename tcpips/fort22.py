@@ -345,6 +345,11 @@ def gen_ps_f() -> callable:
     velocities = np.array(chavas_profile["VV"], dtype="float32")
     pressures = np.array(chavas_profile["p"], dtype="float32")
     # print(radii[0:10], velocities[0:10], pressures[0:10])
+    import matplotlib.pyplot as plt
+    fig, axs = plt.subplots(2, 1)
+    axs[0].plot(radii, pressures)
+    axs[1].plot(radii, velocities)
+    plt.savefig("prof.png")
 
     def f(distances):
         pressure_cube = np.interp(distances, radii, pressures)
@@ -360,13 +365,13 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     coords.lat[:] = coords.lat[:] - coords.lat.mean()
     clon = tj.clon.values.reshape(-1, 1, 1)
     clat = tj.clat.values.reshape(-1, 1, 1)
-    lats = np.expand_dims(coords.lat.values, 0) + clon
-    lons = np.expand_dims(coords.lon.values, 0) + clat
+    lats = np.expand_dims(coords.lon.values, 0) + clat
+    lons = np.expand_dims(coords.lat.values, 0) + clon
 
     f = gen_ps_f()
 
-    dist = np.sqrt((lats - clon) ** 2 + (lats - clat) ** 2) / 111e3
-    psfc, u = f(dist)
+    distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
+    psfc, u = f(distances)
 
     rad = (
         np.arctan2(np.radians(lons - clon), np.radians(lats - clat))
@@ -382,17 +387,18 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
             PSFC=(
                 [
                     "time",
-                    "yi",
-                    "xi",
+                    "xi", "yi",
                 ],
                 psfc.astype("float32"),
             ),
-            U10=(["time", "yi", "xi"], u10.astype("float32")),
-            V10=(["time", "yi", "xi"], v10.astype("float32")),
+            U10=(["time", "xi", "yi"], u10.astype("float32")),
+            V10=(["time", "xi", "yi"], v10.astype("float32")),
+            D=(["time", "xi", "yi"], distances.astype("float32")),
+            U=(["time", "xi", "yi"], u.astype("float32")),
         ),
         coords=dict(
-            lon=(["time", "yi", "xi"], lons),
-            lat=(["time", "yi", "xi"], lats),
+            lon=(["time", "xi", "yi"], lons),
+            lat=(["time", "xi", "yi"], lats),
             time=tj.time.values,
             # reference_time=self.impact_time,
         ),
@@ -428,3 +434,5 @@ if __name__ == "__main__":
     # print(timedeltas)
 
     # blank_fort22()
+    # jupyter-lab --ip 0.0.0.0 --port 8888 --no-browser
+
