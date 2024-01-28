@@ -3,7 +3,7 @@ from typing import List
 
 REQUIRED: List[str] = [
     "xarray[complete]",
-    "xarray-datatree",
+    "xarray-datatree", # to process netCDF4 files with groups.
     "netCDF4",
     "dask[complete]",
     "uncertainties",
@@ -42,6 +42,6 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "chavas15"],
-    package_dir={"tcpips": "tcpips", "chavas15": "chavas15"},
+    packages=["tcpips", "chavas15", "adpy"],
+    package_dir={"tcpips": "tcpips", "chavas15": "chavas15", "adpy": "adpy"},
 )

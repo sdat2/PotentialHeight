@@ -3,8 +3,6 @@
 NWS 13 format:
 
 https://wiki.adcirc.org/NWS13
-
-
 """
 from typing import Optional, List, Tuple
 import os
@@ -12,7 +10,6 @@ import numpy as np
 import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
-import datetime
 from tcpips.constants import DATA_PATH, FIGURE_PATH
 from sithom.time import timeit
 from sithom.plot import plot_defaults
@@ -526,12 +523,7 @@ def return_new_input(
 
 
 if __name__ == "__main__":
-    # python -m tcpips.fort22
-    # trim_fort22()
-    # print(f22_dt)
-    # dt1 = datetime.datetime(year=2004, month=8, day=12)
-    # dt1 = np.datetime64("2004-08-12", "ns")
-    # print(dt1)
+    # python -m adpy.fort22
     node0 = return_new_input()
     node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
 
