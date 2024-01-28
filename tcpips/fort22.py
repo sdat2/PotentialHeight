@@ -17,7 +17,8 @@ from tcpips.constants import DATA_PATH, FIGURE_PATH
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.place import Point
-from src.conversions import angle_between_points, distance_between_points
+from sithom.io import read_json
+from src.conversions import angle_between_points
 
 
 def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
@@ -310,11 +311,49 @@ class Trajectory:
         return np.sin(angle) * windspeed, np.cos(angle) * windspeed
 
 
+@timeit
+def trajectory_ds_from_time(
+    angle,
+    trans_speed: float,
+    impact_lon: float,
+    impact_lat: float,
+    impact_time: np.datetime64,
+    time_array: np.datetime64,
+) -> xr.Dataset:
+    """
+    Create a trajectory dataset for the center eye of the tropical cylone.
+
+    Args:
+        run_up (float, optional): How many meters to run up. Defaults to 1e6.
+        run_down (float, optional): How many meters to run down. Defaults to 3.5e5.
+
+    Returns:
+        xr.Dataset: trajectory dataset with variables lon, lat and time.
+    """
+    long_angles = (
+        (time_array - impact_time) / np.timedelta64(1, "s") * trans_speed
+    ) / 111e3
+    point = np.array([[impact_lon], [impact_lat]])
+    slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
+    point_array = (point + slope * long_angles).T
+    return xr.Dataset(
+        data_vars=dict(
+            clon=(["time"], point_array[:, 0]),
+            clat=(["time"], point_array[:, 1]),
+        ),
+        coords=dict(
+            time=time_array,
+        ),
+        attrs=dict(description="Tropcial Cyclone trajectory."),
+    )
+
+
 def pressures_profile(profile: dict) -> dict:
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
-    fcor = 5e-5
-    p0 = 1015 * 100  # [Pa]
+    # could speed up but is very quick anyway
+    fcor = 5e-5  # should vary with latitude
+    p0 = 1015 * 100  # [Pa], should be settable
     rho0 = 1.15  # [kg m-3]
     rr = np.array(profile["rr"])  # [m]
     vv = np.array(profile["VV"])  # [m/s]
@@ -336,8 +375,11 @@ def pressures_profile(profile: dict) -> dict:
 
 
 def gen_ps_f() -> callable:
-    from sithom.io import read_json
+    """Generate the interpolation file from the Chavas15 profile.
 
+    This should be changed to take a file name as input,
+    and to allow each timestep to have a different profile.
+    """
     chavas_profile = read_json("cle/outputs.json")
     # print(chavas_profile.keys())
     chavas_profile = pressures_profile(chavas_profile)
@@ -346,6 +388,7 @@ def gen_ps_f() -> callable:
     pressures = np.array(chavas_profile["p"], dtype="float32")
     # print(radii[0:10], velocities[0:10], pressures[0:10])
     import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(2, 1)
     axs[0].plot(radii, pressures)
     axs[1].plot(radii, velocities)
@@ -373,10 +416,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
     psfc, u = f(distances)
 
-    rad = (
-        np.arctan2(np.radians(lons - clon), np.radians(lats - clat))
-        - np.pi / 2
-    )
+    rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
     u10, v10 = np.sin(rad) * u, np.cos(rad) * u
 
     # print(lats, lons)
@@ -387,7 +427,8 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
             PSFC=(
                 [
                     "time",
-                    "xi", "yi",
+                    "xi",
+                    "yi",
                 ],
                 psfc.astype("float32"),
             ),
@@ -416,10 +457,7 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
     psfc, u = f(distances)
 
-    rad = (
-        np.arctan2(np.radians(lons - clon), np.radians(lats - clat))
-        - np.pi / 2
-    )
+    rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
     u10, v10 = np.sin(rad) * u, np.cos(rad) * u
 
     # print(lats, lons)
@@ -430,7 +468,8 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
             PSFC=(
                 [
                     "time",
-                    "yi", "xi",
+                    "yi",
+                    "xi",
                 ],
                 psfc.astype("float32"),
             ),
@@ -447,37 +486,34 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
     )
 
 
-if __name__ == "__main__":
-    # python -m tcpips.fort22
-    # trim_fort22()
-    tj = Trajectory(
-        Point(-90, 40), 30, 2, impact_time=np.datetime64("2004-08-19T12", "ns")
-    )
-    tj_ds = tj.trajectory_ds()
-    tj_ds.to_netcdf(os.path.join(DATA_PATH, "traj.nc"))
-    # print(tj_ds)
-
+@timeit
+def return_new_input(
+    angle=30,
+    trans_speed=2,
+    impact_lon=-90,
+    impact_lat=40,
+    impact_time=np.datetime64("2004-08-19T12", "ns"),
+):
     f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
-    print("f22_dt", f22_dt)
-    # print(f22_dt)
-    # dt1 = datetime.datetime(year=2004, month=8, day=12)
-    # dt1 = np.datetime64("2004-08-12", "ns")
-    # print(dt1)
-    tj_ds_new = tj.trajectory_ds_from_time(f22_dt["TC1"]["time"].values)
-    print("new_tj", tj_ds_new)
-    mc = moving_coords_from_tj(
-        f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_new
+
+    tj_ds_mv = trajectory_ds_from_time(
+        angle,
+        trans_speed,
+        impact_lon,
+        impact_lat,
+        impact_time,
+        f22_dt["TC1"]["time"].values,
     )
-
-    print(mc)
-    # mc.to_netcdf(os.path.join(DATA_PATH, "mov.nc"))
-
-    tj_ds_new = tj.trajectory_ds_from_time(f22_dt["Main"]["time"].values)
-
-    sc = static_coords_from_tj(f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_new)
-
-    # sc.to_netcdf(os.path.join(DATA_PATH, "sc.nc"))
-
+    mc = moving_coords_from_tj(
+        f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_mv
+    )
+    tj_ds_sc = trajectory_ds_from_time(angle,
+        trans_speed,
+        impact_lon,
+        impact_lat,
+        impact_time,
+        f22_dt["Main"]["time"].values)
+    sc = static_coords_from_tj(f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_sc)
     node0 = dt.DataTree(name=None)
     node1 = dt.DataTree(name="Main", parent=node0, data=sc)
     node2 = dt.DataTree(name="TC1", parent=node0, data=mc)
@@ -486,10 +522,18 @@ if __name__ == "__main__":
     node0[""].attrs["institution"] = "Oceanweather Inc. (OWI)"
     node0[""].attrs["conventions"] = "CF-1.6 OWI-NWS13"
 
+    return node0
 
+
+if __name__ == "__main__":
+    # python -m tcpips.fort22
+    # trim_fort22()
+    # print(f22_dt)
+    # dt1 = datetime.datetime(year=2004, month=8, day=12)
+    # dt1 = np.datetime64("2004-08-12", "ns")
+    # print(dt1)
+    node0 = return_new_input()
     node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
-
-
 
     print(node0)
 
@@ -498,4 +542,3 @@ if __name__ == "__main__":
 
     # blank_fort22()
     # jupyter-lab --ip 0.0.0.0 --port 8888 --no-browser
-
