@@ -419,8 +419,8 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     # print(lats, lons)
     return xr.Dataset(
         data_vars=dict(
-            clon=(["time"], tj.clon.values),
-            clat=(["time"], tj.clat.values),
+            clon=(["time"], tj.clon.values, {"units": "degrees_east", "long_name": "center longitude of feature"}),
+            clat=(["time"], tj.clat.values, {"units": "degrees_north", "long_name": "center latitude of feature"}),
             PSFC=(
                 [
                     "time",
@@ -428,9 +428,10 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                     "yi",
                 ],
                 psfc.astype("float32"),
+                {"units": "mb"},
             ),
-            U10=(["time", "xi", "yi"], u10.astype("float32")),
-            V10=(["time", "xi", "yi"], v10.astype("float32")),
+            U10=(["time", "xi", "yi"], u10.astype("float32"), {"units": "m s-1"}),
+            V10=(["time", "xi", "yi"], v10.astype("float32"), {"units": "m s-1"}),
         ),
         coords=dict(
             lon=(
@@ -468,8 +469,6 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
     # print(lats, lons)
     return xr.Dataset(
         data_vars=dict(
-            clon=(["time"], tj.clon.values),
-            clat=(["time"], tj.clat.values),
             PSFC=(
                 [
                     "time",
