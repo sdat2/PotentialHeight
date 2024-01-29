@@ -419,8 +419,16 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     # print(lats, lons)
     return xr.Dataset(
         data_vars=dict(
-            clon=(["time"], tj.clon.values, {"units": "degrees_east", "long_name": "center longitude of feature"}),
-            clat=(["time"], tj.clat.values, {"units": "degrees_north", "long_name": "center latitude of feature"}),
+            clon=(
+                ["time"],
+                tj.clon.values,
+                {"units": "degrees_east", "long_name": "center longitude of feature"},
+            ),
+            clat=(
+                ["time"],
+                tj.clat.values,
+                {"units": "degrees_north", "long_name": "center latitude of feature"},
+            ),
             PSFC=(
                 [
                     "time",
