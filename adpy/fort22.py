@@ -433,12 +433,20 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
             V10=(["time", "xi", "yi"], v10.astype("float32")),
         ),
         coords=dict(
-            lon=(["time", "xi", "yi"], lons),
-            lat=(["time", "xi", "yi"], lats),
-            time=tj.time.values,
+            lon=(
+                ["time", "xi", "yi"],
+                lons,
+                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+            ),
+            lat=(
+                ["time", "xi", "yi"],
+                lats,
+                {"axis": "Y", "standard_name": "latitude", "units": "degrees_east"},
+            ),
+            time=(["time"], tj.time.values, {"axis": "T"}),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(description="Tropical cyclone moving grid."),
+        attrs=dict(description="Tropical cyclone moving grid.", rank=2),
     )
 
 
@@ -469,17 +477,26 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
                     "xi",
                 ],
                 psfc.astype("float32"),
+                {"units": "mb"},
             ),
-            U10=(["time", "yi", "xi"], u10.astype("float32")),
-            V10=(["time", "yi", "xi"], v10.astype("float32")),
+            U10=(["time", "yi", "xi"], u10.astype("float32"), {"units": "m s-1"}),
+            V10=(["time", "yi", "xi"], v10.astype("float32"), {"units": "m s-1"}),
         ),
         coords=dict(
-            lon=(["yi", "xi"], orig.lon.values),
-            lat=(["yi", "xi"], orig.lat.values),
-            time=tj.time.values,
+            lon=(
+                ["yi", "xi"],
+                orig.lon.values,
+                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+            ),
+            lat=(
+                ["yi", "xi"],
+                orig.lat.values,
+                {"axis": "Y", "standard_name": "latitude", "units": "degrees_east"},
+            ),
+            time=(["time"], tj.time.values, {"axis": "T"}),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(description="Tropical cyclone static grid."),
+        attrs=dict(description="Tropical cyclone static grid.", rank=1),
     )
 
 
@@ -504,12 +521,14 @@ def return_new_input(
     mc = moving_coords_from_tj(
         f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_mv
     )
-    tj_ds_sc = trajectory_ds_from_time(angle,
+    tj_ds_sc = trajectory_ds_from_time(
+        angle,
         trans_speed,
         impact_lon,
         impact_lat,
         impact_time,
-        f22_dt["Main"]["time"].values)
+        f22_dt["Main"]["time"].values,
+    )
     sc = static_coords_from_tj(f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_sc)
     node0 = dt.DataTree(name=None)
     node1 = dt.DataTree(name="Main", parent=node0, data=sc)
