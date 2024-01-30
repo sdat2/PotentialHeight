@@ -31,5 +31,6 @@ def read_results():
 
 
 if __name__ == "__main__":
+    # python -m adpy.wrap
     # python adpy/wrap.py
-    setup_new("/work/n01/n01/sithom/adcirc-swan/NWS13set")
+    setup_new("/work/n01/n01/sithom/adcirc-swan/NWS13set3")

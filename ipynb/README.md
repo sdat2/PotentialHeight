@@ -27,6 +27,7 @@ jupyter-lab --ip 0.0.0.0 --port 8822 --no-browser
 jupyter-lab --ip 0.0.0.0 --port 8833 --no-browser
 jupyter-lab --ip 0.0.0.0 --port 8844 --no-browser
 jupyter-lab --ip 0.0.0.0 --port 8855 --no-browser
+jupyter-lab --ip 0.0.0.0 --port 8866 --no-browser
 
 
 http://127.0.0.1:8811/lab?token=3902366e4e2dad2391d48c5c7e70850cdbcc305b814e65f

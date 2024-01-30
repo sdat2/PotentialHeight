@@ -231,7 +231,7 @@ class Trajectory:
                 clat=(["time"], point_array[:, 1]),
             ),
             coords=dict(
-                time=dates,
+                time=(["time"], dates),
                 # reference_time=self.impact_time,
             ),
             attrs=dict(description="Tropcial Cyclone trajectory."),
@@ -267,7 +267,7 @@ class Trajectory:
                 clat=(["time"], point_array[:, 1]),
             ),
             coords=dict(
-                time=time_array,
+                time=(["time"], time_array),
                 # reference_time=self.impact_time,
             ),
             attrs=dict(description="Tropcial Cyclone trajectory."),
@@ -384,17 +384,17 @@ def gen_ps_f() -> callable:
     velocities = np.array(chavas_profile["VV"], dtype="float32")
     pressures = np.array(chavas_profile["p"], dtype="float32")
     # print(radii[0:10], velocities[0:10], pressures[0:10])
-    import matplotlib.pyplot as plt
-
-    fig, axs = plt.subplots(2, 1)
-    axs[0].plot(radii, pressures)
-    axs[1].plot(radii, velocities)
-    plt.savefig("prof.png")
+    if False:
+        import matplotlib.pyplot as plt
+        fig, axs = plt.subplots(2, 1)
+        axs[0].plot(radii, pressures)
+        axs[1].plot(radii, velocities)
+        plt.savefig("prof.png")
 
     def f(distances):
         pressure_cube = np.interp(distances, radii, pressures)
         velo_cube = np.interp(distances, radii, velocities)
-        return pressure_cube, velo_cube
+        return  np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(velo_cube, nan=0.0)
 
     return f
 
@@ -426,13 +426,11 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 ["time"],
                 tj.clon.values,
                 {"units": "degrees_east", "long_name": "center longitude of feature"},
-
             ),
             clat=(
                 ["time"],
                 tj.clat.values,
                 {"units": "degrees_north", "long_name": "center latitude of feature"},
-
             ),
             PSFC=(
                 [
@@ -457,7 +455,9 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 transpose(lats),
                 {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
             ),
-            time=(["time"], tj.time.values, {"axis": "T"}),
+            time=(["time"], tj.time.values, {"axis": "T",# "units": "minutes since 1990-01-01T01:00:00"}
+                    },
+            )
             # reference_time=self.impact_time,
         ),
         attrs=dict(# description="Tropical cyclone moving grid.",
@@ -493,8 +493,8 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
                 {"units": "mb"},
             ),
             U10=(["time", "yi", "xi"], u10.astype("float32"), {"units": "m s-1"}
-),
-            V10=(["time", "yi", "xi"], v10.astype("float32"), {"units": "m s-1"} ),
+            ),
+            V10=(["time", "yi", "xi"], v10.astype("float32"), {"units": "m s-1"},)
         ),
         coords=dict(
             lon=(
@@ -517,13 +517,15 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
 
 @timeit
 def return_new_input(
-    angle=30,
-    trans_speed=2,
-    impact_lon=-90,
-    impact_lat=40,
-    impact_time=np.datetime64("2004-08-19T12", "ns"),
+    angle=0,
+    trans_speed=7.71,
+    impact_lon=-90.6715, #NO+0.6
+    impact_lat=29.9511, # NO
+    impact_time=np.datetime64("2004-08-13T12", "ns"),
 ) -> dt.DataTree:
-    f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    hard_path = "/work/n01/n01/sithom/adcirc-swan/tcpips/data/blank.nc"
+    # f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    f22_dt = dt.open_datatree(hard_path)
     print("f22_dt", f22_dt)
 
     tj_ds_mv = trajectory_ds_from_time(
@@ -561,8 +563,10 @@ if __name__ == "__main__":
     # python -m adpy.fort22
     node0 = return_new_input()
     # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
-    path = "/work/n01/n01/sithom/adcirc-swan/NWS13set"
-    node0.to_netcdf(os.path.join(path, "fort.22.nc"))
+    path = "/work/n01/n01/sithom/adcirc-swan/NWS13set3"
+    enc =  {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
+    node0.to_netcdf(os.path.join(path, "fort.22.nc"),
+                    encoding={"/Main": enc, "/TC1": enc})
 
     print("new", node0)
 
