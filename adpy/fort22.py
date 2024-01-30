@@ -405,7 +405,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     coords.lat[:] = coords.lat[:] - coords.lat.mean()
     clon = tj.clon.values.reshape(-1, 1, 1)
     clat = tj.clat.values.reshape(-1, 1, 1)
-    lats = np.expand_dims(coords.lon.values, 0) + clat
+    lats = (np.expand_dims(coords.lon.values, 0) + clat)
     lons = np.expand_dims(coords.lat.values, 0) + clon
 
     f = gen_ps_f()
@@ -415,6 +415,9 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
 
     rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
     u10, v10 = np.sin(rad) * u, np.cos(rad) * u
+
+    def transpose(npa: np.ndarray) -> np.ndarray:
+        return np.moveaxis(npa, 1, -1)
 
     # print(lats, lons)
     return xr.Dataset(
@@ -432,30 +435,31 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
             PSFC=(
                 [
                     "time",
-                    "xi",
                     "yi",
+                    "xi",
                 ],
-                psfc.astype("float32"),
+                transpose(psfc.astype("float32")),
                 {"units": "mb"},
             ),
-            U10=(["time", "xi", "yi"], u10.astype("float32"), {"units": "m s-1"}),
-            V10=(["time", "xi", "yi"], v10.astype("float32"), {"units": "m s-1"}),
+            U10=(["time", "yi", "xi"], transpose(u10.astype("float32")), {"units": "m s-1"}),
+            V10=(["time", "yi", "xi"], transpose(v10.astype("float32")), {"units": "m s-1"}),
         ),
         coords=dict(
             lon=(
-                ["time", "xi", "yi"],
-                lons,
+                ["time", "yi", "xi"],
+                transpose(lons),
                 {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
             ),
             lat=(
-                ["time", "xi", "yi"],
-                lats,
-                {"axis": "Y", "standard_name": "latitude", "units": "degrees_east"},
+                ["time", "yi", "xi"],
+                transpose(lats),
+                {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
             ),
             time=(["time"], tj.time.values, {"axis": "T"}),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(description="Tropical cyclone moving grid.", rank=2),
+        attrs=dict(# description="Tropical cyclone moving grid.",
+                   rank=2),
     )
 
 
@@ -498,12 +502,13 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
             lat=(
                 ["yi", "xi"],
                 orig.lat.values,
-                {"axis": "Y", "standard_name": "latitude", "units": "degrees_east"},
+                {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
             ),
             time=(["time"], tj.time.values, {"axis": "T"}),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(description="Tropical cyclone static grid.", rank=1),
+        attrs=dict(# description="Tropical cyclone static grid.",
+                   rank=1),
     )
 
 
@@ -516,6 +521,7 @@ def return_new_input(
     impact_time=np.datetime64("2004-08-19T12", "ns"),
 ):
     f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
+    print("f22_dt", f22_dt)
 
     tj_ds_mv = trajectory_ds_from_time(
         angle,
@@ -551,9 +557,11 @@ def return_new_input(
 if __name__ == "__main__":
     # python -m adpy.fort22
     node0 = return_new_input()
-    node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
+    # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
+    path = "/work/n01/n01/sithom/adcirc-swan/NWS13set"
+    node0.to_netcdf(os.path.join(path, "fort.22.nc"))
 
-    print(node0)
+    print("new", node0)
 
     # print(chavas_profile)
     # print(timedeltas)
