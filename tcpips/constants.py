@@ -20,7 +20,7 @@ FIGURE_PATH = pathlib.Path(os.path.join(PROJECT_PATH, "img"))
 CONFIG_PATH = os.path.join(SRC_PATH, "config")
 
 # General data from e.g. paper or cmip etc.
-DATA_PATH = PROJECT_PATH / "data"
+DATA_PATH = os.path.join(PROJECT_PATH, "data")
 GOM = (25.443701, -90.013120)  # Centre of Gulf of Mexico, lat, lon
 MONTHS = [
     "Jan",

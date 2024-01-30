@@ -426,11 +426,13 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 ["time"],
                 tj.clon.values,
                 {"units": "degrees_east", "long_name": "center longitude of feature"},
+
             ),
             clat=(
                 ["time"],
                 tj.clat.values,
                 {"units": "degrees_north", "long_name": "center latitude of feature"},
+
             ),
             PSFC=(
                 [
@@ -441,8 +443,8 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 transpose(psfc.astype("float32")),
                 {"units": "mb"},
             ),
-            U10=(["time", "yi", "xi"], transpose(u10.astype("float32")), {"units": "m s-1"}),
-            V10=(["time", "yi", "xi"], transpose(v10.astype("float32")), {"units": "m s-1"}),
+            U10=(["time", "yi", "xi"], transpose(u10.astype("float32")), {"units": "m s-1"} ),
+            V10=(["time", "yi", "xi"], transpose(v10.astype("float32")), {"units": "m s-1"} ),
         ),
         coords=dict(
             lon=(
@@ -490,14 +492,15 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
                 psfc.astype("float32"),
                 {"units": "mb"},
             ),
-            U10=(["time", "yi", "xi"], u10.astype("float32"), {"units": "m s-1"}),
-            V10=(["time", "yi", "xi"], v10.astype("float32"), {"units": "m s-1"}),
+            U10=(["time", "yi", "xi"], u10.astype("float32"), {"units": "m s-1"}
+),
+            V10=(["time", "yi", "xi"], v10.astype("float32"), {"units": "m s-1"} ),
         ),
         coords=dict(
             lon=(
                 ["yi", "xi"],
                 orig.lon.values,
-                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
+                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"}
             ),
             lat=(
                 ["yi", "xi"],
@@ -519,7 +522,7 @@ def return_new_input(
     impact_lon=-90,
     impact_lat=40,
     impact_time=np.datetime64("2004-08-19T12", "ns"),
-):
+) -> dt.DataTree:
     f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
     print("f22_dt", f22_dt)
 

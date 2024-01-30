@@ -9,10 +9,13 @@
 %config IPCompleter.greedy=True
 import os
 import numpy as np
+import netCDF4 as nc
 import xarray as xr
+import datatree as dt
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from sithom.plot import plot_defaults, label_subplots, lim
+from tcpips.constants import DATA_PATH, FIGURE_PATH
 plot_defaults()
 ```
 
