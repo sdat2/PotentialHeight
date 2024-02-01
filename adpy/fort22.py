@@ -519,7 +519,7 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
 def return_new_input(
     angle=0,
     trans_speed=7.71,
-    impact_lon=-90.6715, #NO+0.6
+    impact_lon=-89.4715, #NO+0.6
     impact_lat=29.9511, # NO
     impact_time=np.datetime64("2004-08-13T12", "ns"),
 ) -> dt.DataTree:
@@ -557,6 +557,17 @@ def return_new_input(
     node0[""].attrs["conventions"] = "CF-1.6 OWI-NWS13"
 
     return node0
+
+
+def save_forcing(path = "/work/n01/n01/sithom/adcirc-swan/NWS13set3",
+                 angle=0, trans_speed=7.71):
+    node0 = return_new_input(angle=angle, trans_speed=trans_speed, # impact_lon=impact_lon
+                             )
+    # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
+    enc =  {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
+    node0.to_netcdf(os.path.join(path, "fort.22.nc"),
+                    encoding={"/Main": enc, "/TC1": enc})
+    print("new", node0)
 
 
 if __name__ == "__main__":
