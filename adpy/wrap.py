@@ -1,6 +1,17 @@
 """Wrap.
 
-To set off Slurm I could use:
+To set off Slurm I could use (https://stackoverflow.com/questions/61704713/best-practice-submitting-slurm-jobs-via-python):
+- Slurmpy https://github.com/brentp/slurmpy
+- Snakemake
+@article{molder2021sustainable,
+  title={Sustainable data analysis with Snakemake},
+  author={M{\"o}lder, Felix and Jablonski, Kim Philipp and Letcher, Brice and Hall, Michael B and Tomkins-Tinch, Christopher H and Sochat, Vanessa and Forster, Jan and Lee, Soohyun and Twardziok, Sven O and Kanitz, Alexander and others},
+  journal={F1000Research},
+  volume={10},
+  year={2021},
+  publisher={Faculty of 1000 Ltd}
+}
+- Joblib
 - Fireworks (https://materialsproject.github.io/fireworks/)
 @article {CPE:CPE3505,
 author = {Jain, Anubhav and Ong, Shyue Ping and Chen, Wei and Medasani, Bharat and Qu, Xiaohui and Kocher, Michael and Brafman, Miriam and Petretto, Guido and Rignanese, Gian-Marco and Hautier, Geoffroy and Gunter, Daniel and Persson, Kristin A.},
@@ -23,7 +34,9 @@ import shutil
 from .fort22 import return_new_input, save_forcing
 from .fort63 import xr_loader
 from sithom.time import timeit
+from src.constants import NEW_ORLEANS
 
+ROOT = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH = "/work/n01/n01/sithom/adcirc-swan/NWS13ex"
 
 
@@ -54,18 +67,53 @@ def run_new(out_path=OG_PATH):
 
     # look at results.
 
+@timeit
 def read_results(path=OG_PATH):
     mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
-    print(mele_ds)
+    # read zeta_max point closes to the
+    # work out closest point to NEW_ORLEANS
+    xs = mele_ds.x.values
+    ys = mele_ds.y.values
+    dist = ((xs- NEW_ORLEANS.lon)**2 + (ys - NEW_ORLEANS.lat)**2)**0.5
+    min_p = np.argmin(dist)
+    # Read the maximum elevation for that point
+    return mele_ds["zeta_max"].values[min_p]
 
 
-if __name__ == "__main__":
-    # python -m adpy.wrap
-    # python adpy/wrap.py
-    root = "/work/n01/n01/sithom/adcirc-swan/"
-    exp_dir = os.path.join(root, "angle_test")
+@timeit
+def run_angle_exp():
+    exp_dir = os.path.join(ROOT, "angle_test")
     os.makedirs(exp_dir, exist_ok=True)
     for i, angle in enumerate(np.linspace(-90, 90, num=10)):
         tmp_dir = os.path.join(exp_dir, f"exp_{i:03}")
         print(tmp_dir, angle)
         setup_new(tmp_dir, angle)
+
+
+@timeit
+def read_angle_exp():
+    results = []
+    exp_dir = os.path.join(ROOT, "angle_test")
+    for i, angle in enumerate(np.linspace(-90, 90, num=10)):
+        tmp_dir = os.path.join(exp_dir, f"exp_{i:03}")
+        print(tmp_dir, angle)
+        res = read_results(tmp_dir)
+        print(i, angle, res)
+        results += [[i, angle, res]]
+    results = np.array(results)
+
+
+    import matplotlib.pyplot as plt
+    from sithom.plot import plot_defaults
+
+    plot_defaults()
+    plt.plot(results[:, 1], results[:, 2])
+    plt.xlabel("Angle [$^{\circ}$]")
+    plt.ylabel("Height [m]")
+    plt.savefig("angle_test.png")
+
+
+if __name__ == "__main__":
+    # python -m adpy.wrap
+    # python adpy/wrap.py
+    read_angle_exp()

@@ -3,6 +3,14 @@
 NWS 13 format:
 
 https://wiki.adcirc.org/NWS13
+
+TODO: Distance calculations still assume Flat Platee Caree Earth.
+
+TODO: Tropical cyclone is not yet allowed to evolve with time.
+
+TODO: Could do with some unit tests.
+
+TODO: is 1015 mb as normal too high?
 """
 from typing import Optional, List, Tuple
 import os
@@ -374,8 +382,12 @@ def pressures_profile(profile: dict) -> dict:
 def gen_ps_f() -> callable:
     """Generate the interpolation file from the Chavas15 profile.
 
-    This should be changed to take a file name as input,
+    Maybe I should also make options for any other azimuthally symetric model.
+
+    This should potentially be changed to take a file name as input,
     and to allow each timestep to have a different profile.
+
+    That would require some clever way of interpolating each time step.
     """
     chavas_profile = read_json("cle/outputs.json")
     # print(chavas_profile.keys())
