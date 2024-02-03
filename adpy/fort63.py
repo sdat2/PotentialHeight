@@ -13,7 +13,7 @@ import xarray as xr
 def xr_loader(file_name: str, verbose: bool = False) -> xr.Dataset:
     """Load an xarray dataset from a ADCIRC netCDF4 file."""
     ds_nc = nc.Dataset(file_name)
-    for var in ["neta", "nvel"]: # known problem variables
+    for var in ["neta", "nvel"]:  # known problem variables
         if var in ds_nc.variables:
             if verbose:
                 print("removing", ds_nc.variables[var])

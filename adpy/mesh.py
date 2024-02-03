@@ -2,70 +2,51 @@
 Process ADCIRC meshes efficiently.
 """
 import numpy as np
-from adpy.fort63 import xr_loader
+import netCDF4 as nc
+import xarray as xr
+from sithom.time import timeit
+from sithom.plot import BoundingBox
+from src.constants import NO_BBOX
 
 
-f63 = xr_loader("data/fort.63.nc")
+def xr_loader(file_name: str, verbose: bool = False) -> xr.Dataset:
+    """Load an xarray dataset from a ADCIRC netCDF4 file."""
+    ds_nc = nc.Dataset(file_name)
+    for var in ["neta", "nvel"]:  # known problem variables
+        if var in ds_nc.variables:
+            if verbose:
+                print("removing", ds_nc.variables[var])
+            del ds_nc.variables[var]
+    return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc))
 
 
-def trim_tri(
-    x: np.ndarray,
-    y: np.ndarray,
-    tri: np.ndarray,
-    bbox: BoundingBox,
-    z: Optional[np.ndarray] = None,
-) -> Union[
-    Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-    Tuple[np.ndarray, np.ndarray, np.ndarray],
-]:
+@timeit
+def filter_mesh(file_path: str = "../data/fort.63.nc", bbox: BoundingBox = NO_BBOX) -> xr.Dataset:
     """
-    Trim triangular mesh to x and y points within an area.
+    Load an adcirc output file and filter it to a bounding box.
 
     Args:
-        x (np.ndarray): longitude [degrees East].
-        y (np.ndarray): latitude [degrees North].
-        tri (np.ndarray): triangular mesh.
-        bbox (BoundingBox): bounding box to trim by.
-        z (Optional[np.ndarray], optional): z parameter. Defaults to None.
+        file_path (str, optional): Path to ADCIRC file. Defaults to "../data/fort.63.nc".
+        bbox (BoundingBox, optional): Bounding box to trim to. Defaults to NO_BBOX.
 
     Returns:
-        Union[
-            Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
-            Tuple[np.ndarray, np.ndarray, np.ndarray],
-             ]: trimmed x, y, tri, and z.
+        xr.Dataset: Filtered xarray dataset.
     """
-
-    @np.vectorize
-    def in_bbox(xi: float, yi: float) -> bool:
-        return (
-            xi > bbox.lon[0]
-            and xi < bbox.lon[1]
-            and yi > bbox.lat[0]
-            and yi < bbox.lat[1]
-        )
-
-    tindices = in_bbox(x, y)
-    indices = np.where(tindices)[0]
-    new_indices = np.where(indices)[0]
-    neg_indices = np.where(~tindices)[0]
-    tri_list = tri.tolist()
-    new_tri_list = []
-    for el in tri_list:
-        if np.any([x in neg_indices for x in el]):
-            continue
-        else:
-            new_tri_list.append(el)
-
-    tri_new = np.array(new_tri_list)
-    # should there be an off by one error here?
-    tri_new = np.select(
-        [tri_new == x for x in indices.tolist()], new_indices.tolist(), tri_new
-    )
-    if z is None:
-        return x[indices], y[indices], tri_new
-    elif len(z.shape) == 1:
-        return x[indices], y[indices], tri_new, z[indices]
-    elif len(z.shape) == 2:
-        return x[indices], y[indices], tri_new, z[:, indices]
-    else:
-        return None
+    f63 = xr_loader(file_path)  # load file as xarray dataset
+    xs = f63.x.values  # longitudes
+    ys = f63.y.values  # latitudes
+    ys_in = (bbox.lat[0] < ys) & (ys < bbox.lat[1])
+    xs_in = (bbox.lon[0] < xs) & (xs < bbox.lon[1])
+    both_in = xs_in & ys_in
+    indices = np.where(both_in)[0]      # surviving old labels
+    new_indices = np.where(indices)[0]  # new labels
+    neg_indices = np.where(~both_in)[0] # indices to get rid of
+    elements = f63.element.values - 1   # triangular component mesh
+    mask = ~np.isin(elements, neg_indices).any(axis=1)
+    filtered_elements = elements[mask]
+    mapping = dict(zip(indices, new_indices))
+    relabelled_elements = np.vectorize(mapping.get)(filtered_elements)
+    f63_n = f63.isel(node=indices)
+    del f63_n["element"]  # remove old triangular component mesh
+    f63_n["element"] = (["nele", "nvertex"], relabelled_elements + 1) # add new triangular component mesh
+    return f63_n

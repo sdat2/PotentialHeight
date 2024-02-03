@@ -50,7 +50,15 @@ def setup_new(new_path: str, angle: float):
         new_path (str): _description_
     """
     # original path to copy setting files from
-    files = ["fort.13", "fort.14", "fort.15", "fort.64.nc", "fort.73.nc", "fort.74.nc", "submit.slurm"]
+    files = [
+        "fort.13",
+        "fort.14",
+        "fort.15",
+        "fort.64.nc",
+        "fort.73.nc",
+        "fort.74.nc",
+        "submit.slurm",
+    ]
     os.makedirs(new_path, exist_ok=True)
     for file in files:
         shutil.copy(os.path.join(OG_PATH, file), os.path.join(new_path, file))
@@ -67,6 +75,7 @@ def run_new(out_path=OG_PATH):
 
     # look at results.
 
+
 @timeit
 def read_results(path=OG_PATH):
     mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
@@ -74,7 +83,7 @@ def read_results(path=OG_PATH):
     # work out closest point to NEW_ORLEANS
     xs = mele_ds.x.values
     ys = mele_ds.y.values
-    dist = ((xs- NEW_ORLEANS.lon)**2 + (ys - NEW_ORLEANS.lat)**2)**0.5
+    dist = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2) ** 0.5
     min_p = np.argmin(dist)
     # Read the maximum elevation for that point
     return mele_ds["zeta_max"].values[min_p]
@@ -101,7 +110,6 @@ def read_angle_exp():
         print(i, angle, res)
         results += [[i, angle, res]]
     results = np.array(results)
-
 
     import matplotlib.pyplot as plt
     from sithom.plot import plot_defaults

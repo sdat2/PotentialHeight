@@ -398,6 +398,7 @@ def gen_ps_f() -> callable:
     # print(radii[0:10], velocities[0:10], pressures[0:10])
     if False:
         import matplotlib.pyplot as plt
+
         fig, axs = plt.subplots(2, 1)
         axs[0].plot(radii, pressures)
         axs[1].plot(radii, velocities)
@@ -406,7 +407,9 @@ def gen_ps_f() -> callable:
     def f(distances):
         pressure_cube = np.interp(distances, radii, pressures)
         velo_cube = np.interp(distances, radii, velocities)
-        return  np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(velo_cube, nan=0.0)
+        return np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(
+            velo_cube, nan=0.0
+        )
 
     return f
 
@@ -417,7 +420,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
     coords.lat[:] = coords.lat[:] - coords.lat.mean()
     clon = tj.clon.values.reshape(-1, 1, 1)
     clat = tj.clat.values.reshape(-1, 1, 1)
-    lats = (np.expand_dims(coords.lon.values, 0) + clat)
+    lats = np.expand_dims(coords.lon.values, 0) + clat
     lons = np.expand_dims(coords.lat.values, 0) + clon
 
     f = gen_ps_f()
@@ -453,8 +456,16 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 transpose(psfc.astype("float32")),
                 {"units": "mb"},
             ),
-            U10=(["time", "yi", "xi"], transpose(u10.astype("float32")), {"units": "m s-1"} ),
-            V10=(["time", "yi", "xi"], transpose(v10.astype("float32")), {"units": "m s-1"} ),
+            U10=(
+                ["time", "yi", "xi"],
+                transpose(u10.astype("float32")),
+                {"units": "m s-1"},
+            ),
+            V10=(
+                ["time", "yi", "xi"],
+                transpose(v10.astype("float32")),
+                {"units": "m s-1"},
+            ),
         ),
         coords=dict(
             lon=(
@@ -467,13 +478,16 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 transpose(lats),
                 {"axis": "Y", "standard_name": "latitude", "units": "degrees_north"},
             ),
-            time=(["time"], tj.time.values, {"axis": "T",# "units": "minutes since 1990-01-01T01:00:00"}
-                    },
+            time=(
+                ["time"],
+                tj.time.values,
+                {
+                    "axis": "T",  # "units": "minutes since 1990-01-01T01:00:00"}
+                },
             )
             # reference_time=self.impact_time,
         ),
-        attrs=dict(# description="Tropical cyclone moving grid.",
-                   rank=2),
+        attrs=dict(rank=2),  # description="Tropical cyclone moving grid.",
     )
 
 
@@ -504,15 +518,18 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
                 psfc.astype("float32"),
                 {"units": "mb"},
             ),
-            U10=(["time", "yi", "xi"], u10.astype("float32"), {"units": "m s-1"}
+            U10=(["time", "yi", "xi"], u10.astype("float32"), {"units": "m s-1"}),
+            V10=(
+                ["time", "yi", "xi"],
+                v10.astype("float32"),
+                {"units": "m s-1"},
             ),
-            V10=(["time", "yi", "xi"], v10.astype("float32"), {"units": "m s-1"},)
         ),
         coords=dict(
             lon=(
                 ["yi", "xi"],
                 orig.lon.values,
-                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"}
+                {"axis": "X", "standard_name": "longitude", "units": "degrees_east"},
             ),
             lat=(
                 ["yi", "xi"],
@@ -522,8 +539,7 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
             time=(["time"], tj.time.values, {"axis": "T"}),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(# description="Tropical cyclone static grid.",
-                   rank=1),
+        attrs=dict(rank=1),  # description="Tropical cyclone static grid.",
     )
 
 
@@ -531,8 +547,8 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
 def return_new_input(
     angle=0,
     trans_speed=7.71,
-    impact_lon=-89.4715, #NO+0.6
-    impact_lat=29.9511, # NO
+    impact_lon=-89.4715,  # NO+0.6
+    impact_lat=29.9511,  # NO
     impact_time=np.datetime64("2004-08-13T12", "ns"),
 ) -> dt.DataTree:
     hard_path = "/work/n01/n01/sithom/adcirc-swan/tcpips/data/blank.nc"
@@ -571,14 +587,18 @@ def return_new_input(
     return node0
 
 
-def save_forcing(path = "/work/n01/n01/sithom/adcirc-swan/NWS13set3",
-                 angle=0, trans_speed=7.71):
-    node0 = return_new_input(angle=angle, trans_speed=trans_speed, # impact_lon=impact_lon
-                             )
+def save_forcing(
+    path="/work/n01/n01/sithom/adcirc-swan/NWS13set3", angle=0, trans_speed=7.71
+):
+    node0 = return_new_input(
+        angle=angle,
+        trans_speed=trans_speed,  # impact_lon=impact_lon
+    )
     # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
-    enc =  {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
-    node0.to_netcdf(os.path.join(path, "fort.22.nc"),
-                    encoding={"/Main": enc, "/TC1": enc})
+    enc = {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
+    node0.to_netcdf(
+        os.path.join(path, "fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
+    )
     print("new", node0)
 
 
@@ -587,9 +607,10 @@ if __name__ == "__main__":
     node0 = return_new_input()
     # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
     path = "/work/n01/n01/sithom/adcirc-swan/NWS13set3"
-    enc =  {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
-    node0.to_netcdf(os.path.join(path, "fort.22.nc"),
-                    encoding={"/Main": enc, "/TC1": enc})
+    enc = {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
+    node0.to_netcdf(
+        os.path.join(path, "fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
+    )
 
     print("new", node0)
 
