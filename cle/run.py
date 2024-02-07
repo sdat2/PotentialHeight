@@ -1,4 +1,5 @@
 """Run the CLE15 model with json files."""
+
 from typing import Callable, Tuple, Optional, Dict, List
 import os
 import numpy as np
@@ -903,15 +904,17 @@ def plot_gom_bbox_soln() -> None:
     ds["t0"].plot(
         ax=axs[1, 0], cbar_kwargs={"label": "Outflow temperature, $T_0$, [K]"}
     )
-    ds["msl"].where(~np.isnan(ds["t0"])).plot(
+    (ds["msl"] / 1).where(~np.isnan(ds["t0"])).plot(
         ax=axs[2, 0], cbar_kwargs={"label": "Mean sea level pressure, $P_0$, [hPa]"}
     )
-    ds["r0"].plot(ax=axs[0, 1], cbar_kwargs={"label": "Potential size, $r_a$, [km]"})
+    (ds["r0"] / 10).plot(
+        ax=axs[0, 1], cbar_kwargs={"label": "Potential size, $r_a$, [km]"}
+    )
     ds["vmax"].plot(
         ax=axs[1, 1],
         cbar_kwargs={"label": "Potential intensity, $V_{\mathrm{max}}$, [m s$^{-1}$]"},
     )
-    ds["pm"].plot(
+    (ds["pm"] / 100).plot(
         ax=axs[2, 1], cbar_kwargs={"label": "Pressure at maximum winds, $P_m$, [hPa]"}
     )
     for i in range(3):
@@ -924,6 +927,7 @@ def plot_gom_bbox_soln() -> None:
     # axs[1].plot(ds["lat"], ds["vmax"], "k")
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
     plt.savefig(folder + "/gom_bbox_r0_pm_rmax.pdf")
+    print("saving to ", folder + "/gom_bbox_r0_pm_rmax.pdf")
 
     vars: List[str] = ["t", "q", "vmax", "r0", "pc", "t0"]
     pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
@@ -940,5 +944,5 @@ if __name__ == "__main__":
     # ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
     # plot_from_ds()  # ds_name="gom_soln_2.nc")
     # plot_soln_curves()
-    plot_gom_bbox()
+    # plot_gom_bbox()
     plot_gom_bbox_soln()
