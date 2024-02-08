@@ -5,7 +5,7 @@ import numpy as np
 import netCDF4 as nc
 import xarray as xr
 from sithom.time import timeit
-from sithom.plot import BoundingBox
+from sithom.places import BoundingBox
 from src.constants import NO_BBOX
 
 

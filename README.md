@@ -1,13 +1,20 @@
-# pips
-Potential Intensity and Potential Size Calculations
+# tcpips
+Tropical Cyclone Potential Intensity (PI) and Potential Size (PS) Calculations
 
 ## Getting started
 
 Developer install:
 
 ```bash
+# Use conda to install a python virtual environment
 conda env create -n tcpips -f env.yml
-# or
-"$(micromamba shell hook --shell zsh)"
+conda activate tcpips
+
+# or use micromamba (faster)
+# maybe you need to activate micromamba "$(micromamba shell hook --shell zsh)"
 micromamba create -n tcpips -f env.yml
+micromamba activate tcpips
+
+# Install repository in editable version
+pip install -e .
 ```
