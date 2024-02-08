@@ -5,7 +5,7 @@ import numpy as np
 import netCDF4 as nc
 import xarray as xr
 from sithom.time import timeit
-from sithom.places import BoundingBox
+from sithom.place import BoundingBox
 from src.constants import NO_BBOX
 
 
@@ -78,38 +78,42 @@ def select_edge_indices(
 
     Args:
         mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y" and "element".
-        lon (float): Longitude of central point.
-        lat (float): Latitude of central point.
+        lon (float): Longitude of central point (degree_East).
+        lat (float): Latitude of central point (degree_North).
         number (int, optional): How many to choose initially. Defaults to 10.
         verbose (bool, optional): Whether to print. Defaults to False.
 
     Returns:
         np.ndarray: coastal indices near central point.
     """
-    # me = Maxele(os.path.join(KAT_EX_PATH, "maxele.63.nc"))
-    lons = mesh_ds.x
-    lats = mesh_ds.y
 
-    # compute Euclidean (flat-world) distance in degrees
-    distances = (lons - lon) ** 2 + (lats - lat) ** 2
+    lons = mesh_ds.x.values # longitudes (1d numpy array)
+    lats = mesh_ds.y.values # latitudes (1d numpy array)
+
+    # compute Euclidean (flat-world) distance in degrees**2
+    nsq_distances = -(lons - lon) ** 2 - (lats - lat) ** 2
+
+    if verbose:
+        print("Central point", lon, lat)
+        print("Distances", nsq_distances)
 
     # Use argpartition to get top K indices
     # Note: The result includes the partition index, so we use -K-1 to get exactly K elements
-    indices = np.argpartition(distances, -number)[-number:]
+    indices = np.argpartition(nsq_distances, -number)[-number:]
 
     # Optional: Sort the top K indices if you need them sorted
-    indices = indices[np.argsort(distances[indices])[::-1]]
+    indices = indices[np.argsort(nsq_distances[indices])[::-1]]
 
-    (uniq, freq) = np.unique(mesh_ds.element, return_counts=True)
+    (uniq, freq) = np.unique(mesh_ds.element.values, return_counts=True)
     edge_vertices = uniq[freq <= 4]
     if verbose:
-        print("Coastals indices", edge_vertices, len(edge_vertices))
         print("Nearby indices", indices, len(indices))
+        # print("Coastals indices", edge_vertices, len(edge_vertices))
 
     indices = indices[np.in1d(indices, edge_vertices)]
     return indices
 
 
 if __name__ == "__main__":
-    # python -m
+    # python -m adforce.mesh
     filter_mesh()
