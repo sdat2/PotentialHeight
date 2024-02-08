@@ -42,6 +42,6 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "chavas15", "adpy"],
-    package_dir={"tcpips": "tcpips", "chavas15": "chavas15", "adpy": "adpy"},
+    packages=["tcpips", "chavas15", "adforce"],
+    package_dir={"tcpips": "tcpips", "chavas15": "chavas15", "adforce": "adforce"},
 )
