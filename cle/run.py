@@ -907,7 +907,7 @@ def plot_gom_bbox_soln() -> None:
     (ds["msl"] / 1).where(~np.isnan(ds["t0"])).plot(
         ax=axs[2, 0], cbar_kwargs={"label": "Mean sea level pressure, $P_0$, [hPa]"}
     )
-    (ds["r0"] / 10).plot(
+    (ds["r0"] / 1000).plot(
         ax=axs[0, 1], cbar_kwargs={"label": "Potential size, $r_a$, [km]"}
     )
     ds["vmax"].plot(
