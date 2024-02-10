@@ -42,7 +42,7 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
         N (int): Number of nodes in the mesh.
 
     Returns:
-        np.ndarray: NxN Boolean adjacency matrix.
+        np.ndarray: NxN symetric boolean adjacency matrix.
     """
     adjacency_matrix = np.zeros((N, N), dtype=bool)
     rows = np.repeat(triangles, 3, axis=0).flatten()
@@ -50,6 +50,29 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
     adjacency_matrix[rows, cols] = True
     adjacency_matrix[cols, rows] = True
     return adjacency_matrix
+
+
+def select_coast(mesh_ds, overtopping=False):
+    """
+    Select the coastal nodes.
+
+    Args:
+        mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y" and "element".
+
+    Returns:
+        np.ndarray: coastal indices.
+    """
+    if not overtopping:
+        # method 1: find the nodes that are only in 3 triangls or less:
+        (uniq, freq) = np.unique(mesh_ds.element.values -1, return_counts=True)
+        return uniq[freq <= 4]
+    else:
+        # method 2: find land, propogate out to adjacent nodes, intersect with not land.
+        adj = calculate_adjacency_matrix(mesh_ds.element.values -1, len(mesh_ds.x))
+        depths = mesh_ds.depth.values
+        land = depths < 0
+        coast = np.any(adj[land], axis=0) & ~land # probably the same as adj.dot(land) & ~land, which is more efficient?
+        return np.where(coast)[0]
 
 
 @timeit
@@ -66,27 +89,27 @@ def filter_mesh(
     Returns:
         xr.Dataset: Filtered xarray dataset.
     """
-    f63 = xr_loader(file_path)  # load file as xarray dataset
-    xs = f63.x.values  # longitudes (1d numpy array)
-    ys = f63.y.values  # latitudes (1d numpy array)
+    adc_ds = xr_loader(file_path)  # load file as xarray dataset
+    xs = adc_ds.x.values  # longitudes (1d numpy array)
+    ys = adc_ds.y.values  # latitudes (1d numpy array)
     ys_in = (bbox.lat[0] < ys) & (ys < bbox.lat[1])
     xs_in = (bbox.lon[0] < xs) & (xs < bbox.lon[1])
     both_in = xs_in & ys_in
     indices = np.where(both_in)[0]  # surviving old labels
     new_indices = np.where(indices)[0]  # new labels
     neg_indices = np.where(~both_in)[0]  # indices to get rid of
-    elements = f63.element.values - 1  # triangular component mesh
+    elements = adc_ds.element.values - 1  # triangular component mesh
     mask = ~np.isin(elements, neg_indices).any(axis=1)
     filtered_elements = elements[mask]
     mapping = dict(zip(indices, new_indices))
     relabelled_elements = np.vectorize(mapping.get)(filtered_elements)
-    f63_n = f63.isel(node=indices)
-    del f63_n["element"]  # remove old triangular component mesh
-    f63_n["element"] = (
+    adc_ds_n = adc_ds.isel(node=indices)
+    del adc_ds_n["element"]  # remove old triangular component mesh
+    adc_ds_n["element"] = (
         ["nele", "nvertex"],
         relabelled_elements + 1,
     )  # add new triangular component mesh
-    return f63_n
+    return adc_ds_n
 
 
 @timeit
