@@ -33,6 +33,26 @@ def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
 
 
 @timeit
+def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
+    """
+    Calculate a boolean adjacency matrix for a mesh of triangles.
+
+    Args:
+        triangles (np.ndarray): Mx3 array of triangle indices.
+        N (int): Number of nodes in the mesh.
+
+    Returns:
+        np.ndarray: NxN Boolean adjacency matrix.
+    """
+    adjacency_matrix = np.zeros((N, N), dtype=bool)
+    rows = np.repeat(triangles, 3, axis=0).flatten()
+    cols = np.repeat(triangles, 3, axis=None)
+    adjacency_matrix[rows, cols] = True
+    adjacency_matrix[cols, rows] = True
+    return adjacency_matrix
+
+
+@timeit
 def filter_mesh(
     file_path: str = "../data/fort.63.nc", bbox: BoundingBox = NO_BBOX
 ) -> xr.Dataset:
