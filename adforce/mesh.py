@@ -71,7 +71,8 @@ def select_coast(mesh_ds, overtopping=False):
         adj = calculate_adjacency_matrix(mesh_ds.element.values -1, len(mesh_ds.x))
         depths = mesh_ds.depth.values
         land = depths < 0
-        coast = np.any(adj[land], axis=0) & ~land # probably the same as adj.dot(land) & ~land, which is more efficient?
+        # coast = np.any(adj[land], axis=0) & ~land # probably the same as
+        coast = adj.dot(land) & ~land # , which is more efficient?
         return np.where(coast)[0]
 
 
@@ -147,8 +148,8 @@ def select_edge_indices(
     # Optional: Sort the top K indices if you need them sorted
     indices = indices[np.argsort(nsq_distances[indices])[::-1]]
 
-    (uniq, freq) = np.unique(mesh_ds.element.values, return_counts=True)
-    edge_vertices = uniq[freq <= 4]
+    edge_vertices = select_coast(mesh_ds, overtopping=False)
+
     if verbose:
         print("Nearby indices", indices, len(indices))
         # print("Coastals indices", edge_vertices, len(edge_vertices))
