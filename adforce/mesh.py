@@ -37,6 +37,8 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
     """
     Calculate a boolean adjacency matrix for a mesh of triangles.
 
+    TODO: Switch to sparse matrix implementation.
+
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
         N (int): Number of nodes in the mesh.
@@ -44,11 +46,16 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
     Returns:
         np.ndarray: NxN symetric boolean adjacency matrix.
     """
-    adjacency_matrix = np.zeros((N, N), dtype=bool)
-    rows = np.repeat(triangles, 3, axis=0).flatten()
-    cols = np.repeat(triangles, 3, axis=None)
-    adjacency_matrix[rows, cols] = True
-    adjacency_matrix[cols, rows] = True
+    # M is the number of triangles
+    # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
+    adjacency_matrix = np.zeros((N, N), dtype=bool) # NxN boolean matrix
+
+    rows = np.repeat(triangles, 3, axis=0).flatten() # 9M long
+    # [0, 0, 0, 1, 1, 1, 2, 2, 2, ...] values 0 to N-1
+    cols = np.repeat(triangles, 3, axis=None) # 9M long
+    # [0, 1, 2, 0, 1, 2, 0, 1, 2, ...] values 0 to N-1
+    adjacency_matrix[rows, cols] = True  # "smart indexing" in numpy is very fast and efficient
+    # adjacency_matrix[cols, rows] = True # already symetric without second call
     return adjacency_matrix
 
 
@@ -68,10 +75,20 @@ def select_coast(mesh_ds, overtopping=False):
         return uniq[freq <= 4]
     else:
         # method 2: find land, propogate out to adjacent nodes, intersect with not land.
+        # float32 "depth" which attribute for every node (length N).
+        # if "depth" negative, then it is land.
+        # if "depth" positive, then it is water.
+        # We have mesh Mx3 array of triangle indices.
+        # [[0, 1, 2], [1, 2, 3], [2, 3, 4], ...]
+        # From this we can calculate the adjacency matrix.
+        # Objective: We want to select the points that are in the water and are adjacent to land.
+        # Output: list of indices or boolean array of length N.
+
         adj = calculate_adjacency_matrix(mesh_ds.element.values -1, len(mesh_ds.x))
-        depths = mesh_ds.depth.values
-        land = depths < 0
+        depths = mesh_ds.depth.values # depths vector length N
+        land = depths < 0 # boolean land vector length N
         # coast = np.any(adj[land], axis=0) & ~land # probably the same as
+        # bipartite graph
         coast = adj.dot(land) & ~land # , which is more efficient?
         return np.where(coast)[0]
 
