@@ -66,12 +66,14 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int, sparse=True) -> Un
     return adjacency_matrix
 
 
-def select_coast(mesh_ds, overtopping=False):
+@timeit
+def select_coast_indices(mesh_ds: xr.Dataset, overtopping: bool = False) -> np.ndarray:
     """
     Select the coastal nodes.
 
     Args:
         mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" (and "depth" if overtopping allowed).
+        overtopping (bool, optional): Whether overtopping is included in mesh. Defaults to False.
 
     Returns:
         np.ndarray: coastal indices.
@@ -80,7 +82,9 @@ def select_coast(mesh_ds, overtopping=False):
         # method 1: find the nodes that are only in 3 triangles or less:
         (uniq, freq) = np.unique(mesh_ds.element.values -1, return_counts=True)
         # maybe we should add a check for the depth to exclude water boundary nodes.
-        return uniq[freq <= 4]
+        indices = uniq[freq <= 4] # 3 or less triangles
+        adj = calculate_adjacency_matrix(mesh_ds.element.values -1, len(mesh_ds.x), sparse=False)
+        return indices, adj[indices, :][:, indices]
     else:
         # method 2: find land, propogate out to adjacent nodes, intersect with not land.
         # float32 "depth" which attribute for every node (length N).
@@ -98,11 +102,61 @@ def select_coast(mesh_ds, overtopping=False):
         # coast = np.any(adj[land], axis=0) & ~land # probably the same as
         # ?bipartite graph?
         coast = adj.dot(land) & ~land # , which is more efficient?
-        return np.where(coast)[0]
+        return np.where(coast)[0], adj[coast, :][:, coast].todense()
 
 
 @timeit
-def filter_mesh(
+def select_coast(mesh_ds: xr.Dataset, overtopping: bool = False) -> xr.Dataset:
+    """
+    Select the coastal nodes.
+
+    Args:
+        mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" (and "depth" if overtopping allowed).
+        overtopping (bool, optional): Whether overtopping is included in mesh. Defaults to False.
+
+    Returns:
+        xr.Dataset: Filtered xarray dataset.
+    """
+    indices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
+    new_mesh = mesh_ds.isel(node=indices)
+    del new_mesh["element"]
+    new_mesh["adj"] = (["node1", "node2"], adj)
+    return new_mesh
+
+
+@timeit
+def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
+    """
+    Filter an ADCIRC mesh to a subset of nodes.
+    Keep the triangular component mesh.
+
+    Args:
+        adc_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element".
+        indices (np.ndarray): Indices to keep.
+
+    Returns:
+        xr.Dataset: Filtered xarray dataset.
+
+    """
+    og_indices = np.arange(len(adc_ds.x))
+    neg_indices = np.setdiff1d(og_indices, indices)
+    new_indices = np.where(indices)[0]
+    elements = adc_ds.element.values - 1  # triangular component mesh
+    mask = ~np.isin(elements, neg_indices).any(axis=1)
+    filtered_elements = elements[mask]
+    mapping = dict(zip(indices, new_indices))
+    relabelled_elements = np.vectorize(mapping.get)(filtered_elements)
+    adc_ds_n = adc_ds.isel(node=indices)
+    del adc_ds_n["element"]  # remove old triangular component mesh
+    adc_ds_n["element"] = (  # add new triangular component mesh
+        ["nele", "nvertex"],
+        relabelled_elements + 1,
+    )  # add new triangular component mesh
+    return adc_ds_n
+
+
+@timeit
+def bbox_mesh(
     file_path: str = "../data/fort.63.nc", bbox: BoundingBox = NO_BBOX
 ) -> xr.Dataset:
     """
@@ -122,6 +176,8 @@ def filter_mesh(
     xs_in = (bbox.lon[0] < xs) & (xs < bbox.lon[1])
     both_in = xs_in & ys_in
     indices = np.where(both_in)[0]  # surviving old labels
+    return filter_mesh(adc_ds, indices)
+    """
     new_indices = np.where(indices)[0]  # new labels
     neg_indices = np.where(~both_in)[0]  # indices to get rid of
     elements = adc_ds.element.values - 1  # triangular component mesh
@@ -131,16 +187,22 @@ def filter_mesh(
     relabelled_elements = np.vectorize(mapping.get)(filtered_elements)
     adc_ds_n = adc_ds.isel(node=indices)
     del adc_ds_n["element"]  # remove old triangular component mesh
-    adc_ds_n["element"] = (
+    adc_ds_n["element"] = ( # add new triangular component mesh
         ["nele", "nvertex"],
         relabelled_elements + 1,
     )  # add new triangular component mesh
     return adc_ds_n
+    """
 
 
 @timeit
 def select_edge_indices(
-    mesh_ds: xr.Dataset, lon: float, lat: float, number: int = 10, verbose=False
+    mesh_ds: xr.Dataset,
+    lon: float,
+    lat: float,
+    number: int = 10,
+    overtopping=False,
+    verbose=False
 ) -> np.ndarray:
     """
     Select edge cells.
@@ -150,6 +212,7 @@ def select_edge_indices(
         lon (float): Longitude of central point (degree_East).
         lat (float): Latitude of central point (degree_North).
         number (int, optional): How many to choose initially. Defaults to 10.
+        overtopping (bool, optional): Whether overtopping is included in mesh. Defaults to False.
         verbose (bool, optional): Whether to print. Defaults to False.
 
     Returns:
@@ -173,7 +236,7 @@ def select_edge_indices(
     # Optional: Sort the top K indices if you need them sorted
     indices = indices[np.argsort(nsq_distances[indices])[::-1]]
 
-    edge_vertices = select_coast(mesh_ds, overtopping=False)
+    edge_vertices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
 
     if verbose:
         print("Nearby indices", indices, len(indices))
@@ -185,4 +248,4 @@ def select_edge_indices(
 
 if __name__ == "__main__":
     # python -m adforce.mesh
-    filter_mesh()
+    bbox_mesh()
