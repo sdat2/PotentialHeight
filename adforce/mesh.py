@@ -1,5 +1,5 @@
 """
-Process ADCIRC meshes efficiently.
+Process ADCIRC meshes efficiently. This is the shared functionality for processing ADCIRC meshes.
 """
 from typing import Union
 import numpy as np
@@ -41,14 +41,15 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int, sparse=True) -> Un
     Assumes that nodes are numbered from 0 to N-1.
     Assumes nodes are not self-adjacent.
 
-    TODO: Switch to sparse matrix implementation.
+    TODO: Test sparse matrix implementation.
+    TODO: Could go to 3M long rows/cols if called twice. Is this a speedup? Is there a sym=True option?
 
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
         N (int): Number of nodes in the mesh.
 
     Returns:
-        np.ndarray: NxN symetric boolean adjacency matrix.
+        Union[np.ndarray, csr_matrix]: NxN symetric boolean adjacency matrix.
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
