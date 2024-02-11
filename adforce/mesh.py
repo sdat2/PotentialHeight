@@ -1,7 +1,9 @@
 """
 Process ADCIRC meshes efficiently.
 """
+from typing import Union
 import numpy as np
+from scipy.sparse import csr_matrix
 import netCDF4 as nc
 import xarray as xr
 from sithom.time import timeit
@@ -33,7 +35,7 @@ def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
 
 
 @timeit
-def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
+def calculate_adjacency_matrix(triangles: np.ndarray, N: int, sparse=True) -> Union[np.ndarray, csr_matrix]:
     """
     Calculate a boolean adjacency matrix for a mesh of triangles.
     Assumes that nodes are numbered from 0 to N-1.
@@ -50,13 +52,15 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
-    adjacency_matrix = np.zeros((N, N), dtype=bool) # NxN boolean matrix
-
     rows = np.repeat(triangles, 2, axis=0).flatten() # 6M long
     # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
     cols = np.repeat(np.roll(triangles, shift=1, axis=1), 2, axis=None) # 6M long
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
-    adjacency_matrix[rows, cols] = True  # "smart indexing" in numpy is very fast and efficient
+    if not sparse:
+        adjacency_matrix = np.zeros((N, N), dtype=bool) # NxN boolean matrix
+        adjacency_matrix[rows, cols] = True  # "smart indexing" in numpy is very fast and efficient
+    else:
+        adjacency_matrix = csr_matrix((np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool)
     # adjacency_matrix[cols, rows] = True # already symetric without second call
     return adjacency_matrix
 
