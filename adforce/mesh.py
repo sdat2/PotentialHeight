@@ -36,6 +36,8 @@ def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
 def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
     """
     Calculate a boolean adjacency matrix for a mesh of triangles.
+    Assumes that nodes are numbered from 0 to N-1.
+    Assumes nodes are not self-adjacent.
 
     TODO: Switch to sparse matrix implementation.
 
@@ -50,10 +52,10 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int) -> np.ndarray:
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
     adjacency_matrix = np.zeros((N, N), dtype=bool) # NxN boolean matrix
 
-    rows = np.repeat(triangles, 3, axis=0).flatten() # 9M long
-    # [0, 0, 0, 1, 1, 1, 2, 2, 2, ...] values 0 to N-1
-    cols = np.repeat(triangles, 3, axis=None) # 9M long
-    # [0, 1, 2, 0, 1, 2, 0, 1, 2, ...] values 0 to N-1
+    rows = np.repeat(triangles, 2, axis=0).flatten() # 6M long
+    # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
+    cols = np.repeat(np.roll(triangles, shift=1, axis=1), 2, axis=None) # 6M long
+    # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
     adjacency_matrix[rows, cols] = True  # "smart indexing" in numpy is very fast and efficient
     # adjacency_matrix[cols, rows] = True # already symetric without second call
     return adjacency_matrix
@@ -64,14 +66,15 @@ def select_coast(mesh_ds, overtopping=False):
     Select the coastal nodes.
 
     Args:
-        mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y" and "element".
+        mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" (and "depth" if overtopping allowed).
 
     Returns:
         np.ndarray: coastal indices.
     """
     if not overtopping:
-        # method 1: find the nodes that are only in 3 triangls or less:
+        # method 1: find the nodes that are only in 3 triangles or less:
         (uniq, freq) = np.unique(mesh_ds.element.values -1, return_counts=True)
+        # maybe we should add a check for the depth to exclude water boundary nodes.
         return uniq[freq <= 4]
     else:
         # method 2: find land, propogate out to adjacent nodes, intersect with not land.
@@ -88,7 +91,7 @@ def select_coast(mesh_ds, overtopping=False):
         depths = mesh_ds.depth.values # depths vector length N
         land = depths < 0 # boolean land vector length N
         # coast = np.any(adj[land], axis=0) & ~land # probably the same as
-        # bipartite graph
+        # ?bipartite graph?
         coast = adj.dot(land) & ~land # , which is more efficient?
         return np.where(coast)[0]
 
