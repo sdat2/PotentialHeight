@@ -219,6 +219,9 @@ def select_edge_indices(
         np.ndarray: coastal indices near central point.
     """
 
+    edge_vertices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
+
+    mesh_ds = mesh_ds.isel(node=edge_vertices)
     lons = mesh_ds.x.values # longitudes (1d numpy array)
     lats = mesh_ds.y.values # latitudes (1d numpy array)
 
@@ -236,13 +239,7 @@ def select_edge_indices(
     # Optional: Sort the top K indices if you need them sorted
     indices = indices[np.argsort(nsq_distances[indices])[::-1]]
 
-    edge_vertices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
-
-    if verbose:
-        print("Nearby indices", indices, len(indices))
-        # print("Coastals indices", edge_vertices, len(edge_vertices))
-
-    indices = indices[np.in1d(indices, edge_vertices)]
+    # indices = indices[np.in1d(indices, edge_vertices)]
     return indices
 
 
