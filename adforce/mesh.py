@@ -205,7 +205,7 @@ def select_edge_indices(
     verbose=False
 ) -> np.ndarray:
     """
-    Select edge cells.
+    Select edge cells near a point.
 
     Args:
         mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y" and "element".
@@ -221,9 +221,9 @@ def select_edge_indices(
 
     edge_vertices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
 
-    mesh_ds = mesh_ds.isel(node=edge_vertices)
-    lons = mesh_ds.x.values # longitudes (1d numpy array)
-    lats = mesh_ds.y.values # latitudes (1d numpy array)
+    coast_mesh_ds = mesh_ds.isel(node=edge_vertices)
+    lons = coast_mesh_ds.x.values # longitudes (1d numpy array)
+    lats = coast_mesh_ds.y.values # latitudes (1d numpy array)
 
     # compute Euclidean (flat-world) distance in degrees**2
     nsq_distances = -(lons - lon) ** 2 - (lats - lat) ** 2
