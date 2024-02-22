@@ -1,7 +1,9 @@
 """
-Process ADCIRC meshes efficiently. This is the shared functionality for processing ADCIRC meshes.
+Process ADCIRC meshes efficiently.
+This is the shared functionality for processing ADCIRC meshes.
 """
-from typing import Union
+
+from typing import Union, Tuple
 import numpy as np
 from scipy.sparse import csr_matrix
 import netCDF4 as nc
@@ -15,6 +17,8 @@ from src.constants import NO_BBOX
 def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
     """
     Load an xarray dataset from a ADCIRC netCDF4 file.
+
+    ADCIRC netCDF4 files have some scalar variables that need to be removed.
 
     Args:
         file_path (str): Path to netCDF4 file.
@@ -35,13 +39,14 @@ def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
 
 
 @timeit
-def calculate_adjacency_matrix(triangles: np.ndarray, N: int, sparse=True) -> Union[np.ndarray, csr_matrix]:
+def calculate_adjacency_matrix(
+    triangles: np.ndarray, N: int, sparse=True
+) -> Union[np.ndarray, csr_matrix]:
     """
     Calculate a boolean adjacency matrix for a mesh of triangles.
     Assumes that nodes are numbered from 0 to N-1.
     Assumes nodes are not self-adjacent.
 
-    TODO: Test sparse matrix implementation.
     TODO: Could go to 3M long rows/cols if called twice. Is this a speedup? Is there a sym=True option?
 
     Args:
@@ -53,21 +58,27 @@ def calculate_adjacency_matrix(triangles: np.ndarray, N: int, sparse=True) -> Un
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
-    rows = np.repeat(triangles, 2, axis=0).flatten() # 6M long
+    rows = np.repeat(triangles, 2, axis=0).flatten()  # 6M long
     # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
-    cols = np.repeat(np.roll(triangles, shift=1, axis=1), 2, axis=None) # 6M long
+    cols = np.repeat(np.roll(triangles, shift=1, axis=1), 2, axis=None)  # 6M long
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
     if not sparse:
-        adjacency_matrix = np.zeros((N, N), dtype=bool) # NxN boolean matrix
-        adjacency_matrix[rows, cols] = True  # "smart indexing" in numpy is very fast and efficient
+        adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
+        adjacency_matrix[rows, cols] = (
+            True  # "smart indexing" in numpy is very fast and efficient
+        )
     else:
-        adjacency_matrix = csr_matrix((np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool)
+        adjacency_matrix = csr_matrix(
+            (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool
+        )
     # adjacency_matrix[cols, rows] = True # already symetric without second call
     return adjacency_matrix
 
 
 @timeit
-def select_coast_indices(mesh_ds: xr.Dataset, overtopping: bool = False) -> np.ndarray:
+def select_coast(
+    mesh_ds: xr.Dataset, overtopping: bool = False
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Select the coastal nodes.
 
@@ -76,14 +87,16 @@ def select_coast_indices(mesh_ds: xr.Dataset, overtopping: bool = False) -> np.n
         overtopping (bool, optional): Whether overtopping is included in mesh. Defaults to False.
 
     Returns:
-        np.ndarray: coastal indices.
+        Tuple[np.ndarray, np.ndarray]: coastal indices, adjacency matrix.
     """
     if not overtopping:
         # method 1: find the nodes that are only in 3 triangles or less:
-        (uniq, freq) = np.unique(mesh_ds.element.values -1, return_counts=True)
+        (uniq, freq) = np.unique(mesh_ds.element.values - 1, return_counts=True)
         # maybe we should add a check for the depth to exclude water boundary nodes.
-        indices = uniq[freq <= 4] # 3 or less triangles
-        adj = calculate_adjacency_matrix(mesh_ds.element.values -1, len(mesh_ds.x), sparse=False)
+        indices = uniq[freq <= 4]  # 3 or less triangles
+        adj = calculate_adjacency_matrix(
+            mesh_ds.element.values - 1, len(mesh_ds.x), sparse=False
+        )
         return indices, adj[indices, :][:, indices]
     else:
         # method 2: find land, propogate out to adjacent nodes, intersect with not land.
@@ -96,12 +109,11 @@ def select_coast_indices(mesh_ds: xr.Dataset, overtopping: bool = False) -> np.n
         # Objective: We want to select the points that are in the water and are adjacent to land.
         # Output: list of indices or boolean array of length N.
 
-        adj = calculate_adjacency_matrix(mesh_ds.element.values -1, len(mesh_ds.x))
-        depths = mesh_ds.depth.values # depths vector length N
-        land = depths < 0 # boolean land vector length N
+        adj = calculate_adjacency_matrix(mesh_ds.element.values - 1, len(mesh_ds.x))
+        depths = mesh_ds.depth.values  # depths vector length N
+        land = depths < 0  # boolean land vector length N
         # coast = np.any(adj[land], axis=0) & ~land # probably the same as
-        # ?bipartite graph?
-        coast = adj.dot(land) & ~land # , which is more efficient?
+        coast = adj.dot(land) & ~land  # , which is more efficient?
         return np.where(coast)[0], adj[coast, :][:, coast].todense()
 
 
@@ -117,7 +129,7 @@ def select_coast(mesh_ds: xr.Dataset, overtopping: bool = False) -> xr.Dataset:
     Returns:
         xr.Dataset: Filtered xarray dataset.
     """
-    indices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
+    indices, adj = select_coast(mesh_ds, overtopping=overtopping)
     new_mesh = mesh_ds.isel(node=indices)
     del new_mesh["element"]
     new_mesh["adj"] = (["node1", "node2"], adj)
@@ -196,13 +208,13 @@ def bbox_mesh(
 
 
 @timeit
-def select_edge_indices(
+def select_nearby(
     mesh_ds: xr.Dataset,
     lon: float,
     lat: float,
     number: int = 10,
     overtopping=False,
-    verbose=False
+    verbose=False,
 ) -> np.ndarray:
     """
     Select edge cells near a point.
@@ -216,21 +228,21 @@ def select_edge_indices(
         verbose (bool, optional): Whether to print. Defaults to False.
 
     Returns:
-        np.ndarray: coastal indices near central point.
+        xr.Dataset: coastal indices near central point.
     """
 
-    edge_vertices, adj = select_coast_indices(mesh_ds, overtopping=overtopping)
+    edge_vertices, adj = select_coast(mesh_ds, overtopping=overtopping)
 
     coast_mesh_ds = mesh_ds.isel(node=edge_vertices)
-    lons = coast_mesh_ds.x.values # longitudes (1d numpy array)
-    lats = coast_mesh_ds.y.values # latitudes (1d numpy array)
+    lons = coast_mesh_ds.x.values  # longitudes (1d numpy array)
+    lats = coast_mesh_ds.y.values  # latitudes (1d numpy array)
 
     # compute Euclidean (flat-world) distance in degrees**2
-    nsq_distances = -(lons - lon) ** 2 - (lats - lat) ** 2
+    nsq_distances = -((lons - lon) ** 2) - (lats - lat) ** 2
 
     if verbose:
-        print("Central point", lon, lat)
-        print("Distances", nsq_distances)
+        print("Central point", lon, "degrees_East", lat, "degrees_North")
+        print("Distances", nsq_distances, "degrees**2")
 
     # Use argpartition to get top K indices
     # Note: The result includes the partition index, so we use -K-1 to get exactly K elements
@@ -240,7 +252,7 @@ def select_edge_indices(
     indices = indices[np.argsort(nsq_distances[indices])[::-1]]
 
     # indices = indices[np.in1d(indices, edge_vertices)]
-    return indices
+    return coast_mesh_ds.isel(node=indices)
 
 
 if __name__ == "__main__":
