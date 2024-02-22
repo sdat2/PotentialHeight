@@ -139,7 +139,40 @@ def plot_nearby(
     axs[2].legend()
 
     label_subplots(axs, override="inside")
+    return fig, axs
 
 
 if __name__ == "__main__":
-    plot_nearby()
+    # python -m adforce.fort63
+    from src.constants import KATRINA_TIDE_NC
+
+    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+
+    from tcpips.constants import FIGURE_PATH
+
+    figure_dir = os.path.join(FIGURE_PATH, "kat2")
+    os.makedirs(figure_dir, exist_ok=True)
+
+    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+    for station in range(len(tide_ds.lon)):
+
+        fig, axs = plot_nearby(
+            data_folder="/work/n01/n01/sithom/adcirc-swan/kat2/",
+            point=Point(
+                tide_ds.isel(stationid=station).lon.values,
+                tide_ds.isel(stationid=station).lat.values,
+            ),
+            bbox=NO_BBOX.pad(0.5),
+            plot_mesh=False,
+            overtopping=True,
+        )
+        axs[2].plot(
+            tide_ds.date_time,
+            tide_ds.isel(stationid=station).water_level,
+            color="black",
+        )
+        # plt.plot(tide_ds.date_time, tide_ds.isel(stationid=node).water_level)
+        plt.savefig(os.path.join(figure_dir, f"station_{station}.png"))
+        plt.clf()
+        plt.close()
+        plt.close()

@@ -28,11 +28,12 @@ year = {2015},
 note = {CPE-14-0307.R2},
 -
 """
+
 import os
 import numpy as np
 import shutil
 from .fort22 import return_new_input, save_forcing
-from .fort63 import xr_loader
+from .mesh import xr_loader
 from sithom.time import timeit
 from src.constants import NEW_ORLEANS
 
@@ -83,7 +84,17 @@ def read_results(path=OG_PATH):
     # work out closest point to NEW_ORLEANS
     xs = mele_ds.x.values
     ys = mele_ds.y.values
-    dist = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2) ** 0.5
+    from src.constants import KATRINA_TIDE_NC
+    import xarray as xr
+
+    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+    lon, lat = (
+        tide_ds.isel(stationid=3).lon.values,
+        tide_ds.isel(stationid=3).lat.values,
+    )
+
+    # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
+    dist = ((xs - lon) ** 2 + (ys - lat) ** 2) ** 0.5
     min_p = np.argmin(dist)
     # Read the maximum elevation for that point
     return mele_ds["zeta_max"].values[min_p]
@@ -122,6 +133,6 @@ def read_angle_exp():
 
 
 if __name__ == "__main__":
-    # python -m adpy.wrap
-    # python adpy/wrap.py
+    # python -m adforce.wrap
+    # python adforce/wrap.py
     read_angle_exp()

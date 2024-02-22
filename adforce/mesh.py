@@ -118,9 +118,9 @@ def select_coast(
 
 
 @timeit
-def select_coast(mesh_ds: xr.Dataset, overtopping: bool = False) -> xr.Dataset:
+def select_coast_mesh(mesh_ds: xr.Dataset, overtopping: bool = False) -> xr.Dataset:
     """
-    Select the coastal nodes.
+    Select the coastal mesh.
 
     Args:
         mesh_ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" (and "depth" if overtopping allowed).
@@ -236,6 +236,8 @@ def select_nearby(
     coast_mesh_ds = mesh_ds.isel(node=edge_vertices)
     lons = coast_mesh_ds.x.values  # longitudes (1d numpy array)
     lats = coast_mesh_ds.y.values  # latitudes (1d numpy array)
+
+    print("Central point", lon, "degrees_East", lat, "degrees_North")
 
     # compute Euclidean (flat-world) distance in degrees**2
     nsq_distances = -((lons - lon) ** 2) - (lats - lat) ** 2
