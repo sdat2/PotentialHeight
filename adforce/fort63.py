@@ -193,14 +193,14 @@ if __name__ == "__main__":
 
     from tcpips.constants import FIGURE_PATH
 
-    figure_dir = os.path.join(FIGURE_PATH, "8kmeshnws12")
+    figure_dir = os.path.join(FIGURE_PATH, "hresmeshnws12")
     os.makedirs(figure_dir, exist_ok=True)
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     for station in range(len(tide_ds.lon)):
 
         fig, axs = plot_nearby(
-            data_folder="/work/n01/n01/sithom/adcirc-swan/testsuite/adcirc/adcirc_katrina-2d-parallel",
+            data_folder="/work/n01/n01/sithom/adcirc-swan/testsuite/adcirc/adcirc_katria_2d-highres",
             point=Point(
                 tide_ds.isel(stationid=station).lon.values,
                 tide_ds.isel(stationid=station).lat.values,
