@@ -10,6 +10,7 @@ However this is a general feature, so perhaps a grid script would be useful.
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import xarray as xr
 from src.constants import NO_BBOX, NEW_ORLEANS
 from sithom.time import timeit
@@ -61,12 +62,12 @@ def plot_nearby(
     fig, axs = plt.subplots(3, 1, figsize=(8, 10))
 
     # axs[0].tricontourf(maxele_ds.x.values, maxele_ds.y.values, maxele_ds.element.values -1, np.nan_to_num(maxele_ds.zeta.isel(time=0), nan=0), levels=20)
-    axs[0].tricontourf(
+    im = axs[0].tricontourf(
         maxele_ds.x.values,
         maxele_ds.y.values,
         maxele_ds.element.values - 1,
         maxele_ds.depth,
-        levels=100,
+        levels=1000,
     )
     if plot_mesh:
         axs[0].triplot(
@@ -79,12 +80,16 @@ def plot_nearby(
 
     axs[0].scatter(point.lon, point.lat, marker="x", color="red")
 
-    axs[1].tricontourf(
+    divider = make_axes_locatable(axs[0])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im, cax=cax, orientation="vertical", label="Depth [m]")
+
+    im = axs[1].tricontourf(
         maxele_ds.x.values,
         maxele_ds.y.values,
         maxele_ds.element.values - 1,
         np.nan_to_num(maxele_ds.zeta_max.values, 0),
-        levels=100,
+        levels=1000,
     )
     if plot_mesh:
         axs[1].triplot(
@@ -95,6 +100,10 @@ def plot_nearby(
             linewidth=0.2,
         )
     axs[1].scatter(point.lon, point.lat, marker="x", color="red")
+
+    divider = make_axes_locatable(axs[1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.colorbar(im, cax=cax, orientation="vertical", label="Max water level [m]")
 
     colors = [
         "red",
@@ -142,8 +151,7 @@ def plot_nearby(
     return fig, axs
 
 
-if __name__ == "__main__":
-    # python -m adforce.fort63
+def kat2():
     from src.constants import KATRINA_TIDE_NC
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
@@ -169,10 +177,44 @@ if __name__ == "__main__":
         axs[2].plot(
             tide_ds.date_time,
             tide_ds.isel(stationid=station).water_level,
-            color="black",
+            # color="",
         )
         # plt.plot(tide_ds.date_time, tide_ds.isel(stationid=node).water_level)
         plt.savefig(os.path.join(figure_dir, f"station_{station}.png"))
         plt.clf()
         plt.close()
+
+
+if __name__ == "__main__":
+    # python -m adforce.fort63
+    from src.constants import KATRINA_TIDE_NC
+
+    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+
+    from tcpips.constants import FIGURE_PATH
+
+    figure_dir = os.path.join(FIGURE_PATH, "8kmeshnws12")
+    os.makedirs(figure_dir, exist_ok=True)
+
+    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+    for station in range(len(tide_ds.lon)):
+
+        fig, axs = plot_nearby(
+            data_folder="/work/n01/n01/sithom/adcirc-swan/testsuite/adcirc/adcirc_katrina-2d-parallel",
+            point=Point(
+                tide_ds.isel(stationid=station).lon.values,
+                tide_ds.isel(stationid=station).lat.values,
+            ),
+            bbox=NO_BBOX.pad(0.5),
+            plot_mesh=True,
+            overtopping=False,
+        )
+        axs[2].plot(
+            tide_ds.date_time,
+            tide_ds.isel(stationid=station).water_level,
+            # color="",
+        )
+        # plt.plot(tide_ds.date_time, tide_ds.isel(stationid=node).water_level)
+        plt.savefig(os.path.join(figure_dir, f"station_{station}.png"))
+        plt.clf()
         plt.close()
