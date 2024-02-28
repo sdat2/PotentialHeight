@@ -11,7 +11,7 @@ To set off Slurm I could use (https://stackoverflow.com/questions/61704713/best-
   year={2021},
   publisher={Faculty of 1000 Ltd}
 }
-- Joblib
+- Joblib (https://joblib.readthedocs.io/en/latest/)
 - Fireworks (https://materialsproject.github.io/fireworks/)
 @article {CPE:CPE3505,
 author = {Jain, Anubhav and Ong, Shyue Ping and Chen, Wei and Medasani, Bharat and Qu, Xiaohui and Kocher, Michael and Brafman, Miriam and Petretto, Guido and Rignanese, Gian-Marco and Hautier, Geoffroy and Gunter, Daniel and Persson, Kristin A.},
