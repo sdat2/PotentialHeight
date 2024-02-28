@@ -12,6 +12,7 @@ TODO: Could do with some unit tests.
 
 TODO: is 1015 mb as normal too high?
 """
+
 from typing import Optional, List, Tuple
 import os
 import numpy as np
@@ -415,7 +416,7 @@ def gen_ps_f() -> callable:
 
 
 @timeit
-def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
+def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
     coords.lon[:] = coords.lon[:] - coords.lon.mean()
     coords.lat[:] = coords.lat[:] - coords.lat.mean()
     clon = tj.clon.values.reshape(-1, 1, 1)
@@ -484,7 +485,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
                 {
                     "axis": "T",  # "units": "minutes since 1990-01-01T01:00:00"}
                 },
-            )
+            ),
             # reference_time=self.impact_time,
         ),
         attrs=dict(rank=2),  # description="Tropical cyclone moving grid.",
@@ -492,7 +493,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray):
 
 
 @timeit
-def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray):
+def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
     lats = np.expand_dims(orig.lat.values, 0)
     lons = np.expand_dims(orig.lon.values, 0)
     clon = tj.clon.values.reshape(-1, 1, 1)
@@ -588,11 +589,19 @@ def return_new_input(
 
 
 def save_forcing(
-    path="/work/n01/n01/sithom/adcirc-swan/NWS13set3", angle=0, trans_speed=7.71
-):
+    path: str = "/work/n01/n01/sithom/adcirc-swan/NWS13set3",
+    angle: float = 0,
+    trans_speed: float = 7.71,
+    impact_lon: float = -89.4715,
+    impact_lat: float = 29.9511,
+    impact_time=np.datetime64("2004-08-13T12", "ns"),
+) -> None:
     node0 = return_new_input(
         angle=angle,
         trans_speed=trans_speed,  # impact_lon=impact_lon
+        impact_lon=impact_lon,
+        impact_lat=impact_lat,
+        impact_time=impact_time,
     )
     # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
     enc = {"time": {"units": "minutes since 1990-01-01T01:00:00"}}

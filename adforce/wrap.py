@@ -29,23 +29,33 @@ note = {CPE-14-0307.R2},
 """
 
 import os
+from typing import Callable
 import numpy as np
 import shutil
 import time
 import xarray as xr
+import matplotlib.pyplot as plt
 from slurmpy import Slurm
 from sithom.time import timeit
+from sithom.plot import plot_defaults
 from src.constants import NEW_ORLEANS, KATRINA_TIDE_NC
 from .fort22 import return_new_input, save_forcing
 from .mesh import xr_loader
 
 
-ROOT = "/work/n01/n01/sithom/adcirc-swan/"
-OG_PATH = "/work/n01/n01/sithom/adcirc-swan/NWS13ex"
+ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
+OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
 
 
 @timeit
-def setup_new(new_path: str, angle: float):
+def setup_new(
+    new_path: str,
+    angle: float = 0,
+    trans_speed: float = 7.71,
+    impact_lon: float = -89.4715,
+    impact_lat: float = 29.9511,
+    impact_time=np.datetime64("2004-08-13T12", "ns"),
+):
     """
     Set up a new ADCIRC folder and add in the
     forcing data.
@@ -67,7 +77,14 @@ def setup_new(new_path: str, angle: float):
     for file in files:
         shutil.copy(os.path.join(OG_PATH, file), os.path.join(new_path, file))
 
-    save_forcing(new_path, angle=angle)
+    save_forcing(
+        new_path,
+        angle=angle,
+        trans_speed=trans_speed,
+        impact_lon=impact_lon,
+        impact_lat=impact_lat,
+        impact_time=impact_time,
+    )
 
 
 @timeit
@@ -157,24 +174,62 @@ echo ""
 
     time_total = 0
     is_finished = query_job(jid)
+    tinc = 1
     while not is_finished and time_total < time_limit:
         is_finished = query_job(jid)
-        time.sleep(10)
-        time_total += 10
+        time.sleep(tinc)
+        time_total += tinc
 
     print(f"Job {jid} finished")
 
     return jid
 
 
+def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable:
+    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+    lon, lat = (
+        tide_ds.isel(stationid=stationid).lon.values,
+        tide_ds.isel(stationid=stationid).lat.values,
+    )
+    mele_og = xr_loader(os.path.join(og_path, "maxele.63.nc"))
+    # read zeta_max point closes to the
+    # work out closest point to NEW_ORLEANS
+    xs = mele_og.x.values
+    ys = mele_og.y.values
+    # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
+    dist = ((xs - lon) ** 2 + (ys - lat) ** 2) ** 0.5
+    min_p = np.argmin(dist)
+
+    def select_max(path: str) -> float:
+        mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
+        return mele_ds["zeta_max"].values[min_p]
+
+    return select_max
+
+
 @timeit
-def run_new(out_path=OG_PATH):
+def run_wrapped(
+    out_path=OG_PATH,
+    select_point=select_point_f(3),
+    angle=0,
+    trans_speed=7.71,
+    impact_lon=-89.4715,
+    impact_lat=29.9511,
+    impact_time=np.datetime64("2004-08-13T12", "ns"),
+):
     # add new forcing
-    forcing_dt = return_new_input()
-    forcing_dt.to_netcdf(os.path.join(out_path, "fort.22.nc"))
+    setup_new(
+        out_path,
+        angle=angle,
+        trans_speed=trans_speed,
+        impact_lon=impact_lon,
+        impact_lat=impact_lat,
+        impact_time=impact_time,
+    )
     # set off sbatch.
     run_and_wait(out_path)
     # look at results.
+    return select_point(out_path)
 
 
 @timeit
@@ -220,9 +275,6 @@ def read_angle_exp():
         results += [[i, angle, res]]
     results = np.array(results)
 
-    import matplotlib.pyplot as plt
-    from sithom.plot import plot_defaults
-
     plot_defaults()
     plt.plot(results[:, 1], results[:, 2])
     plt.xlabel("Angle [$^{\circ}$]")
@@ -230,7 +282,21 @@ def read_angle_exp():
     plt.savefig("angle_test.png")
 
 
+@timeit
+def run_angle_new():
+    exp_dir = os.path.join(ROOT, "angle")
+    os.makedirs(exp_dir, exist_ok=True)
+    res_l = []
+    angles = np.linspace(-90, 90, num=10)
+    for i, angle in enumerate(angles):
+        tmp_dir = os.path.join(exp_dir, f"exp_{i:03}")
+        print(tmp_dir, angle)
+        res_l += [run_wrapped(out_path=tmp_dir, angle=angle)]
+    print(angles, res_l)
+
+
 if __name__ == "__main__":
     # python -m adforce.wrap
     # python adforce/wrap.py
-    read_angle_exp()
+    # read_angle_exp()
+    run_angle_new()
