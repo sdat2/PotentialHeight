@@ -26,16 +26,19 @@ pages = {5037--5059},
 keywords = {scientific workflows, high-throughput computing, fault-tolerant computing},
 year = {2015},
 note = {CPE-14-0307.R2},
--
 """
 
 import os
 import numpy as np
 import shutil
+import time
+import xarray as xr
+from slurmpy import Slurm
+from sithom.time import timeit
+from src.constants import NEW_ORLEANS, KATRINA_TIDE_NC
 from .fort22 import return_new_input, save_forcing
 from .mesh import xr_loader
-from sithom.time import timeit
-from src.constants import NEW_ORLEANS
+
 
 ROOT = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH = "/work/n01/n01/sithom/adcirc-swan/NWS13ex"
@@ -68,12 +71,109 @@ def setup_new(new_path: str, angle: float):
 
 
 @timeit
+def run_and_wait(dir: str, jobname: str = "run", time_limit: float = 60 * 60) -> int:
+    s = Slurm(
+        jobname,
+        {
+            "nodes": 1,
+            "account": "n01-SOWISE",
+            "partition": "standard",
+            "qos": "standard",
+            "time": "1:0:0",
+            "tasks-per-node": 128,
+            "cpus-per-task": 1,
+            "output": os.path.join(dir, "test.out"),
+            "error": os.path.join(dir, "test.out"),
+            "mail-type": "ALL",
+            "mail-user": "sdat2@cam.ac.uk",
+        },
+    )
+
+    jid = s.run(
+        f"""
+module load PrgEnv-gnu/8.3.3
+module load cray-hdf5-parallel
+module load cray-netcdf-hdf5parallel
+
+cd {dir}
+
+work=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
+source $work/.bashrc
+
+d1=/work/n01/n01/sithom/adcirc-swan/katrina1
+
+echo "hook 1"
+eval "$(conda shell.bash hook)"
+
+# define variables
+case_name=$SLURM_JOB_NAME # name for printing
+np=128 # how many parallel tasks to define
+
+export OMP_NUM_THREADS=1
+
+# Propagate the cpus-per-task setting from script to srun commands
+#    By default, Slurm does not propagate this setting from the sbatch
+#    options to srun commands in the job script. If this is not done,
+#    process/thread pinning may be incorrect leading to poor performance
+export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
+
+#...Run the case
+echo ""
+echo "|---------------------------------------------|"
+echo "    TEST CASE: $case_name"
+echo ""
+echo -n "    Prepping case..."
+$d1/adcprep --np $np --partmesh >  adcprep.log
+$d1/adcprep --np $np --prepall  >> adcprep.log
+if [ $? == 0 ] ; then
+    echo "done!"
+else
+    echo "ERROR!"
+    exit 1
+fi
+
+echo -n "    Runnning case..."
+srun --distribution=block:block --hint=nomultithread $d1/padcirc > padcirc_log.txt
+exitstat=$?
+echo "Finished"
+echo "    ADCIRC Exit Code: $exitstat"
+if [ "x$exitstat" != "x0" ] ; then
+    echo "    ERROR: ADCIRC did not exit cleanly."
+    exit 1
+fi
+echo ""
+
+"""
+    )
+
+    def query_job(jid: int) -> bool:
+        args = f"sacct -j {jid} -o state"
+        job_states = [x.strip() for x in os.popen(args).read().strip().split("\n")]
+        return (
+            np.all([x == "COMPLETED" for x in job_states[2:]])
+            if len(job_states) > 2
+            else False
+        )
+
+    time_total = 0
+    is_finished = query_job(jid)
+    while not is_finished and time_total < time_limit:
+        is_finished = query_job(jid)
+        time.sleep(10)
+        time_total += 10
+
+    print(f"Job {jid} finished")
+
+    return jid
+
+
+@timeit
 def run_new(out_path=OG_PATH):
     # add new forcing
     forcing_dt = return_new_input()
     forcing_dt.to_netcdf(os.path.join(out_path, "fort.22.nc"))
     # set off sbatch.
-
+    run_and_wait(out_path)
     # look at results.
 
 
@@ -84,8 +184,6 @@ def read_results(path=OG_PATH):
     # work out closest point to NEW_ORLEANS
     xs = mele_ds.x.values
     ys = mele_ds.y.values
-    from src.constants import KATRINA_TIDE_NC
-    import xarray as xr
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     lon, lat = (
