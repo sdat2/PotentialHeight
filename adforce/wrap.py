@@ -39,6 +39,7 @@ from slurmpy import Slurm
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from src.constants import NEW_ORLEANS, KATRINA_TIDE_NC
+from tcpips.constants import FIGURE_PATH
 from .fort22 import return_new_input, save_forcing
 from .mesh import xr_loader
 
@@ -119,8 +120,8 @@ source $work/.bashrc
 
 d1=/work/n01/n01/sithom/adcirc-swan/katrina1
 
-echo "hook 1"
-eval "$(conda shell.bash hook)"
+# echo "hook 1"
+# eval "$(conda shell.bash hook)"
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing
@@ -186,6 +187,16 @@ echo ""
 
 
 def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable:
+    """
+    Create a function to select the maximum elevation near a given stationid.
+
+    Args:
+        stationid (int): _description_
+        og_path (str, optional): _description_. Defaults to OG_PATH.
+
+    Returns:
+        Callable: _description_
+    """
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     lon, lat = (
         tide_ds.isel(stationid=stationid).lon.values,
@@ -284,6 +295,7 @@ def read_angle_exp():
 
 @timeit
 def run_angle_new():
+    # https://github.com/sdat2/new-orleans/blob/main/src/models/emu6d.py
     exp_dir = os.path.join(ROOT, "angle")
     os.makedirs(exp_dir, exist_ok=True)
     res_l = []
@@ -295,8 +307,31 @@ def run_angle_new():
     print(angles, res_l)
 
 
+@timeit
+def run_speed():
+    # https://github.com/sdat2/new-orleans/blob/main/src/models/emu6d.py
+    exp_dir = os.path.join(ROOT, "trans_speed")
+    os.makedirs(exp_dir, exist_ok=True)
+    res_l = []
+    speeds = np.linspace(1, 25, num=50)
+    for i, speed in enumerate(speeds):
+        tmp_dir = os.path.join(exp_dir, f"exp_{i:03}")
+        print(tmp_dir, speed)
+        res_l += [run_wrapped(out_path=tmp_dir, trans_speed=speed)]
+    print(speeds, res_l)
+    plt.plot(speeds, res_l)
+    plt.xlabel("Translation speed [m/s]")
+    plt.ylabel("Height [m]")
+    plt.savefig(
+        os.path.join(
+            FIGURE_PATH,
+            "trans_speed_test.png",
+        )
+    )
+
+
 if __name__ == "__main__":
     # python -m adforce.wrap
     # python adforce/wrap.py
     # read_angle_exp()
-    run_angle_new()
+    run_speed()
