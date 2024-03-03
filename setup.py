@@ -16,6 +16,11 @@ REQUIRED: List[str] = [
     "intake-xarray",
     "gcsfs",
     "xmip",
+    "hydra-core",
+    "imageio",
+    "trieste",
+    "trieste[plotting]",
+    "trieste[qhsri]",
 ]
 
 setup(

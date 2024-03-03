@@ -265,7 +265,7 @@ def read_results(path=OG_PATH):
 
 
 @timeit
-def run_angle_exp():
+def run_angle_exp() -> None:
     exp_dir = os.path.join(ROOT, "angle_test")
     os.makedirs(exp_dir, exist_ok=True)
     for i, angle in enumerate(np.linspace(-90, 90, num=10)):
@@ -275,7 +275,7 @@ def run_angle_exp():
 
 
 @timeit
-def read_angle_exp():
+def read_angle_exp() -> None:
     results = []
     exp_dir = os.path.join(ROOT, "angle_test")
     for i, angle in enumerate(np.linspace(-90, 90, num=10)):
@@ -294,21 +294,31 @@ def read_angle_exp():
 
 
 @timeit
-def run_angle_new():
+def run_angle_new() -> None:
     # https://github.com/sdat2/new-orleans/blob/main/src/models/emu6d.py
     exp_dir = os.path.join(ROOT, "angle")
     os.makedirs(exp_dir, exist_ok=True)
     res_l = []
-    angles = np.linspace(-90, 90, num=10)
+    angles = np.linspace(-80, 80, num=100)
     for i, angle in enumerate(angles):
         tmp_dir = os.path.join(exp_dir, f"exp_{i:03}")
         print(tmp_dir, angle)
         res_l += [run_wrapped(out_path=tmp_dir, angle=angle)]
     print(angles, res_l)
+    plot_defaults()
+    plt.plot(angles, res_l)
+    plt.xlabel("Angle [$^{\circ}$]")
+    plt.ylabel("Height [m]")
+    plt.savefig(
+        os.path.join(
+            FIGURE_PATH,
+            "angle_test.png",
+        )
+    )
 
 
 @timeit
-def run_speed():
+def run_speed() -> None:
     # https://github.com/sdat2/new-orleans/blob/main/src/models/emu6d.py
     exp_dir = os.path.join(ROOT, "trans_speed")
     os.makedirs(exp_dir, exist_ok=True)
@@ -334,4 +344,5 @@ if __name__ == "__main__":
     # python -m adforce.wrap
     # python adforce/wrap.py
     # read_angle_exp()
-    run_speed()
+    # run_speed()
+    run_angle_new()
