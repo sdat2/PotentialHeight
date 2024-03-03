@@ -2,25 +2,25 @@ from setuptools import setup
 from typing import List
 
 REQUIRED: List[str] = [
-    "xarray[complete]",
-    "xarray-datatree",  # to process netCDF4 files with groups.
-    "netCDF4",
-    "dask[complete]",
-    "uncertainties",
-    "sithom>=0.0.5",
-    "imageio",
-    "requests",
-    "intake",
-    "aiohttp",
-    "intake-esm",
-    "intake-xarray",
-    "gcsfs",
-    "xmip",
-    "hydra-core",
-    "imageio",
-    "trieste",
-    "trieste[plotting]",
-    "trieste[qhsri]",
+    "xarray[complete]",  # to process netCDF4 files (adforce, tcpips).
+    "xarray-datatree",  # to process netCDF4 files with groups (adforce).
+    "netCDF4",  # to process netCDF4 files (adforce, tcpips).
+    "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
+    "uncertainties",  # common utility
+    "sithom>=0.0.5",  # common utilities
+    "imageio",  # to make animations
+    "requests",  # to download data
+    "intake",  # to read CMIP6 data
+    "aiohttp",  # to read CMIP6 data
+    "intake-esm",  # to read CMIP6 data
+    "intake-xarray",  # to read CMIP6 data
+    "gcsfs",  # to read CMIP6 data
+    "xmip",  # to preprocess CMIP6 data
+    "hydra-core",  # to read the config files
+    "trieste",  # to run bayesian optimisation (adbo)
+    "trieste[plotting]",  # to run bayesian optimisation (adbo)
+    "trieste[qhsri]",  # to run bayesian optimisation (adbo)
+    "slurmpy",  # to run SLURM jobs (adforce)
 ]
 
 setup(
@@ -49,9 +49,10 @@ setup(
     ],
     packages=["tcpips", "chavas15", "adforce", "adbo"],
     package_dir={
-        "tcpips": "tcpips",
-        "chavas15": "chavas15",
-        "adforce": "adforce",
-        "adbo": "adbo",
+        "tcpips": "tcpips",  # Calculate potential intensity and potential size from CMIP6 data
+        "chavas15": "chavas15",  # Calculate the Chavas, Lin and Emanuel (2015) profile
+        "adforce": "adforce",  # All of the interfacing with ADCIRC
+        "adbo": "adbo",  # all of the tensorflow/trieste stuff
+        "worst": "worst",  # Extreme value theory using the upper bound limit
     },
 )

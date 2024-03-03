@@ -9,6 +9,7 @@ data/
 # Distribution / packaging
 .Python
 build/
+slurm-*/
 develop-eggs/
 dist/
 downloads/
