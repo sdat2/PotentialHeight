@@ -2,6 +2,7 @@
 
 To set off Slurm I could use (https://stackoverflow.com/questions/61704713/best-practice-submitting-slurm-jobs-via-python):
 - Slurmpy https://github.com/brentp/slurmpy
+        -- simplest
 - Snakemake
 @article{molder2021sustainable,
   title={Sustainable data analysis with Snakemake},
@@ -38,6 +39,7 @@ import matplotlib.pyplot as plt
 from slurmpy import Slurm
 from sithom.time import timeit
 from sithom.plot import plot_defaults
+from sithom.io import write_json
 from src.constants import NEW_ORLEANS, KATRINA_TIDE_NC
 from tcpips.constants import FIGURE_PATH
 from .fort22 import return_new_input, save_forcing
@@ -340,9 +342,56 @@ def run_speed() -> None:
     )
 
 
+@timeit
+def run_disp() -> None:
+    # https://github.com/sdat2/new-orleans/blob/main/src/models/emu6d.py
+    exp_dir = os.path.join(ROOT, "displacment")
+    os.makedirs(exp_dir, exist_ok=True)
+    res_l = []
+    tmp_dirs = []
+
+    displacements = np.linspace(-2, 2, num=50)
+
+    def save_output() -> None:
+        nonlocal tmp_dirs, res_l, displacements
+        output = {
+            i: {
+                "dir": tmp_dirs[i],
+                "res": res_l[i],
+                "displacement": displacements[i],
+            }
+            for i in range(len(tmp_dirs))
+        }
+        write_json(output, os.path.join(exp_dir, "displacement_test.json"))
+
+    for i, displacement in enumerate(displacements):
+        tmp_dir = os.path.join(exp_dir, f"exp_{i:03}")
+        print(tmp_dir, displacement)
+        tmp_dirs += [tmp_dir]
+        res_l += [
+            run_wrapped(out_path=tmp_dir, impact_lon=NEW_ORLEANS.lon + displacement)
+        ]
+        save_output()
+    print(displacements, res_l)
+
+    plot_defaults()
+
+    plt.plot(displacements, res_l)
+    plt.xlabel("Displacement, $c$ [$^{\circ}$]")
+    plt.ylabel("Height [m]")
+    plt.savefig(
+        os.path.join(
+            FIGURE_PATH,
+            "displacement_test.png",
+        )
+    )
+
+
 if __name__ == "__main__":
     # python -m adforce.wrap
     # python adforce/wrap.py
     # read_angle_exp()
     # run_speed()
-    run_angle_new()
+    # TODO: add an option to turn the tide off.
+    run_disp()
+    # run_angle_new()
