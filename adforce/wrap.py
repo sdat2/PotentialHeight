@@ -246,7 +246,7 @@ def run_wrapped(
 
 
 @timeit
-def read_results(path=OG_PATH):
+def read_results(path=OG_PATH, stationid=3):
     mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
     # read zeta_max point closes to the
     # work out closest point to NEW_ORLEANS
@@ -255,8 +255,8 @@ def read_results(path=OG_PATH):
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     lon, lat = (
-        tide_ds.isel(stationid=3).lon.values,
-        tide_ds.isel(stationid=3).lat.values,
+        tide_ds.isel(stationid=stationid).lon.values,
+        tide_ds.isel(stationid=stationid).lat.values,
     )
 
     # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
