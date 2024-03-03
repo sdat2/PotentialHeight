@@ -390,7 +390,9 @@ def gen_ps_f() -> callable:
 
     That would require some clever way of interpolating each time step.
     """
-    chavas_profile = read_json("cle/outputs.json")
+    chavas_profile = read_json(
+        "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/outputs.json"
+    )
     # print(chavas_profile.keys())
     chavas_profile = pressures_profile(chavas_profile)
     radii = np.array(chavas_profile["rr"], dtype="float32")
