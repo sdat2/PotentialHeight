@@ -96,7 +96,7 @@ def observer_f(config: dict, exp_name: str = "bo_test") -> Callable:
 @timeit
 def run_bayesopt_exp(
     seed: int = 10, exp_name: str = "bo_test", init_steps: int = 10, daf_steps: int = 10
-):
+) -> None:
     setup_tf(seed=seed, log_name=exp_name)
     constraints_d = {
         "angle": {"min": -80, "max": 80, "units": "degrees"},
@@ -123,13 +123,13 @@ def run_bayesopt_exp(
         track_state=False,
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
-    print("result", result)
+    # print("result", result)
     # print("history", history)
     real_res = result[0].unwrap()
     dataset = real_res.dataset
     query_points = dataset.query_points.numpy()
     observations = dataset.observations.numpy()
-    fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+    _, ax = plt.subplots(2, 2, figsize=(10, 10))
     plot_bo_points(
         query_points,
         ax[0, 0],
@@ -143,6 +143,8 @@ def run_bayesopt_exp(
 
 
 if __name__ == "__main__":
-    run_bayesopt_exp(seed=11, exp_name="bo_test5", init_steps=5, daf_steps=35)
-    # python -m adforce.exp
-    # python -m adforce.exp &> logs/exp.log
+    # run_bayesopt_exp(seed=12, exp_name="bo_test5", init_steps=5, daf_steps=35)
+    run_bayesopt_exp(seed=13, exp_name="bo_test6", init_steps=5, daf_steps=35)
+    # python -m adbo.exp &> logs/bo_test6.log
+    # python -m adbo.exp
+    # python -m adbo.exp &> logs/exp.log
