@@ -17,4 +17,11 @@ micromamba activate tcpips
 
 # Install repository in editable version
 pip install -e .
+
+```
+
+## Bayesian optimization loop
+
+```bash
+python -m adbo.exp &> logs/bo_test3.txt
 ```
