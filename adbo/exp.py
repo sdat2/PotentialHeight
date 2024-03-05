@@ -109,11 +109,31 @@ def run_bayesopt_exp(
     init_steps = 10
     initial_query_points = search_space.sample_sobol(init_steps)
     observer = observer_f(constraints_d, exp_name=exp_name)
+
+    from trieste.objectives import SingleObjectiveTestProblem, ObjectiveTestProblem
+
+    import math
+
+    _ORIGINAL_BRANIN_MINIMIZERS = tf.constant(
+        [[-math.pi, 12.275], [math.pi, 2.275], [9.42478, 2.475]], tf.float64
+    )
+
+    obs_class = SingleObjectiveTestProblem(
+        name="adcirc35k",
+        search_space=search_space,
+        objective=observer,
+        minimizers=(_ORIGINAL_BRANIN_MINIMIZERS + [5.0, 0.0]) / 15.0,
+        minimum=-10,
+    )
+
+    observer = obs_class.objective
+
     initial_data = observer(initial_query_points)
     gpr = trieste.models.gpflow.build_gpr(initial_data, search_space)
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
     acquisition_rule = EfficientGlobalOptimization(MinValueEntropySearch(search_space))
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
+
     daf_steps = 10
     result = bo.optimize(
         daf_steps,
@@ -137,14 +157,14 @@ def run_bayesopt_exp(
         m_add="+",  # obs_values=observations
     )  # , arg_min_idx)
     plt.scatter(query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis")
-    ax[0, 0].set_xlabel(r"$x_1$")
-    ax[0, 0].set_xlabel(r"$x_2$")
+    ax[0, 0].set_xlabel(r"$x_1$ [dimensionless]")
+    ax[0, 0].set_ylabel(r"$x_2$ [dimensionless]")
     plt.savefig(os.path.join("img", "bo_test5_mves.png"))
 
 
 if __name__ == "__main__":
     # run_bayesopt_exp(seed=12, exp_name="bo_test5", init_steps=5, daf_steps=35)
-    run_bayesopt_exp(seed=13, exp_name="bo_test6", init_steps=5, daf_steps=35)
-    # python -m adbo.exp &> logs/bo_test6.log
+    run_bayesopt_exp(seed=13, exp_name="bo_test8", init_steps=5, daf_steps=35)
+    # python -m adbo.exp &> logs/bo_test7.log
     # python -m adbo.exp
     # python -m adbo.exp &> logs/exp.log
