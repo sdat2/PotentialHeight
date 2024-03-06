@@ -234,5 +234,5 @@ if __name__ == "__main__":
     # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
     # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
     run_bayesopt_exp(
-        seed=15, exp_name="test15", init_steps=1, daf_steps=50, wrap_test=True
+        seed=15, exp_name="test15", init_steps=5, daf_steps=50, wrap_test=True
     )
