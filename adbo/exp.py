@@ -2,7 +2,11 @@
 
 from typing import Callable
 import os
+import math
 import numpy as np
+import time
+
+start_tf_import = time.time()
 import tensorflow as tf
 import tensorflow_probability as tfp
 import trieste
@@ -10,13 +14,18 @@ from trieste.acquisition import (
     # ExpectedImprovement,
     MinValueEntropySearch,
 )
+from trieste.objectives import SingleObjectiveTestProblem, ObjectiveTestProblem
 from trieste.acquisition.rule import EfficientGlobalOptimization
 from trieste.experimental.plotting.plotting import plot_bo_points, plot_function_2d
+from trieste.objectives.single_objectives import check_objective_shapes
+
+end_tf_import = time.time()
+print("tf import time", end_tf_import - start_tf_import)
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
 import matplotlib.pyplot as plt
-from adforce.wrap import run_wrapped
+from adforce.wrap import run_wrapped, select_point_f
 from src.constants import NEW_ORLEANS
 from .rescale import rescale_inverse
 
@@ -45,12 +54,29 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 
 
 @timeit
-def observer_f(config: dict, exp_name: str = "bo_test") -> Callable:
+def observer_f(
+    config: dict, exp_name: str = "bo_test", stationid: int = 3, wrap_test: bool = False
+) -> Callable[[tf.Tensor], tf.Tensor]:
+    """
+    Return a wrapper function for the ADCIRC model that is compatible with being used as an observer in trieste after processing.
+
+    At each observer function call the model is run and the result is returned and saved.
+
+    Args:
+        config (dict): _description_
+        exp_name (str, optional): Name for folder. Defaults to "bo_test".
+        stationid (int, optional): Which coast tidal gauge to sample near. Defaults to 3.
+        wrap_test (bool, optional): If True, do not run the ADCIRC model. Defaults to False.
+
+    Returns:
+        Callable[[tf.Tensor], tf.Tensor]: trieste observer function.
+    """
     # set up folder for all experiments
-    exp_dir = os.path.join(ROOT, exp_name)
+    exp_dir = os.path.join(ROOT, "exp", exp_name)
     os.makedirs(exp_dir, exist_ok=True)
     call_number = -1
     output = {}
+    select_point = select_point_f(stationid)
 
     def temp_dir() -> str:
         nonlocal exp_dir
@@ -67,11 +93,12 @@ def observer_f(config: dict, exp_name: str = "bo_test") -> Callable:
         }
         write_json(output, os.path.join(exp_dir, "experiments.json"))
 
-    def obs(queries: tf.Tensor) -> tf.Tensor:
-        nonlocal call_number
+    @check_objective_shapes(d=3)
+    def obs(x: tf.Tensor) -> tf.Tensor:
+        nonlocal call_number, select_point
         # put in real space
-        returned_results = []
-        real_queries = rescale_inverse(queries, config)
+        returned_results = []  # new results, negative height [m]
+        real_queries = rescale_inverse(x, config)  # convert to real space
         for i in range(real_queries.shape[0]):
             call_number += 1
             tmp_dir = temp_dir()
@@ -81,7 +108,13 @@ def observer_f(config: dict, exp_name: str = "bo_test") -> Callable:
             }
             inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
             del inputs["displacement"]
-            real_result = run_wrapped(out_path=tmp_dir, **inputs)
+            if wrap_test:
+                real_result = 9.0
+            else:
+                real_result = run_wrapped(
+                    out_path=tmp_dir, select_point=select_point, **inputs
+                )
+
             add_query_to_output(real_queries[i], real_result)
             # flip sign to make it a minimisation problem
             returned_results.append(-real_result)
@@ -95,7 +128,11 @@ def observer_f(config: dict, exp_name: str = "bo_test") -> Callable:
 
 @timeit
 def run_bayesopt_exp(
-    seed: int = 10, exp_name: str = "bo_test", init_steps: int = 10, daf_steps: int = 10
+    seed: int = 10,
+    exp_name: str = "bo_test",
+    init_steps: int = 10,
+    daf_steps: int = 10,
+    wrap_test: bool = False,
 ) -> None:
     setup_tf(seed=seed, log_name=exp_name)
     constraints_d = {
@@ -108,12 +145,9 @@ def run_bayesopt_exp(
     search_space = trieste.space.Box([0, 0, 0], [1, 1, 1])
     init_steps = 10
     initial_query_points = search_space.sample_sobol(init_steps)
-    observer = observer_f(constraints_d, exp_name=exp_name)
+    observer = observer_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
 
-    from trieste.objectives import SingleObjectiveTestProblem, ObjectiveTestProblem
-
-    import math
-
+    # what does the minimizer do?
     _ORIGINAL_BRANIN_MINIMIZERS = tf.constant(
         [[-math.pi, 12.275], [math.pi, 2.275], [9.42478, 2.475]], tf.float64
     )
@@ -123,18 +157,17 @@ def run_bayesopt_exp(
         search_space=search_space,
         objective=observer,
         minimizers=(_ORIGINAL_BRANIN_MINIMIZERS + [5.0, 0.0]) / 15.0,
-        minimum=-10,
+        minimum=tf.constant([-10], tf.float64),
     )
 
     observer = obs_class.objective
+    print("observer", observer, type(obs_class))
 
     initial_data = observer(initial_query_points)
     gpr = trieste.models.gpflow.build_gpr(initial_data, search_space)
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
     acquisition_rule = EfficientGlobalOptimization(MinValueEntropySearch(search_space))
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
-
-    daf_steps = 10
     result = bo.optimize(
         daf_steps,
         initial_data,
@@ -164,7 +197,14 @@ def run_bayesopt_exp(
 
 if __name__ == "__main__":
     # run_bayesopt_exp(seed=12, exp_name="bo_test5", init_steps=5, daf_steps=35)
-    run_bayesopt_exp(seed=13, exp_name="bo_test8", init_steps=5, daf_steps=35)
-    # python -m adbo.exp &> logs/bo_test7.log
+    # run_bayesopt_exp(seed=13, exp_name="bo_test8", init_steps=5, daf_steps=35)
+    # python -m adbo.exp &> logs/bo_test10.log
     # python -m adbo.exp
     # python -m adbo.exp &> logs/exp.log
+    # run_bayesopt_exp(seed=14, exp_name="bo_test10", init_steps=5, daf_steps=50)
+    # python -m adbo.exp &> logs/test13.log
+    # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
+    # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
+    run_bayesopt_exp(
+        seed=15, exp_name="test13", init_steps=10, daf_steps=50, wrap_test=True
+    )

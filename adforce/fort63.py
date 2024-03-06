@@ -163,7 +163,6 @@ def kat2():
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     for station in range(len(tide_ds.lon)):
-
         fig, axs = plot_nearby(
             data_folder="/work/n01/n01/sithom/adcirc-swan/kat2/",
             point=Point(
@@ -198,7 +197,6 @@ if __name__ == "__main__":
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     for station in range(len(tide_ds.lon)):
-
         fig, axs = plot_nearby(
             data_folder="/work/n01/n01/sithom/adcirc-swan/testsuite/adcirc/adcirc_katria_2d-highres",
             point=Point(
