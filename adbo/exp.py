@@ -101,7 +101,7 @@ def observer_f(
         }
         write_json(output, os.path.join(exp_dir, "experiments.json"))
 
-    # @check_objective_shapes(d=3)
+    @check_objective_shapes(d=3)
     def obs(x: tf.Tensor) -> tf.Tensor:
         """
         Run the ADCIRC model and return the result.
@@ -126,7 +126,7 @@ def observer_f(
             inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
             del inputs["displacement"]
             if wrap_test:
-                real_result = 9.0
+                real_result = min(7 + np.random.normal(), 10)
             else:
                 real_result = run_wrapped(
                     out_path=tmp_dir, select_point=select_point, **inputs
@@ -136,9 +136,10 @@ def observer_f(
             # flip sign to make it a minimisation problem
             returned_results.append([-real_result])
 
-        return Dataset(
-            query_points=x, observations=tf.constant(returned_results, dtype=tf.float64)
-        )
+        return tf.constant(returned_results, dtype=tf.float64)
+        # Dataset(
+        #    query_points=x, observations=tf.constant(returned_results, dtype=tf.float64)
+        # )
         # run the model
         # return the result
 
@@ -173,21 +174,22 @@ def run_bayesopt_exp(
     # set up BayesOpt
     search_space = trieste.space.Box([0, 0, 0], [1, 1, 1])
     initial_query_points = search_space.sample_sobol(init_steps)
-    init_observer = observer_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
+    init_objective = observer_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
 
     print("initial_query_points", initial_query_points, type(initial_query_points))
 
     obs_class = SingleObjectiveTestProblem(
         name="adcirc35k",
         search_space=search_space,
-        objective=init_observer,
+        objective=init_objective,
         minimizers=tf.constant(
             [[0.114614, 0.555649, 0.852547]], tf.float64
         ),  # what does the minimizer do?
         minimum=tf.constant([-10], tf.float64),
     )
 
-    observer = obs_class.objective
+    # observer = trieste.objectives.utils.mk_observer(obs_class.objective)
+    observer = trieste.objectives.utils.mk_observer(init_objective)
     print("observer", observer, type(obs_class))
 
     initial_data = observer(initial_query_points)
@@ -210,6 +212,8 @@ def run_bayesopt_exp(
     dataset = real_res.dataset
     query_points = dataset.query_points.numpy()
     observations = dataset.observations.numpy()
+
+    # plot the results
     _, ax = plt.subplots(2, 2, figsize=(10, 10))
     plot_bo_points(
         query_points,
@@ -233,6 +237,10 @@ if __name__ == "__main__":
     # python -m adbo.exp &> logs/test15.log
     # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
     # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
+    # run_bayesopt_exp(
+    #    seed=15, exp_name="test15", init_steps=5, daf_steps=50, wrap_test=True
+    # )
     run_bayesopt_exp(
-        seed=15, exp_name="test15", init_steps=5, daf_steps=50, wrap_test=True
+        seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50, wrap_test=False
     )
+    #  python -m adbo.exp &> logs/bo_test16.log
