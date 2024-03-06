@@ -14,6 +14,7 @@ from trieste.acquisition import (
     # ExpectedImprovement,
     MinValueEntropySearch,
 )
+from trieste.data import Dataset
 from trieste.objectives import SingleObjectiveTestProblem, ObjectiveTestProblem
 from trieste.acquisition.rule import EfficientGlobalOptimization
 from trieste.experimental.plotting.plotting import plot_bo_points, plot_function_2d
@@ -36,6 +37,13 @@ ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 
 @timeit
 def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
+    """
+    Set up the tensorflow environment.
+
+    Args:
+        seed (int, optional): Random seed for numpy/tensorflow. Defaults to 1793.
+        log_name (str, optional): Name for the log. Defaults to "experiment1".
+    """
     np.random.seed(seed)
     tf.random.set_seed(seed)
     print("trieste.__version__", trieste.__version__)
@@ -84,7 +92,7 @@ def observer_f(
         os.makedirs(tmp_dir, exist_ok=True)
         return tmp_dir
 
-    def add_query_to_output(real_query: np.ndarray, real_result: tf.Tensor) -> None:
+    def add_query_to_output(real_query: tf.Tensor, real_result: tf.Tensor) -> None:
         nonlocal output
         output[call_number] = {
             "dir": temp_dir(),
@@ -93,8 +101,17 @@ def observer_f(
         }
         write_json(output, os.path.join(exp_dir, "experiments.json"))
 
-    @check_objective_shapes(d=3)
+    # @check_objective_shapes(d=3)
     def obs(x: tf.Tensor) -> tf.Tensor:
+        """
+        Run the ADCIRC model and return the result.
+
+        Args:
+            x (tf.Tensor): Possibly a batch of scaled queries.
+
+        Returns:
+            tf.Tensor: The negative of the result of the ADCIRC model.
+        """
         nonlocal call_number, select_point
         # put in real space
         returned_results = []  # new results, negative height [m]
@@ -117,9 +134,11 @@ def observer_f(
 
             add_query_to_output(real_queries[i], real_result)
             # flip sign to make it a minimisation problem
-            returned_results.append(-real_result)
+            returned_results.append([-real_result])
 
-        return tf.constant(returned_results)
+        return Dataset(
+            query_points=x, observations=tf.constant(returned_results, dtype=tf.float64)
+        )
         # run the model
         # return the result
 
@@ -134,6 +153,16 @@ def run_bayesopt_exp(
     daf_steps: int = 10,
     wrap_test: bool = False,
 ) -> None:
+    """
+    Run a Bayesian Optimisation experiment.
+
+    Args:
+        seed (int, optional): Seed to initialize. Defaults to 10.
+        exp_name (str, optional): Experiment name. Defaults to "bo_test".
+        init_steps (int, optional): How many sobol sambles. Defaults to 10.
+        daf_steps (int, optional): How many acquisition points. Defaults to 10.
+        wrap_test (bool, optional): Whether to prevent. Defaults to False.
+    """
     setup_tf(seed=seed, log_name=exp_name)
     constraints_d = {
         "angle": {"min": -80, "max": 80, "units": "degrees"},
@@ -143,20 +172,18 @@ def run_bayesopt_exp(
     }
     # set up BayesOpt
     search_space = trieste.space.Box([0, 0, 0], [1, 1, 1])
-    init_steps = 10
     initial_query_points = search_space.sample_sobol(init_steps)
-    observer = observer_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
+    init_observer = observer_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
 
-    # what does the minimizer do?
-    _ORIGINAL_BRANIN_MINIMIZERS = tf.constant(
-        [[-math.pi, 12.275], [math.pi, 2.275], [9.42478, 2.475]], tf.float64
-    )
+    print("initial_query_points", initial_query_points, type(initial_query_points))
 
     obs_class = SingleObjectiveTestProblem(
         name="adcirc35k",
         search_space=search_space,
-        objective=observer,
-        minimizers=(_ORIGINAL_BRANIN_MINIMIZERS + [5.0, 0.0]) / 15.0,
+        objective=init_observer,
+        minimizers=tf.constant(
+            [[0.114614, 0.555649, 0.852547]], tf.float64
+        ),  # what does the minimizer do?
         minimum=tf.constant([-10], tf.float64),
     )
 
@@ -164,6 +191,7 @@ def run_bayesopt_exp(
     print("observer", observer, type(obs_class))
 
     initial_data = observer(initial_query_points)
+    print("initial_data", initial_data, type(initial_data))
     gpr = trieste.models.gpflow.build_gpr(initial_data, search_space)
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
     acquisition_rule = EfficientGlobalOptimization(MinValueEntropySearch(search_space))
@@ -173,7 +201,7 @@ def run_bayesopt_exp(
         initial_data,
         model,
         acquisition_rule,
-        track_state=False,
+        track_state=False,  # there was some issue with this on mac
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
     # print("result", result)
@@ -202,9 +230,9 @@ if __name__ == "__main__":
     # python -m adbo.exp
     # python -m adbo.exp &> logs/exp.log
     # run_bayesopt_exp(seed=14, exp_name="bo_test10", init_steps=5, daf_steps=50)
-    # python -m adbo.exp &> logs/test13.log
+    # python -m adbo.exp &> logs/test15.log
     # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
     # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
     run_bayesopt_exp(
-        seed=15, exp_name="test13", init_steps=10, daf_steps=50, wrap_test=True
+        seed=15, exp_name="test15", init_steps=1, daf_steps=50, wrap_test=True
     )
