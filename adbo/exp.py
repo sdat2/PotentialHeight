@@ -14,10 +14,9 @@ from trieste.acquisition import (
     # ExpectedImprovement,
     MinValueEntropySearch,
 )
-from trieste.data import Dataset
-from trieste.objectives import SingleObjectiveTestProblem, ObjectiveTestProblem
+from trieste.objectives import SingleObjectiveTestProblem
 from trieste.acquisition.rule import EfficientGlobalOptimization
-from trieste.experimental.plotting.plotting import plot_bo_points, plot_function_2d
+from trieste.experimental.plotting.plotting import plot_bo_points
 from trieste.objectives.single_objectives import check_objective_shapes
 
 end_tf_import = time.time()
@@ -62,13 +61,13 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 
 
 @timeit
-def observer_f(
+def objective_f(
     config: dict, exp_name: str = "bo_test", stationid: int = 3, wrap_test: bool = False
 ) -> Callable[[tf.Tensor], tf.Tensor]:
     """
     Return a wrapper function for the ADCIRC model that is compatible with being used as an observer in trieste after processing.
 
-    At each observer function call the model is run and the result is returned and saved.
+    At each objective function call the model is run and the result is returned and saved.
 
     Args:
         config (dict): _description_
@@ -102,7 +101,7 @@ def observer_f(
         write_json(output, os.path.join(exp_dir, "experiments.json"))
 
     @check_objective_shapes(d=3)
-    def obs(x: tf.Tensor) -> tf.Tensor:
+    def obj(x: tf.Tensor) -> tf.Tensor:
         """
         Run the ADCIRC model and return the result.
 
@@ -143,7 +142,7 @@ def observer_f(
         # run the model
         # return the result
 
-    return obs
+    return obj
 
 
 @timeit
@@ -174,7 +173,7 @@ def run_bayesopt_exp(
     # set up BayesOpt
     search_space = trieste.space.Box([0, 0, 0], [1, 1, 1])
     initial_query_points = search_space.sample_sobol(init_steps)
-    init_objective = observer_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
+    init_objective = objective_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
 
     print("initial_query_points", initial_query_points, type(initial_query_points))
 
@@ -219,12 +218,15 @@ def run_bayesopt_exp(
         query_points,
         ax[0, 0],
         5,
+        m_init="o",
         m_add="+",  # obs_values=observations
     )  # , arg_min_idx)
-    plt.scatter(query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis")
+    ax[0, 0].scatter(
+        query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis"
+    )
     ax[0, 0].set_xlabel(r"$x_1$ [dimensionless]")
     ax[0, 0].set_ylabel(r"$x_2$ [dimensionless]")
-    plt.savefig(os.path.join("img", "bo_test5_mves.png"))
+    plt.savefig(os.path.join("img", exp_name + "_mves.png"))
 
 
 if __name__ == "__main__":
@@ -240,7 +242,6 @@ if __name__ == "__main__":
     # run_bayesopt_exp(
     #    seed=15, exp_name="test15", init_steps=5, daf_steps=50, wrap_test=True
     # )
-    run_bayesopt_exp(
-        seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50, wrap_test=False
-    )
-    #  python -m adbo.exp &> logs/bo_test16.log
+    # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
+    #  python -m adbo.exp &> logs/bo_test17.log
+    run_bayesopt_exp(seed=18, exp_name="bo_test18", init_steps=5, daf_steps=100)

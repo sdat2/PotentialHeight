@@ -30,3 +30,20 @@ pip install -e .
 ```bash
 python -m adbo.exp &> logs/bo_test3.txt
 ```
+
+## Extension priorities
+
+ - BayesOpt animations/graphs.
+ - Get Chavas et al. 2015 profile to work in python rather than just Matlab (~x100 speed up).
+ - CMIP6 processing for potential size and intensity.
+ - Scipy distribution fitting for CMIP6.
+ - Better tidal gauges.
+ - BayesOpt for different places along the coast.
+ - 430k node mesh.
+
+ # SurgeNet
+
+ - Calculate dual graph as in Benteviglio et al. 2024. SWE-GNN
+ - Consider NeuralODE to fix the smoothing problem of deep GNN.
+ - Would diffusion/GANs also help?
+ - How to include the dynamic features and tides?
