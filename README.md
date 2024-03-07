@@ -1,11 +1,13 @@
 # WorstSurge repository
 
-
 ## adforce
 ADCIRC forcing and processing.
 
-# adbo
-Bayesian optimisation.
+## adbo
+Bayesian optimisation using adforce.
+
+## chavas15
+Chavas et al. 2015 profile.
 
 ## tcpips
 Tropical Cyclone Potential Intensity (PI) and Potential Size (PS) Calculations
