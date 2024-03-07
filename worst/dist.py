@@ -54,3 +54,14 @@ def genpareto_given_max_gen(rv_continuous):
 
 
 genpareto_given_max = genpareto_given_max_gen(name="genpareto_given_max")
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    x = np.linspace(0, 1, 100)
+    c = 0.5
+    plt.plot(x, genextreme_given_max.pdf(x, c), label="genextreme_given_max")
+    plt.plot(x, genpareto_given_max.pdf(x, c), label="genpareto_given_max")
+    plt.legend()
+    plt.show()
