@@ -1,16 +1,18 @@
 # WorstSurge repository
 
 ## adforce
-ADCIRC forcing and processing.
+ADCIRC forcing and processing. Some generic mesh processing.
 
 ## adbo
-Bayesian optimisation using adforce.
+Bayesian optimization using `adforce` to force adcirc with a `trieste` Bayesian optimization loop.
 
 ## chavas15
-Chavas et al. 2015 profile.
+Chavas et al. 2015 profile. (Currently not working properly)
 
 ## tcpips
-Tropical Cyclone Potential Intensity (PI) and Potential Size (PS) Calculations
+Tropical Cyclone Potential Intensity (PI) and Potential Size (PS) Calculations.
+Includes pangeo script to download and process data from CMIP6 for calculations.
+Uses 
 
 ## worst
 Statistical worst-case GEV/GPD fit.
@@ -47,11 +49,11 @@ python -m adbo.exp &> logs/bo_test3.txt
  - Get Chavas et al. 2015 profile to work in python rather than just Matlab (~x100 speed up).
  - CMIP6 processing for potential size and intensity.
  - Scipy distribution fitting for CMIP6.
- - Better tidal gauges.
+ - Better tidal gauge comparisons for different events.
  - BayesOpt for different places along the coast.
- - 430k node mesh.
+ - Get 430k node mesh working.
 
- # SurgeNet
+## SurgeNet exploration
 
  - Calculate dual graph as in Benteviglio et al. 2024. SWE-GNN
  - Consider NeuralODE to fix the smoothing problem of deep GNN.
