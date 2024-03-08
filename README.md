@@ -15,6 +15,7 @@ Includes pangeo script to download and process data from CMIP6 for calculations.
 Uses 
 
 ## worst
+
 Statistical worst-case GEV/GPD fit.
 
 
@@ -46,6 +47,8 @@ python -m adbo.exp &> logs/bo_test3.txt
 ## Extension priorities
 
  - BayesOpt animations/graphs.
+    - Impact animation.
+    - GP convergence animation (2D).
  - Get Chavas et al. 2015 profile to work in python rather than just Matlab (~x100 speed up).
  - CMIP6 processing for potential size and intensity.
  - Scipy distribution fitting for CMIP6.

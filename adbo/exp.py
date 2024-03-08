@@ -20,7 +20,7 @@ from trieste.experimental.plotting.plotting import plot_bo_points
 from trieste.objectives.single_objectives import check_objective_shapes
 
 end_tf_import = time.time()
-print("tf import time", end_tf_import - start_tf_import)
+print("tf import time", end_tf_import - start_tf_import)  # takes about 270 seconds
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
@@ -31,7 +31,7 @@ from .rescale import rescale_inverse
 
 plot_defaults()
 
-ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
+ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path
 
 
 @timeit
@@ -69,8 +69,10 @@ def objective_f(
 
     At each objective function call the model is run and the result is returned and saved.
 
+    TODO: add wandb logging option.
+
     Args:
-        config (dict): _description_
+        config (dict): Dictionary with the constraints for the model.
         exp_name (str, optional): Name for folder. Defaults to "bo_test".
         stationid (int, optional): Which coast tidal gauge to sample near. Defaults to 3.
         wrap_test (bool, optional): If True, do not run the ADCIRC model. Defaults to False.
@@ -84,6 +86,7 @@ def objective_f(
     call_number = -1
     output = {}
     select_point = select_point_f(stationid)
+    dimension_inputs = len(config["order"])
 
     def temp_dir() -> str:
         nonlocal exp_dir
@@ -100,7 +103,7 @@ def objective_f(
         }
         write_json(output, os.path.join(exp_dir, "experiments.json"))
 
-    @check_objective_shapes(d=3)
+    @check_objective_shapes(d=dimension_inputs)
     def obj(x: tf.Tensor) -> tf.Tensor:
         """
         Run the ADCIRC model and return the result.
@@ -109,7 +112,7 @@ def objective_f(
             x (tf.Tensor): Possibly a batch of scaled queries.
 
         Returns:
-            tf.Tensor: The negative of the result of the ADCIRC model.
+            tf.Tensor: The negative of the result of the ADCIRC model at the selected point.
         """
         nonlocal call_number, select_point
         # put in real space
@@ -122,8 +125,9 @@ def objective_f(
                 name: float(real_queries[i][j])
                 for j, name in enumerate(config["order"])
             }
-            inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
-            del inputs["displacement"]
+            if "displacement" in inputs:
+                inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
+                del inputs["displacement"]
             if wrap_test:
                 real_result = min(7 + np.random.normal(), 10)
             else:
@@ -145,8 +149,26 @@ def objective_f(
     return obj
 
 
+DEFAULT_CONSTRAINTS = {
+    "angle": {"min": -80, "max": 80, "units": "degrees"},
+    "trans_speed": {"min": 0, "max": 15, "units": "m/s"},
+    "displacement": {"min": -2, "max": 2, "units": "degrees"},
+    "order": ("angle", "trans_speed", "displacement"),  # order of input features
+}
+
+
+@timeit
+def gp_model_out(datasets, gp_models, state) -> bool:
+    # use the early_stop_callback to save the GP at each step
+    print("gp_model_out", gp_models)
+    for i, model in enumerate(gp_models):
+        model.save(os.path.join(f"gp_model_{i}.h5"))
+    return True
+
+
 @timeit
 def run_bayesopt_exp(
+    constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
     exp_name: str = "bo_test",
     init_steps: int = 10,
@@ -164,33 +186,30 @@ def run_bayesopt_exp(
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
     setup_tf(seed=seed, log_name=exp_name)
-    constraints_d = {
-        "angle": {"min": -80, "max": 80, "units": "degrees"},
-        "trans_speed": {"min": 0, "max": 15, "units": "m/s"},
-        "displacement": {"min": -2, "max": 2, "units": "degrees"},
-        "order": ("angle", "trans_speed", "displacement"),
-    }
+
     # set up BayesOpt
     search_space = trieste.space.Box([0, 0, 0], [1, 1, 1])
     initial_query_points = search_space.sample_sobol(init_steps)
-    init_objective = objective_f(constraints_d, exp_name=exp_name, wrap_test=wrap_test)
-
     print("initial_query_points", initial_query_points, type(initial_query_points))
+    init_objective = objective_f(constraints, exp_name=exp_name, wrap_test=wrap_test)
+    put_through_sotp = False
 
-    obs_class = SingleObjectiveTestProblem(
-        name="adcirc35k",
-        search_space=search_space,
-        objective=init_objective,
-        minimizers=tf.constant(
-            [[0.114614, 0.555649, 0.852547]], tf.float64
-        ),  # what does the minimizer do?
-        minimum=tf.constant([-10], tf.float64),
-    )
-
-    # observer = trieste.objectives.utils.mk_observer(obs_class.objective)
-    observer = trieste.objectives.utils.mk_observer(init_objective)
-    print("observer", observer, type(obs_class))
-
+    if put_through_sotp:
+        obs_class = SingleObjectiveTestProblem(
+            name="adcirc35k",
+            search_space=search_space,
+            objective=init_objective,
+            minimizers=tf.constant(
+                [[0.114614, 0.555649, 0.852547]], tf.float64
+            ),  # what does the minimizer do?
+            minimum=tf.constant([-10], tf.float64),
+        )
+        print("obs_class", obs_class, type(obs_class))
+        observer = trieste.objectives.utils.mk_observer(obs_class.objective)
+    else:
+        # observer = trieste.objectives.utils.mk_observer(obs_class.objective)
+        observer = trieste.objectives.utils.mk_observer(init_objective)
+    print("observer", observer, type(observer))
     initial_data = observer(initial_query_points)
     print("initial_data", initial_data, type(initial_data))
     gpr = trieste.models.gpflow.build_gpr(initial_data, search_space)
@@ -202,7 +221,8 @@ def run_bayesopt_exp(
         initial_data,
         model,
         acquisition_rule,
-        track_state=False,  # there was some issue with this on mac
+        track_state=True,  # there was some issue with this on mac
+        early_stop_callback=gp_model_out,
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
     # print("result", result)
@@ -239,9 +259,20 @@ if __name__ == "__main__":
     # python -m adbo.exp &> logs/test15.log
     # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
     # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
-    # run_bayesopt_exp(
-    #    seed=15, exp_name="test15", init_steps=5, daf_steps=50, wrap_test=True
-    # )
+    constraints_2d = {
+        "angle": {"min": -80, "max": 80, "units": "degrees"},
+        "displacement": {"min": -2, "max": 2, "units": "degrees"},
+        "order": ("angle", "displacement"),  # order of input features
+    }
+    run_bayesopt_exp(
+        seed=15,
+        constraints=constraints_2d,
+        exp_name="test21",
+        init_steps=5,
+        daf_steps=50,
+        wrap_test=True,
+    )
+    # python -m adbo.exp &> logs/test21.log
     # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
     #  python -m adbo.exp &> logs/bo_test17.log
-    run_bayesopt_exp(seed=18, exp_name="bo_test18", init_steps=5, daf_steps=100)
+    # run_bayesopt_exp(seed=18, exp_name="bo_test18", init_steps=5, daf_steps=100)
