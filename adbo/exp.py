@@ -87,6 +87,7 @@ def objective_f(
     output = {}
     select_point = select_point_f(stationid)
     dimension_inputs = len(config["order"])
+    print("dimension_inputs", dimension_inputs)
 
     def temp_dir() -> str:
         nonlocal exp_dir
@@ -158,12 +159,14 @@ DEFAULT_CONSTRAINTS = {
 
 
 @timeit
-def gp_model_out(datasets, gp_models, state) -> bool:
+def gp_model_out_callback(datasets, gp_models, state) -> bool:
     # use the early_stop_callback to save the GP at each step
-    print("gp_model_out", gp_models)
+    print("gp_model_out_callback", gp_models)
     for i, model in enumerate(gp_models):
-        model.save(os.path.join(f"gp_model_{i}.h5"))
-    return True
+        print(i, model, type(model))
+        print(i, gp_models[model], type(gp_models[model]))
+    #  model.save(os.path.join(f"gp_model_{i}.h5"))
+    return False
 
 
 @timeit
@@ -188,7 +191,8 @@ def run_bayesopt_exp(
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
-    search_space = trieste.space.Box([0, 0, 0], [1, 1, 1])
+    dimensions_input = len(constraints["order"])
+    search_space = trieste.space.Box([0] * dimensions_input, [1] * dimensions_input)
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
     init_objective = objective_f(constraints, exp_name=exp_name, wrap_test=wrap_test)
@@ -222,7 +226,7 @@ def run_bayesopt_exp(
         model,
         acquisition_rule,
         track_state=True,  # there was some issue with this on mac
-        early_stop_callback=gp_model_out,
+        early_stop_callback=gp_model_out_callback,
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
     # print("result", result)
