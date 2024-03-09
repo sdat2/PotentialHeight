@@ -9,6 +9,7 @@ import time
 start_tf_import = time.time()
 import tensorflow as tf
 import tensorflow_probability as tfp
+import gpflow
 import trieste
 from trieste.acquisition import (
     # ExpectedImprovement,
@@ -37,7 +38,7 @@ ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path
 @timeit
 def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
     """
-    Set up the tensorflow environment.
+    Set up the tensorflow environment by seeding and setting up logging/tensorboard.
 
     Args:
         seed (int, optional): Random seed for numpy/tensorflow. Defaults to 1793.
@@ -90,6 +91,12 @@ def objective_f(
     print("dimension_inputs", dimension_inputs)
 
     def temp_dir() -> str:
+        """
+        Return a temporary directory for the current experiment.
+
+        Returns:
+            str: Temporary directory based on the call number.
+        """
         nonlocal exp_dir
         tmp_dir = os.path.join(exp_dir, f"exp_{call_number:04}")
         os.makedirs(tmp_dir, exist_ok=True)
@@ -158,15 +165,57 @@ DEFAULT_CONSTRAINTS = {
 }
 
 
-@timeit
-def gp_model_out_callback(datasets, gp_models, state) -> bool:
-    # use the early_stop_callback to save the GP at each step
-    print("gp_model_out_callback", gp_models)
-    for i, model in enumerate(gp_models):
-        print(i, model, type(model))
-        print(i, gp_models[model], type(gp_models[model]))
-    #  model.save(os.path.join(f"gp_model_{i}.h5"))
-    return False
+def gp_model_callback_maker(
+    dir: str, dimension: int = 2
+) -> Callable[[any, any, any], bool]:
+    """
+    Return a callback function that saves the GP model at each step.
+
+    Args:
+        dir (str): Directory to save the models.
+        dimension (int, optional): Number of input dimensions. Defaults to 2.
+
+    Returns:
+        Callable[[any, any, any], bool]: Callback function for early_stop_callback.
+    """
+    # https://github.com/secondmind-labs/trieste/blob/develop/trieste/models/gpflow/models.py
+    os.makedirs(dir, exist_ok=True)
+    # saver = gpflow.saver.Saver()
+    call: int = 0
+
+    @timeit
+    def gp_model_callback(datasets, gp_models, state) -> bool:
+        """
+        Save the GP model at each step.
+
+        Args:
+            datasets (any): The datasets.
+            gp_models (any): The GP models.
+            state (any): The state.
+
+        Returns:
+            bool: Whether to stop the optimization.
+        """
+        # could either save the whole model or just the predictions at particular points.
+        nonlocal call
+        call += 1  # increment the call number
+
+        print("dimension", dimension)
+        print("datasets", datasets)
+        print("state", state)
+        # use the early_stop_callback to save the GP at each step
+        print("gp_model_out_callback", gp_models)
+        for i, model in enumerate(gp_models):
+            print(i, model, type(model))
+            print(i, gp_models[model], type(gp_models[model]))
+            print(
+                "gp_models[model].model", gp_models[model].model
+            )  # .save(f"gp_model_{i}.h5")
+            #  model.save(os.path.join(f"gp_model_{i}.h5"))
+            # saver.save(os.path.join(dir, f"gp_model_{call}"), model)
+        return False  # False means don't stop
+
+    return gp_model_callback
 
 
 @timeit
@@ -182,6 +231,7 @@ def run_bayesopt_exp(
     Run a Bayesian Optimisation experiment.
 
     Args:
+        constraints (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
         seed (int, optional): Seed to initialize. Defaults to 10.
         exp_name (str, optional): Experiment name. Defaults to "bo_test".
         init_steps (int, optional): How many sobol sambles. Defaults to 10.
@@ -226,7 +276,9 @@ def run_bayesopt_exp(
         model,
         acquisition_rule,
         track_state=True,  # there was some issue with this on mac
-        early_stop_callback=gp_model_out_callback,
+        early_stop_callback=gp_model_callback_maker(
+            exp_name, dimension=dimensions_input
+        ),
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
     # print("result", result)
@@ -271,12 +323,12 @@ if __name__ == "__main__":
     run_bayesopt_exp(
         seed=15,
         constraints=constraints_2d,
-        exp_name="test21",
+        exp_name="test32",
         init_steps=5,
         daf_steps=50,
         wrap_test=True,
     )
-    # python -m adbo.exp &> logs/test21.log
+    # python -m adbo.exp &> logs/test32.log
     # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
     #  python -m adbo.exp &> logs/bo_test17.log
     # run_bayesopt_exp(seed=18, exp_name="bo_test18", init_steps=5, daf_steps=100)
