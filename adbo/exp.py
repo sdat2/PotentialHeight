@@ -197,7 +197,7 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call
+        nonlocal call, dir
         call += 1  # increment the call number
 
         print("dimension", dimension)
@@ -211,6 +211,9 @@ def gp_model_callback_maker(
             print(
                 "gp_models[model].model", gp_models[model].model
             )  # .save(f"gp_model_{i}.h5")
+            ckpt = tf.train.Checkpoint(model=gp_models[model].model)
+            manager = tf.train.CheckpointManager(ckpt, dir, max_to_keep=100)
+            manager.save()
             #  model.save(os.path.join(f"gp_model_{i}.h5"))
             # saver.save(os.path.join(dir, f"gp_model_{call}"), model)
         return False  # False means don't stop
