@@ -8,6 +8,7 @@ However this is a general feature, so perhaps a grid script would be useful.
 """
 
 import os
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -15,8 +16,10 @@ import xarray as xr
 from src.constants import NO_BBOX, NEW_ORLEANS
 from sithom.time import timeit
 from sithom.place import BoundingBox, Point
+from sithom.xr import plot_units
 from sithom.plot import label_subplots, plot_defaults
 from .mesh import select_coast, filter_mesh, select_nearby, bbox_mesh
+from .fort22 import read_fort22
 
 
 @timeit
@@ -216,3 +219,77 @@ if __name__ == "__main__":
         plt.savefig(os.path.join(figure_dir, f"station_{station}.png"))
         plt.clf()
         plt.close()
+
+
+plot_defaults()
+
+
+def plot_quiver_height(
+    path_in: str = "mult1", time_i: int = 160, x_pos: float = 0.95, y_pos: float = -0.15
+) -> None:
+    """
+    Plot quiver height.
+
+    Args:
+        path_in (str, optional): name of data folder. Defaults to "mult1".
+        time_i (int, optional): time_i. Defaults to 185.
+        x_pos (float, optional): x_pos. Defaults to 0.95.
+        y_pos (float, optional): y_pos. Defaults to -0.15.
+    """
+    # path_in = os.path.join(DATA_PATH, path_in)
+    ds = bbox_mesh(
+        os.path.join(path_in, "fort.63.nc"), bbox=NO_BBOX.pad(0.3), use_dask=True
+    )
+    print(ds)
+    vmin, vmax = ds.zeta.min().values, ds.zeta.max().values
+    vmin, vmax = np.min([-vmax, vmin]), np.max([-vmin, vmax])
+    print(vmin, vmax)
+    levels = np.linspace(vmin, vmax, num=400)
+    cbar_levels = np.linspace(vmin, vmax, num=5)
+    plt.tricontourf(
+        ds.x.values,
+        ds.y.values,
+        ds.element.values - 1,
+        np.nan_to_num(ds.zeta.isel(time=time_i).values, copy=False, nan=0),
+        vmin=vmin,
+        vmax=vmax,
+        levels=levels,
+        cmap="cmo.balance",
+    )
+    ax = plt.gca()
+    cbar = plt.colorbar(label="Height [m]")
+    cbar.set_ticks(cbar_levels)
+    cbar.set_ticklabels(["{:.2f}".format(x) for x in cbar_levels.tolist()])
+    plt.xlabel("Longitude [$^{\circ}$E]")
+    plt.ylabel("Latitude [$^{\circ}$N]")
+    time = ds.isel(time=time_i).time.values
+    ts = pd.to_datetime(str(time))
+    print(ts)
+    # plt.savefig(os.path.join(output_path, str(time_i) + ".png"))
+    # plt.clf()
+    ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["Main"].to_dataset()
+    print(ds)
+    quiver = plot_units(
+        ds.sel(time=time, method="nearest"), x_dim="lon", y_dim="lat"
+    ).plot.quiver(
+        ax=ax,
+        x="lon",
+        y="lat",
+        u="U10",
+        v="V10",
+        add_guide=False,
+    )
+    _ = plt.quiverkey(
+        quiver,
+        x_pos,
+        y_pos,
+        40,
+        str(r"$40$ m s$^{-1}$"),  # + "\n"
+        labelpos="E",
+        coordinates="axes",
+        # coordinates="figure"
+    )
+    NO_BBOX.ax_lim(plt.gca())
+    plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
+    # plt.savefig(os.path.join(FIGURE_PATH, "example_colision.png"))
+    # plt.clf()

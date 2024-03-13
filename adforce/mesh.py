@@ -14,7 +14,7 @@ from src.constants import NO_BBOX
 
 
 @timeit
-def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
+def xr_loader(file_path: str, verbose: bool = False, use_dask=False) -> xr.Dataset:
     """
     Load an xarray dataset from a ADCIRC netCDF4 file.
 
@@ -23,6 +23,7 @@ def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
     Args:
         file_path (str): Path to netCDF4 file.
         verbose (bool, optional): Whether to print. Defaults to False.
+        use_dask (bool, optional): Whether to use dask. Defaults to False.
 
     Returns:
         xr.Dataset: loaded xarray dataset (lazy).
@@ -35,7 +36,10 @@ def xr_loader(file_path: str, verbose: bool = False) -> xr.Dataset:
                 print("removing", ds_nc.variables[var])
             del ds_nc.variables[var]
     # pass to xarray
-    return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc))
+    if use_dask:
+        return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc), chunks={"time": 1})
+    else:
+        return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc))
 
 
 @timeit
@@ -64,9 +68,9 @@ def calculate_adjacency_matrix(
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
     if not sparse:
         adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
-        adjacency_matrix[
-            rows, cols
-        ] = True  # "smart indexing" in numpy is very fast and efficient
+        adjacency_matrix[rows, cols] = (
+            True  # "smart indexing" in numpy is very fast and efficient
+        )
     else:
         adjacency_matrix = csr_matrix(
             (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool
@@ -169,7 +173,7 @@ def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
 
 @timeit
 def bbox_mesh(
-    file_path: str = "../data/fort.63.nc", bbox: BoundingBox = NO_BBOX
+    file_path: str = "../data/fort.63.nc", bbox: BoundingBox = NO_BBOX, use_dask=True
 ) -> xr.Dataset:
     """
     Load an adcirc output file and filter it to a bounding box.
@@ -181,7 +185,8 @@ def bbox_mesh(
     Returns:
         xr.Dataset: Filtered xarray dataset.
     """
-    adc_ds = xr_loader(file_path)  # load file as xarray dataset
+
+    adc_ds = xr_loader(file_path, use_dask=use_dask)  # load file as xarray dataset
     xs = adc_ds.x.values  # longitudes (1d numpy array)
     ys = adc_ds.y.values  # latitudes (1d numpy array)
     ys_in = (bbox.lat[0] < ys) & (ys < bbox.lat[1])
