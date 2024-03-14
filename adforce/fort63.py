@@ -22,6 +22,9 @@ from .mesh import select_coast, filter_mesh, select_nearby, bbox_mesh
 from .fort22 import read_fort22
 
 
+plot_defaults()
+
+
 @timeit
 def plot_nearby(
     data_folder: str = "../../NWS13set4/",
@@ -219,9 +222,6 @@ if __name__ == "__main__":
         plt.savefig(os.path.join(figure_dir, f"station_{station}.png"))
         plt.clf()
         plt.close()
-
-
-plot_defaults()
 
 
 def plot_quiver_height(

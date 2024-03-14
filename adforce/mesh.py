@@ -5,7 +5,8 @@ This is the shared functionality for processing ADCIRC meshes.
 
 from typing import Union, Tuple
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix
+import matplotlib.pyplot as plt
 import netCDF4 as nc
 import xarray as xr
 from sithom.time import timeit
@@ -81,7 +82,7 @@ def calculate_adjacency_matrix(
 
 @timeit
 def select_coast(
-    mesh_ds: xr.Dataset, overtopping: bool = False
+    mesh_ds: xr.Dataset, overtopping: bool = False, keep_sparse=False
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Select the coastal nodes.
@@ -118,7 +119,10 @@ def select_coast(
         land = depths < 0  # boolean land vector length N
         # coast = np.any(adj[land], axis=0) & ~land # probably the same as
         coast = adj.dot(land) & ~land  # , which is more efficient?
-        return np.where(coast)[0], adj[coast, :][:, coast].todense()
+        if keep_sparse:
+            return np.where(coast)[0], adj[coast, :][:, coast]
+        else:
+            return np.where(coast)[0], adj[coast, :][:, coast].todense()
 
 
 @timeit
@@ -260,6 +264,39 @@ def select_nearby(
 
     # indices = indices[np.in1d(indices, edge_vertices)]
     return coast_mesh_ds.isel(node=indices)
+
+
+def plot_contour(
+    ax,
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    adj_matrix: Union[np.ndarray, csr_matrix],
+):
+    if isinstance(adj_matrix, csr_matrix):
+        adj_coo = coo_matrix(adj_matrix)
+        for i, j, _ in zip(adj_coo.row, adj_coo.col, adj_coo.data):
+            ax.plot(
+                [x_values[i], x_values[j]],
+                [y_values[i], y_values[j]],
+                "k-",
+                linewidth=0.5,
+            )  # Plot each edge with a thin line
+    else:
+        for i in range(len(adj_matrix)):
+            for j in range(len(adj_matrix)):
+                if adj_matrix[i, j]:
+                    ax.plot(
+                        [x_values[i], x_values[j]],
+                        [y_values[i], y_values[j]],
+                        "k-",
+                        linewidth=0.5,
+                    )
+
+    # Optionally, plot the nodes with very small size if needed
+    ax.scatter(x_values, y_values, s=0.1, color="blue")  # Very small node size
+
+    # Adjust the plot
+    ax.set_aspect("equal")
 
 
 if __name__ == "__main__":
