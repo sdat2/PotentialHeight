@@ -17,7 +17,7 @@ from trieste.acquisition import (
 )
 from trieste.objectives import SingleObjectiveTestProblem
 from trieste.acquisition.rule import EfficientGlobalOptimization
-from trieste.experimental.plotting.plotting import plot_bo_points
+from trieste.experimental.plotting.plotting import plot_bo_points, plot_regret
 from trieste.objectives.single_objectives import check_objective_shapes
 
 end_tf_import = time.time()
@@ -157,7 +157,7 @@ def objective_f(
     return obj
 
 
-DEFAULT_CONSTRAINTS = {
+DEFAULT_CONSTRAINTS: dict = {
     "angle": {"min": -80, "max": 80, "units": "degrees"},
     "trans_speed": {"min": 0, "max": 15, "units": "m/s"},
     "displacement": {"min": -2, "max": 2, "units": "degrees"},
@@ -214,8 +214,31 @@ def gp_model_callback_maker(
             ckpt = tf.train.Checkpoint(model=gp_models[model].model)
             manager = tf.train.CheckpointManager(ckpt, dir, max_to_keep=100)
             manager.save()
+            plt.show()
+            plt.clf()
+            plt.close()
+
+            fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+            n = 100
+            x1 = np.linspace(0, 1, num=n)
+            x2 = np.linspace(0, 1, num=n)
+            X1, X2 = np.meshgrid(x1, x2)
+            X = np.column_stack([X1.flatten(), X2.flatten()])
+            Y, Yvar = gp_models[model].predict_y(X)
+            Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
+            axs[0].contourf(X1, X2, Y, levels=1000)
+            # axs[0].colorbar()
+            axs[0].set_title("Mean")
+            axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
+            # axs[1].colorbar()
+            axs[1].set_title("Std. Dev. $\sigma$")
+            plt.show()
+            plt.clf()
+            plt.close()
+
             #  model.save(os.path.join(f"gp_model_{i}.h5"))
             # saver.save(os.path.join(dir, f"gp_model_{call}"), model)
+
         return False  # False means don't stop
 
     return gp_model_callback
@@ -292,20 +315,35 @@ def run_bayesopt_exp(
     observations = dataset.observations.numpy()
 
     # plot the results
-    _, ax = plt.subplots(2, 2, figsize=(10, 10))
+    _, ax = plt.subplots(1, 1, figsize=(10, 10))
     plot_bo_points(
         query_points,
-        ax[0, 0],
+        ax,
         5,
         m_init="o",
         m_add="+",  # obs_values=observations
     )  # , arg_min_idx)
-    ax[0, 0].scatter(
-        query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis"
-    )
-    ax[0, 0].set_xlabel(r"$x_1$ [dimensionless]")
-    ax[0, 0].set_ylabel(r"$x_2$ [dimensionless]")
+    ax.scatter(query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis")
+    ax.set_xlabel(r"$x_1$ [dimensionless]")
+    ax.set_ylabel(r"$x_2$ [dimensionless]")
     plt.savefig(os.path.join("img", exp_name + "_mves.png"))
+    plt.show()
+    plt.clf()
+    plt.close()
+
+    _, ax = plt.subplots(1, 1, figsize=(10, 10))
+    plot_regret(
+        query_points,
+        ax,
+        num_init=5,
+        show_obs=True,
+    )
+    ax.set_xlabel("Iteration")
+    ax.set_ylabel("Regret")
+    plt.savefig(os.path.join("img", exp_name + "_regret.png"))
+    plt.show()
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
