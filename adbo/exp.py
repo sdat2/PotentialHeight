@@ -167,7 +167,7 @@ DEFAULT_CONSTRAINTS: dict = {
 
 
 def gp_model_callback_maker(
-    direc: str, dimension: int = 2
+    direc: str, dimension: int = 2, config: dict = DEFAULT_CONSTRAINTS
 ) -> Callable[[any, any, any], bool]:
     """
     Return a callback function that saves the GP model at each step.
@@ -184,13 +184,18 @@ def gp_model_callback_maker(
     # saver = gpflow.saver.Saver()
     call: int = 0
 
-    n = 100
-    x1 = np.linspace(0, 1, num=n)
-    x2 = np.linspace(0, 1, num=n)
-    X1, X2 = np.meshgrid(x1, x2)
-    X = np.column_stack([X1.flatten(), X2.flatten()])
-    ypred_list = []
-    yvar_list = []
+    if len(config["order"]) == 2:
+        n = 100
+        x1 = np.linspace(0, 1, num=n)
+        x2 = np.linspace(0, 1, num=n)
+
+        x_r = rescale_inverse(np.column_stack([x1, x2]), config=config)
+        x1_r, x2_r = x_r[:, 0], x_r[:, 1]
+
+        X1, X2 = np.meshgrid(x1, x2)
+        X = np.column_stack([X1.flatten(), X2.flatten()])
+        ypred_list = []
+        yvar_list = []
 
     @timeit
     def gp_model_callback(datasets, gp_models, state) -> bool:
@@ -206,7 +211,7 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, yvar_list
+        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, yvar_list, config
         call += 1  # increment the call number
 
         print("dimension", dimension)
@@ -226,45 +231,53 @@ def gp_model_callback_maker(
             # plt.show()
             plt.clf()
             plt.close()
+            if len(config["order"]) == 2:
+                fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+                Y, Yvar = gp_models[model].predict_y(X)
+                Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
+                ypred_list.append(Y)
+                yvar_list.append(Yvar)
+                print("np.array(ypred_list))", np.array(ypred_list).shape)
+                print("np.array(yvar_list))", np.array(yvar_list).shape)
+                print(
+                    "np.array([x + 1 for x in range(call)]))",
+                    [x + 1 for x in range(len(ypred_list))],
+                )
+                xr.Dataset(
+                    data_vars={
+                        "ypred": (("call", "x1", "x2"), np.array(ypred_list)),
+                        "yvar": (("call", "x1", "x2"), np.array(yvar_list)),
+                    },
+                    coords={
+                        "x1": (
+                            ("x1"),
+                            x1_r,
+                            {"units": config[config["order"][0]]["units"]},
+                        ),
+                        "x2": (
+                            ("x2"),
+                            x2_r,
+                            {"units": config[config["order"][1]]["units"]},
+                        ),
+                        "call": [x + 1 for x in range(len(ypred_list))],
+                    },
+                ).to_netcdf(os.path.join(direc, f"gp_model_outputs.nc"))
 
-            fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-            Y, Yvar = gp_models[model].predict_y(X)
-            Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
-            ypred_list.append(Y)
-            yvar_list.append(Yvar)
-            print("np.array(ypred_list))", np.array(ypred_list).shape)
-            print("np.array(yvar_list))", np.array(yvar_list).shape)
-            print(
-                "np.array([x + 1 for x in range(call)]))",
-                [x + 1 for x in range(len(ypred_list))],
-            )
-            xr.Dataset(
-                data_vars={
-                    "ypred": (("call", "x1", "x2"), np.array(ypred_list)),
-                    "yvar": (("call", "x1", "x2"), np.array(yvar_list)),
-                },
-                coords={
-                    "x1": x1,
-                    "x2": x2,
-                    "call": [x + 1 for x in range(len(ypred_list))],
-                },
-            ).to_netcdf(os.path.join(direc, f"gp_model_{call}.nc"))
-
-            im = axs[0].contourf(X1, X2, Y, levels=1000)
-            # add colorbar to the plot with the right scale and the same size as the plot
-            fig.colorbar(im, ax=axs[0], fraction=0.046, pad=0.04)
-            # axs[0].colorbar()
-            axs[0].set_title("Mean")
-            im = axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
-            fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.04)
-            # axs[1].colorbar()
-            axs[1].set_title("Std. Dev., $\sigma$")
-            axs[0].set_xlabel("x$_1$")
-            axs[0].set_ylabel("x$_2$")
-            axs[1].set_xlabel("x$_1$")
-            # plt.show()
-            plt.clf()
-            plt.close()
+                im = axs[0].contourf(X1, X2, Y, levels=1000)
+                # add colorbar to the plot with the right scale and the same size as the plot
+                fig.colorbar(im, ax=axs[0], fraction=0.046, pad=0.04)
+                # axs[0].colorbar()
+                axs[0].set_title("Mean")
+                im = axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
+                fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.04)
+                # axs[1].colorbar()
+                axs[1].set_title("Std. Dev., $\sigma$")
+                axs[0].set_xlabel("x$_1$")
+                axs[0].set_ylabel("x$_2$")
+                axs[1].set_xlabel("x$_1$")
+                # plt.show()
+                plt.clf()
+                plt.close()
             #  model.save(os.path.join(f"gp_model_{i}.h5"))
             # saver.save(os.path.join(direc, f"gp_model_{call}"), model)
 
@@ -295,7 +308,7 @@ def run_bayesopt_exp(
         daf_steps (int, optional): How many acquisition points. Defaults to 10.
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
-    os.makedirs(direc, exist_ok=True)
+    os.makedirs(direc, exp_name, exist_ok=True)
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
@@ -355,7 +368,7 @@ def run_bayesopt_exp(
             "y": (("call"), observations.flatten()),
         },
         coords={"call": [x + 1 for x in range(len(observations))]},
-    ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
+    ).to_netcdf(os.path.join(direc, exp_name, exp_name + "_mves.nc"))
 
     # plot the results
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
