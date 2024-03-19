@@ -4,6 +4,7 @@ from typing import Callable
 import os
 import math
 import numpy as np
+import xarray as xr
 import time
 
 start_tf_import = time.time()
@@ -105,7 +106,7 @@ def objective_f(
     def add_query_to_output(real_query: tf.Tensor, real_result: tf.Tensor) -> None:
         nonlocal output
         output[call_number] = {
-            "dir": temp_dir(),
+            "": temp_dir(),
             "res": float(real_result),
             **{name: float(real_query[j]) for j, name in enumerate(config["order"])},
         }
@@ -166,22 +167,30 @@ DEFAULT_CONSTRAINTS: dict = {
 
 
 def gp_model_callback_maker(
-    dir: str, dimension: int = 2
+    direc: str, dimension: int = 2
 ) -> Callable[[any, any, any], bool]:
     """
     Return a callback function that saves the GP model at each step.
 
     Args:
-        dir (str): Directory to save the models.
+        direc (str): Directory to save the models.
         dimension (int, optional): Number of input dimensions. Defaults to 2.
 
     Returns:
         Callable[[any, any, any], bool]: Callback function for early_stop_callback.
     """
     # https://github.com/secondmind-labs/trieste/blob/develop/trieste/models/gpflow/models.py
-    os.makedirs(dir, exist_ok=True)
+    os.makedirs(direc, exist_ok=True)
     # saver = gpflow.saver.Saver()
     call: int = 0
+
+    n = 100
+    x1 = np.linspace(0, 1, num=n)
+    x2 = np.linspace(0, 1, num=n)
+    X1, X2 = np.meshgrid(x1, x2)
+    X = np.column_stack([X1.flatten(), X2.flatten()])
+    ypred_list = []
+    yvar_list = []
 
     @timeit
     def gp_model_callback(datasets, gp_models, state) -> bool:
@@ -197,7 +206,7 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call, dir
+        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, yvar_list
         call += 1  # increment the call number
 
         print("dimension", dimension)
@@ -212,32 +221,52 @@ def gp_model_callback_maker(
                 "gp_models[model].model", gp_models[model].model
             )  # .save(f"gp_model_{i}.h5")
             ckpt = tf.train.Checkpoint(model=gp_models[model].model)
-            manager = tf.train.CheckpointManager(ckpt, dir, max_to_keep=100)
+            manager = tf.train.CheckpointManager(ckpt, direc, max_to_keep=100)
             manager.save()
-            plt.show()
+            # plt.show()
             plt.clf()
             plt.close()
 
             fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-            n = 100
-            x1 = np.linspace(0, 1, num=n)
-            x2 = np.linspace(0, 1, num=n)
-            X1, X2 = np.meshgrid(x1, x2)
-            X = np.column_stack([X1.flatten(), X2.flatten()])
             Y, Yvar = gp_models[model].predict_y(X)
             Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
-            axs[0].contourf(X1, X2, Y, levels=1000)
+            ypred_list.append(Y)
+            yvar_list.append(Yvar)
+            print("np.array(ypred_list))", np.array(ypred_list).shape)
+            print("np.array(yvar_list))", np.array(yvar_list).shape)
+            print(
+                "np.array([x + 1 for x in range(call)]))",
+                [x + 1 for x in range(len(ypred_list))],
+            )
+            xr.Dataset(
+                data_vars={
+                    "ypred": (("call", "x1", "x2"), np.array(ypred_list)),
+                    "yvar": (("call", "x1", "x2"), np.array(yvar_list)),
+                },
+                coords={
+                    "x1": x1,
+                    "x2": x2,
+                    "call": [x + 1 for x in range(len(ypred_list))],
+                },
+            ).to_netcdf(os.path.join(direc, f"gp_model_{call}.nc"))
+
+            im = axs[0].contourf(X1, X2, Y, levels=1000)
+            # add colorbar to the plot with the right scale and the same size as the plot
+            fig.colorbar(im, ax=axs[0], fraction=0.046, pad=0.04)
             # axs[0].colorbar()
             axs[0].set_title("Mean")
-            axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
+            im = axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
+            fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.04)
             # axs[1].colorbar()
-            axs[1].set_title("Std. Dev. $\sigma$")
-            plt.show()
+            axs[1].set_title("Std. Dev., $\sigma$")
+            axs[0].set_xlabel("x$_1$")
+            axs[0].set_ylabel("x$_2$")
+            axs[1].set_xlabel("x$_1$")
+            # plt.show()
             plt.clf()
             plt.close()
-
             #  model.save(os.path.join(f"gp_model_{i}.h5"))
-            # saver.save(os.path.join(dir, f"gp_model_{call}"), model)
+            # saver.save(os.path.join(direc, f"gp_model_{call}"), model)
 
         return False  # False means don't stop
 
@@ -249,6 +278,8 @@ def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
     exp_name: str = "bo_test",
+    direc: str = "exp",
+    stationid: int = 3,
     init_steps: int = 10,
     daf_steps: int = 10,
     wrap_test: bool = False,
@@ -264,6 +295,7 @@ def run_bayesopt_exp(
         daf_steps (int, optional): How many acquisition points. Defaults to 10.
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
+    os.makedirs(direc, exist_ok=True)
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
@@ -271,7 +303,9 @@ def run_bayesopt_exp(
     search_space = trieste.space.Box([0] * dimensions_input, [1] * dimensions_input)
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
-    init_objective = objective_f(constraints, exp_name=exp_name, wrap_test=wrap_test)
+    init_objective = objective_f(
+        constraints, stationid=stationid, exp_name=exp_name, wrap_test=wrap_test
+    )
     put_through_sotp = False
 
     if put_through_sotp:
@@ -314,6 +348,15 @@ def run_bayesopt_exp(
     query_points = dataset.query_points.numpy()
     observations = dataset.observations.numpy()
 
+    xr.Dataset(
+        data_vars={
+            "x1": (("call"), query_points[:, 0]),
+            "x2": (("call"), query_points[:, 1]),
+            "y": (("call"), observations.flatten()),
+        },
+        coords={"call": [x + 1 for x in range(len(observations))]},
+    ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
+
     # plot the results
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
     plot_bo_points(
@@ -327,13 +370,13 @@ def run_bayesopt_exp(
     ax.set_xlabel(r"$x_1$ [dimensionless]")
     ax.set_ylabel(r"$x_2$ [dimensionless]")
     plt.savefig(os.path.join("img", exp_name + "_mves.png"))
-    plt.show()
+    # plt.show()
     plt.clf()
     plt.close()
 
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
     plot_regret(
-        query_points,
+        dataset.observations.numpy(),
         ax,
         num_init=5,
         show_obs=True,
@@ -341,7 +384,7 @@ def run_bayesopt_exp(
     ax.set_xlabel("Iteration")
     ax.set_ylabel("Regret")
     plt.savefig(os.path.join("img", exp_name + "_regret.png"))
-    plt.show()
+    # plt.show()
     plt.clf()
     plt.close()
 
@@ -362,12 +405,12 @@ if __name__ == "__main__":
         "order": ("angle", "displacement"),  # order of input features
     }
     run_bayesopt_exp(
-        seed=15,
+        seed=13,
         constraints=constraints_2d,
-        exp_name="test32",
+        exp_name="bo-test-2d-2",
         init_steps=5,
         daf_steps=50,
-        wrap_test=True,
+        wrap_test=False,
     )
     # python -m adbo.exp &> logs/test32.log
     # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
