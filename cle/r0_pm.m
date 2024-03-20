@@ -6,7 +6,7 @@ close all
 addpath(genpath('mfiles/'));
 
 % read in JSON file of inputs
-fileName = 'inputs.json'; % filename in JSON extension
+fileName = 'data/inputs.json'; % filename in JSON extension
 in_str = fileread(fileName); % dedicated for reading files as text
 in = jsondecode(in_str); % Using the jsondecode function to parse JSON from string
 
@@ -26,7 +26,7 @@ out.Vmerge = Vmerge;
 
 % write out JSON file of outputs
 out_str = jsonencode(out);
-fid = fopen('outputs.json', 'w');
+fid = fopen('data/outputs.json', 'w');
 if fid == -1, error('Cannot create JSON file'); end
 fwrite(fid, out_str, 'char');
 fclose(fid);

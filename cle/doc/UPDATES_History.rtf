@@ -1,0 +1,91 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1671\cocoasubrtf500
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fswiss\fcharset0 Helvetica-Bold;\f2\fswiss\fcharset0 ArialMT;
+\f3\fswiss\fcharset0 Arial-BoldMT;}
+{\colortbl;\red255\green255\blue255;\red26\green26\blue26;}
+{\*\expandedcolortbl;;\csgenericrgb\c10196\c10196\c10196;}
+\margl1440\margr1440\vieww10800\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 CLE15_PUBLIC UPDATE HISTORY\
+Daniel Chavas\
+Latest update: 2020-06-23\
+\
+2020-06-23\
+- Fixed a bug in ER11E04_nondim_rfitinput.m that gave the wrong solution if rfit was too close to r0 (when guessing r0, if the true rfit > current r0 then the ratio is greater than 1 and that returned a NaN, which resulted in an incorrect final solution returned to the user). This is called by CLE15_plot_rfitinput.m .\
+\
+2020-06-11\
+- Updated aesthetics of plots in plotting scripts (axis labels and ranges, colors). No changes to model code.\
+\
+2018-04-25\
+- Set default value of Cd_vary to 0 (i.e. constant Cd in outer region). Donelan (2018, JGR-O) describes errors in laboratory results for the variation of drag coefficient with wind speed at moderate-to-high wind speeds; the formulation employed here is based on Donelan et al. (2004) laboratory results. Thus the default is set to constant. Users are welcome to implement their own wind speed dependence formulations based on alternative datasets.\
+\
+2017-06-25\
+- Commented out test figure 1008 within subfile run by CLE15_plot_rmaxinput.m\
+- Updated default setting CkCd_vary = 1 (i.e. C_k/C_d constant)\
+\
+2016-12-20\
+- Commented out an assert statement in E04_outerwind_nondim_LargePond.m that returned an error for storms with rfit > 5000 km, which doesnt work for simulations with very large storms.\
+\
+2015-12-19\
+- Minor modifications to plotting scripts.\
+\
+2015-11-19\
+- Increased non-dimensional radial resolution of angular momentum interpolation to ensure that interpolated solution can sufficiently resolve the solution near rmax. This was done in all approaches for model specification. Before this, there was a discrepancy between the desired (rmax,Vmax) and their actual values in the output profile because of this interpolation problem.\
+\
+2015-05-13\
+- Major overhaul of the entire code, now calculated in non-dimensional space (M/M0 vs. r/r0).\
+- Code now runs ~100x faster than previous version; for typical case, code runs in 0.02 sec for input rmax and in 0.06 sec for input r0.\
+- Split function into two options: 1) input rmax (see 
+\f1\b CLE_plot_rmaxinput.m
+\f0\b0 ), r0 is predicted; 2) input r0 (see 
+\f1\b CLE_plot_r0input.m
+\f0\b0 ), rmax is predicted; 3) input wind radius (rfit,Vfit) (see 
+\f1\b CLE_plot_rfitinput.m
+\f0\b0 ), rmax and r0 are predicted. This way depending on what you\'92re trying to do you can just use the appropriate function call directly.\
+- Incorporated options for variable CkCd (CkCdvary) and eye adjustment (eye_ad) directly into profile functions.\
+- Ck/Cd is now capped at 1.9, as the inner solution can have issues for values >= 2. This is particularly relevant for allowing variable CkCd (CkCdvary=1), as such high values correspond to very high Vmax values that are beyond the range used to estimate CkCd based on the data.\
+- Additionally, there exist cases for very large (rmax >~ 200 km), very weak storms (Vmax<20 m/s) with low CkCd values (~<0.5) where no merged solution can be found. The code now automatically increases CkCd by steps of 0.1 until such a merge point exists, thereby finding a solution for these cases. Because this applies to weak storms only (and where the theory probably doesn\'92t apply anyways), the effect of this is not expected to be large for application purposes.\
+\
+2015-04-28\
+- Updated 
+\f1\b ER11E04_Chavas.m
+\f0\b0  to use cleaner version of code that now can take any wind radius (i.e. it does not assume that the wind radius comes from the outer region). Option to input rmax and r_in and predict Vmax is removed, as this is not particularly useful.\
+- Updated 
+\f1\b Plot_ER11E04.m
+\f0\b0  to match above code update and moved to subdirectory \'93testing/\'94\
+- Created 
+\f1\b ER11E04_windprofile.m
+\f0\b0  as a template file for the user to quickly calculate a wind profile and plot it\
+\
+\pard\pardeftab720\partightenfactor0
+
+\f2 \cf2 2014-12-08\
+- Updated the best estimate values of Ck/Cd (CkCd_bestfit.mat) for submitted manuscript. The values only change minimally from previous values.
+\f0 \cf0 \
+
+\f2 \cf2 \
+2014-11-04\
+- Updated 
+\f3\b ER11E04_Chavas.m
+\f2\b0  to try the ER11-only solution for cases with small Vmax and/or large rmax. This may still not necessarily converge to a solution, though.\
+- Updated documentation file.\
+- Updated 
+\f3\b Plot_ER11E04.m
+\f2\b0  to plot an array of solutions. The file also includes code to back-calculate the solution using (Vmax and r12), which is currently commented out.\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0 \cf0 2014-10-20
+\f2 \cf2 \
+\pard\pardeftab720\partightenfactor0
+\cf2 - Fixed a bug in file ER11_radprof.m that made the model crash if the input rmax had a decimal of exactly .5 (e.g. 25.5 km)\
+- Updated pathnames to avoid using backslashes, since Windows uses the forward slash (thanks Ping)\
+- Added a basic documentation file 
+\f3\b ER11E04_Chavas_Documentation.pdf
+\f2\b0 \
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0 \cf0 2014-10-17\
+First shared publicly\
+}
