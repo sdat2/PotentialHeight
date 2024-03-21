@@ -5,13 +5,50 @@ import os
 import numpy as np
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
+from oct2py import octave
+from oct2py import Oct2Py, get_log
+
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
-from .constants import TEMP_0K, BACKGROUND_PRESSURE, DEFAULT_SURF_TEMP
+from constants import TEMP_0K, BACKGROUND_PRESSURE, DEFAULT_SURF_TEMP
 
 plot_defaults()
+
+oc = Oct2Py(logger=get_log())
+oc.eval("addpath(genpath('mcle'))")
+# oc.addpath(".")
+# oc.addpath("mfiles/")
+# path = "/Users/simon/tcpips/cle/"
+# oc.addpath("/Users/simon/tcpips/cle/")
+# oc.addpath("/Users/simon/tcpips/cle/mfiles")
+# oc.eval("addpath(genpath('.'))")
+# oc.eval("addpath(genpath('mfiles/'))")
+# print("dir", dir(oc))
+
+
+@timeit
+def run_cle15_octpy(**kwargs) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
+    in_dict = read_json("data/inputs.json")
+    in_dict.update(kwargs)
+    # print(in_dict)
+    # oc.eval("path")
+    rr, VV, rmax, rmerge, Vmerge = oc.feval(
+        "ER11E04_nondim_r0input",
+        in_dict["Vmax"],
+        in_dict["r0"],
+        in_dict["fcor"],
+        in_dict["Cdvary"],
+        in_dict["Cd"],
+        in_dict["w_cool"],
+        in_dict["CkCdvary"],
+        in_dict["CkCd"],
+        in_dict["eye_adj"],
+        in_dict["alpha_eye"],
+        nout=5,
+    )
+    return rr, VV, rmax, rmerge, Vmerge
 
 
 @timeit
@@ -408,4 +445,6 @@ if __name__ == "__main__":
     # plot_soln_curves()
     # plot_gom_bbox()
     # ds_solns(num=50, verbose=True, ds_name="data/gom_soln_new.nc")
-    find_solution_rmaxv()
+    # find_solution_rmaxv()
+    run_cle15_octpy()
+    run_cle15()

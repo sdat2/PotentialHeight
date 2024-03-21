@@ -216,7 +216,6 @@ if __name__ == "__main__":
         axs[2].plot(
             tide_ds.date_time,
             tide_ds.isel(stationid=station).water_level,
-            # color="",
         )
         # plt.plot(tide_ds.date_time, tide_ds.isel(stationid=node).water_level)
         plt.savefig(os.path.join(figure_dir, f"station_{station}.png"))
