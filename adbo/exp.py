@@ -308,7 +308,7 @@ def run_bayesopt_exp(
         daf_steps (int, optional): How many acquisition points. Defaults to 10.
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
-    os.makedirs(direc, exp_name, exist_ok=True)
+    os.makedirs(os.path.join(direc, exp_name), exist_ok=True)
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
@@ -420,12 +420,12 @@ if __name__ == "__main__":
     run_bayesopt_exp(
         seed=13,
         constraints=constraints_2d,
-        exp_name="bo-test-2d-2",
-        init_steps=5,
+        exp_name="bo-test-2d-3",
+        init_steps=30,
         daf_steps=50,
         wrap_test=False,
     )
     # python -m adbo.exp &> logs/test32.log
     # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
-    #  python -m adbo.exp &> logs/bo_test17.log
+    #  python -m adbo.exp &> logs/bo_test-2d-3.log
     # run_bayesopt_exp(seed=18, exp_name="bo_test18", init_steps=5, daf_steps=100)

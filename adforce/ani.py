@@ -1,3 +1,4 @@
+from typing import Optional
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,7 +10,7 @@ from sithom.place import BoundingBox
 from sithom.xr import plot_units
 from sithom.plot import axis_formatter
 from sithom.time import timeit
-from adforce.mesh import bbox_mesh
+from adforce.mesh import bbox_mesh, xr_loader
 
 plot_defaults()
 
@@ -19,7 +20,7 @@ def plot_heights(
     path_in: str = "mult1",
     step_size: int = 1,
     add_name: str = "",
-    bbox: BoundingBox = NO_BBOX,
+    bbox: Optional[BoundingBox] = NO_BBOX,
 ) -> None:
     """
     Plot heights.
@@ -30,13 +31,17 @@ def plot_heights(
         add_name (str, optional): additional prefix name. Defaults to "".
         bbox (BoundingBox, optional): bounding box. Defaults to NO_BBOX.
     """
+    plot_defaults()
     img_folder = os.path.join(path_in, "img")
     os.makedirs(img_folder, exist_ok=True)
     figure_names = []
     # path_in = os.path.join(DATA_PATH, path_in)
-    ds = bbox_mesh(
-        os.path.join(path_in, "fort.63.nc"), bbox=bbox.pad(0.3), use_dask=True
-    )
+    if bbox is not None:
+        ds = bbox_mesh(
+            os.path.join(path_in, "fort.63.nc"), bbox=bbox.pad(0.3), use_dask=True
+        )
+    else:
+        ds = xr_loader(os.path.join(path_in, "fort.63.nc"), use_dask=True)
     vmin, vmax = ds.zeta.min().values, ds.zeta.max().values
     vmin, vmax = np.min([-vmax, vmin]), np.max([-vmin, vmax])
     print(vmin, vmax)
@@ -65,6 +70,8 @@ def plot_heights(
         cbar = plt.colorbar(
             im,
             ax=ax,
+            fraction=0.046,
+            pad=0.04,
             **ckwargs,
         )
         ax.set_title("Water Height [m]")
@@ -82,7 +89,8 @@ def plot_heights(
             color="purple",
             label="New Orleans",
         )
-        NO_BBOX.ax_lim(plt.gca())
+        if bbox is not None:
+            bbox.ax_lim(plt.gca())
         ax.set_aspect("equal")
         plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
         figure_name = os.path.join(img_folder, add_name + f"height_{time_i:04}.png")
@@ -97,3 +105,25 @@ def plot_heights(
         for filename in figure_names:
             image = imageio.imread(filename)
             writer.append_data(image)
+
+
+if __name__ == "__main__":
+    # python -m adforce.ani
+    # plot_heights(
+    #     path_in="/work/n01/n01/sithom/adcirc-swan/NWS13example/",
+    #     bbox=NO_BBOX.pad(5),
+    #     add_name="zoomed_out_",
+    #     step_size=10,
+    # )
+    plot_heights(
+        path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.new/",
+        bbox=None,
+        step_size=2,
+        add_name="whole_",
+    )
+    # plot_heights(
+    #     path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+    #     bbox=NO_BBOX,
+    #     add_name="",
+    #     step_size=10,
+    # )

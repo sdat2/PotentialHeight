@@ -389,9 +389,11 @@ def gen_ps_f() -> callable:
     and to allow each timestep to have a different profile.
 
     That would require some clever way of interpolating each time step.
+
+    TODO: Make it possible to feed a profile file in some way.
     """
     chavas_profile = read_json(
-        "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/outputs.json"
+        "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/data/outputs.json"
     )
     # print(chavas_profile.keys())
     chavas_profile = pressures_profile(chavas_profile)

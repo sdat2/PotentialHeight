@@ -45,6 +45,10 @@ from .mesh import xr_loader
 
 ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
+paths = {
+    "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
+    "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
+}
 
 
 @timeit
@@ -55,6 +59,7 @@ def setup_new(
     impact_lon: float = -89.4715,
     impact_lat: float = 29.9511,
     impact_time=np.datetime64("2004-08-13T12", "ns"),
+    resolution: str = "mid",
 ):
     """
     Set up a new ADCIRC folder and add in the
@@ -75,7 +80,7 @@ def setup_new(
     ]
     os.makedirs(new_path, exist_ok=True)
     for file in files:
-        shutil.copy(os.path.join(OG_PATH, file), os.path.join(new_path, file))
+        shutil.copy(os.path.join(paths[resolution], file), os.path.join(new_path, file))
 
     save_forcing(
         new_path,
@@ -109,18 +114,15 @@ def run_and_wait(dir: str, jobname: str = "run", time_limit: float = 60 * 60) ->
     jid = s.run(
         f"""
 module load PrgEnv-gnu/8.3.3
-module load cray-hdf5-parallel
-module load cray-netcdf-hdf5parallel
+module load cray-hdf5-parallel/1.12.2.1
+module load cray-parallel-netcdf/1.12.3.1
 
 cd {dir}
 
 work=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
 source $work/.bashrc
 
-d1=/work/n01/n01/sithom/adcirc-swan/katrina1
-
-# echo "hook 1"
-# eval "$(conda shell.bash hook)"
+d1=/work/n01/n01/sithom/adcirc-swan/compile_n4
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing
@@ -226,6 +228,7 @@ def run_wrapped(
     impact_lon=-89.4715,
     impact_lat=29.9511,
     impact_time=np.datetime64("2004-08-13T12", "ns"),
+    resolution="mid",
 ):
     # add new forcing
     setup_new(
@@ -235,6 +238,7 @@ def run_wrapped(
         impact_lon=impact_lon,
         impact_lat=impact_lat,
         impact_time=impact_time,
+        resolution=resolution,
     )
     # set off sbatch.
     run_and_wait(out_path)
@@ -270,4 +274,8 @@ if __name__ == "__main__":
     # run_speed()
     # TODO: add an option to turn the tide off.
     # run_angle_new()
-    pass
+    run_wrapped(
+        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap",
+        angle=0,
+        resolution="high",
+    )
