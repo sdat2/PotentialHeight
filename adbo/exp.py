@@ -167,14 +167,14 @@ DEFAULT_CONSTRAINTS: dict = {
 
 
 def gp_model_callback_maker(
-    direc: str, dimension: int = 2, config: dict = DEFAULT_CONSTRAINTS
+    direc: str, config: dict = DEFAULT_CONSTRAINTS
 ) -> Callable[[any, any, any], bool]:
     """
     Return a callback function that saves the GP model at each step.
 
     Args:
         direc (str): Directory to save the models.
-        dimension (int, optional): Number of input dimensions. Defaults to 2.
+        config (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
 
     Returns:
         Callable[[any, any, any], bool]: Callback function for early_stop_callback.
@@ -183,8 +183,10 @@ def gp_model_callback_maker(
     os.makedirs(direc, exist_ok=True)
     # saver = gpflow.saver.Saver()
     call: int = 0
+    dimensions = len(config["order"])
 
-    if len(config["order"]) == 2:
+    if dimensions:  # if 2D save GP model output
+
         n = 100
         x1 = np.linspace(0, 1, num=n)
         x2 = np.linspace(0, 1, num=n)
@@ -211,10 +213,10 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, yvar_list, config
+        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, yvar_list, config, dimensions
         call += 1  # increment the call number
 
-        print("dimension", dimension)
+        print("dimension", dimensions)
         print("datasets", datasets)
         print("state", state)
         # use the early_stop_callback to save the GP at each step
@@ -231,7 +233,7 @@ def gp_model_callback_maker(
             # plt.show()
             plt.clf()
             plt.close()
-            if len(config["order"]) == 2:
+            if dimensions == 2:
                 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
                 Y, Yvar = gp_models[model].predict_y(X)
                 Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
@@ -263,21 +265,21 @@ def gp_model_callback_maker(
                     },
                 ).to_netcdf(os.path.join(direc, f"gp_model_outputs.nc"))
 
-                im = axs[0].contourf(X1, X2, Y, levels=1000)
-                # add colorbar to the plot with the right scale and the same size as the plot
-                fig.colorbar(im, ax=axs[0], fraction=0.046, pad=0.04)
-                # axs[0].colorbar()
-                axs[0].set_title("Mean")
-                im = axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
-                fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.04)
-                # axs[1].colorbar()
-                axs[1].set_title("Std. Dev., $\sigma$")
-                axs[0].set_xlabel("x$_1$")
-                axs[0].set_ylabel("x$_2$")
-                axs[1].set_xlabel("x$_1$")
-                # plt.show()
-                plt.clf()
-                plt.close()
+                # im = axs[0].contourf(X1, X2, Y, levels=1000)
+                # # add colorbar to the plot with the right scale and the same size as the plot
+                # fig.colorbar(im, ax=axs[0], fraction=0.046, pad=0.04)
+                # # axs[0].colorbar()
+                # axs[0].set_title("Mean")
+                # im = axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
+                # fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.04)
+                # # axs[1].colorbar()
+                # axs[1].set_title("Std. Dev., $\sigma$")
+                # axs[0].set_xlabel("x$_1$")
+                # axs[0].set_ylabel("x$_2$")
+                # axs[1].set_xlabel("x$_1$")
+                # # plt.show()
+                # plt.clf()
+                # plt.close()
             #  model.save(os.path.join(f"gp_model_{i}.h5"))
             # saver.save(os.path.join(direc, f"gp_model_{call}"), model)
 
@@ -291,7 +293,7 @@ def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
     exp_name: str = "bo_test",
-    direc: str = "exp",
+    root_exp_direc: str = "/work/n01/n01/sithom/adcirc-swan/exp",
     stationid: int = 3,
     init_steps: int = 10,
     daf_steps: int = 10,
@@ -308,11 +310,13 @@ def run_bayesopt_exp(
         daf_steps (int, optional): How many acquisition points. Defaults to 10.
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
-    os.makedirs(os.path.join(direc, exp_name), exist_ok=True)
+    direc = os.path.join(root_exp_direc, exp_name)
+    os.makedirs(direc, exist_ok=True)
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
     dimensions_input = len(constraints["order"])
+    assert dimensions_input == 2
     search_space = trieste.space.Box([0] * dimensions_input, [1] * dimensions_input)
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
@@ -350,7 +354,8 @@ def run_bayesopt_exp(
         acquisition_rule,
         track_state=True,  # there was some issue with this on mac
         early_stop_callback=gp_model_callback_maker(
-            exp_name, dimension=dimensions_input
+            direc,
+            constraints,
         ),
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
@@ -361,14 +366,24 @@ def run_bayesopt_exp(
     query_points = dataset.query_points.numpy()
     observations = dataset.observations.numpy()
 
+    rescaled_query_points = rescale_inverse(query_points, constraints)
+
     xr.Dataset(
         data_vars={
-            "x1": (("call"), query_points[:, 0]),
-            "x2": (("call"), query_points[:, 1]),
-            "y": (("call"), observations.flatten()),
+            "x1": (
+                ("call"),
+                rescaled_query_points[:, 0],
+                {"units": constraints["angle"]["units"]},
+            ),
+            "x2": (
+                ("call"),
+                rescaled_query_points[:, 1],
+                {"units": constraints["displacement"]["units"]},
+            ),
+            "y": (("call"), -observations.flatten(), {"units": "m"}),
         },
         coords={"call": [x + 1 for x in range(len(observations))]},
-    ).to_netcdf(os.path.join(direc, exp_name, exp_name + "_mves.nc"))
+    ).to_netcdf(os.path.join(root_exp_direc, exp_name, exp_name + "_mves.nc"))
 
     # plot the results
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -420,7 +435,7 @@ if __name__ == "__main__":
     run_bayesopt_exp(
         seed=13,
         constraints=constraints_2d,
-        exp_name="bo-test-2d-3",
+        exp_name="bo-test-2d-4",
         init_steps=30,
         daf_steps=50,
         wrap_test=False,

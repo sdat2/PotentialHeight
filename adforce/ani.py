@@ -33,7 +33,9 @@ def plot_heights(
     """
     plot_defaults()
     img_folder = os.path.join(path_in, "img")
+    gif_folder = os.path.join(path_in, "gif")
     os.makedirs(img_folder, exist_ok=True)
+    os.makedirs(gif_folder, exist_ok=True)
     figure_names = []
     # path_in = os.path.join(DATA_PATH, path_in)
     if bbox is not None:
@@ -98,7 +100,7 @@ def plot_heights(
         figure_names.append(figure_name)
         plt.clf()
 
-    gif_name = os.path.join(path_in, add_name + "height.gif")
+    gif_name = os.path.join(gif_folder, add_name + "height.gif")
     print("gif_name", gif_name)
 
     with imageio.get_writer(gif_name, mode="I") as writer:
@@ -116,10 +118,10 @@ if __name__ == "__main__":
     #     step_size=10,
     # )
     plot_heights(
-        path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.new/",
-        bbox=None,
-        step_size=2,
-        add_name="whole_",
+        path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap/",
+        bbox=NO_BBOX,
+        step_size=1,
+        add_name="zoomed_in_",
     )
     # plot_heights(
     #     path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
