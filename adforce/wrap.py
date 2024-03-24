@@ -187,16 +187,16 @@ echo ""
     return jid
 
 
-def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable:
+def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable[[str], float]:
     """
     Create a function to select the maximum elevation near a given stationid.
 
     Args:
-        stationid (int): _description_
-        og_path (str, optional): _description_. Defaults to OG_PATH.
+        stationid (int): Stationid to select.
+        og_path (str, optional): Original path. Defaults to OG_PATH.
 
     Returns:
-        Callable: _description_
+        Callable: Function to select the maximum elevation near a given stationid.
     """
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     lon, lat = (
@@ -210,9 +210,18 @@ def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable:
     ys = mele_og.y.values
     # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
     dist = ((xs - lon) ** 2 + (ys - lat) ** 2) ** 0.5
-    min_p = np.argmin(dist)
+    min_p = np.argmin(dist)  # closest point to stationid
 
     def select_max(path: str) -> float:
+        """
+        Select the maximum elevation near a given stationid from time series data.
+
+        Args:
+            path (str): Path to ADCIRC run folder.
+
+        Returns:
+            float: Maximum elevation near a given stationid.
+        """
         mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
         return mele_ds["zeta_max"].values[min_p]
 

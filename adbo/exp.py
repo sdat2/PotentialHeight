@@ -1,6 +1,6 @@
 """Run BayesOpt experiments"""
 
-from typing import Callable
+from typing import Callable, Optional
 import os
 import math
 import numpy as np
@@ -167,7 +167,9 @@ DEFAULT_CONSTRAINTS: dict = {
 
 
 def gp_model_callback_maker(
-    direc: str, config: dict = DEFAULT_CONSTRAINTS
+    direc: str,
+    config: dict = DEFAULT_CONSTRAINTS,
+    acq_rule: Optional[EfficientGlobalOptimization] = None,
 ) -> Callable[[any, any, any], bool]:
     """
     Return a callback function that saves the GP model at each step.
@@ -185,7 +187,7 @@ def gp_model_callback_maker(
     call: int = 0
     dimensions = len(config["order"])
 
-    if dimensions:  # if 2D save GP model output
+    if dimensions == 2:  # if 2D save GP model output
 
         n = 100
         x1 = np.linspace(0, 1, num=n)
@@ -197,7 +199,8 @@ def gp_model_callback_maker(
         X1, X2 = np.meshgrid(x1, x2)
         X = np.column_stack([X1.flatten(), X2.flatten()])
         ypred_list = []
-        yvar_list = []
+        ystd_list = []
+        acq_list = []
 
     @timeit
     def gp_model_callback(datasets, gp_models, state) -> bool:
@@ -213,7 +216,7 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, yvar_list, config, dimensions
+        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, ystd_list, config, dimensions
         call += 1  # increment the call number
 
         print("dimension", dimensions)
@@ -227,6 +230,7 @@ def gp_model_callback_maker(
             print(
                 "gp_models[model].model", gp_models[model].model
             )  # .save(f"gp_model_{i}.h5")
+            # setting up a checkpoint every time is probably overwriting the previous one
             ckpt = tf.train.Checkpoint(model=gp_models[model].model)
             manager = tf.train.CheckpointManager(ckpt, direc, max_to_keep=100)
             manager.save()
@@ -238,18 +242,29 @@ def gp_model_callback_maker(
                 Y, Yvar = gp_models[model].predict_y(X)
                 Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
                 ypred_list.append(Y)
-                yvar_list.append(Yvar)
+                ystd_list.append(np.std(Yvar))
                 print("np.array(ypred_list))", np.array(ypred_list).shape)
-                print("np.array(yvar_list))", np.array(yvar_list).shape)
+                print("np.array(yvar_list))", np.array(ystd_list).shape)
+                data_vars = {
+                    "ypred": (("call", "x1", "x2"), np.array(ypred_list)),
+                    "ystd": (("call", "x1", "x2"), np.array(ystd_list)),
+                }
+                if acq_rule is not None:
+                    if acq_rule.acquisition_function is not None:
+                        acq = acq_rule.acquisition_function(X)
+                        acq = np.reshape(acq, (n, n))
+                    else:
+                        acq = np.zeros((n, n))
+                    acq_list.append(acq)
+                    data_vars["acq"] = (("call", "x1", "x2"), np.array(acq_list))
+
+
                 print(
                     "np.array([x + 1 for x in range(call)]))",
                     [x + 1 for x in range(len(ypred_list))],
                 )
                 xr.Dataset(
-                    data_vars={
-                        "ypred": (("call", "x1", "x2"), np.array(ypred_list)),
-                        "yvar": (("call", "x1", "x2"), np.array(yvar_list)),
-                    },
+                    data_vars=data_vars,
                     coords={
                         "x1": (
                             ("x1"),
@@ -306,6 +321,7 @@ def run_bayesopt_exp(
         constraints (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
         seed (int, optional): Seed to initialize. Defaults to 10.
         exp_name (str, optional): Experiment name. Defaults to "bo_test".
+        root_exp_direc (str, optional): Root directory for the experiments. Defaults to "/work/n01/n01/sithom/adcirc-swan/exp".
         init_steps (int, optional): How many sobol sambles. Defaults to 10.
         daf_steps (int, optional): How many acquisition points. Defaults to 10.
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
@@ -345,7 +361,8 @@ def run_bayesopt_exp(
     print("initial_data", initial_data, type(initial_data))
     gpr = trieste.models.gpflow.build_gpr(initial_data, search_space)
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
-    acquisition_rule = EfficientGlobalOptimization(MinValueEntropySearch(search_space))
+    acquisition_func = MinValueEntropySearch(search_space)
+    acquisition_rule = EfficientGlobalOptimization(acquisition_func)
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
     result = bo.optimize(
         daf_steps,
@@ -356,6 +373,7 @@ def run_bayesopt_exp(
         early_stop_callback=gp_model_callback_maker(
             direc,
             constraints,
+            acq_rule=acquisition_rule,
         ),
     ).astuple()
     trieste.logging.set_summary_filter(lambda name: True)  # enable all summaries
@@ -383,7 +401,7 @@ def run_bayesopt_exp(
             "y": (("call"), -observations.flatten(), {"units": "m"}),
         },
         coords={"call": [x + 1 for x in range(len(observations))]},
-    ).to_netcdf(os.path.join(root_exp_direc, exp_name, exp_name + "_mves.nc"))
+    ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
 
     # plot the results
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -415,6 +433,9 @@ def run_bayesopt_exp(
     # plt.show()
     plt.clf()
     plt.close()
+    from adbo.ani import plot_gps
+
+    plot_gps(path_in=direc)
 
 
 if __name__ == "__main__":
@@ -433,13 +454,22 @@ if __name__ == "__main__":
         "order": ("angle", "displacement"),  # order of input features
     }
     run_bayesopt_exp(
-        seed=13,
+        seed=1,
         constraints=constraints_2d,
-        exp_name="bo-test-2d-4",
-        init_steps=30,
-        daf_steps=50,
-        wrap_test=False,
+        exp_name="test-2d-3",
+        init_steps=5,
+        daf_steps=10,
+        wrap_test=True,
     )
+    # python -m adbo.exp &> logs/test-2d.log
+    # run_bayesopt_exp(
+    #     seed=13,
+    #     constraints=constraints_2d,
+    #     exp_name="bo-test-2d-4",
+    #     init_steps=30,
+    #     daf_steps=50,
+    #     wrap_test=False,
+    # )
     # python -m adbo.exp &> logs/test32.log
     # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
     #  python -m adbo.exp &> logs/bo_test-2d-3.log

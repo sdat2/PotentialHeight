@@ -2,6 +2,7 @@ import os
 import xarray as xr
 import matplotlib.pyplot as plt
 import imageio
+from tqdm import tqdm
 
 from sithom.plot import plot_defaults, feature_grid
 from sithom.time import timeit
@@ -10,6 +11,7 @@ from sithom.time import timeit
 @timeit
 def plot_gps(
     path_in: str = "mult1",
+    gp_file: str = "gp_model_outputs.nc",
     add_name: str = "",
 ) -> None:
     """
@@ -27,15 +29,21 @@ def plot_gps(
 
     figure_names = []
 
-    ds = xr.open_dataset(os.path.join(path_in, "gp_model_outputs.nc"), use_dask=True)
+    ds = xr.open_dataset(os.path.join(path_in, gp_file))
+
+    print(ds)
+
+    ds["ypred"] = -ds.ypred
 
     vminm, vmaxm = ds.ypred.min().values, ds.ypred.max().values
+    if "yvar" in ds:
+        ds["ystd"] = ds.yvar**0.5
     vminstd, vmaxstd = ds.ystd.min().values, ds.ystd.max().values
 
-    x1_units = ds.x1.attrs["units"]
-    x2_units = ds.x2.attrs["units"]
+    # x1_units = ds.x1.attrs["units"]
+    # x2_units = ds.x2.attrs["units"]
 
-    for call_i in range(len(ds.call.values)):
+    for call_i in tqdm(range(len(ds.call.values)), desc="Plotting GPs"):
         fig, axs = feature_grid(
             ds.isel(call=call_i),
             [["ypred", "ystd"]],
@@ -44,8 +52,8 @@ def plot_gps(
             [[[vminm, vmaxm, "cmo.amp"], [0, vmaxstd, "cmo.amp"]]],
             ["", ""],
             xy=(
-                ("x1", "Displacement", x1_units),
-                ("x2", "Angle", x2_units),
+                ("x1", "Angle", "$^{\circ}$"),
+                ("x2", "Displacement", "$^{\circ}$"),
             ),
         )
         figure_name = os.path.join(img_folder, f"gp_{call_i}.png")
@@ -64,4 +72,8 @@ def plot_gps(
 
 
 if __name__ == "__main__":
-    plot_gps(path_in="")
+    # python -m adbo.ani
+    plot_gps(
+        path_in="/work/n01/n01/sithom/adcirc-swan/exp/bo-test-2d-4",
+        add_name="",
+    )
