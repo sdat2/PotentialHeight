@@ -30,7 +30,7 @@ note = {CPE-14-0307.R2},
 """
 
 import os
-from typing import Callable
+from typing import Callable, Dict
 import numpy as np
 import shutil
 import time
@@ -45,10 +45,11 @@ from .mesh import xr_loader
 
 ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
-paths = {
+paths: Dict[str, str] = {
     "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
     "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
 }
+node_dict: Dict[str, int] = {"mid": 1, "high": 4}
 
 
 @timeit
@@ -93,19 +94,32 @@ def setup_new(
 
 
 @timeit
-def run_and_wait(dir: str, jobname: str = "run", time_limit: float = 60 * 60) -> int:
+def run_and_wait(
+    direc: str, jobname: str = "run", time_limit: float = 60 * 60, nodes=1
+) -> int:
+    """
+    Run the ADCIRC model and wait for it to finish.
+
+    Args:
+        direc (str): Path to ADCIRC run folder.
+        jobname (str, optional): Job name. Defaults to "run".
+        time_limit (float, optional): Time limit in seconds, before leaving without answer. Defaults to 60*60 (60 minutes).
+
+    Returns:
+        int: Slurm Job ID.
+    """
     s = Slurm(
         jobname,
         {
-            "nodes": 1,
+            "nodes": nodes,
             "account": "n01-SOWISE",
             "partition": "standard",
             "qos": "standard",
             "time": "1:0:0",
-            "tasks-per-node": 128,
+            "tasks-per-node": 128,  # number of cpus on archer2 node.
             "cpus-per-task": 1,
-            "output": os.path.join(dir, "test.out"),
-            "error": os.path.join(dir, "test.out"),
+            "output": os.path.join(direc, "slurm.out"),
+            "error": os.path.join(direc, "slurm.out"),
             "mail-type": "ALL",
             "mail-user": "sdat2@cam.ac.uk",
         },
@@ -117,16 +131,16 @@ module load PrgEnv-gnu/8.3.3
 module load cray-hdf5-parallel/1.12.2.1
 module load cray-parallel-netcdf/1.12.3.1
 
-cd {dir}
+cd {direc}
 
-work=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
-source $work/.bashrc
+home_dir=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
+source $home_dir/.bashrc
 
-d1=/work/n01/n01/sithom/adcirc-swan/compile_n4
+compile_dir=/work/n01/n01/sithom/adcirc-swan/compile_n4
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing
-np=128 # how many parallel tasks to define
+np=$SLURM_NTASKS # how many parallel tasks to define
 
 export OMP_NUM_THREADS=1
 
@@ -142,8 +156,8 @@ echo "|---------------------------------------------|"
 echo "    TEST CASE: $case_name"
 echo ""
 echo -n "    Prepping case..."
-$d1/adcprep --np $np --partmesh >  adcprep.log
-$d1/adcprep --np $np --prepall  >> adcprep.log
+$compile_dir/adcprep --np $np --partmesh >  adcprep.log
+$compile_dir/adcprep --np $np --prepall  >> adcprep.log
 if [ $? == 0 ] ; then
     echo "done!"
 else
@@ -250,7 +264,7 @@ def run_wrapped(
         resolution=resolution,
     )
     # set off sbatch.
-    run_and_wait(out_path)
+    run_and_wait(out_path, nodes=node_dict[resolution])
     # look at results.
     return select_point(out_path)
 
@@ -284,7 +298,7 @@ if __name__ == "__main__":
     # TODO: add an option to turn the tide off.
     # run_angle_new()
     run_wrapped(
-        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap",
-        angle=0,
+        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2",
+        angle=10,
         resolution="high",
     )

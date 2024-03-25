@@ -1,4 +1,5 @@
 """Potential Intensity Calculation script."""
+
 from typing import Dict, Tuple
 import os
 import xarray as xr
@@ -71,7 +72,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         "Minimum Central Pressure",
         "hPa",
     )
-    out_ds.ifl.attrs["standard_name"] = "pyPI Flag"
+    out_ds.ifl.attrs["standard_name"] = "tcpyPI Flag"
     out_ds.t0.attrs["standard_name"], out_ds.t0.attrs["units"] = (
         "Outflow Temperature",
         "K",

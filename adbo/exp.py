@@ -29,6 +29,7 @@ from sithom.io import write_json
 import matplotlib.pyplot as plt
 from adforce.wrap import run_wrapped, select_point_f
 from src.constants import NEW_ORLEANS
+from .ani import plot_gps
 from .rescale import rescale_inverse
 
 plot_defaults()
@@ -238,11 +239,12 @@ def gp_model_callback_maker(
             plt.clf()
             plt.close()
             if dimensions == 2:
+                # what's a good way to check that this puts the dimensions the right way around?
                 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
                 Y, Yvar = gp_models[model].predict_y(X)
                 Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
                 ypred_list.append(Y)
-                ystd_list.append(np.std(Yvar))
+                ystd_list.append(np.sqrt(Yvar))
                 print("np.array(ypred_list))", np.array(ypred_list).shape)
                 print("np.array(yvar_list))", np.array(ystd_list).shape)
                 data_vars = {
@@ -251,13 +253,12 @@ def gp_model_callback_maker(
                 }
                 if acq_rule is not None:
                     if acq_rule.acquisition_function is not None:
-                        acq = acq_rule.acquisition_function(X)
+                        acq = acq_rule.acquisition_function(tf.expand_dims(X, axis=-2))
                         acq = np.reshape(acq, (n, n))
                     else:
                         acq = np.zeros((n, n))
                     acq_list.append(acq)
                     data_vars["acq"] = (("call", "x1", "x2"), np.array(acq_list))
-
 
                 print(
                     "np.array([x + 1 for x in range(call)]))",
@@ -433,9 +434,7 @@ def run_bayesopt_exp(
     # plt.show()
     plt.clf()
     plt.close()
-    from adbo.ani import plot_gps
-
-    plot_gps(path_in=direc)
+    plot_gps(path_in=direc, plot_acq=True)
 
 
 if __name__ == "__main__":
@@ -456,11 +455,12 @@ if __name__ == "__main__":
     run_bayesopt_exp(
         seed=1,
         constraints=constraints_2d,
-        exp_name="test-2d-3",
+        exp_name="bo-test-2d-4",
         init_steps=5,
         daf_steps=10,
-        wrap_test=True,
+        wrap_test=False,
     )
+    # python -m adbo.exp &> logs/bo-test-2d-4.log
     # python -m adbo.exp &> logs/test-2d.log
     # run_bayesopt_exp(
     #     seed=13,

@@ -12,6 +12,7 @@ from sithom.time import timeit
 def plot_gps(
     path_in: str = "mult1",
     gp_file: str = "gp_model_outputs.nc",
+    plot_acq: bool = False,
     add_name: str = "",
 ) -> None:
     """
@@ -39,23 +40,59 @@ def plot_gps(
     if "yvar" in ds:
         ds["ystd"] = ds.yvar**0.5
     vminstd, vmaxstd = ds.ystd.min().values, ds.ystd.max().values
+    if plot_acq and "acq" in ds:
+        vminacq, vmaxacq = ds.acq.min().values, ds.acq.max().values
 
     # x1_units = ds.x1.attrs["units"]
     # x2_units = ds.x2.attrs["units"]
 
     for call_i in tqdm(range(len(ds.call.values)), desc="Plotting GPs"):
-        fig, axs = feature_grid(
-            ds.isel(call=call_i),
-            [["ypred", "ystd"]],
-            [["m", "m"]],
-            [["GP prediction, $\hat{y}$", "GP standard deviation, $\sigma_{\hat{y}}$"]],
-            [[[vminm, vmaxm, "cmo.amp"], [0, vmaxstd, "cmo.amp"]]],
-            ["", ""],
-            xy=(
-                ("x1", "Angle", "$^{\circ}$"),
-                ("x2", "Displacement", "$^{\circ}$"),
-            ),
-        )
+        if plot_acq and "acq" in ds:
+            fig, axs = feature_grid(
+                ds.isel(call=call_i),
+                [["ypred", "ystd", "acq"]],
+                [["m", "m", None]],
+                [
+                    [
+                        "GP prediction, $\hat{y}$",
+                        "GP standard deviation, $\sigma_{\hat{y}}$",
+                        r"Acquisition function, $\alpha$",
+                    ]
+                ],
+                [
+                    [
+                        [vminm, vmaxm, "cmo.amp"],
+                        [0, vmaxstd, "cmo.amp"],
+                        [vminacq, vmaxacq, "cmo.amp"],
+                    ],
+                ],
+                ["", "", ""],
+                figsize=(4 * 3, 4),
+                xy=(
+                    ("x1", "Angle", "$^{\circ}$"),
+                    ("x2", "Displacement", "$^{\circ}$"),
+                ),
+            )
+        else:
+
+            fig, axs = feature_grid(
+                ds.isel(call=call_i),
+                [["ypred", "ystd"]],
+                [["m", "m"]],
+                [
+                    [
+                        "GP prediction, $\hat{y}$",
+                        "GP standard deviation, $\sigma_{\hat{y}}$",
+                    ]
+                ],
+                [[[vminm, vmaxm, "cmo.amp"], [0, vmaxstd, "cmo.amp"]]],
+                ["", ""],
+                figsize=(4 * 2, 4),
+                xy=(
+                    ("x1", "Angle", "$^{\circ}$"),
+                    ("x2", "Displacement", "$^{\circ}$"),
+                ),
+            )
         figure_name = os.path.join(img_folder, f"gp_{call_i}.png")
         figure_names.append(figure_name)
         plt.savefig(figure_name)
@@ -74,6 +111,7 @@ def plot_gps(
 if __name__ == "__main__":
     # python -m adbo.ani
     plot_gps(
-        path_in="/work/n01/n01/sithom/adcirc-swan/exp/bo-test-2d-4",
+        path_in="/work/n01/n01/sithom/adcirc-swan/exp/test-2d-3",
         add_name="",
+        plot_acq=True,
     )
