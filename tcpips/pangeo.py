@@ -62,17 +62,14 @@ def convert(ds: xr.Dataset) -> xr.Dataset:
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
 url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
-try:
-    print("url", url)
-    cat = intake.open_esm_datastore(url)
-    print("cat", cat)
-    unique = cat.unique()
-    print("cat", cat)
-    print("unique", unique)
-except Exception as e:
-    print("Exception", e)
-    cat = None
-    unique = None
+# try:
+print("url", url)
+cat = intake.open_esm_datastore(url)
+print("cat", cat)
+unique = cat.unique()
+print("cat", cat)
+print("unique", unique)
+# except Exception as e:
 
 
 @timeit
@@ -158,9 +155,9 @@ def get_all() -> None:
 
 
 @timeit
-def get_ocean() -> None:
+def get_ocean(experiments=["historical", "ssp585"]) -> None:
     cat_subset = cat.search(
-        experiment_id=["historical", "ssp585"],
+        experiment_id=experiments,
         table_id=["Omon"],
         institution_id="NCAR",
         member_id="r10i1p1f1",
@@ -180,18 +177,28 @@ def get_ocean() -> None:
             zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
         )
 
-    print(dset_dict.keys())
+    print("dset_dict.keys()", dset_dict.keys())
 
-    ds_l = []
+    ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
     for i, (k, ds) in enumerate(dset_dict.items()):
         if "member_id" in ds.dims:
             ds = ds.isel(member_id=0)
-        print("\n\n", i, k, ds.dims, ds["tos"].attrs, "\n\n")
-        ds_l.append(ds.isel(dcpp_init_year=0))
+        for experiment in experiments:
+            if experiment in k:
+                ds_d[experiment] = ds.isel(dcpp_init_year=0)
+
+        print(
+            "\n\n i, k, ds.dims, ds['tos'].attrs",
+            i,
+            k,
+            ds.dims,
+            ds["tos"].attrs,
+            "\n\n",
+        )
         ds.isel(dcpp_init_year=0).to_netcdf(os.path.join(DATA_PATH, f"ocean-{i}.nc"))
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        ds = xr.concat(ds_l[::-1])
+        ds = xr.concat([ds_d[experiment] for experiment in experiments], dim="time")
 
     print("merged ds", ds)
 
