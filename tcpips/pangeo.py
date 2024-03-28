@@ -463,4 +463,5 @@ if __name__ == "__main__":
     # regrid_2d()
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
-    pass
+    # pass
+    get_data()
