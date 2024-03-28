@@ -1,3 +1,4 @@
+import os
 from typing import Tuple, Dict
 import intake
 import dask
@@ -60,14 +61,16 @@ def convert(ds: xr.Dataset) -> xr.Dataset:
 
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
-url = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
+url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
 try:
+    print("url", url)
     cat = intake.open_esm_datastore(url)
+    print("cat", cat)
     unique = cat.unique()
     print("cat", cat)
     print("unique", unique)
 except Exception as e:
-    print(e)
+    print("Exception", e)
     cat = None
     unique = None
 
@@ -111,7 +114,7 @@ def get_atmos() -> None:
 
     print("merged ds", ds)
 
-    ds.to_netcdf("data/atmos.nc")
+    ds.to_netcdf(os.path.join(DATA_PATH, "atmos.nc"))
 
 
 @timeit
@@ -151,7 +154,7 @@ def get_all() -> None:
 
     print("merged ds", ds)
 
-    ds.to_netcdf("data/all.nc")
+    ds.to_netcdf(os.path.join(DATA_PATH, "all.nc"))
 
 
 @timeit
@@ -185,14 +188,14 @@ def get_ocean() -> None:
             ds = ds.isel(member_id=0)
         print("\n\n", i, k, ds.dims, ds["tos"].attrs, "\n\n")
         ds_l.append(ds.isel(dcpp_init_year=0))
-        ds.isel(dcpp_init_year=0).to_netcdf(f"data/ocean-{i}.nc")
+        ds.isel(dcpp_init_year=0).to_netcdf(os.path.join(DATA_PATH, f"ocean-{i}.nc"))
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         ds = xr.concat(ds_l[::-1])
 
     print("merged ds", ds)
 
-    ds.to_netcdf("data/ocean.nc")
+    ds.to_netcdf(os.path.join(DATA_PATH, "ocean.nc"))
 
 
 @timeit
@@ -221,8 +224,8 @@ def regrid_2d_1degree() -> None:
         )
         return ds
 
-    ocean_ds = open("data/ocean.nc")
-    atmos_ds = open("data/atmos.nc").isel(dcpp_init_year=0)
+    ocean_ds = open(os.path.join(DATA_PATH, "ocean.nc"))
+    atmos_ds = open(os.path.join(DATA_PATH, "atmos.nc")).isel(dcpp_init_year=0)
 
     new_coords = xe.util.grid_global(1, 1)
 
@@ -241,7 +244,7 @@ def regrid_2d_1degree() -> None:
         keep_attrs=True,
         skipna=True,
     ).to_netcdf(
-        "data/atmos_new_regridded.nc",
+        os.path.join(DATA_PATH, "atmos_new_regridded.nc"),
         format="NETCDF4",
         engine="h5netcdf",
         encoding={
@@ -287,8 +290,8 @@ def regrid_2d() -> None:
         )
         return ds
 
-    ocean_ds = open("data/ocean.nc")
-    atmos_ds = open("data/atmos.nc").isel(dcpp_init_year=0)
+    ocean_ds = open(os.path.join(DATA_PATH, "ocean.nc"))
+    atmos_ds = open(os.path.join(DATA_PATH, "atmos.nc")).isel(dcpp_init_year=0)
     print("ocean_ds", ocean_ds)
     # ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)
@@ -349,7 +352,7 @@ def regrid_2d() -> None:
         skipna=True,
     )
     print("ocean_out", ocean_out)
-    ocean_out.to_netcdf("data/ocean_regridded.nc")
+    ocean_out.to_netcdf(os.path.join(DATA_PATH, "ocean_regridded.nc"))
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
 
     ocean_out.tos.isel(time=0).plot()
@@ -417,11 +420,11 @@ def regrid_1d(xesmf: bool = False) -> None:
         else:
             return ds.rename({"x": "lon", "y": "lat"})
 
-    ocean_ds = open_1d("data/ocean.nc")
+    ocean_ds = open_1d(os.path.join(DATA_PATH, "ocean.nc"))
     print("ocean_ds", ocean_ds)
     ocean_ds.isel(time=0).tos.plot(x="lon", y="lat")
 
-    atmos_ds = open_1d("data/atmos.nc").isel(dcpp_init_year=0)
+    atmos_ds = open_1d(os.path.join(DATA_PATH, "atmos.nc")).isel(dcpp_init_year=0)
     print("atmos_ds", atmos_ds)
     atmos_ds.isel(time=0).psl.plot(x="lon", y="lat")
 
@@ -451,12 +454,13 @@ def regrid_1d(xesmf: bool = False) -> None:
             method="nearest",
         )
     print("ocean_out", ocean_out)
-    ocean_out.to_netcdf("data/ocean_regridded.nc")
+    ocean_out.to_netcdf(os.path.join(DATA_PATH, "ocean_regridded.nc"))
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
 
 
 if __name__ == "__main__":
     # tcpips/pangeo.py
     # regrid_2d()
-    regrid_1d(xesmf=True)
+    # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
+    pass

@@ -8,6 +8,7 @@ Example:
         from tcpips.constants import PROJECT_PATH, FIGURE_PATH
 
 """
+
 # import os/pathlib to manipulate file names.
 import os
 import pathlib
@@ -18,11 +19,12 @@ SRC_PATH = pathlib.Path(os.path.dirname(constants_path))
 PROJECT_PATH = pathlib.Path(os.path.dirname(SRC_PATH))
 FIGURE_PATH = pathlib.Path(os.path.join(PROJECT_PATH, "img"))
 CONFIG_PATH = os.path.join(SRC_PATH, "config")
+DATA_PATH = os.path.join(PROJECT_PATH, "data")
 
 # General data from e.g. paper or cmip etc.
 DATA_PATH = os.path.join(PROJECT_PATH, "data")
 GOM = (25.443701, -90.013120)  # Centre of Gulf of Mexico, lat, lon
-MONTHS = [
+MONTHS = [  # 3 letter month names
     "Jan",
     "Feb",
     "Mar",
@@ -35,4 +37,11 @@ MONTHS = [
     "Oct",
     "Nov",
     "Dec",
+]
+
+QUARTERS = [  # 3-letter quarter names
+    "JFM",
+    "AMJ",
+    "JAS",
+    "OND",
 ]

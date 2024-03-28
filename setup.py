@@ -14,6 +14,7 @@ REQUIRED: List[str] = [
     "aiohttp",  # to read CMIP6 data (tcpips)
     "intake-esm",  # to read CMIP6 data (tcpips)
     "intake-xarray",  # to read CMIP6 data (tcpips)
+    "xesmf",  # to regrid CMIP6 data (tcpips) # really this needs to be installed by
     "gcsfs",  # to read CMIP6 data (tcpips)
     "xmip",  # to preprocess CMIP6 data (tcpips)
     "hydra-core",  # to read the config files

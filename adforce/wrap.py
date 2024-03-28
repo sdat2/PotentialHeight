@@ -45,11 +45,11 @@ from .mesh import xr_loader
 
 ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
-paths: Dict[str, str] = {
+model_ref_paths: Dict[str, str] = {
     "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
     "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
 }
-node_dict: Dict[str, int] = {"mid": 1, "high": 4}
+node_dict: Dict[str, int] = {"low": 1, "mid": 1, "high": 8}
 
 
 @timeit
@@ -61,13 +61,12 @@ def setup_new(
     impact_lat: float = 29.9511,
     impact_time=np.datetime64("2004-08-13T12", "ns"),
     resolution: str = "mid",
-):
+) -> None:
     """
-    Set up a new ADCIRC folder and add in the
-    forcing data.
+    Set up a new ADCIRC folder and add in the forcing data.
 
     Args:
-        new_path (str): _description_
+        new_path (str): New model directory.
     """
     # original path to copy setting files from
     files = [
@@ -77,11 +76,13 @@ def setup_new(
         "fort.64.nc",
         "fort.73.nc",
         "fort.74.nc",
-        "submit.slurm",
     ]
     os.makedirs(new_path, exist_ok=True)
     for file in files:
-        shutil.copy(os.path.join(paths[resolution], file), os.path.join(new_path, file))
+        shutil.copy(
+            os.path.join(model_ref_paths[resolution], file),
+            os.path.join(new_path, file),
+        )
 
     save_forcing(
         new_path,
@@ -93,9 +94,29 @@ def setup_new(
     )
 
 
+def is_job_finished(jid: int) -> bool:
+    """
+    Check if a SLURM job is finished using sacct.
+
+    Args:
+        jid (int): Job ID.
+
+    Returns:
+        bool: Whether the job is finished.
+    """
+
+    args = f"sacct -j {jid} -o state"
+    job_states = [x.strip() for x in os.popen(args).read().strip().split("\n")]
+    return (
+        np.all([x == "COMPLETED" for x in job_states[2:]])
+        if len(job_states) > 2
+        else False
+    )
+
+
 @timeit
 def run_and_wait(
-    direc: str, jobname: str = "run", time_limit: float = 60 * 60, nodes=1
+    direc: str, jobname: str = "run", time_limit: float = 3 * 60 * 60, nodes: int = 1
 ) -> int:
     """
     Run the ADCIRC model and wait for it to finish.
@@ -103,7 +124,7 @@ def run_and_wait(
     Args:
         direc (str): Path to ADCIRC run folder.
         jobname (str, optional): Job name. Defaults to "run".
-        time_limit (float, optional): Time limit in seconds, before leaving without answer. Defaults to 60*60 (60 minutes).
+        time_limit (float, optional): Time limit in seconds, before leaving without answer. Defaults to 60*60 (3 hours).
 
     Returns:
         int: Slurm Job ID.
@@ -166,7 +187,7 @@ else
 fi
 
 echo -n "    Runnning case..."
-srun --distribution=block:block --hint=nomultithread $d1/padcirc > padcirc_log.txt
+srun --distribution=block:block --hint=nomultithread $compile_dir/padcirc > padcirc_log.txt
 exitstat=$?
 echo "Finished"
 echo "    ADCIRC Exit Code: $exitstat"
@@ -179,35 +200,28 @@ echo ""
 """
     )
 
-    def query_job(jid: int) -> bool:
-        args = f"sacct -j {jid} -o state"
-        job_states = [x.strip() for x in os.popen(args).read().strip().split("\n")]
-        return (
-            np.all([x == "COMPLETED" for x in job_states[2:]])
-            if len(job_states) > 2
-            else False
-        )
-
     time_total = 0
-    is_finished = query_job(jid)
+    is_finished = is_job_finished(jid)
     tinc = 1
     while not is_finished and time_total < time_limit:
-        is_finished = query_job(jid)
+        is_finished = is_job_finished(jid)
         time.sleep(tinc)
         time_total += tinc
 
-    print(f"Job {jid} finished")
-
+    if not is_finished:
+        print(f"Job {jid} did not finish in time")
+    else:
+        print(f"Job {jid} finished")
     return jid
 
 
-def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable[[str], float]:
+def select_point_f(stationid: int, resolution: str = "mid") -> Callable[[str], float]:
     """
     Create a function to select the maximum elevation near a given stationid.
 
     Args:
         stationid (int): Stationid to select.
-        og_path (str, optional): Original path. Defaults to OG_PATH.
+        resolution (str, optional): Original path. Defaults to OG_PATH.
 
     Returns:
         Callable: Function to select the maximum elevation near a given stationid.
@@ -217,7 +231,7 @@ def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable[[str], fl
         tide_ds.isel(stationid=stationid).lon.values,
         tide_ds.isel(stationid=stationid).lat.values,
     )
-    mele_og = xr_loader(os.path.join(og_path, "maxele.63.nc"))
+    mele_og = xr_loader(os.path.join(model_ref_paths[resolution], "maxele.63.nc"))
     # read zeta_max point closes to the
     # work out closest point to NEW_ORLEANS
     xs = mele_og.x.values
@@ -244,15 +258,31 @@ def select_point_f(stationid: int, og_path: str = OG_PATH) -> Callable[[str], fl
 
 @timeit
 def run_wrapped(
-    out_path=OG_PATH,
-    select_point=select_point_f(3),
-    angle=0,
-    trans_speed=7.71,
-    impact_lon=-89.4715,
-    impact_lat=29.9511,
+    out_path: str = "test-run",
+    select_point: str = select_point_f(3, resolution="mid"),
+    angle: float = 0,
+    trans_speed: float = 7.71,
+    impact_lon: float = -89.4715,
+    impact_lat: float = 29.9511,
     impact_time=np.datetime64("2004-08-13T12", "ns"),
-    resolution="mid",
+    resolution: str = "mid",
 ):
+    """
+    Run the ADCIRC model and wait for it to finish.
+
+    Args:
+        out_path (str, optional): Path to ADCIRC run folder. Defaults to OG_PATH.
+        select_point (Callable, optional): Function to select the maximum elevation near a given stationid. Defaults to select_point_f(3).
+        angle (float, optional): Angle of the storm. Defaults to 0.
+        trans_speed (float, optional): Translation speed of the storm. Defaults to 7.71.
+        impact_lon (float, optional): Longitude of the storm impact. Defaults to -89.4715.
+        impact_lat (float, optional): Latitude of the storm impact. Defaults to 29.9511.
+        impact_time (np.datetime64, optional): Time of the storm impact. Defaults to np.datetime64("2004-08-13T12", "ns").
+        resolution (str, optional): Resolution of the ADCIRC model. Defaults to "mid".
+
+    Returns:
+        float: Maximum elevation near a given stationid.
+    """
     # add new forcing
     setup_new(
         out_path,
@@ -270,7 +300,17 @@ def run_wrapped(
 
 
 @timeit
-def read_results(path=OG_PATH, stationid=3):
+def read_results(path: str = OG_PATH, stationid: int = 3):
+    """
+    Read the results of the ADCIRC run.
+
+    Args:
+        path (str, optional): Path to ADCIRC run folder. Defaults to OG_PATH.
+        stationid (int, optional): Stationid to select. Defaults to 3.
+
+    Returns:
+        float: Maximum elevation near a given stationid.
+    """
     mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
     # read zeta_max point closes to the
     # work out closest point to NEW_ORLEANS
@@ -298,7 +338,8 @@ if __name__ == "__main__":
     # TODO: add an option to turn the tide off.
     # run_angle_new()
     run_wrapped(
-        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2",
+        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap3",
+        select_point=select_point_f(3, resolution="high"),
         angle=10,
         resolution="high",
     )

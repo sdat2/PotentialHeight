@@ -65,7 +65,11 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 
 @timeit
 def objective_f(
-    config: dict, exp_name: str = "bo_test", stationid: int = 3, wrap_test: bool = False
+    config: dict,
+    exp_name: str = "bo_test",
+    stationid: int = 3,
+    wrap_test: bool = False,
+    resolution="mid",
 ) -> Callable[[tf.Tensor], tf.Tensor]:
     """
     Return a wrapper function for the ADCIRC model that is compatible with being used as an observer in trieste after processing.
@@ -124,7 +128,7 @@ def objective_f(
         Returns:
             tf.Tensor: The negative of the result of the ADCIRC model at the selected point.
         """
-        nonlocal call_number, select_point
+        nonlocal call_number, select_point, resolution, wrap_test
         # put in real space
         returned_results = []  # new results, negative height [m]
         real_queries = rescale_inverse(x, config)  # convert to real space
@@ -142,7 +146,10 @@ def objective_f(
                 real_result = min(7 + np.random.normal(), 10)
             else:
                 real_result = run_wrapped(
-                    out_path=tmp_dir, select_point=select_point, **inputs
+                    out_path=tmp_dir,
+                    resolution=resolution,
+                    select_point=select_point,
+                    **inputs,
                 )
 
             add_query_to_output(real_queries[i], real_result)
@@ -308,6 +315,7 @@ def gp_model_callback_maker(
 def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
+    resolution: str = "mid",
     exp_name: str = "bo_test",
     root_exp_direc: str = "/work/n01/n01/sithom/adcirc-swan/exp",
     stationid: int = 3,
@@ -338,7 +346,11 @@ def run_bayesopt_exp(
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
     init_objective = objective_f(
-        constraints, stationid=stationid, exp_name=exp_name, wrap_test=wrap_test
+        constraints,
+        stationid=stationid,
+        exp_name=exp_name,
+        wrap_test=wrap_test,
+        resolution=resolution,
     )
     put_through_sotp = False
 
@@ -455,11 +467,13 @@ if __name__ == "__main__":
     run_bayesopt_exp(
         seed=1,
         constraints=constraints_2d,
-        exp_name="bo-test-2d-4",
+        exp_name="bo-test-2d-hres",
+        resolution="high",
         init_steps=5,
-        daf_steps=10,
+        daf_steps=20,
         wrap_test=False,
     )
+    # python -m adbo.exp &> logs/bo-test-2d-hres.log
     # python -m adbo.exp &> logs/bo-test-2d-4.log
     # python -m adbo.exp &> logs/test-2d.log
     # run_bayesopt_exp(
