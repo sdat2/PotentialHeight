@@ -92,7 +92,7 @@ def objective_f(
     os.makedirs(exp_dir, exist_ok=True)
     call_number = -1
     output = {}
-    select_point = select_point_f(stationid)
+    select_point = select_point_f(stationid, resolution=resolution)
     dimension_inputs = len(config["order"])
     print("dimension_inputs", dimension_inputs)
 

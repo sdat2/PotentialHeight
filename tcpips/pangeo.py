@@ -36,13 +36,13 @@ print("unique", unique)
 # except Exception as e:
 
 
-def combined_experiments_from_dset_dict(dset_dict, experiments):
+def combined_experiments_from_dset_dict(dset_dict, experiments: List[str]):
     ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
-    # zero_dims = ["member_id", "dcpp_init_year"]
+    # zero_dims = ["member_id", "CMIP6_PATH"]
     for k, ds in dset_dict.items():
         if "member_id" in ds.dims:
-            ds = ds.isel(member_id=0, dcpp_init_year=0)
-        if "dcpp_init_year" in ds.dims:
+            ds = ds.isel(member_id=0)
+        if "CMIP6_PATH" in ds.dims:
             ds = ds.isel(dcpp_init_year=0)
 
         print(k, ds)
@@ -168,8 +168,9 @@ def get_data() -> None:
 def regrid_2d_1degree(output_res=1.0) -> None:
     plot_defaults()
 
-    def open(name):
-        ds = xr.open_dataset(name, chunks={"time": 40})
+    def open_ds(path: str) -> xr.Dataset:
+        # open netcdf4 file using dask backend
+        ds = xr.open_dataset(path, chunks={"time": 40})
         ds = ds.drop_vars(
             [
                 x
@@ -184,46 +185,45 @@ def regrid_2d_1degree(output_res=1.0) -> None:
         )
         return ds
 
-    ocean_ds = open(os.path.join(CMIP6_PATH, "ocean.nc"))
-    atmos_ds = open(os.path.join(CMIP6_PATH, "atmos.nc")).isel(dcpp_init_year=0)
+    ocean_ds = open_ds(os.path.join(CMIP6_PATH, "ocean.nc"))
+    atmos_ds = open_ds(os.path.join(CMIP6_PATH, "atmos.nc"))
 
-    new_coords = xe.util.grid_global(output_res, output_res)
+    new_coords = xe.util.grid_global(
+        output_res, output_res
+    )  # make regular lat/lon grid
 
-    regridder = xe.Regridder(ocean_ds, new_coords, "bilinear", periodic=True)
-    print(regridder)
-    ocean_out = regridder(
-        ocean_ds,
-        keep_attrs=True,
-        skipna=True,
-    )
-    regridder = xe.Regridder(
-        atmos_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True
-    )
-    regridder(
-        atmos_ds,
-        keep_attrs=True,
-        skipna=True,
-    ).to_netcdf(
-        os.path.join(CMIP6_PATH, "atmos_new_regridded.nc"),
-        format="NETCDF4",
-        engine="h5netcdf",
-        encoding={
-            var: {"dtype": "float32", "zlib": True, "complevel": 6}
-            for var in conversion_names.keys()
-            if var in atmos_ds
-        },
-    )
+    def regrid_and_save(input_ds: xr.Dataset, output_name: str):
+        regridder = xe.Regridder(
+            input_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True
+        )
+        print(regridder)
+        out_ds = regridder(
+            input_ds,
+            keep_attrs=True,
+            skipna=True,
+            ignore_degenerate=True,
+        )
+        out_ds.to_netcdf(
+            os.path.join(CMIP6_PATH, output_name),
+            format="NETCDF4",
+            engine="h5netcdf",  # should be better at parallel writing/dask
+            encoding={
+                var: {"dtype": "float32", "zlib": True, "complevel": 6}
+                for var in conversion_names.keys()
+                if var in out_ds
+            },
+        )
+        return out_ds  # return for later plotting.
 
-    # xr.merge([ocean_out, atmos_out], compat="override").to_netcdf(
-    #    "data/all_regridded.nc", engine="h5netcdf"
-    # )
+    ocean_out = regrid_and_save(ocean_ds, "regrid_2d_1degree_ocean_regridded.nc")
+    regrid_and_save(atmos_ds, "regrid_2d_1degree_atmos_regridded.nc")
 
     print("ocean_out", ocean_out)
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
-    plt.savefig(os.path.join(FIGURE_PATH, "ocean_regridded.png"))
+    plt.savefig(os.path.join(FIGURE_PATH, "regrid_2d_1degree_ocean_regridded.png"))
     plt.clf()
     ocean_out.tos.isel(time=0).plot()
-    plt.savefig(os.path.join(FIGURE_PATH, "ocean_regridded_1d.png"))
+    plt.savefig(os.path.join(FIGURE_PATH, "regrid_2d_1degree_ocean_regridded_1d.png"))
     plt.clf()
 
 
@@ -244,7 +244,7 @@ def regrid_2d() -> None:
                     # "lon_bounds",
                     # "time_bounds",
                     # "lat_bounds",
-                    "dcpp_init_year",
+                    "CMIP6_PATH",
                     "member_id",
                 ]
                 if x in ds
@@ -253,7 +253,7 @@ def regrid_2d() -> None:
         return ds
 
     ocean_ds = open(os.path.join(CMIP6_PATH, "ocean.nc"))
-    atmos_ds = open(os.path.join(CMIP6_PATH, "atmos.nc"))  # .isel(dcpp_init_year=0)
+    atmos_ds = open(os.path.join(CMIP6_PATH, "atmos.nc"))  # .isel(CMIP6_PATH=0)
     print("ocean_ds", ocean_ds)
     # ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)
@@ -314,7 +314,7 @@ def regrid_2d() -> None:
         skipna=True,
     )
     print("ocean_out", ocean_out)
-    ocean_out.to_netcdf(os.path.join(CMIP6_PATH, "ocean_regridded.nc"))
+    ocean_out.to_netcdf(os.path.join(CMIP6_PATH, "regrid_2d_ocean_regridded.nc"))
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
 
     ocean_out.tos.isel(time=0).plot()
@@ -371,7 +371,7 @@ def regrid_1d(xesmf: bool = False) -> None:
                     "lon_bounds",
                     "time_bounds",
                     "lat_bounds",
-                    "dcpp_init_year",
+                    "CMIP6_PATH",
                     "member_id",
                 ]
                 if x in ds
@@ -387,7 +387,7 @@ def regrid_1d(xesmf: bool = False) -> None:
     print("ocean_ds", ocean_ds)
     ocean_ds.isel(time=0).tos.plot(x="lon", y="lat")
 
-    atmos_ds = open_1d(os.path.join(CMIP6_PATH, "atmos.nc")).isel(dcpp_init_year=0)
+    atmos_ds = open_1d(os.path.join(CMIP6_PATH, "atmos.nc")).isel(CMIP6_PATH=0)
     print("atmos_ds", atmos_ds)
     atmos_ds.isel(time=0).psl.plot(x="lon", y="lat")
 
@@ -417,8 +417,9 @@ def regrid_1d(xesmf: bool = False) -> None:
             method="nearest",
         )
     print("ocean_out", ocean_out)
-    ocean_out.to_netcdf(os.path.join(CMIP6_PATH, "ocean_regridded.nc"))
+    ocean_out.to_netcdf(os.path.join(CMIP6_PATH, "regrid1d_ocean_regridded.nc"))
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
+    plt.savefig(os.path.join(FIGURE_PATH, "ocean_regridded_regrid1d.png"))
 
 
 if __name__ == "__main__":
@@ -427,5 +428,8 @@ if __name__ == "__main__":
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
     # pass
-    get_data()
+    # get_data()
+    # regrid_2d()
+    regrid_2d_1degree(output_res=1)
     regrid_2d()
+    regrid_1d(xesmf=True)
