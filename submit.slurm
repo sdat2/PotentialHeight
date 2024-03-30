@@ -4,13 +4,13 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=0:20:0
+#SBATCH --time=6:00:0
 
 # Replace [budget code] below with your project code (e.g. t01)
 
 #SBATCH --account=n01-SOWISE
 #SBATCH --partition=standard
-#SBATCH --qos=short
+#SBATCH --qos=standard
 
 # emailing for start and end.
 #SBATCH --mail-type=BEGIN
@@ -32,6 +32,8 @@ source $work/.bashrc
 
 eval "$(conda shell.bash hook)"
 
+echo "which python"
+which python
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing

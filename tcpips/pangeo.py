@@ -26,23 +26,24 @@ os.makedirs(CMIP6_PATH, exist_ok=True)
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
 url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
-# try:
-print("url", url)
-cat = intake.open_esm_datastore(url)
-print("cat", cat)
-unique = cat.unique()
-print("cat", cat)
-print("unique", unique)
-# except Exception as e:
+try:
+    print("url", url)
+    cat = intake.open_esm_datastore(url)
+    print("cat", cat)
+    unique = cat.unique()
+    print("cat", cat)
+    print("unique", unique)
+except Exception as e:
+    print("Exception", e)
 
 
 def combined_experiments_from_dset_dict(dset_dict, experiments: List[str]):
     ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
-    # zero_dims = ["member_id", "CMIP6_PATH"]
+    # zero_dims = ["member_id", "dcpp_init_year"]
     for k, ds in dset_dict.items():
         if "member_id" in ds.dims:
             ds = ds.isel(member_id=0)
-        if "CMIP6_PATH" in ds.dims:
+        if "dcpp_init_year" in ds.dims:
             ds = ds.isel(dcpp_init_year=0)
 
         print(k, ds)
@@ -165,12 +166,13 @@ def get_data() -> None:
 
 
 @timeit
-def regrid_2d_1degree(output_res=1.0) -> None:
+def regrid_2d_1degree(output_res=1.0, time_chunk=10) -> None:
     plot_defaults()
 
     def open_ds(path: str) -> xr.Dataset:
+        nonlocal time_chunk
         # open netcdf4 file using dask backend
-        ds = xr.open_dataset(path, chunks={"time": 40})
+        ds = xr.open_dataset(path, chunks={"time": time_chunk})
         ds = ds.drop_vars(
             [
                 x
@@ -192,7 +194,17 @@ def regrid_2d_1degree(output_res=1.0) -> None:
         output_res, output_res
     )  # make regular lat/lon grid
 
-    def regrid_and_save(input_ds: xr.Dataset, output_name: str):
+    def regrid_and_save(input_ds: xr.Dataset, output_name: str) -> xr.Dataset:
+        """
+        Regrid and save the input dataset to the output name.
+
+        Args:
+            input_ds (xr.Dataset): dataset to regrid.
+            output_name (str): name of the output file.
+
+        Returns:
+            xr.Dataset: regridded dataset.
+        """
         regridder = xe.Regridder(
             input_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True
         )
@@ -201,7 +213,7 @@ def regrid_2d_1degree(output_res=1.0) -> None:
             input_ds,
             keep_attrs=True,
             skipna=True,
-            ignore_degenerate=True,
+            # ignore_degenerate=True,
         )
         out_ds.to_netcdf(
             os.path.join(CMIP6_PATH, output_name),
@@ -231,7 +243,7 @@ def regrid_2d_1degree(output_res=1.0) -> None:
 def regrid_2d() -> None:
     plot_defaults()
 
-    def open(name):
+    def open_ds(name):
         ds = xr.open_dataset(name)
         ds = ds.drop_vars(
             [
@@ -244,7 +256,7 @@ def regrid_2d() -> None:
                     # "lon_bounds",
                     # "time_bounds",
                     # "lat_bounds",
-                    "CMIP6_PATH",
+                    "dcpp_init_year",
                     "member_id",
                 ]
                 if x in ds
@@ -252,8 +264,8 @@ def regrid_2d() -> None:
         )
         return ds
 
-    ocean_ds = open(os.path.join(CMIP6_PATH, "ocean.nc"))
-    atmos_ds = open(os.path.join(CMIP6_PATH, "atmos.nc"))  # .isel(CMIP6_PATH=0)
+    ocean_ds = open_ds(os.path.join(CMIP6_PATH, "ocean.nc"))
+    atmos_ds = open_ds(os.path.join(CMIP6_PATH, "atmos.nc"))  # .isel(CMIP6_PATH=0)
     print("ocean_ds", ocean_ds)
     # ocean_ds = ocean_ds.rename({"lon_bounds": "lon_b", "lat_bounds": "lat_b"})
     print("atmos_ds", atmos_ds)

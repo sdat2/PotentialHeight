@@ -136,7 +136,7 @@ def run_and_wait(
             "account": "n01-SOWISE",
             "partition": "standard",
             "qos": "standard",
-            "time": "1:0:0",
+            "time": str(int(time_limit / 60 / 60)) + ":0:0",
             "tasks-per-node": 128,  # number of cpus on archer2 node.
             "cpus-per-task": 1,
             "output": os.path.join(direc, "slurm.out"),
