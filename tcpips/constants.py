@@ -45,3 +45,6 @@ QUARTERS = [  # 3-letter quarter names
     "JAS",
     "OND",
 ]
+
+CMIP6_PATH = os.path.join(DATA_PATH, "cmip6")
+os.makedirs(CMIP6_PATH, exist_ok=True)

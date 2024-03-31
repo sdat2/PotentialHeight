@@ -8,7 +8,7 @@ potential size and potential intensity.
 """
 
 import os
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict, List, Optional
 import intake
 import dask
 import xesmf as xe
@@ -18,11 +18,9 @@ from xmip.preprocessing import combined_preprocessing
 from xmip.postprocessing import interpolate_grid_label
 from sithom.plot import feature_grid, plot_defaults, label_subplots
 from sithom.time import timeit
-from tcpips.constants import FIGURE_PATH, DATA_PATH
-from tcpips.convert import conversion_names, convert
+from tcpips.constants import FIGURE_PATH, CMIP6_PATH
+from tcpips.convert import conversion_names
 
-CMIP6_PATH = os.path.join(DATA_PATH, "cmip6")
-os.makedirs(CMIP6_PATH, exist_ok=True)
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
 url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
@@ -37,7 +35,20 @@ except Exception as e:
     print("Exception", e)
 
 
-def combined_experiments_from_dset_dict(dset_dict, experiments: List[str]):
+def combined_experiments_from_dset_dict(
+    dset_dict: dict, experiments: List[str], name: str = "test"
+) -> Optional[xr.Dataset]:
+    """
+    Function to combine experiments together.
+
+    Args:
+        dset_dict (dict): _description_
+        experiments (List[str]): _description_
+        name (str, optional): _description_. Defaults to "test".
+
+    Returns:
+        xr.Dataset: combined xarray dataset.
+    """
     ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
     # zero_dims = ["member_id", "dcpp_init_year"]
     for k, ds in dset_dict.items():
@@ -50,97 +61,23 @@ def combined_experiments_from_dset_dict(dset_dict, experiments: List[str]):
         for experiment in experiments:
             if experiment in k:
                 ds_d[experiment] = ds
+                ds.to_netcdf(os.path.join(CMIP6_PATH, f"{name}_{experiment}_{k}.nc"))
 
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        ds = xr.concat([ds_d[experiment] for experiment in experiments], dim="time")
+        if len(ds_d) == len(experiments):
+            ds = xr.concat([ds_d[experiment] for experiment in experiments], dim="time")
+        else:
+            ds = None
+        # ds = xr.concat([ds_d[experiment] for experiment in experiments], dim="time")
 
     return ds
 
 
-@timeit
-def get_atmos(experiments: List[str] = ["historical", "ssp585"]) -> None:
-
-    cat_subset = cat.search(
-        experiment_id=["historical", "ssp585"],
-        table_id=["Amon"],  # , "Omon"],
-        institution_id="NCAR",
-        member_id="r10i1p1f1",
-        source_id="CESM2",
-        variable_id=conversion_names.keys(),
-        # grid_label="gn",
-    )
-    print("cat_subset", cat_subset)
-    unique = cat_subset.unique()
-    print("unique", unique)
-
-    z_kwargs = {"consolidated": True, "decode_times": True}
-    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        dset_dict = interpolate_grid_label(
-            cat_subset.to_dataset_dict(
-                zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
-            ),
-            target_grid_label="gr",
-        )
-
-    print(dset_dict.keys())
-
-    ds = combined_experiments_from_dset_dict(dset_dict, experiments)
-    print("merged ds", ds)
-    ds.to_netcdf(os.path.join(CMIP6_PATH, "atmos.nc"))
-
-
-@timeit
-def get_all() -> None:
-    cat_subset = cat.search(
-        experiment_id=["historical", "ssp585"],
-        table_id=["Amon", "Omon"],
-        institution_id="NCAR",
-        member_id="r10i1p1f1",
-        source_id="CESM2",
-        variable_id=conversion_names.keys(),
-        # grid_label="gn",
-    )
-
-    print("cat_subset", cat_subset)
-    unique = cat_subset.unique()
-    print("unique", unique)
-
-    z_kwargs = {"consolidated": True, "decode_times": True}
-    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        # dset_dict = interpolate_grid_label(
-        dset_dict = cat_subset.to_dataset_dict(
-            zarr_kwargs=z_kwargs, preprocess=combined_preprocessing
-        )  # , target_grid_label="gr", merge_kwargs={"compat": "override", "combine_attrs": "override""})
-
-    print(dset_dict.keys())
-
-    ds_l = []
-    for k, ds in dset_dict.items():
-        if "member_id" in ds.dims:
-            ds = ds.isel(member_id=0, dcpp_init_year=0)
-        print(k)
-        ds_l.append(ds)
-
-    with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-        ds = xr.concat(ds_l[::-1], dim="time")
-
-    print("merged ds", ds)
-
-    ds.to_netcdf(os.path.join(CMIP6_PATH, "all.nc"))
-
-
-@timeit
-def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
-    cat_subset = cat.search(
-        experiment_id=experiments,
-        table_id=["Omon"],
-        institution_id="NCAR",
-        member_id="r10i1p1f1",
-        source_id="CESM2",
-        variable_id=conversion_names.keys(),
-        # dcpp_init_year="20200528",
-        grid_label="gn",
-    )
+def combined_experiments_from_cat_subset(
+    cat_subset: intake.catalog.local.LocalCatalogEntry,
+    experiments: List[str],
+    name: str = "test",
+) -> Optional[xr.Dataset]:
 
     print("cat_subset", cat_subset)
     unique = cat_subset.unique()
@@ -154,9 +91,52 @@ def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
 
     print("dset_dict.keys()", dset_dict.keys())
 
-    ds = combined_experiments_from_dset_dict(dset_dict, experiments)
+    ds = combined_experiments_from_dset_dict(dset_dict, experiments, name)
 
-    ds.to_netcdf(os.path.join(CMIP6_PATH, "ocean.nc"))
+    return ds
+
+
+@timeit
+def get_atmos(experiments: List[str] = ["historical", "ssp585"]) -> None:
+
+    cat_subset_obj = cat.search(
+        experiment_id=["historical", "ssp585"],
+        table_id=["Amon"],  # , "Omon"],
+        institution_id="NCAR",
+        # member_id="r10i1p1f1",
+        source_id="CESM2",
+        variable_id=conversion_names.keys(),
+        # grid_label="gn",
+    )
+    for member_id in cat_subset_obj.unique()["member_id"]:
+        print("member_id", member_id)
+        cat_subset = cat_subset_obj.search(member_id=member_id)
+        ds = combined_experiments_from_cat_subset(cat_subset, experiments, "atmos")
+        print("ds", ds)
+
+    # ds.to_netcdf(os.path.join(CMIP6_PATH, "atmos.nc"))
+
+
+@timeit
+def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
+    cat_subset_obj = cat.search(
+        experiment_id=experiments,
+        table_id=["Omon"],
+        institution_id="NCAR",
+        # member_id="r10i1p1f1",
+        source_id="CESM2",
+        variable_id=conversion_names.keys(),
+        # dcpp_init_year="20200528",
+        grid_label="gn",
+    )
+
+    for member_id in cat_subset_obj.unique()["member_id"]:
+        print("member_id", member_id)
+        cat_subset = cat_subset_obj.search(member_id=member_id)
+        ds = combined_experiments_from_cat_subset(cat_subset, experiments, "atmos")
+        print("ds", ds)
+
+    # ds.to_netcdf(os.path.join(CMIP6_PATH, "ocean.nc"))
 
 
 @timeit
@@ -227,15 +207,25 @@ def regrid_2d_1degree(output_res=1.0, time_chunk=10) -> None:
         )
         return out_ds  # return for later plotting.
 
-    ocean_out = regrid_and_save(ocean_ds, "regrid_2d_1degree_ocean_regridded.nc")
-    regrid_and_save(atmos_ds, "regrid_2d_1degree_atmos_regridded.nc")
+    ocean_out = regrid_and_save(
+        ocean_ds, f"regrid_2d_{output_res:.1}degree_ocean_regridded.nc"
+    )
+    regrid_and_save(atmos_ds, f"regrid_2d_{output_res:.1}degree_atmos_regridded.nc")
 
     print("ocean_out", ocean_out)
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
-    plt.savefig(os.path.join(FIGURE_PATH, "regrid_2d_1degree_ocean_regridded.png"))
+    plt.savefig(
+        os.path.join(
+            FIGURE_PATH, f"regrid_2d_{output_res:.1}degree_ocean_regridded.png"
+        )
+    )
     plt.clf()
     ocean_out.tos.isel(time=0).plot()
-    plt.savefig(os.path.join(FIGURE_PATH, "regrid_2d_1degree_ocean_regridded_1d.png"))
+    plt.savefig(
+        os.path.join(
+            FIGURE_PATH, f"regrid_2d_{output_res:.1}degree_ocean_regridded_1d.png"
+        )
+    )
     plt.clf()
 
 
@@ -399,7 +389,7 @@ def regrid_1d(xesmf: bool = False) -> None:
     print("ocean_ds", ocean_ds)
     ocean_ds.isel(time=0).tos.plot(x="lon", y="lat")
 
-    atmos_ds = open_1d(os.path.join(CMIP6_PATH, "atmos.nc")).isel(CMIP6_PATH=0)
+    atmos_ds = open_1d(os.path.join(CMIP6_PATH, "atmos.nc"))  # .isel(CMIP6_PATH=0)
     print("atmos_ds", atmos_ds)
     atmos_ds.isel(time=0).psl.plot(x="lon", y="lat")
 
@@ -440,8 +430,8 @@ if __name__ == "__main__":
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
     # pass
-    # get_data()
+    get_data()
     # regrid_2d()
-    regrid_2d_1degree(output_res=1)
-    regrid_2d()
-    regrid_1d(xesmf=True)
+    # regrid_2d_1degree(output_res=0.25)
+    # regrid_2d()
+    # regrid_1d(xesmf=True)

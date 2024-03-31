@@ -464,15 +464,20 @@ if __name__ == "__main__":
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
         "order": ("angle", "displacement"),  # order of input features
     }
+    stationid: int = 5
     run_bayesopt_exp(
-        seed=101,
+        seed=10 + stationid,
         constraints=constraints_2d,
-        exp_name="bo-test-2d-hres2",
-        resolution="high",
+        stationid=stationid,
+        exp_name=f"bo-test-2d-midres{stationid:01}",
+        resolution="mid",
         init_steps=5,
         daf_steps=20,
         wrap_test=False,
     )
+    # python -m adbo.exp &> logs/bo-test-2d-midres0.log
+    # python -m adbo.exp &> logs/bo-test-2d-midres2.log
+    # python -m adbo.exp &> logs/bo-test-2d-midres5.log
     # python -m adbo.exp &> logs/bo-test-2d-hres.log
     # python -m adbo.exp &> logs/bo-test-2d-hres2.log
     # python -m adbo.exp &> logs/bo-test-2d-4.log
