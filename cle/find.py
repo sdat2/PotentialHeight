@@ -7,17 +7,23 @@ from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from oct2py import octave
 from oct2py import Oct2Py, get_log
-
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
-from constants import TEMP_0K, BACKGROUND_PRESSURE, DEFAULT_SURF_TEMP
+from .constants import (
+    TEMP_0K,
+    BACKGROUND_PRESSURE,
+    DEFAULT_SURF_TEMP,
+    DATA_PATH,
+    FIGURE_PATH,
+    SRC_PATH,
+)
 
 plot_defaults()
 
 oc = Oct2Py(logger=get_log())
-oc.eval("addpath(genpath('mcle'))")
+oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
 # oc.addpath(".")
 # oc.addpath("mfiles/")
 # path = "/Users/simon/tcpips/cle/"
@@ -29,8 +35,10 @@ oc.eval("addpath(genpath('mcle'))")
 
 
 @timeit
-def run_cle15_octpy(**kwargs) -> Tuple[np.ndarray, np.ndarray, float, float, float]:
-    in_dict = read_json("data/inputs.json")
+def _run_cle15_octpy(
+    **kwargs,
+) -> dict:  # Tuple[np.ndarray, np.ndarray, float, float, float]:
+    in_dict = read_json(os.path.join(DATA_PATH, "inputs.json"))
     in_dict.update(kwargs)
     # print(in_dict)
     # oc.eval("path")
@@ -48,12 +56,61 @@ def run_cle15_octpy(**kwargs) -> Tuple[np.ndarray, np.ndarray, float, float, flo
         in_dict["alpha_eye"],
         nout=5,
     )
-    return rr, VV, rmax, rmerge, Vmerge
+    ou = dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
+    return ou
+
+
+@timeit
+def _run_cle15_octave(inputs, execute):
+    ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
+    if inputs is not None:
+        for key in inputs:
+            if key in ins:
+                ins[key] = inputs[key]
+
+    write_json(ins, os.path.join(DATA_PATH, "inputs.json"))
+
+    # Storm parameters
+
+    # run octave file r0_pm.m
+    if execute:
+        # disabling gui leads to one order of magnitude speedup
+        # also the pop-up window makes me feel sick due to the screen moving about.
+        os.system("octave --no-gui --no-gui-libs mcle/r0_pm.m")
+
+    # read in the output from r0_pm.m
+    ou = read_json(os.path.join(DATA_PATH, "outputs.json"))
+
+    return ou
+
+
+def pressure_from_wind(
+    rr: np.ndarray,  # [m]
+    vv: np.ndarray,  # [m/s]
+    p0: float = 1015 * 100,  # Pa
+    rho0: float = 1.15,  # kg m-3
+    fcor: float = 5e-5,  # m s-2
+) -> np.ndarray:  # [Pa]
+    p = np.zeros(rr.shape)  # [Pa]
+    # rr ascending
+    assert np.all(rr == np.sort(rr))
+    p[-1] = p0
+    for j in range(len(rr) - 1):
+        i = -j - 2
+        # Assume Coriolis force and pressure-gradient balance centripetal force.
+        p[i] = p[i + 1] - rho0 * (
+            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
+        ) * (rr[i + 1] - rr[i])
+        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
+    return p
 
 
 @timeit
 def run_cle15(
-    execute: bool = True, plot: bool = False, inputs: Optional[Dict[str, any]] = None
+    execute: bool = True,
+    plot: bool = False,
+    inputs: Optional[Dict[str, any]] = None,
+    octpy: bool = False,
 ) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
@@ -62,28 +119,17 @@ def run_cle15(
         execute (bool, optional): Execute the model. Defaults to True.
         plot (bool, optional): Plot the output. Defaults to False.
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
+        octpy (bool, optional): Use octpy. Defaults to False.
 
     Returns:
         Tuple[float, float, float, float]: pm, rmax, vmax, pc
     """
-    ins = read_json("data/inputs.json")
-    if inputs is not None:
-        for key in inputs:
-            if key in ins:
-                ins[key] = inputs[key]
 
-    write_json(ins, "data/inputs.json")
-
-    # Storm parameters
-
-    # run octave file r0_pm.m
-    if execute:
-        # disabling gui leads to one order of magnitude speedup
-        # also the pop-up window makes me feel sick due to the screen moving about.
-        os.system("octave --no-gui --no-gui-libs r0_pm.m")
-
-    # read in the output from r0_pm.m
-    ou = read_json("data/outputs.json")
+    if octpy:
+        ou = _run_cle15_octpy(inputs)
+    else:
+        ou = _run_cle15_octave(inputs, execute)
+    ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
 
     if plot:
         # print(ou)
@@ -117,7 +163,7 @@ def run_cle15(
         plt.xlabel("Radius, $r$, [km]")
         plt.ylabel("Rotating wind speed, $V$, [m s$^{-1}$]")
         plt.title("CLE15 Wind Profile")
-        plt.savefig("img/r0_pm.pdf", format="pdf")
+        plt.savefig(os.path.join(FIGURE_PATH, "r0_pm.pdf"), format="pdf")
         plt.clf()
 
     # integrate the wind profile to get the pressure profile
@@ -126,17 +172,7 @@ def run_cle15(
     rho0 = 1.15  # [kg m-3]
     rr = np.array(ou["rr"])  # [m]
     vv = np.array(ou["VV"])  # [m/s]
-    p = np.zeros(rr.shape)  # [Pa]
-    # rr ascending
-    assert np.all(rr == np.sort(rr))
-    p[-1] = p0
-    for j in range(len(rr) - 1):
-        i = -j - 2
-        # Assume Coriolis force and pressure-gradient balance centripetal force.
-        p[i] = p[i + 1] - rho0 * (
-            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + ins["fcor"] * vv[i]
-        ) * (rr[i + 1] - rr[i])
-        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
+    p = pressure_from_wind(rr, vv, p0, rho0, fcor=ins["fcor"])
 
     if plot:
         plt.plot(rr / 1000, p / 100, "k")
@@ -145,7 +181,7 @@ def run_cle15(
         plt.title("CLE15 Pressure Profile")
         plt.ylim([np.min(p) / 100, np.max(p) * 1.0005 / 100])
         plt.xlim([0, rr[-1] / 1000])
-        plt.savefig("img/r0_pmp.pdf", format="pdf")
+        plt.savefig(os.path.join(FIGURE_PATH, "r0_pmp.pdf"), format="pdf")
         plt.clf()
 
     # plot the pressure profile
@@ -333,7 +369,7 @@ def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
     plt.plot(r0s / 1000, pcs / 100, "k")
     plt.xlabel("Radius, $r_a$, [km]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig("img/r0_pc.pdf")
+    plt.savefig(os.path.join(DATA_PATH, "r0_pc.pdf"))
     plt.clf()
     return pcs
 
@@ -349,7 +385,7 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
     plt.plot(r0s / 1000, np.array(pms) / 100, "r")
     plt.xlabel("Radius, $r_a$, [km]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig("img/r0_pc_wang.pdf")
+    plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_wang.pdf"))
     plt.clf()
     return pms
 
@@ -423,12 +459,12 @@ def find_solution_rmaxv(
                 intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution"
             )
         plt.legend()
-        plt.savefig("r0_pc_rmaxadj.pdf")
+        plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_rmaxadj.pdf"))
         plt.clf()
         plt.plot(r0s / 1000, rmaxs / 1000, "k")
         plt.xlabel("Radius, $r_a$, [km]")
         plt.ylabel("Radius of maximum winds, $r_m$, [km]")
-        plt.savefig("r0_rmax.pdf")
+        plt.savefig(os.path.join(FIGURE_PATH, "r0_rmax.pdf"))
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
     return intersect[0][0], vmax_pi, intersect[1][0]
@@ -446,5 +482,8 @@ if __name__ == "__main__":
     # plot_gom_bbox()
     # ds_solns(num=50, verbose=True, ds_name="data/gom_soln_new.nc")
     # find_solution_rmaxv()
-    run_cle15_octpy()
-    run_cle15()
+    # for _ in range(10):
+    #     _run_cle15_octpy()
+
+    for _ in range(10):
+        _run_cle15_octave({}, True)

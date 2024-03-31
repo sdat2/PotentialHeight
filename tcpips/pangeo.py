@@ -42,12 +42,12 @@ def combined_experiments_from_dset_dict(
     Function to combine experiments together.
 
     Args:
-        dset_dict (dict): _description_
-        experiments (List[str]): _description_
-        name (str, optional): _description_. Defaults to "test".
+        dset_dict (dict): Dataset dict from intake.
+        experiments (List[str]): CMIP6 experiments to combine.
+        name (str, optional): Prefix name e.g. "ocean". Defaults to "test".
 
     Returns:
-        xr.Dataset: combined xarray dataset.
+        Optional[xr.Dataset]: combined xarray dataset or None if there aren't a set to combine.
     """
     ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
     # zero_dims = ["member_id", "dcpp_init_year"]

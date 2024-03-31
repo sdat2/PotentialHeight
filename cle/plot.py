@@ -6,9 +6,17 @@ import xarray as xr
 from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
-from tcpips.pi import get_gom_bbox
-from .constants import TEMP_0K, BACKGROUND_PRESSURE, DEFAULT_SURF_TEMP
+
+# from tcpips.pi import get_gom_bbox
+from .constants import (
+    TEMP_0K,
+    BACKGROUND_PRESSURE,
+    DEFAULT_SURF_TEMP,
+    FIGURE_PATH,
+    DATA_PATH,
+)
 from .create_ds import gom_time
+from .find import carnot, pressure_from_wind, _run_cle15_octpy
 
 plot_defaults()
 
@@ -37,7 +45,7 @@ def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
     plt.colorbar(im, label="Year", shrink=0.5)
     plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     plt.ylabel("Radius of outer winds, $r_a$, [km]")
-    plt.savefig("img/rmax_vmax.pdf")
+    plt.savefig(os.path.join(FIGURE_PATH, "rmax_vmax.pdf"))
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
     vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]  # , "time"]
@@ -327,7 +335,7 @@ def plot_gom_solns() -> None:
     axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig("img/rmax_time.pdf")
+    plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
 
 
 def plot_and_calc_gom() -> None:
@@ -348,4 +356,60 @@ def plot_and_calc_gom() -> None:
     axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig("img/rmax_time.pdf")
+    plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
+
+
+def profile_from_vals(rmax: float, vmax: float, r0: float, fcor=7.836084948051749e-05):
+    # rr = np.linspace(0, r0, num=1000)
+    ou = _run_cle15_octpy(**{"r0": r0, "Vmax": vmax, "rmax": rmax, "fcor": fcor})
+    for key in ou:
+        if isinstance(ou[key], np.ndarray):
+            ou[key] = ou[key].flatten()
+    ou["p"] = pressure_from_wind(ou["rr"], ou["VV"], fcor=fcor)
+    return ou
+
+
+@timeit
+def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
+    ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
+    print(ds)
+    print(ds["rmax"])
+    print(ds["vmax"])
+    print(ds["r0"])
+    plot_defaults()
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    for i in range(0, len(ds.time.values), 20):
+        dst = ds.isel(time=i)
+        ou = profile_from_vals(dst["rmax"].values, dst["vmax"].values, dst["r0"].values)
+        print("rr", ou["rr"])
+        axs[0].plot(ou["rr"] / 1000, ou["VV"], color="black", linewidth=linewidth)
+        print("vv", ou["VV"])
+        axs[0].scatter(dst["r0"].values / 1000, 0, color="red", s=marker_size)
+        axs[0].scatter(
+            dst["rmax"].values / 1000, dst["vmax"].values, color="red", s=marker_size
+        )
+        axs[1].plot(ou["rr"] / 1000, ou["p"] / 100, color="black", linewidth=linewidth)
+        print("p", ou["p"])
+        axs[1].scatter(
+            dst["rmax"].values / 1000,
+            dst["pm"].values / 100,
+            color="red",
+            s=marker_size,
+        )
+
+    axs[0].set_ylabel("Wind speed, $V$ [m s$^{-1}$]")
+    axs[1].set_ylabel("Pressure, $p$ [hPa]")
+    plt.xlabel("Radius, $r$, [km]")
+    plt.savefig(os.path.join(FIGURE_PATH, "c15_timeseries_profiles.pdf"))
+
+
+if __name__ == "__main__":
+    # python plot.py
+    # plot_gom_bbox()
+    # plot_gom_bbox_soln()
+    # plot_soln_curves()
+    # plot_profiles()
+    # plot_from_ds()
+    # plot_and_calc_gom()
+    # plot_gom_solns()
+    plot_c15_profiles_over_time()

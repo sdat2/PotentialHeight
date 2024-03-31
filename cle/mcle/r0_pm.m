@@ -3,7 +3,8 @@
 clear
 clc
 close all
-addpath(genpath('mfiles/'));
+addpath(genpath('mcle/'));
+addpath(genpath('mcle/mfiles/'));
 
 % read in JSON file of inputs
 fileName = 'data/inputs.json'; % filename in JSON extension
@@ -30,3 +31,4 @@ fid = fopen('data/outputs.json', 'w');
 if fid == -1, error('Cannot create JSON file'); end
 fwrite(fid, out_str, 'char');
 fclose(fid);
+
