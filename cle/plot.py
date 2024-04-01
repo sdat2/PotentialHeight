@@ -377,6 +377,8 @@ def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
     print(ds["vmax"])
     print(ds["r0"])
     plot_defaults()
+    print(ds.time.values)
+    
     fig, axs = plt.subplots(2, 1, sharex=True)
     for i in range(0, len(ds.time.values), 20):
         dst = ds.isel(time=i)
@@ -399,8 +401,10 @@ def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
 
     axs[0].set_ylabel("Wind speed, $V$ [m s$^{-1}$]")
     axs[1].set_ylabel("Pressure, $p$ [hPa]")
+    label_subplots(axs)
     plt.xlabel("Radius, $r$, [km]")
     plt.savefig(os.path.join(FIGURE_PATH, "c15_timeseries_profiles.pdf"))
+    plt.clf()
 
 
 if __name__ == "__main__":

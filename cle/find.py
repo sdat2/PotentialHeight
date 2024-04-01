@@ -91,6 +91,21 @@ def pressure_from_wind(
     rho0: float = 1.15,  # kg m-3
     fcor: float = 5e-5,  # m s-2
 ) -> np.ndarray:  # [Pa]
+    """
+    Use coriolis force and pressure gradient force to find physical pressure profile to correspond to the velocity profile.
+
+    TODO: decrease air density in response to decreased pressure (will make central pressure lower).
+
+    Args:
+        rr (np.ndarray): radii array [m].
+        vv (np.ndarray): velocity array [m/s]
+        p0 (float): ambient pressure in Pa.
+        rho0 (float): Air density at ambient pressure [kg/m3].
+        fcor (float): Coriolis force.
+
+    Returns:
+        np.ndarray: Pressure array [Pa].
+    """
     p = np.zeros(rr.shape)  # [Pa]
     # rr ascending
     assert np.all(rr == np.sort(rr))
@@ -98,11 +113,12 @@ def pressure_from_wind(
     for j in range(len(rr) - 1):
         i = -j - 2
         # Assume Coriolis force and pressure-gradient balance centripetal force.
+        # delta P = - rho * ( v^2/r + fcor * vv[i] ) * delta r
         p[i] = p[i + 1] - rho0 * (
             vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
         ) * (rr[i + 1] - rr[i])
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
-    return p
+    return p  # pressure profile [Pa]
 
 
 @timeit
@@ -122,10 +138,10 @@ def run_cle15(
         octpy (bool, optional): Use octpy. Defaults to False.
 
     Returns:
-        Tuple[float, float, float, float]: pm, rmax, vmax, pc
+        Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
     """
 
-    if octpy:
+    if octpy:  # should be faster if graphical element disabled
         ou = _run_cle15_octpy(inputs)
     else:
         ou = _run_cle15_octave(inputs, execute)
@@ -172,7 +188,7 @@ def run_cle15(
     rho0 = 1.15  # [kg m-3]
     rr = np.array(ou["rr"])  # [m]
     vv = np.array(ou["VV"])  # [m/s]
-    p = pressure_from_wind(rr, vv, p0, rho0, fcor=ins["fcor"])
+    p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])
 
     if plot:
         plt.plot(rr / 1000, p / 100, "k")
