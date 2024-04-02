@@ -8,7 +8,7 @@ potential size and potential intensity.
 """
 
 import os
-from typing import Dict, List, Optional
+from typing import Tuple, Dict, List, Optional
 import intake
 import dask
 import xesmf as xe
@@ -42,12 +42,12 @@ def combined_experiments_from_dset_dict(
     Function to combine experiments together.
 
     Args:
-        dset_dict (dict): Dataset dict from intake.
-        experiments (List[str]): CMIP6 experiments to combine.
-        name (str, optional): Prefix name e.g. "ocean". Defaults to "test".
+        dset_dict (dict): dictionary of datasets.
+        experiments (List[str]): list of experiments to combine.
+        name (str, optional): Defaults to "test".
 
     Returns:
-        Optional[xr.Dataset]: combined xarray dataset or None if there aren't a set to combine.
+        xr.Dataset: combined xarray dataset.
     """
     ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
     # zero_dims = ["member_id", "dcpp_init_year"]
@@ -100,7 +100,7 @@ def combined_experiments_from_cat_subset(
 def get_atmos(experiments: List[str] = ["historical", "ssp585"]) -> None:
 
     cat_subset_obj = cat.search(
-        experiment_id=["historical", "ssp585"],
+        experiment_id=experiments,
         table_id=["Amon"],  # , "Omon"],
         institution_id="NCAR",
         # member_id="r10i1p1f1",
@@ -146,7 +146,7 @@ def get_data() -> None:
 
 
 @timeit
-def regrid_2d_1degree(output_res=1.0, time_chunk=10) -> None:
+def regrid_2d_1degree(output_res: float = 1.0, time_chunk: int = 10) -> None:
     plot_defaults()
 
     def open_ds(path: str) -> xr.Dataset:
@@ -235,7 +235,7 @@ def regrid_2d() -> None:
 
     def open_ds(name):
         ds = xr.open_dataset(name)
-        ds = ds.drop_vars(
+        return ds.drop_vars(
             [
                 x
                 for x in [
@@ -251,8 +251,7 @@ def regrid_2d() -> None:
                 ]
                 if x in ds
             ]
-        )
-        return ds
+        )  # return ds
 
     ocean_ds = open_ds(os.path.join(CMIP6_PATH, "ocean.nc"))
     atmos_ds = open_ds(os.path.join(CMIP6_PATH, "atmos.nc"))  # .isel(CMIP6_PATH=0)
@@ -355,8 +354,8 @@ def regrid_2d() -> None:
 
 @timeit
 def regrid_1d(xesmf: bool = False) -> None:
-    def open_1d(name):
-        ds = xr.open_dataset(name)
+    def open_1d(path: str):
+        ds = xr.open_dataset(path)
         # plt.imshow(ds.lat.values)
         #
         # plt.imshow(ds.lon.values)

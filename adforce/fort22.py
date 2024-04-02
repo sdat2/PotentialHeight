@@ -446,7 +446,11 @@ def gen_ps_f(
 
 
 @timeit
-def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray,     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),) -> xr.Dataset:
+def moving_coords_from_tj(
+    coords: xr.DataArray,
+    tj: xr.DataArray,
+    profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
+) -> xr.Dataset:
     """
     Make a moving grid from the tropical cyclone trajectory.
 
@@ -464,7 +468,9 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray,     profile_pa
     lats = np.expand_dims(coords.lon.values, 0) + clat
     lons = np.expand_dims(coords.lat.values, 0) + clon
 
-    ifunc: Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]] = gen_ps_f(profile_path=profile_path)
+    ifunc: Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]] = gen_ps_f(
+        profile_path=profile_path
+    )
 
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
     psfc, wsp = ifunc(distances)
@@ -528,13 +534,16 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray,     profile_pa
             ),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(rank=2),
-        description="Tropical cyclone moving grid.",
+        attrs=dict(rank=2, description="Tropical cyclone moving grid."),
     )
 
 
 @timeit
-def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray,     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json")) -> xr.Dataset:
+def static_coords_from_tj(
+    orig: xr.DataArray,
+    tj: xr.DataArray,
+    profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
+) -> xr.Dataset:
     """
     Make a static input grid from the tropical cyclone trajectory.
 
@@ -632,7 +641,9 @@ def return_new_input(
         f22_dt["TC1"]["time"].values,
     )
     mc = moving_coords_from_tj(
-        f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]], tj_ds_mv
+        f22_dt["TC1"].to_dataset().isel(time=0)[["lon", "lat"]],
+        tj_ds_mv,
+        profile_path=profile_path,
     )
     tj_ds_sc = trajectory_ds_from_time(
         angle,
@@ -642,7 +653,9 @@ def return_new_input(
         impact_time,
         f22_dt["Main"]["time"].values,
     )
-    sc = static_coords_from_tj(f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_sc)
+    sc = static_coords_from_tj(
+        f22_dt["Main"].to_dataset()[["lon", "lat"]], tj_ds_sc, profile_path=profile_path
+    )
     node0 = dt.DataTree(name=None)
     node1 = dt.DataTree(name="Main", parent=node0, data=sc)
     node2 = dt.DataTree(name="TC1", parent=node0, data=mc)
@@ -663,8 +676,20 @@ def save_forcing(
     impact_lat: float = 29.9511,
     impact_time=np.datetime64("2004-08-13T12", "ns"),
 ) -> None:
+    """
+    Save the forcing file for ADCIRC.
+
+    Args:
+        path (str, optional): Defaults to "/work/n01/n01/sithom/adcirc-swan/NWS13set3".
+        profile_path (str, optional): Defaults to os.path.join(CLE_DATA_PATH, "outputs.json").
+        angle (float, optional): Defaults to 0 [deg].
+        trans_speed (float, optional): Defaults to 7.71 [m/s].
+        impact_lon (float, optional): Defaults to -89.4715 [deg].
+        impact_lat (float, optional): Defaults to 29.9511 [deg].
+        impact_time (_type_, optional): Defaults to np.datetime64("2004-08-13T12", "ns").
+    """
     node0 = return_new_input(
-        profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
+        profile_path=profile_path,
         angle=angle,
         trans_speed=trans_speed,  # impact_lon=impact_lon
         impact_lon=impact_lon,

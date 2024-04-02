@@ -81,6 +81,7 @@ def objective_f(
 
     Args:
         config (dict): Dictionary with the constraints for the model.
+        profile_name (str, optional): Name of the profile. Defaults to "outputs.json".
         exp_name (str, optional): Name for folder. Defaults to "bo_test".
         stationid (int, optional): Which coast tidal gauge to sample near. Defaults to 3.
         wrap_test (bool, optional): If True, do not run the ADCIRC model. Defaults to False.
@@ -110,6 +111,13 @@ def objective_f(
         return tmp_dir
 
     def add_query_to_output(real_query: tf.Tensor, real_result: tf.Tensor) -> None:
+        """
+        Add the query and result to the output dictionary.
+
+        Args:
+            real_query (tf.Tensor): The resecaled query.
+            real_result (tf.Tensor): The result with the correct sign.
+        """
         nonlocal output
         output[call_number] = {
             "": temp_dir(),
@@ -187,6 +195,7 @@ def gp_model_callback_maker(
     Args:
         direc (str): Directory to save the models.
         config (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
+        acq_rule (Optional[EfficientGlobalOptimization], optional): The acquisition rule. Defaults to None.
 
     Returns:
         Callable[[any, any, any], bool]: Callback function for early_stop_callback.
@@ -332,6 +341,7 @@ def run_bayesopt_exp(
     Args:
         constraints (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
         seed (int, optional): Seed to initialize. Defaults to 10.
+        profile_name (str, optional): Name of the profile. Defaults to "outputs.json".
         exp_name (str, optional): Experiment name. Defaults to "bo_test".
         root_exp_direc (str, optional): Root directory for the experiments. Defaults to "/work/n01/n01/sithom/adcirc-swan/exp".
         init_steps (int, optional): How many sobol sambles. Defaults to 10.
@@ -344,7 +354,7 @@ def run_bayesopt_exp(
 
     # set up BayesOpt
     dimensions_input = len(constraints["order"])
-    assert dimensions_input == 2
+    # assert dimensions_input == 2
     search_space = trieste.space.Box([0] * dimensions_input, [1] * dimensions_input)
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
@@ -468,13 +478,14 @@ if __name__ == "__main__":
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
         "order": ("angle", "displacement"),  # order of input features
     }
-    stationid: int = 5
+    stationid: int = 3
+    year = 2097
     run_bayesopt_exp(
-        seed=10 + stationid,
-        profile_name="outputs.json",
-        constraints=constraints_2d,
+        seed=20 + stationid,
+        profile_name=f"{year}.json",
+        constraints=DEFAULT_CONSTRAINTS,
         stationid=stationid,
-        exp_name=f"bo-test-2d-midres{stationid:01}",
+        exp_name=f"bo-test-2d-midres{stationid:01}-{year}",
         resolution="mid",
         init_steps=5,
         daf_steps=20,
@@ -482,6 +493,7 @@ if __name__ == "__main__":
     )
     # python -m adbo.exp &> logs/bo-test-2d-midres0.log
     # python -m adbo.exp &> logs/bo-test-2d-midres2.log
+    # python -m adbo.exp &> logs/bo-test-2d-midres3-2097.log
     # python -m adbo.exp &> logs/bo-test-2d-midres5.log
     # python -m adbo.exp &> logs/bo-test-2d-hres.log
     # python -m adbo.exp &> logs/bo-test-2d-hres2.log
