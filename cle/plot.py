@@ -6,6 +6,8 @@ import xarray as xr
 from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
+from sithom.io import write_json
+
 
 # from tcpips.pi import get_gom_bbox
 from .constants import (
@@ -343,6 +345,7 @@ def plot_and_calc_gom() -> None:
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
     times = [int(x) for x in range(1850, 2100, 20)]
 
+    # pick the August average in the data sets
     for time in [str(t) + "-08-15" for t in times]:
         solns += [gom_time(time=time, plot=False)]
 
@@ -359,13 +362,17 @@ def plot_and_calc_gom() -> None:
     plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
 
 
-def profile_from_vals(rmax: float, vmax: float, r0: float, fcor=7.836084948051749e-05):
+def profile_from_vals(
+    rmax: float, vmax: float, r0: float, fcor=7.836084948051749e-05, p0=1016 * 100
+):
     # rr = np.linspace(0, r0, num=1000)
-    ou = _run_cle15_octpy(**{"r0": r0, "Vmax": vmax, "rmax": rmax, "fcor": fcor})
+    ou = _run_cle15_octpy(
+        **{"r0": r0, "Vmax": vmax, "rmax": rmax, "fcor": fcor, "p0": p0 / 100}
+    )
     for key in ou:
         if isinstance(ou[key], np.ndarray):
             ou[key] = ou[key].flatten()
-    ou["p"] = pressure_from_wind(ou["rr"], ou["VV"], fcor=fcor)
+    ou["p"] = pressure_from_wind(ou["rr"], ou["VV"], fcor=fcor, p0=p0)
     return ou
 
 
@@ -378,19 +385,31 @@ def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
     print(ds["r0"])
     plot_defaults()
     print(ds.time.values)
-    
+
     fig, axs = plt.subplots(2, 1, sharex=True)
-    for i in range(0, len(ds.time.values), 20):
-        dst = ds.isel(time=i)
-        ou = profile_from_vals(dst["rmax"].values, dst["vmax"].values, dst["r0"].values)
+    colors = ["red", "blue"]
+
+    for i, t in enumerate([-2, -60]):  # range(0, len(ds.time.values), 20):
+        dst = ds.isel(time=t)
+        time = dst.time.values
+        ou = profile_from_vals(
+            dst["rmax"].values,
+            dst["vmax"].values,
+            dst["r0"].values,
+            p0=dst["msl"].values * 100,
+        )
         print("rr", ou["rr"])
-        axs[0].plot(ou["rr"] / 1000, ou["VV"], color="black", linewidth=linewidth)
+        axs[0].plot(
+            ou["rr"] / 1000, ou["VV"], color=colors[i], linewidth=linewidth, label=time
+        )
         print("vv", ou["VV"])
         axs[0].scatter(dst["r0"].values / 1000, 0, color="red", s=marker_size)
         axs[0].scatter(
             dst["rmax"].values / 1000, dst["vmax"].values, color="red", s=marker_size
         )
-        axs[1].plot(ou["rr"] / 1000, ou["p"] / 100, color="black", linewidth=linewidth)
+        axs[1].plot(
+            ou["rr"] / 1000, ou["p"] / 100, color=colors[i], linewidth=linewidth
+        )
         print("p", ou["p"])
         axs[1].scatter(
             dst["rmax"].values / 1000,
@@ -398,8 +417,16 @@ def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
             color="red",
             s=marker_size,
         )
+        """        axs[1].scatter(
+            0,
+            dst["pmin"].values / 100,
+            color="red",
+            s=marker_size,
+        )"""
+        write_json(ou, os.path.join(DATA_PATH, f"{time}.json"))
 
     axs[0].set_ylabel("Wind speed, $V$ [m s$^{-1}$]")
+    axs[0].legend()
     axs[1].set_ylabel("Pressure, $p$ [hPa]")
     label_subplots(axs)
     plt.xlabel("Radius, $r$, [km]")
@@ -417,3 +444,7 @@ if __name__ == "__main__":
     # plot_and_calc_gom()
     # plot_gom_solns()
     plot_c15_profiles_over_time()
+    ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
+    print(ds)
+    print([var for var in ds])
+    print(ds["msl"].values)
