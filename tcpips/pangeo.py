@@ -8,7 +8,7 @@ potential size and potential intensity.
 """
 
 import os
-from typing import Tuple, Dict, List, Optional
+from typing import Dict, List, Optional
 import intake
 import dask
 import xesmf as xe

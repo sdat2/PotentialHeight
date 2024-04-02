@@ -39,6 +39,7 @@ import matplotlib.pyplot as plt
 from slurmpy import Slurm
 from sithom.time import timeit
 from src.constants import NEW_ORLEANS, KATRINA_TIDE_NC
+from cle.constants import DATA_PATH as CLE_DATA_PATH
 from .fort22 import save_forcing
 from .mesh import xr_loader
 
@@ -55,6 +56,7 @@ node_dict: Dict[str, int] = {"low": 1, "mid": 1, "high": 8}
 @timeit
 def setup_new(
     new_path: str,
+    profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
     angle: float = 0,
     trans_speed: float = 7.71,
     impact_lon: float = -89.4715,
@@ -86,6 +88,7 @@ def setup_new(
 
     save_forcing(
         new_path,
+        profile_path=profile_path,
         angle=angle,
         trans_speed=trans_speed,
         impact_lon=impact_lon,
@@ -259,6 +262,7 @@ def select_point_f(stationid: int, resolution: str = "mid") -> Callable[[str], f
 @timeit
 def run_wrapped(
     out_path: str = "test-run",
+    profile_name: str = "2025.json",
     select_point: str = select_point_f(3, resolution="mid"),
     angle: float = 0,
     trans_speed: float = 7.71,
@@ -266,7 +270,7 @@ def run_wrapped(
     impact_lat: float = 29.9511,
     impact_time=np.datetime64("2004-08-13T12", "ns"),
     resolution: str = "mid",
-):
+) -> float:
     """
     Run the ADCIRC model and wait for it to finish.
 
@@ -286,6 +290,7 @@ def run_wrapped(
     # add new forcing
     setup_new(
         out_path,
+        profile_path=os.path.join(CLE_DATA_PATH, profile_name),
         angle=angle,
         trans_speed=trans_speed,
         impact_lon=impact_lon,
@@ -300,7 +305,7 @@ def run_wrapped(
 
 
 @timeit
-def read_results(path: str = OG_PATH, stationid: int = 3):
+def read_results(path: str = OG_PATH, stationid: int = 3) -> float:
     """
     Read the results of the ADCIRC run.
 
@@ -339,6 +344,7 @@ if __name__ == "__main__":
     # run_angle_new()
     run_wrapped(
         out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap3",
+        profile_name="2025.json",
         select_point=select_point_f(3, resolution="high"),
         angle=10,
         resolution="high",

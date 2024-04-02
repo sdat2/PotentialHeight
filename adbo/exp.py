@@ -66,6 +66,7 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 @timeit
 def objective_f(
     config: dict,
+    profile_name: str = "outputs.json",
     exp_name: str = "bo_test",
     stationid: int = 3,
     wrap_test: bool = False,
@@ -147,6 +148,7 @@ def objective_f(
             else:
                 real_result = run_wrapped(
                     out_path=tmp_dir,
+                    profile_name=profile_name,
                     resolution=resolution,
                     select_point=select_point,
                     **inputs,
@@ -315,6 +317,7 @@ def gp_model_callback_maker(
 def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
+    profile_name: str = "outputs.json",
     resolution: str = "mid",
     exp_name: str = "bo_test",
     root_exp_direc: str = "/work/n01/n01/sithom/adcirc-swan/exp",
@@ -347,6 +350,7 @@ def run_bayesopt_exp(
     print("initial_query_points", initial_query_points, type(initial_query_points))
     init_objective = objective_f(
         constraints,
+        profile_name=profile_name,
         stationid=stationid,
         exp_name=exp_name,
         wrap_test=wrap_test,
@@ -467,6 +471,7 @@ if __name__ == "__main__":
     stationid: int = 5
     run_bayesopt_exp(
         seed=10 + stationid,
+        profile_name="outputs.json",
         constraints=constraints_2d,
         stationid=stationid,
         exp_name=f"bo-test-2d-midres{stationid:01}",

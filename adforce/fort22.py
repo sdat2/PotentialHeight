@@ -397,7 +397,9 @@ def pressures_profile(  # add pressure profile to wind profile
 
 
 def gen_ps_f(
-    profile_path: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/data/outputs.json",
+    profile_path: str = os.path.join(
+        CLE_DATA_PATH, "outputs.json"
+    )  # "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/data/outputs.json",
 ) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
     """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
 
@@ -444,7 +446,7 @@ def gen_ps_f(
 
 
 @timeit
-def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
+def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray,     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),) -> xr.Dataset:
     """
     Make a moving grid from the tropical cyclone trajectory.
 
@@ -462,7 +464,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
     lats = np.expand_dims(coords.lon.values, 0) + clat
     lons = np.expand_dims(coords.lat.values, 0) + clon
 
-    ifunc: Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]] = gen_ps_f()
+    ifunc: Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]] = gen_ps_f(profile_path=profile_path)
 
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
     psfc, wsp = ifunc(distances)
@@ -532,7 +534,7 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
 
 
 @timeit
-def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
+def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray,     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json")) -> xr.Dataset:
     """
     Make a static input grid from the tropical cyclone trajectory.
 
@@ -548,7 +550,7 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
     clon = tj.clon.values.reshape(-1, 1, 1)
     clat = tj.clat.values.reshape(-1, 1, 1)
 
-    ifunc = gen_ps_f()
+    ifunc = gen_ps_f(profile_path=profile_path)
 
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
     psfc, wsp = ifunc(distances)
@@ -595,6 +597,7 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
 
 @timeit
 def return_new_input(
+    profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
     angle: float = 0,
     trans_speed: float = 7.71,
     impact_lon: float = -89.4715,  # NO+0.6
@@ -653,6 +656,7 @@ def return_new_input(
 
 def save_forcing(
     path: str = "/work/n01/n01/sithom/adcirc-swan/NWS13set3",
+    profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
     angle: float = 0,
     trans_speed: float = 7.71,
     impact_lon: float = -89.4715,
@@ -660,6 +664,7 @@ def save_forcing(
     impact_time=np.datetime64("2004-08-13T12", "ns"),
 ) -> None:
     node0 = return_new_input(
+        profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
         angle=angle,
         trans_speed=trans_speed,  # impact_lon=impact_lon
         impact_lon=impact_lon,
