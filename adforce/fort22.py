@@ -13,13 +13,14 @@ TODO: Could do with some unit tests.
 TODO: is 1015 mb as normal too high?
 """
 
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Callable
 import os
 import numpy as np
 import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
 from tcpips.constants import DATA_PATH, FIGURE_PATH
+from cle.constants import DATA_PATH as CLE_DATA_PATH
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.place import Point
@@ -354,13 +355,28 @@ def trajectory_ds_from_time(
     )
 
 
-def pressures_profile(profile: dict) -> dict:
+def pressures_profile(  # add pressure profile to wind profile
+    profile: dict,
+    fcor: float = 5e-5,  # fcor
+    p0: float = 1015 * 100,  # [Pa]
+    rho0: float = 1.15,  # [kg m-3]
+) -> dict:
+    """
+    Add pressure profile to wind profile.
+
+    Args:
+        profile (dict): Wind profile.
+        fcor (float, optional): Coriolis parameter. Defaults to 5e-5.
+        p0 (float, optional): Background pressure. Defaults to 1015 * 100.
+        rho0 (float, optional): Background density. Defaults to 1.15.
+
+    Returns:
+        dict: Wind profile with pressure profile.
+    """
+
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
     # could speed up but is very quick anyway
-    fcor = 5e-5  # should vary with latitude
-    p0 = 1015 * 100  # [Pa], should be settable
-    rho0 = 1.15  # [kg m-3]
     rr = np.array(profile["rr"])  # [m]
     vv = np.array(profile["VV"])  # [m/s]
     p = np.zeros(rr.shape)  # [Pa]
@@ -375,52 +391,70 @@ def pressures_profile(profile: dict) -> dict:
         ) * (rr[i + 1] - rr[i])
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
 
-    profile["p"] = p / 100
+    profile["p"] = p / 100  # pressures in hPa
 
     return profile
 
 
-def gen_ps_f() -> callable:
-    """Generate the interpolation file from the Chavas15 profile.
+def gen_ps_f(
+    profile_path: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/data/outputs.json",
+) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
+    """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
 
-    Maybe I should also make options for any other azimuthally symetric model.
+    Maybe I should also make options for any other azimuthally symetric model automatically.
 
-    This should potentially be changed to take a file name as input,
-    and to allow each timestep to have a different profile.
+    This should potentially be changed to allow each timestep to have a different profile.
 
     That would require some clever way of interpolating each time step.
 
     TODO: Make it possible to feed a profile file in some way.
     """
-    chavas_profile = read_json(
-        "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/data/outputs.json"
-    )
+    chavas_profile = read_json(profile_path)
     # print(chavas_profile.keys())
     chavas_profile = pressures_profile(chavas_profile)
     radii = np.array(chavas_profile["rr"], dtype="float32")
-    velocities = np.array(chavas_profile["VV"], dtype="float32")
+    windspeeds = np.array(chavas_profile["VV"], dtype="float32")
     pressures = np.array(chavas_profile["p"], dtype="float32")
-    # print(radii[0:10], velocities[0:10], pressures[0:10])
+    # print(radii[0:10], windspeeds[0:10], pressures[0:10])
     if False:
         import matplotlib.pyplot as plt
 
         fig, axs = plt.subplots(2, 1)
         axs[0].plot(radii, pressures)
-        axs[1].plot(radii, velocities)
+        axs[1].plot(radii, windspeeds)
         plt.savefig("prof.png")
 
-    def f(distances):
+    def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Interpolate the pressure and wind fields from the wind profile file.
+
+        Args:
+            distances (np.ndarray): distances from the center of the storm.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: pressure, wind speed.
+        """
         pressure_cube = np.interp(distances, radii, pressures)
-        velo_cube = np.interp(distances, radii, velocities)
+        velo_cube = np.interp(distances, radii, windspeeds)
         return np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(
             velo_cube, nan=0.0
         )
 
-    return f
+    return interp_func
 
 
 @timeit
 def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
+    """
+    Make a moving grid from the tropical cyclone trajectory.
+
+    Args:
+        coords (xr.DataArray): dataarray to take the lon and lat from.
+        tj (xr.DataArray): dataarray with the tropical cyclone trajectory.
+
+    Returns:
+        xr.Dataset: Dataset with the moving grid with tropical cyclone surface velocities and pressure.
+    """
     coords.lon[:] = coords.lon[:] - coords.lon.mean()
     coords.lat[:] = coords.lat[:] - coords.lat.mean()
     clon = tj.clon.values.reshape(-1, 1, 1)
@@ -428,13 +462,13 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
     lats = np.expand_dims(coords.lon.values, 0) + clat
     lons = np.expand_dims(coords.lat.values, 0) + clon
 
-    f = gen_ps_f()
+    ifunc: Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]] = gen_ps_f()
 
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
-    psfc, u = f(distances)
+    psfc, wsp = ifunc(distances)
 
     rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
-    u10, v10 = np.sin(rad) * u, np.cos(rad) * u
+    u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
 
     def transpose(npa: np.ndarray) -> np.ndarray:
         return np.moveaxis(npa, 1, -1)
@@ -492,24 +526,35 @@ def moving_coords_from_tj(coords: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
             ),
             # reference_time=self.impact_time,
         ),
-        attrs=dict(rank=2),  # description="Tropical cyclone moving grid.",
+        attrs=dict(rank=2),
+        description="Tropical cyclone moving grid.",
     )
 
 
 @timeit
 def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
+    """
+    Make a static input grid from the tropical cyclone trajectory.
+
+    Args:
+        orig (xr.DataArray): Original dataarray to take the lon and lat from.
+        tj (xr.DataArray): dataarray with the tropical cyclone trajectory.
+
+    Returns:
+        xr.Dataset: Dataset with the static grid with tropical cyclone surface velocities and pressure.
+    """
     lats = np.expand_dims(orig.lat.values, 0)
     lons = np.expand_dims(orig.lon.values, 0)
     clon = tj.clon.values.reshape(-1, 1, 1)
     clat = tj.clat.values.reshape(-1, 1, 1)
 
-    f = gen_ps_f()
+    ifunc = gen_ps_f()
 
     distances = np.sqrt((lons - clon) ** 2 + (lats - clat) ** 2) * 111e3
-    psfc, u = f(distances)
+    psfc, wsp = ifunc(distances)
 
     rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
-    u10, v10 = np.sin(rad) * u, np.cos(rad) * u
+    u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
 
     # print(lats, lons)
     return xr.Dataset(
@@ -550,13 +595,27 @@ def static_coords_from_tj(orig: xr.DataArray, tj: xr.DataArray) -> xr.Dataset:
 
 @timeit
 def return_new_input(
-    angle=0,
-    trans_speed=7.71,
-    impact_lon=-89.4715,  # NO+0.6
-    impact_lat=29.9511,  # NO
+    angle: float = 0,
+    trans_speed: float = 7.71,
+    impact_lon: float = -89.4715,  # NO+0.6
+    impact_lat: float = 29.9511,  # NO
     impact_time=np.datetime64("2004-08-13T12", "ns"),
 ) -> dt.DataTree:
-    hard_path = "/work/n01/n01/sithom/adcirc-swan/tcpips/data/blank.nc"
+    """
+    Return a new input file for ADCIRC.
+
+    Args:
+        angle (float, optional): Angle of the storm. Defaults
+        to 0.
+        trans_speed (float, optional): Translation speed of the storm. Defaults to 7.71.
+        impact_lon (float, optional): Longitude of the storm. Defaults to -89.4715.
+        impact_lat (float, optional): Latitude of the storm. Defaults to 29.9511.
+        impact_time ([type], optional): Time of the storm. Defaults to np.datetime64("2004-08-13T12", "ns").
+
+    Returns:
+        dt.DataTree: DataTree with the new input file data.
+    """
+    hard_path: str = os.path.join(DATA_PATH, "blank.nc")
     # f22_dt = dt.open_datatree(os.path.join(DATA_PATH, "blank.nc"))
     f22_dt = dt.open_datatree(hard_path)
     print("f22_dt", f22_dt)
