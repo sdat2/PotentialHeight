@@ -32,6 +32,10 @@ from src.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 plot_defaults()
 
 ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path
@@ -479,13 +483,13 @@ if __name__ == "__main__":
         "order": ("angle", "displacement"),  # order of input features
     }
     stationid: int = 3
-    year = 2097
+    year: int = 2025
     run_bayesopt_exp(
-        seed=20 + stationid,
+        seed=20 + stationid + year,
         profile_name=f"{year}.json",
         constraints=DEFAULT_CONSTRAINTS,
         stationid=stationid,
-        exp_name=f"bo-test-2d-midres{stationid:01}-{year}",
+        exp_name=f"bo-test-2d-midres-agg-{stationid:01}-{year}",
         resolution="mid",
         init_steps=5,
         daf_steps=20,

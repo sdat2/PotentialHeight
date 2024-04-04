@@ -7,6 +7,10 @@ from tqdm import tqdm
 from sithom.plot import plot_defaults, feature_grid
 from sithom.time import timeit
 
+import matplotlib
+
+matplotlib.use("Agg")
+
 
 @timeit
 def plot_gps(
