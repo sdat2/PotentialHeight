@@ -47,24 +47,29 @@ python -m adbo.exp &> logs/bo_test3.txt
 ## Extension priorities
 
 Done:
+
  - Get 430k node mesh working.
  - BayesOpt animations/graphs.
     - Impact animation (still need to add winds in).
     - GP convergence animation (2D).
 
 In Progress:
- - BayesOpt for different places along the coast.
+
  - CMIP6 processing for potential size and intensity.
+ - BayesOpt for different places along the coast.
+ - Fix 430k wrapping.
+ - Sync times up.
 
 TODO:
 
- - Get Chavas et al. 2015 profile to work in python rather than just Matlab (~x100 speed up).
+ - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
  - Scipy distribution fitting for CMIP6.
  - Better tidal gauge comparisons for different events.
+ - 
 
 ## SurgeNet exploration
 
- - Calculate dual graph as in Benteviglio et al. 2024. SWE-GNN
+ - Calculate dual graph as in Benteviglio et al. 2024 SWE-GNN.
  - Consider NeuralODE to fix the smoothing problem of deep GNN.
  - Would diffusion/GANs also help?
  - How to include the dynamic features and tides?

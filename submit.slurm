@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=6:00:0
+#SBATCH --time=24:00:0
 
 # Replace [budget code] below with your project code (e.g. t01)
 

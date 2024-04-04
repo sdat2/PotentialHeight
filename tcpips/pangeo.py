@@ -52,6 +52,8 @@ def combined_experiments_from_dset_dict(
     ds_d: Dict[str, xr.Dataset] = {}  # order datasets by experiment order
     # zero_dims = ["member_id", "dcpp_init_year"]
     for k, ds in dset_dict.items():
+        assert ds.member_id.size == 1
+        ds_member_id = ds.member_id.values[0]
         if "member_id" in ds.dims:
             ds = ds.isel(member_id=0)
         if "dcpp_init_year" in ds.dims:
@@ -61,14 +63,18 @@ def combined_experiments_from_dset_dict(
         for experiment in experiments:
             if experiment in k:
                 ds_d[experiment] = ds
-                ds.to_netcdf(os.path.join(CMIP6_PATH, f"{name}_{experiment}_{k}.nc"))
+                name = os.path.join(
+                    CMIP6_PATH, f"{name}_{experiment}_{k}_{ds_member_id}.nc"
+                )
+                print("saving", name, "ds")
+                ds.to_netcdf(name)
 
+    # put the two experiments together
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
         if len(ds_d) == len(experiments):
             ds = xr.concat([ds_d[experiment] for experiment in experiments], dim="time")
         else:
             ds = None
-        # ds = xr.concat([ds_d[experiment] for experiment in experiments], dim="time")
 
     return ds
 
@@ -117,6 +123,28 @@ def get_atmos(experiments: List[str] = ["historical", "ssp585"]) -> None:
     # ds.to_netcdf(os.path.join(CMIP6_PATH, "atmos.nc"))
 
 
+def get_data_part(
+    experiments: List[str] = ["historical", "ssp585"],
+    table: str = "Omon",
+    name: str = "ocean",
+):
+    cat_subset_obj = cat.search(
+        experiment_id=experiments,
+        table_id=[table],
+        institution_id="NCAR",
+        # member_id="r10i1p1f1",
+        source_id="CESM2",
+        variable_id=conversion_names.keys(),
+        # dcpp_init_year="20200528",
+        grid_label="gn",
+    )
+    for member_id in cat_subset_obj.unique()["member_id"]:
+        print("member_id", member_id)
+        cat_subset = cat_subset_obj.search(member_id=member_id)
+        ds = combined_experiments_from_cat_subset(cat_subset, experiments, name)
+        print("ds", ds)
+
+
 @timeit
 def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
     cat_subset_obj = cat.search(
@@ -133,7 +161,7 @@ def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
     for member_id in cat_subset_obj.unique()["member_id"]:
         print("member_id", member_id)
         cat_subset = cat_subset_obj.search(member_id=member_id)
-        ds = combined_experiments_from_cat_subset(cat_subset, experiments, "atmos")
+        ds = combined_experiments_from_cat_subset(cat_subset, experiments, "ocean")
         print("ds", ds)
 
     # ds.to_netcdf(os.path.join(CMIP6_PATH, "ocean.nc"))
