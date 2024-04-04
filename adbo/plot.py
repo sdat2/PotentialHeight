@@ -26,6 +26,15 @@ def plot_diff() -> None:
     fig, axs = plt.subplots(4, 1, figsize=(8, 8))
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
+        """
+        Plot experiment.
+
+        Args:
+            exp (dict): Experiment dictionary.
+            label (str): Experiment label.
+            color (str): Color of the markers and lines.
+            marker_size (float, optional): Defaults to 1.
+        """
         nonlocal axs
         calls = list(exp.keys())
         res = [float(exp[call]["res"]) for call in calls]
