@@ -14,8 +14,7 @@ import dask
 import xesmf as xe
 import xarray as xr
 from matplotlib import pyplot as plt
-from xmip.preprocessing import combined_preprocessing
-from xmip.postprocessing import interpolate_grid_label
+from xmip.preprocessing import combined_preprocessing, interpolate_grid_label
 from sithom.plot import feature_grid, plot_defaults, label_subplots
 from sithom.time import timeit
 from tcpips.constants import FIGURE_PATH, CMIP6_PATH

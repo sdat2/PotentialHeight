@@ -483,16 +483,16 @@ if __name__ == "__main__":
         "order": ("angle", "displacement"),  # order of input features
     }
     stationid: int = 3
-    year: int = 2025
+    year: int = 2097  # python -m adbo.exp &> logs/bo-3-2097.log
     run_bayesopt_exp(
-        seed=20 + stationid + year,
+        seed=21 + stationid + year,
         profile_name=f"{year}.json",
         constraints=DEFAULT_CONSTRAINTS,
         stationid=stationid,
-        exp_name=f"bo-test-2d-midres-agg-{stationid:01}-{year}",
+        exp_name=f"bo-{stationid:01}-{year}",
         resolution="mid",
-        init_steps=5,
-        daf_steps=20,
+        init_steps=25,
+        daf_steps=25,
         wrap_test=False,
     )
     # python -m adbo.exp &> logs/bo-test-2d-midres0.log

@@ -16,12 +16,14 @@ def plot_diff() -> None:
     Plot difference between two years.
     """
     plot_defaults()
-    exp1_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2025")
-    exp2_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2097")
+    # exp1_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2025")
+    # exp2_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2097")
+    exp1_dir = os.path.join(EXP_PATH, "bo-3-2025")
+    exp2_dir = os.path.join(EXP_PATH, "bo-3-2097")
     exp1 = read_json(os.path.join(exp1_dir, "experiments.json"))
     exp2 = read_json(os.path.join(exp2_dir, "experiments.json"))
-    print(exp1.keys())
-    print(exp2.keys())
+    # print(exp1.keys())
+    # print(exp2.keys())
 
     fig, axs = plt.subplots(4, 1, figsize=(8, 8))
 
@@ -56,7 +58,7 @@ def plot_diff() -> None:
         axs[2].scatter(calls, angle, label=label, color=color, s=marker_size)
         axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
 
-    def vline(sample: float):
+    def vline(sample: float) -> None:
         nonlocal axs
         axs[0].axvline(sample, color="black", linestyle="--")
         axs[1].axvline(sample, color="black", linestyle="--")
@@ -74,8 +76,8 @@ def plot_diff() -> None:
 
     plot_exp(exp1, "2025", "blue")
     plot_exp(exp2, "2097", "red")
-    vline(5.5)
-    figure_path = os.path.join(FIGURE_PATH, "2025-vs-2097-bayesopt.png")
+    vline(25.5)
+    figure_path = os.path.join(FIGURE_PATH, "2025-vs-2097-sid3.png")
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
 
