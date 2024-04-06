@@ -1,13 +1,20 @@
 % take r0 as input, get central pressure
-
+% octave --no-gui --no-gui-libs r0_pm.m
 clear
 clc
-close all
-addpath(genpath('mcle/'));
-addpath(genpath('mcle/mfiles/'));
+% close all
+% add path to mcle and mfiles
+current_folder = pwd;
+file_path = mfilename('fullpath')
+% take away the file name
+file_path = fileparts(file_path)
+addpath(genpath(file_path)); % 'mcle/'));
+data_folder = char([fileparts(file_path), "/", "data"])
+file_path = char([file_path, "/", "mfiles"])
+addpath(genpath(char([file_path, "/", "mfiles"]) ));  % 'mcle/mfiles/'));
 
 % read in JSON file of inputs
-fileName = 'data/inputs.json'; % filename in JSON extension
+fileName = char([data_folder, '/', 'inputs.json']); % filename in JSON extension
 in_str = fileread(fileName); % dedicated for reading files as text
 in = jsondecode(in_str); % Using the jsondecode function to parse JSON from string
 
@@ -27,7 +34,7 @@ out.Vmerge = Vmerge;
 
 % write out JSON file of outputs
 out_str = jsonencode(out);
-fid = fopen('data/outputs.json', 'w');
+fid = fopen(char([data_folder, '/', 'outputs.json']), 'w');
 if fid == -1, error('Cannot create JSON file'); end
 fwrite(fid, out_str, 'char');
 fclose(fid);
