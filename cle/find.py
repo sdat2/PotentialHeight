@@ -78,7 +78,9 @@ def _run_cle15_octave(inputs, execute):
     if execute:
         # disabling gui leads to one order of magnitude speedup
         # also the pop-up window makes me feel sick due to the screen moving about.
-        os.system("octave --no-gui --no-gui-libs mcle/r0_pm.m")
+        os.system(
+            f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')}"
+        )
 
     # read in the output from r0_pm.m
     ou = read_json(os.path.join(DATA_PATH, "outputs.json"))
@@ -501,10 +503,10 @@ if __name__ == "__main__":
     # ds_solns(num=50, verbose=True, ds_name="data/gom_soln_new.nc")
     # find_solution_rmaxv()
 
-    from timeit import timeit
+    # from timeit import timeit
 
-    for _ in range(10):
-        _run_cle15_octpy()
+    # for _ in range(10):
+    #    _run_cle15_octpy()
 
     for _ in range(10):
         _run_cle15_octave({}, True)
