@@ -25,7 +25,7 @@ def plot_diff() -> None:
     # print(exp1.keys())
     # print(exp2.keys())
 
-    fig, axs = plt.subplots(4, 1, figsize=(8, 8))
+    _, axs = plt.subplots(4, 1, figsize=(8, 8))
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
         """

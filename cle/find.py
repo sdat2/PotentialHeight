@@ -5,7 +5,6 @@ import os
 import numpy as np
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
-from oct2py import octave
 from oct2py import Oct2Py, get_log
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
@@ -22,6 +21,9 @@ from .constants import (
 
 plot_defaults()
 
+os.environ["OCTAVE_CLI_OPTIONS"] = str(
+    "--no-gui --no-gui-libs"  # disable gui to improve performance
+)
 oc = Oct2Py(logger=get_log())
 oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
 # oc.addpath(".")
@@ -487,7 +489,7 @@ def find_solution_rmaxv(
 
 
 if __name__ == "__main__":
-    # python run.py
+    # python -m cle.find
     # find_solution()
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
@@ -498,8 +500,11 @@ if __name__ == "__main__":
     # plot_gom_bbox()
     # ds_solns(num=50, verbose=True, ds_name="data/gom_soln_new.nc")
     # find_solution_rmaxv()
-    # for _ in range(10):
-    #     _run_cle15_octpy()
+
+    from timeit import timeit
+
+    for _ in range(10):
+        _run_cle15_octpy()
 
     for _ in range(10):
         _run_cle15_octave({}, True)
