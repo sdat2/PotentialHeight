@@ -37,9 +37,15 @@ oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
 
 
 @timeit
-def _run_cle15_octpy(
+def _run_cle15_oct2py(
     **kwargs,
 ) -> dict:  # Tuple[np.ndarray, np.ndarray, float, float, float]:
+    """
+    Run the CLE15 model using oct2py.
+
+    Returns:
+        dict: dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
+    """
     in_dict = read_json(os.path.join(DATA_PATH, "inputs.json"))
     in_dict.update(kwargs)
     # print(in_dict)
@@ -58,21 +64,30 @@ def _run_cle15_octpy(
         in_dict["alpha_eye"],
         nout=5,
     )
-    ou = dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
-    return ou
+    return dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
 
 
 @timeit
-def _run_cle15_octave(inputs, execute):
+def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
+    """
+    Run the CLE15 model using octave.
+
+    Args:
+        inputs (dict): Input parameters.
+        execute (bool): Whether to execute the model.
+
+    Returns:
+        dict: dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
+    """
+
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
     if inputs is not None:
         for key in inputs:
             if key in ins:
                 ins[key] = inputs[key]
 
-    write_json(ins, os.path.join(DATA_PATH, "inputs.json"))
-
     # Storm parameters
+    write_json(ins, os.path.join(DATA_PATH, "inputs.json"))
 
     # run octave file r0_pm.m
     if execute:
@@ -83,9 +98,7 @@ def _run_cle15_octave(inputs, execute):
         )
 
     # read in the output from r0_pm.m
-    ou = read_json(os.path.join(DATA_PATH, "outputs.json"))
-
-    return ou
+    return read_json(os.path.join(DATA_PATH, "outputs.json"))
 
 
 def pressure_from_wind(
@@ -96,14 +109,15 @@ def pressure_from_wind(
     fcor: float = 5e-5,  # m s-2
 ) -> np.ndarray:  # [Pa]
     """
-    Use coriolis force and pressure gradient force to find physical pressure profile to correspond to the velocity profile.
+    Use coriolis force and pressure gradient force to find physical
+    pressure profile to correspond to the velocity profile.
 
     TODO: decrease air density in response to decreased pressure (will make central pressure lower).
 
     Args:
         rr (np.ndarray): radii array [m].
         vv (np.ndarray): velocity array [m/s]
-        p0 (float): ambient pressure in Pa.
+        p0 (float): ambient pressure [Pa].
         rho0 (float): Air density at ambient pressure [kg/m3].
         fcor (float): Coriolis force.
 
@@ -130,7 +144,7 @@ def run_cle15(
     execute: bool = True,
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
-    octpy: bool = False,
+    oct2py: bool = True,
 ) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
@@ -139,14 +153,14 @@ def run_cle15(
         execute (bool, optional): Execute the model. Defaults to True.
         plot (bool, optional): Plot the output. Defaults to False.
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
-        octpy (bool, optional): Use octpy. Defaults to False.
+        oct2py (bool, optional): Use oct2py. Defaults to False.
 
     Returns:
         Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
     """
 
-    if octpy:  # should be faster if graphical element disabled
-        ou = _run_cle15_octpy(inputs)
+    if oct2py:  # should be faster if graphical element disabled
+        ou = _run_cle15_oct2py(inputs)
     else:
         ou = _run_cle15_octave(inputs, execute)
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
@@ -192,7 +206,7 @@ def run_cle15(
     rho0 = 1.15  # [kg m-3]
     rr = np.array(ou["rr"])  # [m]
     vv = np.array(ou["VV"])  # [m/s]
-    p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])
+    p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
 
     if plot:
         plt.plot(rr / 1000, p / 100, "k")
@@ -240,7 +254,7 @@ def wang_diff(
 @timeit
 def bisection(f: Callable, left: float, right: float, tol: float) -> float:
     """
-    Bisection method.
+    Bisection numerical method.
 
     https://en.wikipedia.org/wiki/Root-finding_algorithms#Bisection_method
 
@@ -284,7 +298,7 @@ def buck(temp: float) -> float:  # temp in K -> saturation vapour pressure in Pa
         float: saturation vapour pressure in Pa.
     """
     # https://en.wikipedia.org/wiki/Arden_Buck_equation
-    temp = temp - TEMP_0K  # convert from degK to degC
+    temp: float = temp - TEMP_0K  # convert from degK to degC
     return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
 
 
@@ -314,7 +328,7 @@ def absolute_angular_momentum(v: float, r: float, f: float) -> float:
     Returns:
         float: Absolute angular momentum [m2/s].
     """
-    return v * r + 0.5 * f * r**2
+    return v * r + 0.5 * f * r**2  # [m2/s]
 
 
 def wang_consts(
@@ -324,13 +338,33 @@ def wang_consts(
     gas_constant_for_water_vapor: float = 461,  # J/kg/K
     gas_constant: float = 287,  # J/kg/K
     beta_lift_parameterization: float = 1.25,  # dimensionless
-    efficiency_relative_to_carnot: float = 0.5,
-    pressure_dry_at_inflow: float = 985 * 100,
-    coriolis_parameter: float = 5e-5,
-    maximum_wind_speed: float = 83,
-    radius_of_inflow: float = 2193 * 1000,
-    radius_of_max_wind: float = 64 * 1000,
-) -> Tuple[float, float, float]:
+    efficiency_relative_to_carnot: float = 0.5,  # dimensionless
+    pressure_dry_at_inflow: float = 985 * 100,  # Pa
+    coriolis_parameter: float = 5e-5,  # s-1
+    maximum_wind_speed: float = 83,  # m/s
+    radius_of_inflow: float = 2193 * 1000,  # m
+    radius_of_max_wind: float = 64 * 1000,  # m
+) -> Tuple[float, float, float]:  # a, b, c
+    """
+    Wang carnot engine model parameters.
+
+    Args:
+        near_surface_air_temperature (float, optional): Defaults to 299 [K].
+        outflow_temperature (float, optional): Defaults to 200 [K].
+        latent_heat_of_vaporization (float, optional): Defaults to 2.27e6 [J/kg].
+        gas_constant_for_water_vapor (float, optional): Defaults to 461 [J/kg/K].
+        gas_constant (float, optional): Defaults to 287 [J/kg/K].
+        beta_lift_parameterization (float, optional): Defaults to 1.25 [dimesionless].
+        efficiency_relative_to_carnot (float, optional): Defaults to 0.5 [dimensionless].
+        pressure_dry_at_inflow (float, optional): Defaults to 985 * 100 [Pa].
+        coriolis_parameter (float, optional): Defaults to 5e-5 [s-1].
+        maximum_wind_speed (float, optional): Defaults to 83 [m/s].
+        radius_of_inflow (float, optional): Defaults to 2193 * 1000 [m].
+        radius_of_max_wind (float, optional): Defaults to 64 * 1000 [m].
+
+    Returns:
+        Tuple[float, float, float]: a, b, c
+    """
     # a, b, c
     absolute_angular_momentum_at_vmax = absolute_angular_momentum(
         maximum_wind_speed, radius_of_max_wind, coriolis_parameter
@@ -384,32 +418,6 @@ def wang_consts(
     )
 
 
-def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
-    pcs = np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
-    plt.plot(r0s / 1000, pcs / 100, "k")
-    plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig(os.path.join(DATA_PATH, "r0_pc.pdf"))
-    plt.clf()
-    return pcs
-
-
-def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
-    ys = np.array(
-        [
-            bisection(wang_diff(*wang_consts(radius_of_inflow=r0)), 0.3, 1.2, 1e-6)
-            for r0 in r0s
-        ]
-    )
-    pms = (BACKGROUND_PRESSURE - buck(DEFAULT_SURF_TEMP)) / ys + buck(DEFAULT_SURF_TEMP)
-    plt.plot(r0s / 1000, np.array(pms) / 100, "r")
-    plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_wang.pdf"))
-    plt.clf()
-    return pms
-
-
 def find_solution_rmaxv(
     vmax_pi: float = 86,  # m/s
     coriolis_parameter: float = 5e-5,  # s-1
@@ -417,9 +425,25 @@ def find_solution_rmaxv(
     near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
     w_cool: float = 0.002,
     outflow_temperature: float = 200,  # K
-    supergradient_factor: float = 1.2,
+    supergradient_factor: float = 1.2,  # dimensionless
     plot: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Find the solution for rmax and vmax.
+
+    Args:
+        vmax_pi (float, optional): Maximum wind speed. Defaults to 86 m/s.
+        coriolis_parameter (float, optional): Coriolis parameter. Defaults to 5e-5 s-1.
+        background_pressure (float, optional): Background pressure. Defaults to 1015 hPa.
+        near_surface_air_temperature (float, optional): Near surface air temperature. Defaults to 299 K.
+        w_cool (float, optional): Cooling rate. Defaults to 0.002.
+        outflow_temperature (float, optional): Outflow temperature. Defaults to 200 K.
+        supergradient_factor (float, optional): Supergradient factor. Defaults to 1.2.
+        plot (bool, optional): Plot the output. Defaults to False.
+
+    Returns:
+        Tuple[float, float, float]: rmax, vmax_pi, pm
+    """
     r0s = np.linspace(200, 5000, num=30) * 1000
     pcs = []
     pcw = []
@@ -487,7 +511,7 @@ def find_solution_rmaxv(
         plt.savefig(os.path.join(FIGURE_PATH, "r0_rmax.pdf"))
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
-    return intersect[0][0], vmax_pi, intersect[1][0]
+    return intersect[0][0], vmax_pi, intersect[1][0]  # rmax, vmax, pm
 
 
 if __name__ == "__main__":
@@ -505,8 +529,8 @@ if __name__ == "__main__":
 
     # from timeit import timeit
 
-    # for _ in range(10):
-    #    _run_cle15_octpy()
+    for _ in range(10):
+        _run_cle15_oct2py()
 
     for _ in range(10):
         _run_cle15_octave({}, True)

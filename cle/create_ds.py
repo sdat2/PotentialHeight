@@ -10,6 +10,7 @@ from sithom.io import read_json
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
 
+
 # from tcpips.pi import get_gom
 from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH
 from .find import (
@@ -247,3 +248,11 @@ def ds_solns(
     if verbose:
         print(ds)
     ds.to_netcdf(ds_name)
+
+
+if __name__ == "__main__":
+    ds_solns(
+        num=200,
+        verbose=True,
+        ds_name=os.path.join(DATA_PATH, "gom_soln_timeseries_new.nc"),
+    )

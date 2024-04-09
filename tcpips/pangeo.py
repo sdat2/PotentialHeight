@@ -14,7 +14,7 @@ import dask
 import xesmf as xe
 import xarray as xr
 from matplotlib import pyplot as plt
-from xmip.preprocessing import combined_preprocessing, interpolate_grid_label
+from xmip.preprocessing import combined_preprocessing
 from sithom.plot import feature_grid, plot_defaults, label_subplots
 from sithom.time import timeit
 from tcpips.constants import FIGURE_PATH, CMIP6_PATH
@@ -62,11 +62,11 @@ def combined_experiments_from_dset_dict(
         for experiment in experiments:
             if experiment in k:
                 ds_d[experiment] = ds
-                name = os.path.join(
+                new_name = os.path.join(
                     CMIP6_PATH, f"{name}_{experiment}_{k}_{ds_member_id}.nc"
                 )
-                print("saving", name, "ds")
-                ds.to_netcdf(name)
+                print("saving", new_name, "ds")
+                ds.to_netcdf(new_name)
 
     # put the two experiments together
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
@@ -83,6 +83,17 @@ def combined_experiments_from_cat_subset(
     experiments: List[str],
     name: str = "test",
 ) -> Optional[xr.Dataset]:
+    """
+    Combine experiments from a catalog subset.
+
+    Args:
+        cat_subset (intake.catalog.local.LocalCatalogEntry): catalog subset.
+        experiments (List[str]): experiments to combine.
+        name (str, optional): Defaults to "test".
+
+    Returns:
+        Optional[xr.Dataset]: combined xarray dataset.
+    """
 
     print("cat_subset", cat_subset)
     unique = cat_subset.unique()
@@ -103,6 +114,12 @@ def combined_experiments_from_cat_subset(
 
 @timeit
 def get_atmos(experiments: List[str] = ["historical", "ssp585"]) -> None:
+    """
+    Get atmospheric data.
+
+    Args:
+        experiments (List[str], optional): Defaults to ["historical", "ssp585"].
+    """
 
     cat_subset_obj = cat.search(
         experiment_id=experiments,
@@ -127,6 +144,14 @@ def get_data_part(
     table: str = "Omon",
     name: str = "ocean",
 ):
+    """
+    Get data part.
+
+    Args:
+        experiments (List[str], optional): Defaults to ["historical", "ssp585"].
+        table (str, optional): Defaults to "Omon".
+        name (str, optional): Defaults to "ocean".
+    """
     cat_subset_obj = cat.search(
         experiment_id=experiments,
         table_id=[table],
@@ -146,6 +171,12 @@ def get_data_part(
 
 @timeit
 def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
+    """
+    Get ocean data.
+
+    Args:
+        experiments (List[str], optional): Defaults to ["historical", "ssp585"].
+    """
     cat_subset_obj = cat.search(
         experiment_id=experiments,
         table_id=["Omon"],
@@ -174,9 +205,25 @@ def get_data() -> None:
 
 @timeit
 def regrid_2d_1degree(output_res: float = 1.0, time_chunk: int = 10) -> None:
+    """
+    Regrid 2d data to 1 degree resolution.
+
+    Args:
+        output_res (float, optional): Resolution of the output grid. Defaults to 1.0.
+        time_chunk (int, optional): Chunk size for time. Defaults to 10.
+    """
     plot_defaults()
 
     def open_ds(path: str) -> xr.Dataset:
+        """
+        Open dataset.
+
+        Args:
+            path (str): path to the dataset.
+
+        Returns:
+            xr.Dataset: xarray dataset.
+        """
         nonlocal time_chunk
         # open netcdf4 file using dask backend
         ds = xr.open_dataset(path, chunks={"time": time_chunk})
@@ -258,9 +305,12 @@ def regrid_2d_1degree(output_res: float = 1.0, time_chunk: int = 10) -> None:
 
 @timeit
 def regrid_2d() -> None:
+    """
+    Regrid 2d data.
+    """
     plot_defaults()
 
-    def open_ds(name):
+    def open_ds(name: str) -> xr.Dataset:
         ds = xr.open_dataset(name)
         return ds.drop_vars(
             [
@@ -381,6 +431,13 @@ def regrid_2d() -> None:
 
 @timeit
 def regrid_1d(xesmf: bool = False) -> None:
+    """
+    Regrid 1d data.
+
+    Args:
+        xesmf (bool, optional): Defaults to False.
+    """
+
     def open_1d(path: str):
         ds = xr.open_dataset(path)
         # plt.imshow(ds.lat.values)

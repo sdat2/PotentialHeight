@@ -18,14 +18,71 @@ from .constants import (
     DATA_PATH,
 )
 from .create_ds import gom_time
-from .find import carnot, pressure_from_wind, _run_cle15_octpy
+from .find import (
+    carnot,
+    pressure_from_wind,
+    _run_cle15_octpy,
+    run_cle15,
+    bisection,
+    buck,
+    wang_diff,
+    wang_consts,
+)
 
 plot_defaults()
+
+
+def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
+    """
+    Plot the pressure at maximum winds for different radii.
+
+    Args:
+        r0s (np.ndarray):
+
+    Returns:
+        np.ndarray: Pressure at maximum winds.
+    """
+
+    pms = np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
+    plt.plot(r0s / 1000, pms / 100, "k")
+    plt.xlabel("Outer wind radius, $r_a$, [km]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.savefig(os.path.join(DATA_PATH, "r0_pc.pdf"))
+    plt.clf()
+    return pms
+
+
+def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
+    """
+    Plot the pressure at maximum winds for different radii.
+
+    Args:
+        r0s (np.ndarray): Outer radii
+
+    Returns:
+        np.ndarray: Pressure at maximum winds.
+    """
+    ys = np.array(
+        [
+            bisection(wang_diff(*wang_consts(radius_of_inflow=r0)), 0.3, 1.2, 1e-6)
+            for r0 in r0s
+        ]
+    )
+    pms = (BACKGROUND_PRESSURE - buck(DEFAULT_SURF_TEMP)) / ys + buck(DEFAULT_SURF_TEMP)
+    plt.plot(r0s / 1000, np.array(pms) / 100, "r")
+    plt.xlabel("Radius, $r_a$, [km]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_wang.pdf"))
+    plt.clf()
+    return pms
 
 
 def plot_from_ds(ds_name: str = "gom_soln_new.nc") -> None:
     """
     Plot the relationships between the variables.
+
+    Args:
+        ds_name (str, optional): Defaults to "gom_soln_new.nc".
     """
     ds = xr.open_dataset(ds_name)
     folder = "sup"
@@ -176,7 +233,7 @@ def plot_profiles(ds_name: str = "gom_soln_2.nc") -> None:
     Plot the azimuthal wind profiles for different times.
 
     Args:
-        ds_name (str, optional): _description_. Defaults to "gom_soln_2.nc".
+        ds_name (str, optional): Defaults to "gom_soln_2.nc".
     """
     plot_defaults()
     ds = xr.open_dataset(ds_name)
