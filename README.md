@@ -1,18 +1,26 @@
 # WorstSurge repository
 
 ## adforce
+
 ADCIRC forcing and processing. Some generic mesh processing.
 
 ## adbo
+
 Bayesian optimization using `adforce` to force adcirc with a `trieste` Bayesian optimization loop.
 
+## cle
+
+Chavas et al. 2015 profile calculation in matlab. (fairly slow coupling)
+
 ## chavas15
-Chavas et al. 2015 profile. (Currently not working properly)
+
+Chavas et al. 2015 profile calculation in python. (Currently not working properly)
 
 ## tcpips
+
 Tropical Cyclone Potential Intensity (PI) and Potential Size (PS) Calculations.
 Includes pangeo script to download and process data from CMIP6 for calculations.
-Uses 
+Uses the `tcpypi' package to calculate potential intensity
 
 ## worst
 
@@ -56,16 +64,22 @@ Done:
 In Progress:
 
  - CMIP6 processing for potential size and intensity.
+    - Good folder structure for processing.
+    - Make sure regridding is working and efficient.
+    - Paralize potential size calculation as much as possible.
  - BayesOpt for different places along the coast.
  - Fix 430k wrapping.
- - Sync times up.
+ - Sync times up & animate winds.
 
 TODO:
 
+ - Could we produce uncertainty estimates in the upper bound based on MVES.
+ - How to quantify performance of BO better.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
- - Scipy distribution fitting for CMIP6.
+ - GEV with maxima Scipy distribution fitting for CMIP6.
+ - How to distribute optimisation points more uniformly along the coast.
  - Better tidal gauge comparisons for different events.
- - 
+
 
 ## SurgeNet exploration
 
