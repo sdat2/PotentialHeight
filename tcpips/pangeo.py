@@ -76,7 +76,8 @@ def combined_experiments_from_dset_dict(
                 os.makedirs(path, exist_ok=True)
                 new_name = os.path.join(path, f"{ds_member_id}.nc")
                 print("saving", new_name, "ds")
-                ds.to_netcdf(new_name)
+                with dask.config.set(**{"array.slicing.split_large_chunks": True}):
+                    ds.to_netcdf(new_name, format="NETCDF4", engine="h5netcdf")
 
     # put the two experiments together
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
@@ -170,7 +171,7 @@ def get_data_part(
         source_id="CESM2",
         variable_id=conversion_names.keys(),
         # dcpp_init_year="20200528",
-        grid_label="gn",
+        # grid_label="gn",
     )
     for member_id in cat_subset_obj.unique()["member_id"]:
         print("member_id", member_id)
