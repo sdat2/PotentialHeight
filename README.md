@@ -10,7 +10,7 @@ Bayesian optimization using `adforce` to force adcirc with a `trieste` Bayesian 
 
 ## cle
 
-Chavas et al. 2015 profile calculation in matlab. (fairly slow coupling)
+Chavas et al. 2015 profile calculation in matlab. (fairly slow coupling, now using `oct2py`)
 
 ## chavas15
 
@@ -20,11 +20,11 @@ Chavas et al. 2015 profile calculation in python. (Currently not working properl
 
 Tropical Cyclone Potential Intensity (PI) and Potential Size (PS) Calculations.
 Includes pangeo script to download and process data from CMIP6 for calculations.
-Uses the `tcpypi' package to calculate potential intensity
+Uses the `tcpypi` package to calculate potential intensity.
 
 ## worst
 
-Statistical worst-case GEV/GPD fit.
+Statistical worst-case GEV/GPD fit using `scipy`.
 
 
 ## Getting started
@@ -52,7 +52,7 @@ pip install -e .
 python -m adbo.exp &> logs/bo_test3.txt
 ```
 
-## Extension priorities
+## Priorities
 
 Done:
 

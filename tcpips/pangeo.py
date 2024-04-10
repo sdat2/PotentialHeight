@@ -5,6 +5,10 @@ This script is used to download CMIP6 data from the
 Pangeo Google cloud store and process it for use in the TCPIPS project to calculate
 potential size and potential intensity.
 
+Folder structure:
+
+$ROOT/${processing-step}/${experiment}/${atm/oc}/${model}/${member_id}.nc
+
 """
 
 import os
@@ -20,6 +24,12 @@ from sithom.time import timeit
 from tcpips.constants import FIGURE_PATH, CMIP6_PATH
 from tcpips.convert import conversion_names
 
+RAW_PATH = os.path.join(CMIP6_PATH, "raw")
+os.makedirs(RAW_PATH, exist_ok=True)
+REGRIDDED_PATH = os.path.join(CMIP6_PATH, "regridded")
+os.makedirs(REGRIDDED_PATH, exist_ok=True)
+BIAS_CORRECTED_PATH = os.path.join(CMIP6_PATH, "bias_corrected")
+os.makedirs(BIAS_CORRECTED_PATH, exist_ok=True)
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
 url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
@@ -35,7 +45,7 @@ except Exception as e:
 
 
 def combined_experiments_from_dset_dict(
-    dset_dict: dict, experiments: List[str], name: str = "test"
+    dset_dict: dict, experiments: List[str], oc_or_at: str = "atmos"
 ) -> Optional[xr.Dataset]:
     """
     Function to combine experiments together.
@@ -43,7 +53,7 @@ def combined_experiments_from_dset_dict(
     Args:
         dset_dict (dict): dictionary of datasets.
         experiments (List[str]): list of experiments to combine.
-        name (str, optional): Defaults to "test".
+        oc_or_at (str, optional): Defaults to "atmos".
 
     Returns:
         xr.Dataset: combined xarray dataset.
@@ -62,9 +72,9 @@ def combined_experiments_from_dset_dict(
         for experiment in experiments:
             if experiment in k:
                 ds_d[experiment] = ds
-                new_name = os.path.join(
-                    CMIP6_PATH, f"{name}_{experiment}_{k}_{ds_member_id}.nc"
-                )
+                path = os.path.join(RAW_PATH, experiment, oc_or_at)
+                os.makedirs(path, exist_ok=True)
+                new_name = os.path.join(path, f"{ds_member_id}.nc")
                 print("saving", new_name, "ds")
                 ds.to_netcdf(new_name)
 
@@ -81,7 +91,7 @@ def combined_experiments_from_dset_dict(
 def combined_experiments_from_cat_subset(
     cat_subset: intake.catalog.local.LocalCatalogEntry,
     experiments: List[str],
-    name: str = "test",
+    oc_or_at: str = "atmos",
 ) -> Optional[xr.Dataset]:
     """
     Combine experiments from a catalog subset.
@@ -89,7 +99,7 @@ def combined_experiments_from_cat_subset(
     Args:
         cat_subset (intake.catalog.local.LocalCatalogEntry): catalog subset.
         experiments (List[str]): experiments to combine.
-        name (str, optional): Defaults to "test".
+        oc_or_at (str, optional): Defaults to "atmos".
 
     Returns:
         Optional[xr.Dataset]: combined xarray dataset.
@@ -107,7 +117,7 @@ def combined_experiments_from_cat_subset(
 
     print("dset_dict.keys()", dset_dict.keys())
 
-    ds = combined_experiments_from_dset_dict(dset_dict, experiments, name)
+    ds = combined_experiments_from_dset_dict(dset_dict, experiments, oc_or_at)
 
     return ds
 
@@ -142,7 +152,7 @@ def get_atmos(experiments: List[str] = ["historical", "ssp585"]) -> None:
 def get_data_part(
     experiments: List[str] = ["historical", "ssp585"],
     table: str = "Omon",
-    name: str = "ocean",
+    oc_or_at: str = "ocean",
 ):
     """
     Get data part.
@@ -150,7 +160,7 @@ def get_data_part(
     Args:
         experiments (List[str], optional): Defaults to ["historical", "ssp585"].
         table (str, optional): Defaults to "Omon".
-        name (str, optional): Defaults to "ocean".
+        oc_or_at (str, optional): Defaults to "ocean".
     """
     cat_subset_obj = cat.search(
         experiment_id=experiments,
@@ -165,7 +175,7 @@ def get_data_part(
     for member_id in cat_subset_obj.unique()["member_id"]:
         print("member_id", member_id)
         cat_subset = cat_subset_obj.search(member_id=member_id)
-        ds = combined_experiments_from_cat_subset(cat_subset, experiments, name)
+        ds = combined_experiments_from_cat_subset(cat_subset, experiments, oc_or_at)
         print("ds", ds)
 
 
@@ -250,11 +260,11 @@ def regrid_2d_1degree(output_res: float = 1.0, time_chunk: int = 10) -> None:
 
     def regrid_and_save(input_ds: xr.Dataset, output_name: str) -> xr.Dataset:
         """
-        Regrid and save the input dataset to the output name.
+        Regrid and save the input dataset to the output.
 
         Args:
             input_ds (xr.Dataset): dataset to regrid.
-            output_name (str): name of the output file.
+            output_name (str): of the output file.
 
         Returns:
             xr.Dataset: regridded dataset.
