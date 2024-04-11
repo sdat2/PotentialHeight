@@ -48,3 +48,9 @@ QUARTERS = [  # 3-letter quarter names
 
 CMIP6_PATH = os.path.join(DATA_PATH, "cmip6")
 os.makedirs(CMIP6_PATH, exist_ok=True)
+RAW_PATH = os.path.join(CMIP6_PATH, "raw")
+os.makedirs(RAW_PATH, exist_ok=True)
+REGRIDDED_PATH = os.path.join(CMIP6_PATH, "regridded")
+os.makedirs(REGRIDDED_PATH, exist_ok=True)
+BIAS_CORRECTED_PATH = os.path.join(CMIP6_PATH, "bias_corrected")
+os.makedirs(BIAS_CORRECTED_PATH, exist_ok=True)
