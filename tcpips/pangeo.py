@@ -7,15 +7,14 @@ potential size and potential intensity.
 
 Folder structure:
 
-$ROOT/${processing-step}/${experiment}/${atm/oc}/${model}/${member_id}.nc
+${ROOT}/${processing-step}/${experiment}/${atm/oc}/${model}/${member_id}.nc
 
 """
 
 import os
-from typing import Tuple, Dict, List, Optional
+from typing import Dict, List, Optional
 import intake
 import dask
-import xesmf as xe
 import xarray as xr
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit
