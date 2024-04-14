@@ -482,8 +482,9 @@ if __name__ == "__main__":
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
         "order": ("angle", "displacement"),  # order of input features
     }
-    stationid: int = 3
-    year: int = 2097  # python -m adbo.exp &> logs/bo-3-2097.log
+    stationid: int = 2
+    year: int = 2025  # python -m adbo.exp &> logs/bo-3-2097.log
+    # python -m adbo.exp &> logs/bo-test-2-2025.log
     run_bayesopt_exp(
         seed=21 + stationid + year,
         profile_name=f"{year}.json",
@@ -495,7 +496,7 @@ if __name__ == "__main__":
         daf_steps=25,
         wrap_test=False,
     )
-    # python -m adbo.exp &> logs/bo-test-2d-midres0.log
+    # python -m adbo.exp &> logs/bo-test-0-2015.log
     # python -m adbo.exp &> logs/bo-test-2d-midres2.log
     # python -m adbo.exp &> logs/bo-test-2d-midres3-2097.log
     # python -m adbo.exp &> logs/bo-test-2d-midres5.log
