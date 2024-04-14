@@ -118,7 +118,7 @@ def plot_heights_and_winds(
     step_size: int = 1,
     add_name: str = "",
     bbox: Optional[BoundingBox] = NO_BBOX,
-    x_pos: float = 0.95,
+    x_pos: float = 0.9,
     y_pos: float = 1.05,
 ) -> None:
     """
@@ -152,6 +152,7 @@ def plot_heights_and_winds(
     cbar_levels = np.linspace(vmin_eta, vmax_eta, num=5)
     f22_main_ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["Main"].to_dataset()
     f22_main_ds = line_up_f22(f22_main_ds, path_in, NEW_ORLEANS)
+    f22_main_ds = f22_main_ds.coarsen(xi=3, yi=3, boundary="trim").mean()
 
     ckwargs = {
         "label": "",
@@ -178,13 +179,12 @@ def plot_heights_and_winds(
             ax=ax,
             fraction=0.046,
             pad=0.04,
+            shrink=0.5,
             **ckwargs,
         )
         ax.set_title("Water Height [m]")
         cbar.set_ticks(cbar_levels)
         cbar.set_ticklabels(["{:.1f}".format(x) for x in cbar_levels.tolist()])
-        plt.xlabel("Longitude [$^{\circ}$E]")
-        plt.ylabel("Latitude [$^{\circ}$N]")
         time = f63_ds.isel(time=time_i).time.values
         ts = pd.to_datetime(str(time))
 
@@ -194,6 +194,7 @@ def plot_heights_and_winds(
             y="lat",
             u="U10",
             v="V10",
+            scale=200,
             add_guide=False,
         )
 
@@ -211,6 +212,8 @@ def plot_heights_and_winds(
             # ,
         )
         print(ts)
+        plt.xlabel("Longitude [$^{\circ}$E]")
+        plt.ylabel("Latitude [$^{\circ}$N]")
         plt.scatter(
             NEW_ORLEANS.lon,
             NEW_ORLEANS.lat,
@@ -261,7 +264,18 @@ def find_starttime_of_impact(da: xr.DataArray) -> any:
     return da.time.values[first_nonzero]
 
 
-def line_up_f22(f22_main_ds, path_in: str, point: Point) -> xr.Dataset:
+def line_up_f22(f22_main_ds: xr.Dataset, path_in: str, point: Point) -> xr.Dataset:
+    """
+    Line up fort.22.
+
+    Args:
+        f22_main_ds (xr.Dataset):
+        path_in (str):
+        point (Point):
+
+    Returns:
+        xr.Dataset: f22_main_ds
+    """
     f74_ds = xr_loader(os.path.join(path_in, "fort.74.nc"), use_dask=True)
     f22_lons = f22_main_ds.lon.values
     f22_lats = f22_main_ds.lat.values
@@ -285,6 +299,14 @@ def line_up_f22(f22_main_ds, path_in: str, point: Point) -> xr.Dataset:
 
 
 def plot_u10_windx_at_a_point(path_in: str, point: Point, plot: bool = True) -> None:
+    """
+    Plot U10.
+
+    Args:
+        path_in (str): path in.
+        point (Point): point to compare at.
+        plot (bool, optional): Defaults to True.
+    """
     ds = xr_loader(os.path.join(path_in, "fort.74.nc"), use_dask=True)
     f22 = read_fort22(os.path.join(path_in, "fort.22.nc"))
     lons = f22["Main"].lon.values
@@ -324,15 +346,15 @@ if __name__ == "__main__":
     #     add_name="zoomed_out_",
     #     step_size=10,
     # )
-    # plot_heights(
-    #     path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap/",
-    #     bbox=NO_BBOX,
-    #     step_size=1,
-    #     add_name="zoomed_in_",
-    # )
     plot_heights_and_winds(
-        path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+        path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2/",
         bbox=NO_BBOX,
-        add_name="",
-        step_size=10,
+        step_size=1,
+        add_name="zoomed_in_",
     )
+    # plot_heights_and_winds(
+    #     path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+    #     bbox=NO_BBOX,
+    #     add_name="",
+    #     step_size=10,
+    # )

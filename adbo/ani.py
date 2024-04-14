@@ -3,7 +3,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 import imageio
 from tqdm import tqdm
-
+from sithom.io import read_json
 from sithom.plot import plot_defaults, feature_grid
 from sithom.time import timeit
 
@@ -26,6 +26,14 @@ def plot_gps(
         path_in (str, optional): name of data folder. Defaults to "mult1".
     """
     plot_defaults()
+
+    exp = read_json(os.path.join(path_in, "experiments.json"))
+    calls = list(exp.keys())
+    res = [float(exp[call]["res"]) for call in calls]
+    displacement = [float(exp[call]["displacement"]) for call in calls]
+    angle = [float(exp[call]["angle"]) for call in calls]
+    calls = [float(call) + 1 for call in calls]
+
     img_folder = os.path.join(path_in, "img")
     gif_folder = os.path.join(path_in, "gif")
 
@@ -49,8 +57,9 @@ def plot_gps(
 
     # x1_units = ds.x1.attrs["units"]
     # x2_units = ds.x2.attrs["units"]
+    len_active_points = len(ds.call.values)
 
-    for call_i in tqdm(range(len(ds.call.values)), desc="Plotting GPs"):
+    for call_i in tqdm(range(len_active_points), desc="Plotting GPs"):
         if plot_acq and "acq" in ds:
             fig, axs = feature_grid(
                 ds.isel(call=call_i),
@@ -97,6 +106,24 @@ def plot_gps(
                     ("x2", "Displacement", "$^{\circ}$"),
                 ),
             )
+        # this seems not to work properly
+        # initial data points
+        axs.ravel()[0].scatter(
+            angle[:-len_active_points],
+            displacement[:-len_active_points],
+            marker="x",
+            color="blue",
+        )
+        # BO/active data points
+        axs.ravel()[0].scatter(
+            angle[-len_active_points : -len_active_points + call_i],
+            displacement[-len_active_points : -len_active_points + call_i],
+            marker="+",
+            color="green",
+        )
+        plt.title(
+            "Add sample " + str(call_i + 1),
+        )
         figure_name = os.path.join(img_folder, f"gp_{call_i}.png")
         figure_names.append(figure_name)
         plt.savefig(figure_name)
@@ -115,7 +142,7 @@ def plot_gps(
 if __name__ == "__main__":
     # python -m adbo.ani
     plot_gps(
-        path_in="/work/n01/n01/sithom/adcirc-swan/exp/test-2d-3",
+        path_in="/work/n01/n01/sithom/adcirc-swan/exp/bo-test-2d-4",
         add_name="",
-        plot_acq=True,
+        plot_acq=False,
     )
