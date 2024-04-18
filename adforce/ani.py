@@ -152,7 +152,7 @@ def plot_heights_and_winds(
     cbar_levels = np.linspace(vmin_eta, vmax_eta, num=5)
     f22_main_ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["Main"].to_dataset()
     f22_main_ds = line_up_f22(f22_main_ds, path_in, NEW_ORLEANS)
-    f22_main_ds = f22_main_ds.coarsen(xi=3, yi=3, boundary="trim").mean()
+    f22_main_ds = f22_main_ds.coarsen(xi=2, yi=2, boundary="trim").mean()
 
     ckwargs = {
         "label": "",
@@ -194,7 +194,7 @@ def plot_heights_and_winds(
             y="lat",
             u="U10",
             v="V10",
-            scale=200,
+            scale=800,
             add_guide=False,
         )
 
@@ -346,15 +346,15 @@ if __name__ == "__main__":
     #     add_name="zoomed_out_",
     #     step_size=10,
     # )
-    plot_heights_and_winds(
-        path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2/",
-        bbox=NO_BBOX,
-        step_size=1,
-        add_name="zoomed_in_",
-    )
     # plot_heights_and_winds(
-    #     path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+    #     path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2/",
     #     bbox=NO_BBOX,
-    #     add_name="",
-    #     step_size=10,
+    #     step_size=1,
+    #     add_name="zoomed_in_",
     # )
+    plot_heights_and_winds(
+        path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+        bbox=NO_BBOX,
+        add_name="",
+        step_size=10,
+    )

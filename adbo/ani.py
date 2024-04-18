@@ -24,6 +24,9 @@ def plot_gps(
 
     Args:
         path_in (str, optional): name of data folder. Defaults to "mult1".
+        gp_file (str, optional): name of GP file. Defaults to "gp_model_outputs.nc".
+        plot_acq (bool, optional): Plot acquisition function. Defaults to False.
+        add_name (str, optional): Additional name for the gif. Defaults to "".
     """
     plot_defaults()
 
@@ -58,6 +61,9 @@ def plot_gps(
     # x1_units = ds.x1.attrs["units"]
     # x2_units = ds.x2.attrs["units"]
     len_active_points = len(ds.call.values)
+    num_init_data_points = len(calls) - len_active_points
+    print("len_active_points", len_active_points)
+    print("num_init_data_points", num_init_data_points)
 
     for call_i in tqdm(range(len_active_points), desc="Plotting GPs"):
         if plot_acq and "acq" in ds:
@@ -102,27 +108,37 @@ def plot_gps(
                 ["", ""],
                 figsize=(4 * 2, 4),
                 xy=(
-                    ("x1", "Angle", "$^{\circ}$"),
-                    ("x2", "Displacement", "$^{\circ}$"),
+                    ("x1", "Track Bearing", "$^{\circ}$"),
+                    ("x2", "Displacement East of New Orleans", "$^{\circ}$"),
                 ),
             )
         # this seems not to work properly
         # initial data points
+        print(
+            "intial_points",
+            angle[:num_init_data_points],
+            displacement[:num_init_data_points],
+        )
         axs.ravel()[0].scatter(
-            angle[:-len_active_points],
-            displacement[:-len_active_points],
+            angle[:num_init_data_points],
+            displacement[:num_init_data_points],
             marker="x",
+            s=2,
             color="blue",
         )
         # BO/active data points
+        print(
+            "active_points", angle[num_init_data_points : -len_active_points + call_i]
+        )
         axs.ravel()[0].scatter(
-            angle[-len_active_points : -len_active_points + call_i],
-            displacement[-len_active_points : -len_active_points + call_i],
+            angle[num_init_data_points : num_init_data_points + call_i + 1],
+            displacement[num_init_data_points : num_init_data_points + call_i + 1],
+            s=2,
             marker="+",
             color="green",
         )
-        plt.title(
-            "Add sample " + str(call_i + 1),
+        plt.suptitle(
+            "Additional sample " + str(call_i + 1),
         )
         figure_name = os.path.join(img_folder, f"gp_{call_i}.png")
         figure_names.append(figure_name)
@@ -137,6 +153,10 @@ def plot_gps(
         for filename in figure_names:
             image = imageio.imread(filename)
             writer.append_data(image)
+
+    print(f"Saved gif to {gif_name}")
+    print("Active data points: ", len_active_points)
+    print("Total data points: ", call_i + len_active_points + 1)
 
 
 if __name__ == "__main__":
