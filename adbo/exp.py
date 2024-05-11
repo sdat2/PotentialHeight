@@ -180,10 +180,15 @@ def objective_f(
     return obj
 
 
+# maybe shift this to constants?
 DEFAULT_CONSTRAINTS: dict = {
     "angle": {"min": -80, "max": 80, "units": "degrees"},
     "trans_speed": {"min": 0, "max": 15, "units": "m/s"},
-    "displacement": {"min": -2, "max": 2, "units": "degrees"},
+    "displacement": {
+        "min": -2,
+        "max": 2,
+        "units": "degrees",
+    },  # maybe make this relative to exp point.
     "order": ("angle", "trans_speed", "displacement"),  # order of input features
 }
 
@@ -353,6 +358,12 @@ def run_bayesopt_exp(
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
     direc = os.path.join(root_exp_direc, exp_name)
+
+    if os.path.exists(direc):
+        print(f"Experiment {exp_name} already exists")
+        return
+
+    # add existance check here
     os.makedirs(direc, exist_ok=True)
     setup_tf(seed=seed, log_name=exp_name)
 
@@ -467,23 +478,28 @@ def run_bayesopt_exp(
     plot_gps(path_in=direc, plot_acq=True)
 
 
-if __name__ == "__main__":
-    # run_bayesopt_exp(seed=12, exp_name="bo_test5", init_steps=5, daf_steps=35)
-    # run_bayesopt_exp(seed=13, exp_name="bo_test8", init_steps=5, daf_steps=35)
-    # python -m adbo.exp &> logs/bo_test10.log
-    # python -m adbo.exp
-    # python -m adbo.exp &> logs/exp.log
-    # run_bayesopt_exp(seed=14, exp_name="bo_test10", init_steps=5, daf_steps=50)
-    # python -m adbo.exp &> logs/test15.log
-    # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
-    # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
+def create_2d_ani_run():
     constraints_2d = {
         "angle": {"min": -80, "max": 80, "units": "degrees"},
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
         "order": ("angle", "displacement"),  # order of input features
     }
+    print("constraints_2d", constraints_2d)
+    run_bayesopt_exp(
+        constraints=constraints_2d,
+        seed=10,
+        stationid=3,
+        profile_name="2025.json",
+        exp_name="ani-2d",
+        resolution="mid",
+        init_steps=25,
+        daf_steps=25,
+        wrap_test=False,
+    )
 
-    stationid: int = 2
+
+def run_3d_exp():
+    stationid: int = 3
     year: int = 2097  # python -m adbo.exp &> logs/bo-3-2097.log
     # python -m adbo.exp &> logs/bo-test-2-2097.log
     run_bayesopt_exp(
@@ -491,12 +507,32 @@ if __name__ == "__main__":
         profile_name=f"{year}.json",
         constraints=DEFAULT_CONSTRAINTS,
         stationid=stationid,
-        exp_name=f"bo-{stationid:01}-{year}",
+        exp_name=f"bo-{stationid:01}-{year}-midres",
         resolution="mid",
         init_steps=25,
         daf_steps=25,
         wrap_test=False,
     )
+
+
+if __name__ == "__main__":
+    create_2d_ani_run()
+    # TODO: check if the 3d experiments have finished.
+    # we could add an existence check to the run_bayesopt_exp function.
+    # To exist, the directory with that name should exist, the correct number of subdirectories should be created, and the summary results should be stored.
+    # Idea: animation with maximum storm heights for each new sample with track plotted on top.
+    # Idea: create a 3D plot of the GP model output.
+    # Idea:
+    # run_bayesopt_exp(seed=12, exp_name="bo_test5", init_steps=5, daf_steps=35)
+    # run_bayesopt_exp(seed=13, exp_name="bo_test8", init_steps=5, daf_steps=35)
+    # python -m adbo.exp &> logs/bo_test10.log
+    # python -m
+    # python -m adbo.exp &> logs/2d_ani.log
+    # python -m adbo.exp &> logs/exp.log
+    # run_bayesopt_exp(seed=14, exp_name="bo_test10", init_steps=5, daf_steps=50)
+    # python -m adbo.exp &> logs/test15.log
+    # run_bayesopt_exp(seed=15, exp_name="bo_test11", init_steps=1, daf_steps=50)
+    # run_bayesopt_exp(seed=15, exp_name="test12", init_steps=1, daf_steps=50)
     # python -m adbo.exp &> logs/bo-test-0-2015.log
     # python -m adbo.exp &> logs/bo-test-2d-midres2.log
     # python -m adbo.exp &> logs/bo-test-2d-midres3-2097.log

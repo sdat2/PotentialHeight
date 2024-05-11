@@ -6,7 +6,7 @@ from scipy.stats._continuous_distns import rv_continuous
 
 
 class genextreme_given_max_gen(rv_continuous):
-    """Generalized extreme value distribution given maximum value.
+    r"""A generalized extreme value distribution given a maximum value.
 
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genextreme.html
 
@@ -14,7 +14,7 @@ class genextreme_given_max_gen(rv_continuous):
 
     """
 
-    # none of these functions have been thought throughs
+    # none of these functions have been thought through
     def _argcheck(self, c: float):
         return c > 0 and np.isfinite(c)
 
@@ -38,7 +38,7 @@ class genextreme_given_max_gen(rv_continuous):
 genextreme_given_max = genextreme_given_max_gen(name="genextreme_given_max")
 
 
-def genpareto_given_max_gen(rv_continuous):
+class genpareto_given_max_gen(rv_continuous):
     """Generalized Pareto distribution given maximum value.
 
     https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.genpareto.html
@@ -57,6 +57,7 @@ genpareto_given_max = genpareto_given_max_gen(name="genpareto_given_max")
 
 
 if __name__ == "__main__":
+    # python -m worst.dist
     import matplotlib.pyplot as plt
 
     x = np.linspace(0, 1, 100)
