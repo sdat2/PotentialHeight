@@ -624,9 +624,9 @@ def run_3d_exp() -> None:
 
 
 if __name__ == "__main__":
-    create_2d_ani_run()
+    # create_2d_ani_run()
     # TODO: check if the 3d experiments have finished.
-    # run_3d_exp()
+    run_3d_exp()
     # we could add an existence check to the run_bayesopt_exp function.
     # To exist, the directory with that name should exist, the correct number of subdirectories should be created, and the summary results should be stored.
     # Idea: animation with maximum storm heights for each new sample with track plotted on top.

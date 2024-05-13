@@ -43,4 +43,10 @@ np=$SLURM_NTASKS  # how many parallel tasks to define
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
 # python -m adbo.exp --stationid 2 --year 2097
-python -m adbo.exp --stationid 1 --year 2025
+python -m adbo.exp --stationid 3 --year 2025
+python -m adbo.exp --stationid 3 --year 2097
+python -m adbo.exp --stationid 4 --year 2025
+python -m adbo.exp --stationid 5 --year 2025
+python -m adbo.exp --stationid 6 --year 2025
+
+

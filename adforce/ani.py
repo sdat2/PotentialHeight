@@ -120,6 +120,8 @@ def plot_heights_and_winds(
     bbox: Optional[BoundingBox] = NO_BBOX,
     x_pos: float = 0.9,
     y_pos: float = 1.05,
+    scale: float = 800,
+    coarsen: int = 2,
 ) -> None:
     """
     Plot heights and winds.
@@ -152,7 +154,7 @@ def plot_heights_and_winds(
     cbar_levels = np.linspace(vmin_eta, vmax_eta, num=5)
     f22_main_ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["Main"].to_dataset()
     f22_main_ds = line_up_f22(f22_main_ds, path_in, NEW_ORLEANS)
-    f22_main_ds = f22_main_ds.coarsen(xi=2, yi=2, boundary="trim").mean()
+    f22_main_ds = f22_main_ds.coarsen(xi=coarsen, yi=coarsen, boundary="trim").mean()
 
     ckwargs = {
         "label": "",
@@ -194,7 +196,7 @@ def plot_heights_and_winds(
             y="lat",
             u="U10",
             v="V10",
-            scale=800,
+            scale=scale,
             add_guide=False,
         )
 
@@ -204,7 +206,7 @@ def plot_heights_and_winds(
             x_pos,
             y_pos,  # 08,
             40,
-            str(r"$40$ m s$^{-1}$"),  # + "\n"
+            str(str(40) + r" m s$^{-1}$"),  # + "\n"
             labelpos="E",
             coordinates="axes",
             # transform=ccrs.PlateCarree(),
@@ -352,9 +354,26 @@ if __name__ == "__main__":
     #     step_size=1,
     #     add_name="zoomed_in_",
     # )
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Plot U10 at a point.")
+    parser.add_argument(
+        "path_in",
+        type=str,
+        default="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+        help="path to data",
+    )
+    parser.add_argument("step_size", type=int, default=10, help="step size")
+    parser.add_argument(
+        "coarsen", type=int, default=2, help="x position of quiver label"
+    )
+    args = parser.parse_args()
+
     plot_heights_and_winds(
-        path_in="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+        path_in=args.path_in,
         bbox=NO_BBOX,
         add_name="",
-        step_size=10,
+        step_size=args.step_size,
+        coarsen=args.coarsen,
     )
+    # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d --step_size 10 --coarsen 2
