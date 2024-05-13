@@ -8,6 +8,7 @@ import os
 import argparse
 import numpy as np
 import xarray as xr
+import matplotlib
 import time
 
 start_tf_import = time.time()
@@ -36,14 +37,11 @@ from adforce.wrap import run_wrapped, select_point_f
 from src.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
+from .constants import FIGURE_PATH, EXP_PATH
 
-import matplotlib
 
 matplotlib.use("Agg")
-
 plot_defaults()
-
-ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path, move to constants
 
 
 @timeit
@@ -99,7 +97,7 @@ def objective_f(
         Callable[[tf.Tensor], tf.Tensor]: trieste observer function.
     """
     # set up folder for all experiments
-    exp_dir = os.path.join(ROOT, "exp", exp_name)
+    exp_dir = os.path.join(EXP_PATH, exp_name)
     os.makedirs(exp_dir, exist_ok=True)
     call_number = -1
     output = {}
@@ -333,7 +331,11 @@ def gp_model_callback_maker(
                             x2_r,
                             {"units": config[config["order"][1]]["units"]},
                         ),
-                        "call": [x + 1 for x in range(len(ypred_list))],
+                        "call": (
+                            ("call"),
+                            [x + 1 for x in range(len(ypred_list))],
+                            {"units": "dimensionless", "long_name": "call number"},
+                        ),
                     },
                 ).to_netcdf(os.path.join(direc, f"gp_model_outputs.nc"))
 
@@ -363,7 +365,7 @@ def gp_model_callback_maker(
 def run_exists(exp_name: str, num_runs: int) -> bool:
     """
     Check if the experiment has already been run.
-    Check if folder exists., Check if the correct number of subdirectories have been created, and check if the summary results have been stored.
+    Check if folder exists. Check if the correct number of subdirectories have been created, and check if the summary results have been stored.
 
     Args:
         exp_name (str): Name of the experiment.
@@ -371,18 +373,18 @@ def run_exists(exp_name: str, num_runs: int) -> bool:
     Returns:
         bool: Whether the experiment has already been run.
     """
-    if os.path.exists(os.path.join(ROOT, "exp", exp_name)):
+    if os.path.exists(os.path.join(EXP_PATH, exp_name)):
         if (
             len(
                 [
                     x
-                    for x in os.listdir(os.path.join(ROOT, "exp", exp_name))
+                    for x in os.listdir(os.path.join(EXP_PATH, exp_name))
                     if x.startswith("exp_")
                 ]
             )
             == num_runs
         ):
-            if os.path.exists(os.path.join(ROOT, "exp", exp_name, "experiments.json")):
+            if os.path.exists(os.path.join(EXP_PATH, exp_name, "experiments.json")):
                 return True
     return False
 
@@ -394,7 +396,7 @@ def run_bayesopt_exp(
     profile_name: str = "outputs.json",  # 2025.json, 2097.json
     resolution: str = "mid",
     exp_name: str = "bo_test",
-    root_exp_direc: str = os.path.join(ROOT, "exp"),
+    root_exp_direc: str = EXP_PATH,
     stationid: int = 3,
     init_steps: int = 10,
     daf_steps: int = 10,
@@ -513,17 +515,17 @@ def run_bayesopt_exp(
                 **{"y": (("call"), -observations.flatten(), {"units": "m"})},
             },
             coords={"call": [x + 1 for x in range(len(observations))]},
-        ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
+        ).to_netcdf(os.path.join(direc, exp_name + "_results.nc"))
 
     save_results(rescaled_query_points, observations, direc, exp_name)
 
-    def plot_results():
+    def plot_results() -> None:
         # plot the results for 2d
         _, ax = plt.subplots(1, 1, figsize=(10, 10))
         plot_bo_points(
             query_points,
             ax,
-            5,
+            init_steps,
             m_init="o",
             m_add="+",  # obs_values=observations
         )  # , arg_min_idx)
@@ -533,14 +535,14 @@ def run_bayesopt_exp(
         ax.set_xlabel(r"$x_1$ [dimensionless]")
         ax.set_ylabel(r"$x_2$ [dimensionless]")
         # change name to allow choice.
-        plt.savefig(os.path.join("img", exp_name + "_mves.png"))
+        plt.savefig(os.path.join(FIGURE_PATH, exp_name + "_results.pdf"))
         # plt.show()
         plt.clf()
         plt.close()
 
     plot_results()
 
-    def plot_regret():
+    def plt_regret() -> None:
         # plot the regret
         _, ax = plt.subplots(1, 1, figsize=(10, 10))
         plot_regret(
@@ -551,12 +553,12 @@ def run_bayesopt_exp(
         )
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Regret [-m]")
-        plt.savefig(os.path.join("img", exp_name + "_regret.png"))
+        plt.savefig(os.path.join(FIGURE_PATH, exp_name + "_regret.pdf"))
         # plt.show()
         plt.clf()
         plt.close()
 
-    plot_regret()
+    plt_regret()
 
     # plot the gp model changes for 2d case:
     if len(constraints["order"]) == 2:
@@ -567,7 +569,7 @@ def create_2d_ani_run() -> None:
     """
     Run a 2D experiment to make an animation of the GP model output being refined in BayesOpt.
     """
-    constraints_2d = {
+    constraints_2d: dict = {
         "angle": {"min": -80, "max": 80, "units": "degrees"},
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
         "order": ("angle", "displacement"),  # order of input features

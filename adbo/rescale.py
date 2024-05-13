@@ -98,7 +98,7 @@ def _test_rescale(verbose: bool = True) -> None:
     real_ex = np.array([[1.0, 10.0, 7], [5.0, 10.0, 13]]).T
     scaled_ex = np.array([[0.1, 1.0, 0.7], [0.0, 0.5, 0.8]]).T
     config = {
-        "order": ["a", "b"],
+        "order": ("a", "b"),
         "a": {"min": 0.0, "max": 10.0},
         "b": {"min": 5.0, "max": 15.0},
     }
@@ -109,7 +109,11 @@ def _test_rescale(verbose: bool = True) -> None:
         np.array([[0.1]]).T,
         {"order": ["a"], "a": {"min": 0.0, "max": 10.0}},
     )
-    print("Rescaling round trip test passed")
+    real_ex = np.random.rand(500, 2)
+    assert np.allclose(
+        rescale(rescale_inverse(real_ex, config), config), real_ex, atol=1e-6
+    )
+    print("Rescaling round trip test passed.")
 
 
 if __name__ == "__main__":

@@ -21,3 +21,4 @@ FIGURE_PATH = pathlib.Path(os.path.join(PROJECT_PATH, "img"))
 CONFIG_PATH = os.path.join(SRC_PATH, "config")
 AD_PATH = pathlib.Path(os.path.dirname(PROJECT_PATH))
 EXP_PATH = os.path.join(AD_PATH, "exp")
+# ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path, move to constants

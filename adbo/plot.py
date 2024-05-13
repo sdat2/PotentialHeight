@@ -59,6 +59,11 @@ def plot_diff() -> None:
         axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
 
     def vline(sample: float) -> None:
+        """vertical line.
+
+        Args:
+            sample (float): sample number.
+        """
         nonlocal axs
         axs[0].axvline(sample, color="black", linestyle="--")
         axs[1].axvline(sample, color="black", linestyle="--")
