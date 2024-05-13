@@ -48,9 +48,10 @@ ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
 model_ref_paths: Dict[str, str] = {
     "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
+    "mid-notide": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
     "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
 }
-node_dict: Dict[str, int] = {"low": 1, "mid": 1, "high": 8}
+node_dict: Dict[str, int] = {"low": 1, "mid": 1, "mid-notide": 1, "high": 8}
 
 
 @timeit
@@ -158,7 +159,7 @@ module load cray-parallel-netcdf/1.12.3.1
 cd {direc}
 
 home_dir=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
-source $home_dir/.bashrc
+# source $home_dir/.bashrc
 
 compile_dir=/work/n01/n01/sithom/adcirc-swan/compile_n4
 
@@ -343,7 +344,7 @@ if __name__ == "__main__":
     # TODO: add an option to turn the tide off.
     # run_angle_new()
     run_wrapped(
-        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap3",
+        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap4",
         profile_name="2025.json",
         select_point=select_point_f(3, resolution="high"),
         angle=10,

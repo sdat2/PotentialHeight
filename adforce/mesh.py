@@ -15,7 +15,9 @@ from src.constants import NO_BBOX
 
 
 @timeit
-def xr_loader(file_path: str, verbose: bool = False, use_dask=False) -> xr.Dataset:
+def xr_loader(
+    file_path: str, verbose: bool = False, use_dask: bool = False
+) -> xr.Dataset:
     """
     Load an xarray dataset from a ADCIRC netCDF4 file.
 
@@ -45,7 +47,7 @@ def xr_loader(file_path: str, verbose: bool = False, use_dask=False) -> xr.Datas
 
 @timeit
 def calculate_adjacency_matrix(
-    triangles: np.ndarray, N: int, sparse=True
+    triangles: np.ndarray, N: int, sparse: bool = True
 ) -> Union[np.ndarray, csr_matrix]:
     """
     Calculate a boolean adjacency matrix for a mesh of triangles.
@@ -82,7 +84,7 @@ def calculate_adjacency_matrix(
 
 @timeit
 def select_coast(
-    mesh_ds: xr.Dataset, overtopping: bool = False, keep_sparse=False
+    mesh_ds: xr.Dataset, overtopping: bool = False, keep_sparse: bool = False
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Select the coastal nodes.
@@ -156,7 +158,6 @@ def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
 
     Returns:
         xr.Dataset: Filtered xarray dataset.
-
     """
     og_indices = np.arange(len(adc_ds.x))
     neg_indices = np.setdiff1d(og_indices, indices)
@@ -177,7 +178,9 @@ def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
 
 @timeit
 def bbox_mesh(
-    file_path: str = "../data/fort.63.nc", bbox: BoundingBox = NO_BBOX, use_dask=True
+    file_path: str = "../data/fort.63.nc",
+    bbox: BoundingBox = NO_BBOX,
+    use_dask: bool = True,
 ) -> xr.Dataset:
     """
     Load an adcirc output file and filter it to a bounding box.
@@ -185,6 +188,7 @@ def bbox_mesh(
     Args:
         file_path (str, optional): Path to ADCIRC file. Defaults to "../data/fort.63.nc".
         bbox (BoundingBox, optional): Bounding box to trim to. Defaults to NO_BBOX.
+        use_dask (bool, optional): Whether to use dask. Defaults to True.
 
     Returns:
         xr.Dataset: Filtered xarray dataset.

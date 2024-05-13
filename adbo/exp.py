@@ -3,6 +3,7 @@
 from typing import Callable, Optional
 import os
 import math
+import argparse
 import numpy as np
 import xarray as xr
 import time
@@ -361,7 +362,7 @@ def run_bayesopt_exp(
 
     if os.path.exists(direc):
         print(f"Experiment {exp_name} already exists")
-        return
+        # return
 
     # add existance check here
     os.makedirs(direc, exist_ok=True)
@@ -478,7 +479,7 @@ def run_bayesopt_exp(
     plot_gps(path_in=direc, plot_acq=True)
 
 
-def create_2d_ani_run():
+def create_2d_ani_run() -> None:
     constraints_2d = {
         "angle": {"min": -80, "max": 80, "units": "degrees"},
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
@@ -490,7 +491,7 @@ def create_2d_ani_run():
         seed=10,
         stationid=3,
         profile_name="2025.json",
-        exp_name="ani-2d",
+        exp_name="ani-2d-2",
         resolution="mid",
         init_steps=25,
         daf_steps=25,
@@ -498,17 +499,24 @@ def create_2d_ani_run():
     )
 
 
-def run_3d_exp():
-    stationid: int = 3
-    year: int = 2097  # python -m adbo.exp &> logs/bo-3-2097.log
+def run_3d_exp() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stationid", type=int, default=3)
+    parser.add_argument("--year", type=int, default=2097)
+    args = parser.parse_args()
+    stationid: int = args.stationid
+    year: int = args.year
+
+    # stationid: int = 3
+    # year: int = 2097  # python -m adbo.exp &> logs/bo-3-2097.log
     # python -m adbo.exp &> logs/bo-test-2-2097.log
     run_bayesopt_exp(
-        seed=21 + stationid + year,
+        seed=22 + stationid + year,
         profile_name=f"{year}.json",
         constraints=DEFAULT_CONSTRAINTS,
         stationid=stationid,
-        exp_name=f"bo-{stationid:01}-{year}-midres",
-        resolution="mid",
+        exp_name=f"notide-{stationid:01}-{year}-midres",
+        resolution="mid-notide",
         init_steps=25,
         daf_steps=25,
         wrap_test=False,
@@ -516,8 +524,9 @@ def run_3d_exp():
 
 
 if __name__ == "__main__":
-    create_2d_ani_run()
+    # create_2d_ani_run()
     # TODO: check if the 3d experiments have finished.
+    run_3d_exp()
     # we could add an existence check to the run_bayesopt_exp function.
     # To exist, the directory with that name should exist, the correct number of subdirectories should be created, and the summary results should be stored.
     # Idea: animation with maximum storm heights for each new sample with track plotted on top.
