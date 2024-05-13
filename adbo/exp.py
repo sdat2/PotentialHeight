@@ -1,8 +1,10 @@
-"""Run BayesOpt experiments"""
+"""Run BayesOpt experiments.
+
+Should contain all tensorflow imports so that other scripts are easier to use/test without waiting for tensorflow to load.
+"""
 
 from typing import Callable, Optional
 import os
-import math
 import argparse
 import numpy as np
 import xarray as xr
@@ -23,7 +25,9 @@ from trieste.experimental.plotting.plotting import plot_bo_points, plot_regret
 from trieste.objectives.single_objectives import check_objective_shapes
 
 end_tf_import = time.time()
-print("tf import time", end_tf_import - start_tf_import)  # takes about 270 seconds
+print(
+    "tf import time", end_tf_import - start_tf_import
+)  # takes about 270 seconds on ARCHER2 (?why?)
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
@@ -39,7 +43,7 @@ matplotlib.use("Agg")
 
 plot_defaults()
 
-ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path
+ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path, move to constants
 
 
 @timeit
@@ -189,7 +193,7 @@ DEFAULT_CONSTRAINTS: dict = {
         "min": -2,
         "max": 2,
         "units": "degrees",
-    },  # maybe make this relative to exp point.
+    },  # maybe make this relative to experimental point.
     "order": ("angle", "trans_speed", "displacement"),  # order of input features
 }
 
@@ -221,15 +225,19 @@ def gp_model_callback_maker(
 
     if dimensions == 2:  # if 2D save GP model output
 
-        n = 100
-        x1 = np.linspace(0, 1, num=n)
-        x2 = np.linspace(0, 1, num=n)
-
-        x_r = rescale_inverse(np.column_stack([x1, x2]), config=config)
-        x1_r, x2_r = x_r[:, 0], x_r[:, 1]
-
+        nx1, nx2 = 100, 102  # resolution of the plot
+        # added some asymmetry to try to see if axes flip.
+        x1, x2 = np.linspace(0, 1, num=nx1), np.linspace(0, 1, num=nx2)
+        x1_r = rescale_inverse(
+            np.column_stack([x1, np.linspace(0, 1, num=nx1)]), config=config
+        )
+        x2_r = rescale_inverse(
+            np.column_stack([np.linspace(0, 1, num=nx2), x2]), config=config
+        )
+        # x_r = rescale_inverse(np.column_stack([x1, x2]), config=config)
+        # x1_r, x2_r = x_r[:, 0], x_r[:, 1]
         X1, X2 = np.meshgrid(x1, x2)
-        X = np.column_stack([X1.flatten(), X2.flatten()])
+        x_input = np.column_stack([X1.flatten(), X2.flatten()])
         ypred_list = []
         ystd_list = []
         acq_list = []
@@ -248,7 +256,7 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call, direc, n, x1, x2, X1, X2, X, ypred_list, ystd_list, config, dimensions
+        nonlocal call, direc, nx1, nx2, x1, x2, X1, X2, x_input, ypred_list, ystd_list, config, dimensions
         call += 1  # increment the call number
 
         print("dimension", dimensions)
@@ -265,31 +273,48 @@ def gp_model_callback_maker(
             # setting up a checkpoint every time is probably overwriting the previous one
             ckpt = tf.train.Checkpoint(model=gp_models[model].model)
             manager = tf.train.CheckpointManager(ckpt, direc, max_to_keep=100)
+            # TODO: pass manager to callback so that it can be saved every time
             manager.save()
             # plt.show()
             plt.clf()
             plt.close()
             if dimensions == 2:
                 # what's a good way to check that this puts the dimensions the right way around?
-                fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-                Y, Yvar = gp_models[model].predict_y(X)
-                Y, Yvar = np.reshape(Y, (n, n)), np.reshape(Yvar, (n, n))
-                ypred_list.append(Y)
-                ystd_list.append(np.sqrt(Yvar))
+                # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+                y_mean, y_var = gp_models[model].predict_y(x_input)
+                y_mean, y_var = np.reshape(y_mean, (nx1, nx2)), np.reshape(
+                    y_var, (nx1, nx2)
+                )
+                ypred_list.append(y_mean)
+                ystd_list.append(np.sqrt(y_var))
                 print("np.array(ypred_list))", np.array(ypred_list).shape)
                 print("np.array(yvar_list))", np.array(ystd_list).shape)
                 data_vars = {
-                    "ypred": (("call", "x1", "x2"), np.array(ypred_list)),
-                    "ystd": (("call", "x1", "x2"), np.array(ystd_list)),
+                    "ypred": (
+                        ("call", "x1", "x2"),
+                        np.array(ypred_list),
+                        {"units": "m", "long_name": "Mean prediction"},
+                    ),
+                    "ystd": (
+                        ("call", "x1", "x2"),
+                        np.array(ystd_list),
+                        {"units": "m", "long_name": "Std. Dev. in prediction"},
+                    ),
                 }
                 if acq_rule is not None:
                     if acq_rule.acquisition_function is not None:
-                        acq = acq_rule.acquisition_function(tf.expand_dims(X, axis=-2))
-                        acq = np.reshape(acq, (n, n))
+                        acq = acq_rule.acquisition_function(
+                            tf.expand_dims(x_input, axis=-2)
+                        )
+                        acq = np.reshape(acq, (nx1, nx2))
                     else:
-                        acq = np.zeros((n, n))
+                        acq = np.zeros((nx1, nx2))
                     acq_list.append(acq)
-                    data_vars["acq"] = (("call", "x1", "x2"), np.array(acq_list))
+                    data_vars["acq"] = (
+                        ("call", "x1", "x2"),
+                        np.array(acq_list),
+                        {"units": "dimensionless", "long_name": "acquisition function"},
+                    )
 
                 print(
                     "np.array([x + 1 for x in range(call)]))",
@@ -312,12 +337,12 @@ def gp_model_callback_maker(
                     },
                 ).to_netcdf(os.path.join(direc, f"gp_model_outputs.nc"))
 
-                # im = axs[0].contourf(X1, X2, Y, levels=1000)
+                # im = axs[0].contourf(X1, X2, y_mean, levels=1000)
                 # # add colorbar to the plot with the right scale and the same size as the plot
                 # fig.colorbar(im, ax=axs[0], fraction=0.046, pad=0.04)
                 # # axs[0].colorbar()
                 # axs[0].set_title("Mean")
-                # im = axs[1].contourf(X1, X2, np.sqrt(Yvar), levels=1000)
+                # im = axs[1].contourf(X1, X2, np.sqrt(y_var), levels=1000)
                 # fig.colorbar(im, ax=axs[1], fraction=0.046, pad=0.04)
                 # # axs[1].colorbar()
                 # axs[1].set_title("Std. Dev., $\sigma$")
@@ -335,14 +360,41 @@ def gp_model_callback_maker(
     return gp_model_callback
 
 
+def run_exists(exp_name: str, num_runs: int) -> bool:
+    """
+    Check if the experiment has already been run.
+    Check if folder exists., Check if the correct number of subdirectories have been created, and check if the summary results have been stored.
+
+    Args:
+        exp_name (str): Name of the experiment.
+
+    Returns:
+        bool: Whether the experiment has already been run.
+    """
+    if os.path.exists(os.path.join(ROOT, "exp", exp_name)):
+        if (
+            len(
+                [
+                    x
+                    for x in os.listdir(os.path.join(ROOT, "exp", exp_name))
+                    if x.startswith("exp_")
+                ]
+            )
+            == num_runs
+        ):
+            if os.path.exists(os.path.join(ROOT, "exp", exp_name, "experiments.json")):
+                return True
+    return False
+
+
 @timeit
 def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
-    profile_name: str = "outputs.json",
+    profile_name: str = "outputs.json",  # 2025.json, 2097.json
     resolution: str = "mid",
     exp_name: str = "bo_test",
-    root_exp_direc: str = "/work/n01/n01/sithom/adcirc-swan/exp",
+    root_exp_direc: str = os.path.join(ROOT, "exp"),
     stationid: int = 3,
     init_steps: int = 10,
     daf_steps: int = 10,
@@ -363,8 +415,9 @@ def run_bayesopt_exp(
     """
     direc = os.path.join(root_exp_direc, exp_name)
 
-    if os.path.exists(direc):
+    if run_exists(exp_name, num_runs=init_steps + daf_steps):
         print(f"Experiment {exp_name} already exists")
+        return
         # return
 
     # add existance check here
@@ -372,7 +425,7 @@ def run_bayesopt_exp(
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
-    dimensions_input = len(constraints["order"])
+    dimensions_input: int = len(constraints["order"])
     # assert dimensions_input == 2
     search_space = trieste.space.Box([0] * dimensions_input, [1] * dimensions_input)
     initial_query_points = search_space.sample_sobol(init_steps)
@@ -387,7 +440,9 @@ def run_bayesopt_exp(
     )
     put_through_sotp = False
 
-    if put_through_sotp:
+    if (
+        put_through_sotp
+    ):  # put through single objective test problem: shouldn't be necessary
         obs_class = SingleObjectiveTestProblem(
             name="adcirc35k",
             search_space=search_space,
@@ -438,54 +493,70 @@ def run_bayesopt_exp(
 
     rescaled_query_points = rescale_inverse(query_points, constraints)
 
-    # save results data (should make general)
-    xr.Dataset(
-        data_vars={
-            "x1": (
-                ("call"),
-                rescaled_query_points[:, 0],
-                {"units": constraints["angle"]["units"]},
-            ),
-            "x2": (
-                ("call"),
-                rescaled_query_points[:, 1],
-                {"units": constraints["displacement"]["units"]},
-            ),
-            "y": (("call"), -observations.flatten(), {"units": "m"}),
-        },
-        coords={"call": [x + 1 for x in range(len(observations))]},
-    ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
+    def save_results(
+        rescaled_query_points: np.ndarray,  # shape [N, F]
+        observations: np.ndarray,
+        direc: str,
+        exp_name: str,
+    ) -> None:
+        xr.Dataset(
+            data_vars={
+                **{
+                    "x"
+                    + str(i): (
+                        ("call"),
+                        rescaled_query_points[:, i],
+                        {"units": constraints[var]["units"], "long_name": var},
+                    )
+                    for i, var in enumerate(constraints["order"])
+                },
+                **{"y": (("call"), -observations.flatten(), {"units": "m"})},
+            },
+            coords={"call": [x + 1 for x in range(len(observations))]},
+        ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
 
-    # plot the results for 2d
-    _, ax = plt.subplots(1, 1, figsize=(10, 10))
-    plot_bo_points(
-        query_points,
-        ax,
-        5,
-        m_init="o",
-        m_add="+",  # obs_values=observations
-    )  # , arg_min_idx)
-    ax.scatter(query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis")
-    ax.set_xlabel(r"$x_1$ [dimensionless]")
-    ax.set_ylabel(r"$x_2$ [dimensionless]")
-    plt.savefig(os.path.join("img", exp_name + "_mves.png"))
-    # plt.show()
-    plt.clf()
-    plt.close()
+    save_results(rescaled_query_points, observations, direc, exp_name)
 
-    _, ax = plt.subplots(1, 1, figsize=(10, 10))
-    plot_regret(
-        dataset.observations.numpy(),
-        ax,
-        num_init=init_steps,
-        show_obs=True,
-    )
-    ax.set_xlabel("Iteration")
-    ax.set_ylabel("Regret")
-    plt.savefig(os.path.join("img", exp_name + "_regret.png"))
-    # plt.show()
-    plt.clf()
-    plt.close()
+    def plot_results():
+        # plot the results for 2d
+        _, ax = plt.subplots(1, 1, figsize=(10, 10))
+        plot_bo_points(
+            query_points,
+            ax,
+            5,
+            m_init="o",
+            m_add="+",  # obs_values=observations
+        )  # , arg_min_idx)
+        ax.scatter(
+            query_points[:, 0], query_points[:, 1], c=observations, cmap="viridis"
+        )
+        ax.set_xlabel(r"$x_1$ [dimensionless]")
+        ax.set_ylabel(r"$x_2$ [dimensionless]")
+        # change name to allow choice.
+        plt.savefig(os.path.join("img", exp_name + "_mves.png"))
+        # plt.show()
+        plt.clf()
+        plt.close()
+
+    plot_results()
+
+    def plot_regret():
+        # plot the regret
+        _, ax = plt.subplots(1, 1, figsize=(10, 10))
+        plot_regret(
+            dataset.observations.numpy(),
+            ax,
+            num_init=init_steps,
+            show_obs=True,
+        )
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Regret [-m]")
+        plt.savefig(os.path.join("img", exp_name + "_regret.png"))
+        # plt.show()
+        plt.clf()
+        plt.close()
+
+    plot_regret()
 
     # plot the gp model changes for 2d case:
     if len(constraints["order"]) == 2:
@@ -493,42 +564,56 @@ def run_bayesopt_exp(
 
 
 def create_2d_ani_run() -> None:
+    """
+    Run a 2D experiment to make an animation of the GP model output being refined in BayesOpt.
+    """
     constraints_2d = {
         "angle": {"min": -80, "max": 80, "units": "degrees"},
         "displacement": {"min": -2, "max": 2, "units": "degrees"},
         "order": ("angle", "displacement"),  # order of input features
     }
     print("constraints_2d", constraints_2d)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test", type=bool, default=False)
+    parser.add_argument("--year", type=int, default=2025)
+    parser.add_argument("--stationid", type=int, default=3)
+    parser.add_argument("--resolution", type=str, default="mid")
+    parser.add_argument("--exp_name", type=str, default="ani-2d-2")
+    args = parser.parse_args()
+
     run_bayesopt_exp(
         constraints=constraints_2d,
         seed=10,
-        stationid=3,
-        profile_name="2025.json",
-        exp_name="ani-2d-2",
-        resolution="mid",
+        stationid=args.stationid,
+        profile_name=str(args.year) + ".json",
+        exp_name=args.exp_name,
+        resolution=args.resolution,
         init_steps=25,
         daf_steps=25,
-        wrap_test=False,
+        wrap_test=args.test,
     )
 
 
 def run_3d_exp() -> None:
+    """
+    Run an experiment varying the angle, displacement and speed of the storm for a given tropical cyclone profile.
+
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--stationid", type=int, default=3)
     parser.add_argument("--year", type=int, default=2097)
     args = parser.parse_args()
-    stationid: int = args.stationid
-    year: int = args.year
 
     # stationid: int = 3
     # year: int = 2097  # python -m adbo.exp &> logs/bo-3-2097.log
     # python -m adbo.exp &> logs/bo-test-2-2097.log
     run_bayesopt_exp(
-        seed=22 + stationid + year,
-        profile_name=f"{year}.json",
+        seed=22 + args.stationid + args.year,
+        profile_name=f"{args.year}.json",
         constraints=DEFAULT_CONSTRAINTS,
-        stationid=stationid,
-        exp_name=f"notide-{stationid:01}-{year}-midres",
+        stationid=args.stationid,
+        exp_name=f"notide-{args.stationid:01}-{args.year}-midres",
         resolution="mid-notide",
         init_steps=25,
         daf_steps=25,
@@ -537,14 +622,14 @@ def run_3d_exp() -> None:
 
 
 if __name__ == "__main__":
-    # create_2d_ani_run()
+    create_2d_ani_run()
     # TODO: check if the 3d experiments have finished.
-    run_3d_exp()
+    # run_3d_exp()
     # we could add an existence check to the run_bayesopt_exp function.
     # To exist, the directory with that name should exist, the correct number of subdirectories should be created, and the summary results should be stored.
     # Idea: animation with maximum storm heights for each new sample with track plotted on top.
     # Idea: create a 3D plot of the GP model output.
-    # Idea:
+    # Idea: create a 3D plot of the GP model output with the acquisition function.
     # run_bayesopt_exp(seed=12, exp_name="bo_test5", init_steps=5, daf_steps=35)
     # run_bayesopt_exp(seed=13, exp_name="bo_test8", init_steps=5, daf_steps=35)
     # python -m adbo.exp &> logs/bo_test10.log

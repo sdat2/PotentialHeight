@@ -3,12 +3,14 @@
 This is used to rescale the inputs to the GP, and then rescale the outputs back to the original range.
 
 The parameters are defined in the config file, and the rescaling is done by subtracting the minimum value, and dividing by the range.
+
+Input/output numpy arrays are assumed to be of shape [N, F] where N is the number of points and F is the number of features.
 """
 
 import numpy as np
 
 
-def rescale(inputs: np.ndarray, config: dict, verbose=False) -> np.ndarray:
+def rescale(inputs: np.ndarray, config: dict, verbose: bool = False) -> np.ndarray:
     """Rescale the numbers to fall in 0.0 to 1.0 range.
 
     Args:
@@ -47,7 +49,9 @@ def rescale(inputs: np.ndarray, config: dict, verbose=False) -> np.ndarray:
     return outputs
 
 
-def rescale_inverse(inputs: np.ndarray, config: dict, verbose: False) -> np.ndarray:
+def rescale_inverse(
+    inputs: np.ndarray, config: dict, verbose: bool = False
+) -> np.ndarray:
     """Rescale back the numbers to fall in original range.
 
     Args:
