@@ -202,6 +202,9 @@ def gp_model_callback_maker(
     """
     Return a callback function that saves the GP model at each step.
 
+    TODO: problem from the animation: the x1 and x2 are not the right way around. Could be a problem in the scaled results.
+
+
     Args:
         direc (str): Directory to save the models.
         config (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
@@ -402,11 +405,17 @@ def run_bayesopt_exp(
     print("observer", observer, type(observer))
     initial_data = observer(initial_query_points)
     print("initial_data", initial_data, type(initial_data))
-    gpr = trieste.models.gpflow.build_gpr(initial_data, search_space)
+    # set up bayesopt loop
+    gpr = trieste.models.gpflow.build_gpr(
+        initial_data, search_space
+    )  # should add kernel choice here.
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
-    acquisition_func = MinValueEntropySearch(search_space)
+    acquisition_func = MinValueEntropySearch(
+        search_space
+    )  # should add in acquisition function choice here.
     acquisition_rule = EfficientGlobalOptimization(acquisition_func)
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
+    # run bayesopt loop
     result = bo.optimize(
         daf_steps,
         initial_data,
@@ -429,6 +438,7 @@ def run_bayesopt_exp(
 
     rescaled_query_points = rescale_inverse(query_points, constraints)
 
+    # save results data (should make general)
     xr.Dataset(
         data_vars={
             "x1": (
@@ -446,7 +456,7 @@ def run_bayesopt_exp(
         coords={"call": [x + 1 for x in range(len(observations))]},
     ).to_netcdf(os.path.join(direc, exp_name + "_mves.nc"))
 
-    # plot the results
+    # plot the results for 2d
     _, ax = plt.subplots(1, 1, figsize=(10, 10))
     plot_bo_points(
         query_points,
@@ -467,7 +477,7 @@ def run_bayesopt_exp(
     plot_regret(
         dataset.observations.numpy(),
         ax,
-        num_init=5,
+        num_init=init_steps,
         show_obs=True,
     )
     ax.set_xlabel("Iteration")
@@ -476,7 +486,10 @@ def run_bayesopt_exp(
     # plt.show()
     plt.clf()
     plt.close()
-    plot_gps(path_in=direc, plot_acq=True)
+
+    # plot the gp model changes for 2d case:
+    if len(constraints["order"]) == 2:
+        plot_gps(path_in=direc, plot_acq=True)
 
 
 def create_2d_ani_run() -> None:

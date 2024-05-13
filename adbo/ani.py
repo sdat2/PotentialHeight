@@ -18,9 +18,20 @@ def plot_gps(
     gp_file: str = "gp_model_outputs.nc",
     plot_acq: bool = False,
     add_name: str = "",
+    verbose: bool = False,
 ) -> None:
     """
     Plot GPs.
+
+    Function currently assumes that the GP file contains the following variables:
+    - ypred: GP prediction
+    - yvar: GP variance
+    - acq: acquisition function
+
+    And has the following dimensions:
+    - call: number of calls
+    - x1: angle (bearing) [degrees from North]
+    - x2: displacement [degrees east of New Orleans]
 
     Args:
         path_in (str, optional): name of data folder. Defaults to "mult1".
@@ -53,8 +64,8 @@ def plot_gps(
 
     vminm, vmaxm = ds.ypred.min().values, ds.ypred.max().values
     if "yvar" in ds:
-        ds["ystd"] = ds.yvar**0.5
-    vminstd, vmaxstd = ds.ystd.min().values, ds.ystd.max().values
+        ds["ystd"] = ds.yvar**0.5  # take square root of variance to get std
+    _, vmaxstd = 0, ds.ystd.max().values
     if plot_acq and "acq" in ds:
         vminacq, vmaxacq = ds.acq.min().values, ds.acq.max().values
 
@@ -75,7 +86,7 @@ def plot_gps(
                     [
                         "GP prediction, $\hat{y}$",
                         "GP standard deviation, $\sigma_{\hat{y}}$",
-                        r"Acquisition function, $\alpha$",
+                        r"Acquisition function, $\alpha$ [dimensionless]",
                     ]
                 ],
                 [
@@ -88,8 +99,8 @@ def plot_gps(
                 ["", "", ""],
                 figsize=(4 * 3, 4),
                 xy=(
-                    ("x1", "Angle", "$^{\circ}$"),
-                    ("x2", "Displacement", "$^{\circ}$"),
+                    ("x1", "Track Bearing, $\chi$", "$^{\circ}$"),
+                    ("x2", "Track Displacement, $c$", "$^{\circ}$E"),
                 ),
             )
         else:
@@ -113,32 +124,36 @@ def plot_gps(
                 ),
             )
         # this seems not to work properly
-        # initial data points
-        print(
-            "intial_points",
-            angle[:num_init_data_points],
-            displacement[:num_init_data_points],
-        )
-        axs.ravel()[0].scatter(
-            angle[:num_init_data_points],
-            displacement[:num_init_data_points],
-            marker="x",
-            s=2,
-            color="blue",
-        )
-        # BO/active data points
-        print(
-            "active_points", angle[num_init_data_points : -len_active_points + call_i]
-        )
-        axs.ravel()[0].scatter(
-            angle[num_init_data_points : num_init_data_points + call_i + 1],
-            displacement[num_init_data_points : num_init_data_points + call_i + 1],
-            s=2,
-            marker="+",
-            color="green",
-        )
+        if verbose:
+            # initial data points
+            print(
+                "intial_points",
+                angle[:num_init_data_points],
+                displacement[:num_init_data_points],
+            )
+            # BO/active data points
+            print(
+                "active_points",
+                angle[num_init_data_points : -len_active_points + call_i],
+            )
+        for i in range(axs.ravel().shape[0]):
+            axs.ravel()[i].scatter(
+                angle[:num_init_data_points],
+                displacement[:num_init_data_points],
+                marker="x",
+                s=5,
+                color="blue",
+            )
+            #
+            axs.ravel()[i].scatter(
+                angle[num_init_data_points : num_init_data_points + call_i + 1],
+                displacement[num_init_data_points : num_init_data_points + call_i + 1],
+                s=5,
+                marker="+",
+                color="green",
+            )
         plt.suptitle(
-            "Additional sample " + str(call_i + 1),
+            "Additional sample " + str(call_i),
         )
         figure_name = os.path.join(img_folder, f"gp_{call_i}.png")
         figure_names.append(figure_name)
@@ -162,7 +177,7 @@ def plot_gps(
 if __name__ == "__main__":
     # python -m adbo.ani
     plot_gps(
-        path_in="/work/n01/n01/sithom/adcirc-swan/exp/bo-test-2d-4",
+        path_in="/work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2",
         add_name="",
-        plot_acq=False,
+        plot_acq=True,
     )

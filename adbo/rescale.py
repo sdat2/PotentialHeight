@@ -16,14 +16,14 @@ def rescale(input: np.ndarray, config: dict) -> np.ndarray:
     Should write a test that the inverse works.
 
     Args:
-        input (np.ndarray): Input array.
+        input (np.ndarray): Input array [N, F].
         config (dict): Config dictionary. Should have key "order".
 
     Returns:
-        np.ndarray: Rescaled array.
+        np.ndarray: Rescaled array [N, F].
     """
     # this will only deal with 1 dimensional arrays at the moment
-    # print("input", input)
+    print("input", input, input.shape)
     # print("config", config)
     order = config["order"]
     ones = np.ones((input.shape[0]))
@@ -40,21 +40,23 @@ def rescale(input: np.ndarray, config: dict) -> np.ndarray:
         print(input[i], mins[i], diffs[i])
         output.append((input[i] - mins[i]) / diffs[i])
     # print("Output", output)
-    output = (input - mins) / diffs
+    out = (input - mins) / diffs
     # a test that all outputs are between 0 and 1, otherwise raise an error
-    assert np.all(output >= 0) and np.all(output <= 1)
-    return output
+    assert np.all(out >= 0) and np.all(out <= 1)
+
+    assert out.shape == input.shape
+    return out
 
 
 def rescale_inverse(input: np.ndarray, config: dict) -> np.ndarray:
     """Rescale back the numbers to fall in original range.
 
     Args:
-        input (np.ndarray): Input array.
+        input (np.ndarray): Input array [N, F].
         config (dict): Config dictionary. Should have key "order".
 
     Returns:
-        np.ndarray: rescaled array.
+        np.ndarray: rescaled array [N, F].
     """
     # print("input", input)
     # print("config", config)
@@ -65,4 +67,30 @@ def rescale_inverse(input: np.ndarray, config: dict) -> np.ndarray:
     # assert diffs.shape[0] == mins.shape[0] and diffs.shape[0] == ones.shape[0]
     print(diffs.shape, mins.shape, input.shape, ones.shape)
     # return np.dot(input, np.dot(ones, diffs)) + np.dot(ones, mins)
-    return input * diffs + mins
+    out = input * diffs + mins
+    assert out.shape == input.shape
+    return out
+
+
+# let's design a simple round trip test
+def _test_rescale() -> None:
+    """Test rescale function."""
+    config = {
+        "order": ["a", "b"],
+        "a": {"min": 0.0, "max": 10.0},
+        "b": {"min": 5.0, "max": 15.0},
+    }
+    real_ex = np.array([[1.0, 10.0, 7], [5.0, 10.0, 13]]).T  # .swapaxes(0, 1)
+    scaled_ex = np.array([[0.1, 0.5, 0.7], [0.0, 0.5, 0.8]]).T  # .swapaxes(0, 1)
+    print("input", real_ex)
+    output = rescale(real_ex, config)
+    print("output", output, "scaled_ex", scaled_ex)
+    assert np.allclose(output, scaled_ex, atol=1e-6)
+    output = rescale_inverse(scaled_ex, config)
+    print("output", output, "real_ex", real_ex)
+    assert np.allclose(output, real_ex, atol=1e-6)
+
+
+if __name__ == "__main__":
+    # python -m adbo.rescale
+    _test_rescale()
