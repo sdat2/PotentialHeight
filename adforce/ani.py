@@ -14,6 +14,7 @@ from sithom.plot import axis_formatter
 from sithom.time import timeit
 from adforce.mesh import bbox_mesh, xr_loader
 from adforce.fort22 import read_fort22
+import argparse
 
 # from sithom.xr import plot_units
 
@@ -339,33 +340,19 @@ def plot_u10_windx_at_a_point(path_in: str, point: Point, plot: bool = True) -> 
         plt.show()
 
 
-if __name__ == "__main__":
-    # python -m adforce.ani
-    # line_up_times()
-    # plot_heights(
-    #     path_in="/work/n01/n01/sithom/adcirc-swan/NWS13example/",
-    #     bbox=NO_BBOX.pad(5),
-    #     add_name="zoomed_out_",
-    #     step_size=10,
-    # )
-    # plot_heights_and_winds(
-    #     path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2/",
-    #     bbox=NO_BBOX,
-    #     step_size=1,
-    #     add_name="zoomed_in_",
-    # )
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Plot U10 at a point.")
+def run_heights_and_winds():
+    parser = argparse.ArgumentParser()
     parser.add_argument(
-        "path_in",
+        "--path_in",
         type=str,
         default="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
         help="path to data",
     )
-    parser.add_argument("step_size", type=int, default=10, help="step size")
     parser.add_argument(
-        "coarsen", type=int, default=2, help="x position of quiver label"
+        "--step_size", type=int, default=10, help="step size for animation"
+    )
+    parser.add_argument(
+        "--coarsen", type=int, default=2, help="coarsen the wind data by this factor"
     )
     args = parser.parse_args()
 
@@ -376,4 +363,50 @@ if __name__ == "__main__":
         step_size=args.step_size,
         coarsen=args.coarsen,
     )
-    # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d --step_size 10 --coarsen 2
+    # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049 --step_size 10 --coarsen 2
+
+
+def run_heights():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--path_in",
+        type=str,
+        default="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
+        help="path to data",
+    )
+    parser.add_argument(
+        "--step_size", type=int, default=10, help="step size for animation"
+    )
+
+    args = parser.parse_args()
+
+    plot_heights(
+        path_in=args.path_in,
+        bbox=NO_BBOX.pad(5),
+        add_name="zoomed_in_",
+        step_size=args.step_size,
+    )
+
+
+if __name__ == "__main__":
+    run_heights()
+
+# if __name__ == "__main__":
+#    drive_heights_and_winds()
+# python -m adforce.ani
+# line_up_times()
+# plot_heights(
+#     path_in="/work/n01/n01/sithom/adcirc-swan/NWS13example/",
+#     bbox=NO_BBOX.pad(5),
+#     add_name="zoomed_out_",
+#     step_size=10,
+# )
+# plot_heights_and_winds(
+#     path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2/",
+#     bbox=NO_BBOX,
+#     step_size=1,
+#     add_name="zoomed_in_",
+# )
+
+# python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d --step_size 10 --coarsen 2
+# python -m adforce.ani --path_in . --step_size 10 --coarsen 2
