@@ -410,3 +410,4 @@ if __name__ == "__main__":
 
 # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d --step_size 10 --coarsen 2
 # python -m adforce.ani --path_in . --step_size 10 --coarsen 2
+# python -m adforce.ani --path_in . --step_size 10

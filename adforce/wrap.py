@@ -48,7 +48,7 @@ ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
 model_ref_paths: Dict[str, str] = {
     "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
-    "mid-notide": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
+    "mid-notide": "/work/n01/n01/sithom/adcirc-swan/NWS13notide",
     "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
 }
 node_dict: Dict[str, int] = {"low": 1, "mid": 1, "mid-notide": 1, "high": 8}
