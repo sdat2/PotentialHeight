@@ -354,13 +354,39 @@ if __name__ == "__main__":
     # python adforce/wrap.py
     # read_angle_exp()
     # run_speed()
-    # TODO: add an option to turn the tide off.
     # run_angle_new()
 
-    run_wrapped(
-        out_path="/work/n01/n01/sithom/adcirc-swan/exp/notide-example-2",
-        profile_name="2025.json",
-        select_point=select_point_f(3, resolution="mid-notide"),
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run ADCIRC model.")
+    parser.add_argument(
+        "--exp_name",
+        type=str,
+        default="notide-example-2",
+        help="Path to ADCIRC run folder.",
+    )
+    parser.add_argument(
+        "--profile_name",
+        type=str,
+        default="2025.json",
+        help="Path to ADCIRC run folder.",
+    )
+    parser.add_argument(
+        "--stationid",
+        type=int,
+        default=3,
+        help="Stationid to select.",
+    )
+
+    args = parser.parse_args()
+
+    res = run_wrapped(
+        out_path="/work/n01/n01/sithom/adcirc-swan/exp/" + args.exp_name,
+        profile_name=args.profile_name,
+        select_point=select_point_f(args.stationid, resolution="mid-notide"),
         angle=0,
         resolution="mid-notide",
     )
+    print(res)
+
+    # python -m adforce.wrap --exp_name notide-example-3 --profile_name 2025.json --stationid 3
