@@ -580,8 +580,8 @@ def create_2d_ani_run() -> None:
     parser.add_argument("--test", type=bool, default=False)
     parser.add_argument("--year", type=int, default=2025)
     parser.add_argument("--stationid", type=int, default=3)
-    parser.add_argument("--resolution", type=str, default="mid")
-    parser.add_argument("--exp_name", type=str, default="ani-2d-2")
+    parser.add_argument("--resolution", type=str, default="mid-notide")
+    parser.add_argument("--exp_name", type=str, default="ani-2d-3")
     args = parser.parse_args()
 
     run_bayesopt_exp(
@@ -626,7 +626,7 @@ def run_3d_exp() -> None:
 if __name__ == "__main__":
     # create_2d_ani_run()
     # TODO: check if the 3d experiments have finished.
-    run_3d_exp()
+    # run_3d_exp()
     # we could add an existence check to the run_bayesopt_exp function.
     # To exist, the directory with that name should exist, the correct number of subdirectories should be created, and the summary results should be stored.
     # Idea: animation with maximum storm heights for each new sample with track plotted on top.

@@ -4,6 +4,11 @@
 
 ADCIRC forcing and processing. Some generic mesh processing.
 
+Animating an adcirc experiment:
+```bash
+python -m adforce.ani --path_in . --step_size 1
+```
+
 ## adbo
 
 Bayesian optimization using `adforce` to force adcirc with a `trieste` Bayesian optimization loop.
@@ -74,7 +79,7 @@ In Progress:
 TODO:
 
  - Could we produce uncertainty estimates in the upper bound based on MVES.
- - How to quantify performance of BO better.
+ - How to quantify the performance of BO better.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
  - GEV with maxima Scipy distribution fitting for CMIP6.
  - How to distribute optimisation points more uniformly along the coast.

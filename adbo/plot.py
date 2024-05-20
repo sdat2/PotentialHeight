@@ -1,5 +1,6 @@
 """Plot results from adcirc bayesian optimization experiments."""
 
+from typing import Tuple
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,16 +11,33 @@ from tcpips.constants import FIGURE_PATH
 from adbo.constants import EXP_PATH
 
 
+exp_names = [
+    "notide-" + str(stationid) + "-" + str(year) + "-midres"
+    for stationid in range(0, 6)
+    for year in [2025, 2097]
+]
+
+print(exp_names)
+
+
 @timeit
-def plot_diff() -> None:
+def plot_diff(
+    exps: Tuple[str, str] = ("bo-3-2025", "bo-3-2097"),
+    figure_name="2025-vs-2097-sid3.png",
+) -> None:
     """
     Plot difference between two years.
     """
     plot_defaults()
     # exp1_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2025")
     # exp2_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2097")
-    exp1_dir = os.path.join(EXP_PATH, "bo-3-2025")
-    exp2_dir = os.path.join(EXP_PATH, "bo-3-2097")
+    exp1_dir = os.path.join(EXP_PATH, exps[0])
+    exp2_dir = os.path.join(EXP_PATH, exps[1])
+    paths = [os.path.join(direc, "experiments.json") for direc in [exp1_dir, exp2_dir]]
+    if not all([os.path.exists(path) for path in paths]):
+        print("One or more experiments do not exist.", paths)
+        return
+
     exp1 = read_json(os.path.join(exp1_dir, "experiments.json"))
     exp2 = read_json(os.path.join(exp2_dir, "experiments.json"))
     # print(exp1.keys())
@@ -82,7 +100,7 @@ def plot_diff() -> None:
     plot_exp(exp1, "2025", "blue")
     plot_exp(exp2, "2097", "red")
     vline(25.5)
-    figure_path = os.path.join(FIGURE_PATH, "2025-vs-2097-sid3.png")
+    figure_path = os.path.join(FIGURE_PATH, figure_name)
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
 
@@ -165,5 +183,14 @@ def plot_many() -> None:
 
 if __name__ == "__main__":
     # python -m adbo.plot
+    for staionid in range(0, 6):
+        plot_diff(
+            exps=(
+                f"notide-{staionid}-2025-midres",
+                f"notide-{staionid}-2097-midres",
+            ),
+            figure_name=f"2025-vs-2097-sid{staionid}-midres.png",
+        )
     # plot_diff()
-    plot_many()
+    # plot_many()
+    # pass

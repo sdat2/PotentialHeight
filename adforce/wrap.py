@@ -34,6 +34,7 @@ from typing import Callable, Dict
 import numpy as np
 import shutil
 import time
+from datetime import timedelta
 import xarray as xr
 import matplotlib.pyplot as plt
 from slurmpy import Slurm
@@ -46,12 +47,27 @@ from .mesh import xr_loader
 
 ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
+COMPILE_DIR: str = "/work/n01/n01/sithom/adcirc-swan/0/adcirc/work"
 model_ref_paths: Dict[str, str] = {
     "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
     "mid-notide": "/work/n01/n01/sithom/adcirc-swan/NWS13notide",
     "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
 }
 node_dict: Dict[str, int] = {"low": 1, "mid": 1, "mid-notide": 1, "high": 8}
+qos_dict: Dict[str, str] = {
+    "low": "short",
+    "mid": "short",
+    "mid-notide": "short",
+    "high": "standard",
+}
+time_dict: Dict[str, float] = {
+    # time in seconds
+    "low": 20 * 60,  # wall time of 20 minutes for short qos queue on ARCHER2
+    "mid": 20 * 60,
+    "mid-notide": 20 * 60,
+    "high": 60 * 60,
+}
+EMAIL_ADDRESS: str = "sdat2@cam.ac.uk"
 
 
 @timeit
@@ -73,9 +89,10 @@ def setup_new(
     """
     # original path to copy setting files from
     files = [
-        "fort.13",
-        "fort.14",
-        "fort.15",
+        "fort.13",  # node attributes
+        "fort.14",  # mesh
+        "fort.15",  # model settings
+        # setup files
         "fort.64.nc",
         "fort.73.nc",
         "fort.74.nc",
@@ -120,7 +137,7 @@ def is_job_finished(jid: int) -> bool:
 
 @timeit
 def run_and_wait(
-    direc: str, jobname: str = "run", time_limit: float = 3 * 60 * 60, nodes: int = 1
+    direc: str, jobname: str = "run", time_limit: float = 20 * 60, nodes: int = 1
 ) -> int:
     """
     Run the ADCIRC model and wait for it to finish.
@@ -133,35 +150,31 @@ def run_and_wait(
     Returns:
         int: Slurm Job ID.
     """
+    # time_limit_str = "HH:mm:ss".format(time_limit)
     s = Slurm(
         jobname,
         {
             "nodes": nodes,
             "account": "n01-SOWISE",
             "partition": "standard",
-            "qos": "standard",
-            "time": str(int(time_limit / 60 / 60)) + ":0:0",
+            "qos": qos_dict["mid"],
+            "time": str(timedelta(seconds=time_limit)),
             "tasks-per-node": 128,  # number of cpus on archer2 node.
             "cpus-per-task": 1,
             "output": os.path.join(direc, "slurm.out"),
             "error": os.path.join(direc, "slurm.out"),
             "mail-type": "ALL",
-            "mail-user": "sdat2@cam.ac.uk",
+            "mail-user": EMAIL_ADDRESS,
         },
     )
 
     jid = s.run(
         f"""
-module load PrgEnv-gnu/8.3.3
-module load cray-hdf5-parallel/1.12.2.1
-module load cray-parallel-netcdf/1.12.3.1
+module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
 
 cd {direc}
 
-home_dir=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
-# source $home_dir/.bashrc
-
-compile_dir=/work/n01/n01/sithom/adcirc-swan/compile_n4
+compile_dir=/work/n01/n01/sithom/adcirc-swan/0/adcirc/work
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing
@@ -343,10 +356,11 @@ if __name__ == "__main__":
     # run_speed()
     # TODO: add an option to turn the tide off.
     # run_angle_new()
+
     run_wrapped(
-        out_path="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap4",
+        out_path="/work/n01/n01/sithom/adcirc-swan/exp/notide-example-2",
         profile_name="2025.json",
-        select_point=select_point_f(3, resolution="high"),
-        angle=10,
-        resolution="high",
+        select_point=select_point_f(3, resolution="mid-notide"),
+        angle=0,
+        resolution="mid-notide",
     )

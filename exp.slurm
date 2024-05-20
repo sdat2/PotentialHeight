@@ -1,10 +1,13 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=2d-ani
+#SBATCH --job-name=2d-ani-new
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
 #SBATCH --time=24:00:0
+
+# slurm job name as output log file name
+#SBATCH --output=logs/%x-%j.out
 
 # Replace [budget code] below with your project code (e.g. t01)
 
@@ -43,10 +46,11 @@ np=$SLURM_NTASKS  # how many parallel tasks to define
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
 # python -m adbo.exp --stationid 2 --year 2097
-python -m adbo.exp --stationid 3 --year 2025
-python -m adbo.exp --stationid 3 --year 2097
-python -m adbo.exp --stationid 4 --year 2025
-python -m adbo.exp --stationid 5 --year 2025
-python -m adbo.exp --stationid 6 --year 2025
+#python -m adbo.exp --stationid 3 --year 2025
+#python -m adbo.exp --stationid 3 --year 2097
+#python -m adbo.exp --stationid 4 --year 2025
+#python -m adbo.exp --stationid 5 --year 2025
+# python -m adbo.exp --stationid 6 --year 2025
 
 
+python -m adbo.exp
