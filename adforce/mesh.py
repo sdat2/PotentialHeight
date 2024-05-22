@@ -71,9 +71,9 @@ def calculate_adjacency_matrix(
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
     if not sparse:
         adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
-        adjacency_matrix[rows, cols] = (
-            True  # "smart indexing" in numpy is very fast and efficient
-        )
+        adjacency_matrix[
+            rows, cols
+        ] = True  # "smart indexing" in numpy is very fast and efficient
     else:
         adjacency_matrix = csr_matrix(
             (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool

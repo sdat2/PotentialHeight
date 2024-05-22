@@ -104,7 +104,6 @@ def plot_gps(
                 ),
             )
         else:
-
             fig, axs = feature_grid(
                 ds.isel(call=call_i),
                 [["ypred", "ystd"]],
