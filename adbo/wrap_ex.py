@@ -6,11 +6,10 @@ import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
-from src.constants import NEW_ORLEANS
+from adforce.constants import NEW_ORLEANS
 from tcpips.constants import FIGURE_PATH
 from adforce import setup_new, read_results, run_wrapped
 
-ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
 
 
 @timeit

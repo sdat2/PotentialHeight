@@ -34,12 +34,13 @@ from sithom.plot import plot_defaults
 from sithom.io import write_json
 import matplotlib.pyplot as plt
 from adforce.wrap import run_wrapped, select_point_f
-from src.constants import NEW_ORLEANS
+from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
 from .constants import FIGURE_PATH, EXP_PATH
+from .constants import AD_PATH as ROOT
 
-
+# archer 2:
 matplotlib.use("Agg")
 plot_defaults()
 

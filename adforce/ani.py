@@ -5,16 +5,17 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import imageio
-from src.constants import NO_BBOX, NEW_ORLEANS
 import pandas as pd
 import xarray as xr
 from sithom.plot import plot_defaults, lim
 from sithom.place import BoundingBox, Point
 from sithom.plot import axis_formatter
 from sithom.time import timeit
-from adforce.mesh import bbox_mesh, xr_loader
-from adforce.fort22 import read_fort22
 import argparse
+from .mesh import bbox_mesh, xr_loader
+from .fort22 import read_fort22
+from .constants import NO_BBOX, NEW_ORLEANS
+
 
 # from sithom.xr import plot_units
 

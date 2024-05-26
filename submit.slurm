@@ -8,7 +8,7 @@
 
 # Replace [budget code] below with your project code (e.g. t01)
 
-#SBATCH --account=n01-SOWISE
+#SBATCH --account=n02-bas
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 
@@ -19,18 +19,18 @@
 
 
 # Load modules
-module load PrgEnv-gnu/8.3.3
-module load cray-hdf5-parallel/1.12.2.1
-module load cray-netcdf-hdf5parallel/4.9.0.1
+module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
 
 
 # try to activate bashrc
 
-work=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
+# work=/mnt/lustre/a2fs-work1/work/n02/n02/b
 
-source $work/.bashrc
+source ~/.bashrc
 
-eval "$(conda shell.bash hook)"
+micromamba activate tcpips
+
+# eval "$(conda shell.bash hook)"
 
 echo "which python"
 which python

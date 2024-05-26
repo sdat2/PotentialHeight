@@ -39,28 +39,29 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from slurmpy import Slurm
 from sithom.time import timeit
-from src.constants import NEW_ORLEANS, KATRINA_TIDE_NC
+from .constants import NEW_ORLEANS # , KATRINA_TIDE_NC
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from .fort22 import save_forcing
 from .mesh import xr_loader
 
 
-ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"
-OG_PATH: str = "/work/n01/n01/sithom/adcirc-swan/NWS13example"
-COMPILE_DIR: str = "/work/n01/n01/sithom/adcirc-swan/0/adcirc/work"
-model_ref_paths: Dict[str, str] = {
-    "mid": "/work/n01/n01/sithom/adcirc-swan/NWS13example",
-    "mid-notide": "/work/n01/n01/sithom/adcirc-swan/NWS13notide",
-    "high": "/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004",
+ROOT: str = "/work/n02/n02/sdat2/adcirc-swan/"
+OG_PATH: str = "/work/n02/n02/sdat2/adcirc-swan/examples/NWS13example"
+EXE_PATH: str = "/work/n02/n02/sdat2/adcirc-swan/adcirc/work"
+MODEL_PATHS_DICT: Dict[str, str] = {
+    "low": "/work/n02/n02/sdat2/adcirc-swan/adcirc-testsuite/adcirc/adcirc_katrina-2d-nws13-parallel",
+    "mid": "/work/n02/n02/sdat2/adcirc-swan/examples/NWS13example",
+    "mid-notide": "/work/n02/n02/sdat2/adcirc-swan/examples/NWS13notide",
+    "high": "/work/n02/n02/sdat2/adcirc-swan/examples/kat.nws13.2004",
 }
-node_dict: Dict[str, int] = {"low": 1, "mid": 1, "mid-notide": 1, "high": 8}
-qos_dict: Dict[str, str] = {
+NODE_DICT: Dict[str, int] = {"low": 1, "mid": 1, "mid-notide": 1, "high": 8}
+QOS_DICT: Dict[str, str] = {
     "low": "short",
     "mid": "short",
     "mid-notide": "short",
     "high": "standard",
 }
-time_dict: Dict[str, float] = {
+TIME_DICT: Dict[str, float] = {
     # time in seconds
     "low": 20 * 60,  # wall time of 20 minutes for short qos queue on ARCHER2
     "mid": 20 * 60,
@@ -68,6 +69,10 @@ time_dict: Dict[str, float] = {
     "high": 60 * 60,
 }
 EMAIL_ADDRESS: str = "sdat2@cam.ac.uk"
+SLURM_ACCOUNT: str = "n02-bas"
+PARTITION: str = "standard"
+TASKS_PER_NODE: int = 128
+MODULES: str = "PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1"
 
 
 @timeit
@@ -100,7 +105,7 @@ def setup_new(
     os.makedirs(new_path, exist_ok=True)
     for file in files:
         shutil.copy(
-            os.path.join(model_ref_paths[resolution], file),
+            os.path.join(MODEL_PATHS_DICT[resolution], file),
             os.path.join(new_path, file),
         )
 
@@ -155,11 +160,11 @@ def run_and_wait(
         jobname,
         {
             "nodes": nodes,
-            "account": "n01-SOWISE",
-            "partition": "standard",
-            "qos": qos_dict["mid"],
+            "account": SLURM_ACCOUNT,
+            "partition": PARTITION,
+            "qos": QOS_DICT["mid"],
             "time": str(timedelta(seconds=time_limit)),
-            "tasks-per-node": 128,  # number of cpus on archer2 node.
+            "tasks-per-node": TASKS_PER_NODE,  # number of cpus on archer2 node.
             "cpus-per-task": 1,
             "output": os.path.join(direc, "slurm.out"),
             "error": os.path.join(direc, "slurm.out"),
@@ -170,11 +175,11 @@ def run_and_wait(
 
     jid = s.run(
         f"""
-module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
+module {MODULES}
 
 cd {direc}
 
-compile_dir=/work/n01/n01/sithom/adcirc-swan/0/adcirc/work
+EXE_PATH=/work/n02/n02/sdat2/adcirc-swan/0/adcirc/work
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing
@@ -194,8 +199,8 @@ echo "|---------------------------------------------|"
 echo "    TEST CASE: $case_name"
 echo ""
 echo -n "    Prepping case..."
-$compile_dir/adcprep --np $np --partmesh >  adcprep.log
-$compile_dir/adcprep --np $np --prepall  >> adcprep.log
+$EXE_PATH/adcprep --np $np --partmesh >  adcprep.log
+$EXE_PATH/adcprep --np $np --prepall  >> adcprep.log
 if [ $? == 0 ] ; then
     echo "done!"
 else
@@ -204,7 +209,7 @@ else
 fi
 
 echo -n "    Runnning case..."
-srun --distribution=block:block --hint=nomultithread $compile_dir/padcirc > padcirc_log.txt
+srun --distribution=block:block --hint=nomultithread $EXE_PATH/padcirc > padcirc_log.txt
 exitstat=$?
 echo "Finished"
 echo "    ADCIRC Exit Code: $exitstat"
@@ -243,17 +248,17 @@ def select_point_f(stationid: int, resolution: str = "mid") -> Callable[[str], f
     Returns:
         Callable: Function to select the maximum elevation near a given stationid.
     """
-    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
-    lon, lat = (
-        tide_ds.isel(stationid=stationid).lon.values,
-        tide_ds.isel(stationid=stationid).lat.values,
-    )
-    mele_og = xr_loader(os.path.join(model_ref_paths[resolution], "maxele.63.nc"))
+    # = xr.open_dataset(KATRINA_TIDE_NC)
+    #lon, lat = (
+    #    tide_ds.isel(stationid=stationid).lon.values,
+    #    tide_ds.isel(stationid=stationid).lat.values,
+    # )
+    mele_og = xr_loader(os.path.join(MODEL_PATHS_DICT[resolution], "maxele.63.nc"))
     # read zeta_max point closes to the
     # work out closest point to NEW_ORLEANS
     xs = mele_og.x.values
     ys = mele_og.y.values
-    # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
+    lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
     dist = ((xs - lon) ** 2 + (ys - lat) ** 2) ** 0.5
     min_p = np.argmin(dist)  # closest point to stationid
 
@@ -313,7 +318,7 @@ def run_wrapped(
         resolution=resolution,
     )
     # set off sbatch.
-    run_and_wait(out_path, nodes=node_dict[resolution])
+    run_and_wait(out_path, nodes=NODE_DICT[resolution])
     # look at results.
     return select_point(out_path)
 
@@ -336,14 +341,14 @@ def read_results(path: str = OG_PATH, stationid: int = 3) -> float:
     xs = mele_ds.x.values
     ys = mele_ds.y.values
 
-    tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
-    lon, lat = (
-        tide_ds.isel(stationid=stationid).lon.values,
-        tide_ds.isel(stationid=stationid).lat.values,
-    )
+    # tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
+    #lon, lat = (
+    #    tide_ds.isel(stationid=stationid).lon.values,
+    #    tide_ds.isel(stationid=stationid).lat.values,
+    #)
 
     # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
-    dist = ((xs - lon) ** 2 + (ys - lat) ** 2) ** 0.5
+    dist = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2) ** 0.5
     min_p = np.argmin(dist)
     # Read the maximum elevation for that point
     return mele_ds["zeta_max"].values[min_p]
@@ -371,6 +376,7 @@ if __name__ == "__main__":
         default="2025.json",
         help="Path to ADCIRC run folder.",
     )
+    parser.add_argument("--resolution", type=str, default="mid", help="Resolution of the ADCIRC model.")
     parser.add_argument(
         "--stationid",
         type=int,
@@ -381,11 +387,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     res = run_wrapped(
-        out_path="/work/n01/n01/sithom/adcirc-swan/exp/" + args.exp_name,
+        out_path="/work/n02/n02/sdat2/adcirc-swan/exp/" + args.exp_name,
         profile_name=args.profile_name,
-        select_point=select_point_f(args.stationid, resolution="mid-notide"),
+        select_point=select_point_f(args.stationid, resolution=args.resolution),
         angle=0,
-        resolution="mid-notide",
+        resolution=args.resolution,
     )
     print(res)
 

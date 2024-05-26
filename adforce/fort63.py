@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import xarray as xr
-from src.constants import NO_BBOX, NEW_ORLEANS
+from .constants import NO_BBOX, NEW_ORLEANS
 from sithom.time import timeit
 from sithom.place import BoundingBox, Point
 from sithom.xr import plot_units

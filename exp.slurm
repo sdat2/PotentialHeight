@@ -11,7 +11,7 @@
 
 # Replace [budget code] below with your project code (e.g. t01)
 
-#SBATCH --account=n01-SOWISE
+#SBATCH --account=n02-bas
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 
@@ -22,11 +22,9 @@
 
 # try to activate bashrc
 
-work=/mnt/lustre/a2fs-work1/work/n01/n01/sithom
+source ~/.bashrc
 
-source $work/.bashrc
-
-eval "$(conda shell.bash hook)"
+micromamba activate tcpips
 
 echo "which python"
 which python
@@ -46,10 +44,10 @@ np=$SLURM_NTASKS  # how many parallel tasks to define
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
 # python -m adbo.exp --stationid 2 --year 2097
-#python -m adbo.exp --stationid 3 --year 2025
-#python -m adbo.exp --stationid 3 --year 2097
-#python -m adbo.exp --stationid 4 --year 2025
-#python -m adbo.exp --stationid 5 --year 2025
+# python -m adbo.exp --stationid 3 --year 2025
+# python -m adbo.exp --stationid 3 --year 2097
+# python -m adbo.exp --stationid 4 --year 2025
+# python -m adbo.exp --stationid 5 --year 2025
 # python -m adbo.exp --stationid 6 --year 2025
 
 

@@ -11,7 +11,7 @@ import netCDF4 as nc
 import xarray as xr
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from src.constants import NO_BBOX
+from .constants import NO_BBOX
 
 
 @timeit
