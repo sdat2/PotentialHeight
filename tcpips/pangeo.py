@@ -199,7 +199,7 @@ def get_data_part(
     source_id: str = "CESM2-SE",
 ) -> None:
     """
-    Get data part.
+    Get data part from one of the experiments.
 
     Args:
         experiments (List[str], optional): Defaults to ["historical", "ssp585"].
@@ -229,13 +229,16 @@ def get_data_part(
 
 
 @timeit
-def get_data(
+def get_data_pair(
     institution_id: str = "THU",  # "MOHC",  # "NCAR",
     source_id: str = "CIESM",  # "HadGEM3-GC31-HH",  # "CESM2-SE",
 ) -> None:
     """
+    Get data from Pangeo for a particular institution source pair.
+
+    Have a look at the CMIP6 data available on Pangeo:
+
     https://docs.google.com/spreadsheets/d/13DHeTEH_8G08vxTMX1Fs-WbAA6SamBjDdh0fextdcGE/edit#gid=165882553
-    Get data.
 
     Args:
         institution_id (str, optional): Defaults to "MOHC".
@@ -258,12 +261,30 @@ def get_data(
 
 
 if __name__ == "__main__":
-    # tcpips/pangeo.py
+    # python -m tcpips.pangeo
     # regrid_2d()
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
     # pass
-    get_data()
+    # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Pangeo download and processing scripts.")
+    parser.add_argument(
+        "--institution_id",
+        default="NCAR",
+        help="Institution id",
+    )
+    parser.add_argument(
+        "--source_id",
+        default="CESM2",
+        help="Source id",
+    )
+    args = parser.parse_args()
+
+    get_data_pair(institution_id=args.institution_id, source_id=args.source_id)
+    # get_data_pair(institution_id="THU", source_id="CIESM")
+    # get_data_pair(institution_id="THU", source_id="CIESM")
     # regrid_2d()
     # regrid_2d_1degree(output_res=0.25)
     # regrid_2d()

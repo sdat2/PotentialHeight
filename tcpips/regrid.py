@@ -312,3 +312,11 @@ def regrid_1d(xesmf: bool = False) -> None:
     ocean_out.to_netcdf(os.path.join(CMIP6_PATH, "regrid1d_ocean_regridded.nc"))
     ocean_out.tos.isel(time=0).plot(x="lon", y="lat")
     plt.savefig(os.path.join(FIGURE_PATH, "ocean_regridded_regrid1d.png"))
+
+
+if __name__ == "__main__":
+    #regrid_2d_1degree()
+    #regrid_2d()
+    #regrid_1d()
+    # regrid_1d(xesmf=True)
+    pass

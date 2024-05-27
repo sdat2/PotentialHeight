@@ -175,11 +175,11 @@ def run_and_wait(
 
     jid = s.run(
         f"""
-module {MODULES}
+module load {MODULES}
 
 cd {direc}
 
-EXE_PATH=/work/n02/n02/sdat2/adcirc-swan/0/adcirc/work
+EXE_PATH={EXE_PATH}
 
 # define variables
 case_name=$SLURM_JOB_NAME # name for printing
@@ -395,4 +395,4 @@ if __name__ == "__main__":
     )
     print(res)
 
-    # python -m adforce.wrap --exp_name notide-example-3 --profile_name 2025.json --stationid 3
+    # python -m adforce.wrap --exp_name tide-low --profile_name 2025.json --stationid 3

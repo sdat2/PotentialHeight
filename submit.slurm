@@ -19,7 +19,7 @@
 
 
 # Load modules
-module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
+# module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
 
 
 # try to activate bashrc
@@ -49,4 +49,5 @@ np=$SLURM_NTASKS  # how many parallel tasks to define
 # run python job
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
-python -m tcpips.pangeo
+python -m tcpips.regrid
+
