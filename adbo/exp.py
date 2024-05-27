@@ -625,7 +625,7 @@ def run_3d_exp() -> None:
 
 
 if __name__ == "__main__":
-    # create_2d_ani_run()
+    create_2d_ani_run()
     # TODO: check if the 3d experiments have finished.
     # run_3d_exp()
     # we could add an existence check to the run_bayesopt_exp function.

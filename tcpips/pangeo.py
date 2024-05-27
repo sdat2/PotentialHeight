@@ -261,7 +261,8 @@ def get_data_pair(
 
 
 if __name__ == "__main__":
-    # python -m tcpips.pangeo
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2
     # regrid_2d()
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
