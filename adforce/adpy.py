@@ -34,15 +34,23 @@ driver = AdcircRun(
     end_date=datetime(year=2004, month=9, day=15),
     # server_config=slurm,
     spinup_time=timedelta(days=15),
+    netcdf=True,
     #output_interval=timedelta(hours=1),
-    #output_variables=["zeta", "u", "v"],
+    # output_variables=["zeta", "u", "v"],
     # output_netcdf=True,
     # output_directory=SETUP_PATH,
     # output_prefix="test_adpy_",
 )
 driver.timestep = 1.0
+
+driver.set_elevation_surface_output(sampling_rate=timedelta(minutes=60))
+driver.set_velocity_surface_output(sampling_rate=timedelta(minutes=60))
+#
+print("dir(driver)", dir(driver))
 # driver.
 # mesh.generate_tau0()
+# driver.set_elevation_stations_output(sampling_rate=timedelta(minutes=60), )
+
 
 
 # write configuration files to the specified directory
