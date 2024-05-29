@@ -341,7 +341,7 @@ def plot_u10_windx_at_a_point(path_in: str, point: Point, plot: bool = True) -> 
         plt.show()
 
 
-def run_heights_and_winds():
+def run_animation() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--path_in",
@@ -355,42 +355,38 @@ def run_heights_and_winds():
     parser.add_argument(
         "--coarsen", type=int, default=2, help="coarsen the wind data by this factor"
     )
+    parser.add_argument(
+        "--x_pos", type=float, default=0.9, help="relative x position of quiver label"
+    )
+    # add in option flag for with or without winds
+    parser.add_argument(
+        "--winds", action="store_true", help="plot winds with heights"
+    )
+
     args = parser.parse_args()
 
-    plot_heights_and_winds(
-        path_in=args.path_in,
-        bbox=NO_BBOX,
-        add_name="",
-        step_size=args.step_size,
-        coarsen=args.coarsen,
-    )
+    if args.winds:
+        plot_heights_and_winds(
+            path_in=args.path_in,
+            bbox=NO_BBOX,
+            add_name="",
+            step_size=args.step_size,
+            coarsen=args.coarsen,
+            x_pos=args.x_pos,
+        )
+
+    else:
+        plot_heights(
+            path_in=args.path_in,
+            bbox=NO_BBOX,
+            add_name="",
+            step_size=args.step_size,
+        )
     # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049 --step_size 10 --coarsen 2
 
 
-def run_heights():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--path_in",
-        type=str,
-        default="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
-        help="path to data",
-    )
-    parser.add_argument(
-        "--step_size", type=int, default=10, help="step size for animation"
-    )
-
-    args = parser.parse_args()
-
-    plot_heights(
-        path_in=args.path_in,
-        bbox=NO_BBOX.pad(5),
-        add_name="zoomed_in_",
-        step_size=args.step_size,
-    )
-
-
 if __name__ == "__main__":
-    run_heights()
+    run_animation()
 
 # if __name__ == "__main__":
 #    drive_heights_and_winds()
