@@ -395,4 +395,4 @@ if __name__ == "__main__":
     )
     print(res)
 
-    # python -m adforce.wrap --exp_name tide-low --profile_name 2025.json --stationid 3 --resolution mid-notide
+    # python -m adforce.wrap --exp_name notide-mid --profile_name 2025.json --stationid 3 --resolution mid-notide

@@ -50,5 +50,4 @@ np=$SLURM_NTASKS  # how many parallel tasks to define
 # python -m adbo.exp --stationid 5 --year 2025
 # python -m adbo.exp --stationid 6 --year 2025
 
-
 python -m adbo.exp

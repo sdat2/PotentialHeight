@@ -19,3 +19,10 @@ python -m adforce.wrap --exp_name notide-20sec --profile_name 2025.json  --resol
 python -m adforce.ani --path_in . --step_size 1
 ```
 
+### Problems with fort.15 file/owi_netCDF.nc
+
+```txt
+Error termination. Backtrace:
+At line 294 of file /work/n02/n02/sdat2/adcirc-swan/adcirc/src/owiwind_netcdf.F
+Fortran runtime error: Bad value during integer read
+```
