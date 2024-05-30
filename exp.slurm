@@ -20,12 +20,11 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
-# try to activate bashrc
-
+# try to activate micromamba
 source ~/.bashrc
-
 micromamba activate tcpips
 
+# print out the python version
 echo "which python"
 which python
 
@@ -42,12 +41,5 @@ np=$SLURM_NTASKS  # how many parallel tasks to define
 
 # run python job
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
-
-# python -m adbo.exp --stationid 2 --year 2097
-# python -m adbo.exp --stationid 3 --year 2025
-# python -m adbo.exp --stationid 3 --year 2097
-# python -m adbo.exp --stationid 4 --year 2025
-# python -m adbo.exp --stationid 5 --year 2025
-# python -m adbo.exp --stationid 6 --year 2025
 
 python -m adbo.exp

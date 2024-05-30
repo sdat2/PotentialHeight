@@ -225,6 +225,8 @@ echo ""
     time_total = 0
     is_finished = is_job_finished(jid)
     tinc = 1
+    # wait twice as long as the time limit given to the slurm job
+    # to account for queueing.
     while not is_finished and time_total < time_limit * 2:
         is_finished = is_job_finished(jid)
         time.sleep(tinc)
