@@ -10,6 +10,7 @@ Example:
 """
 
 # import os/pathlib to manipulate file names.
+from typing import Dict
 import os
 import pathlib
 
@@ -39,7 +40,7 @@ MONTHS = [  # 3 letter month names
     "Dec",
 ]
 
-QUARTERS = [  # 3-letter quarter names
+QUARTERS = [  # 3-letter quarter names Q1, Q2, Q3, Q4
     "JFM",
     "AMJ",
     "JAS",
@@ -54,3 +55,18 @@ REGRIDDED_PATH = os.path.join(CMIP6_PATH, "regridded")
 os.makedirs(REGRIDDED_PATH, exist_ok=True)
 BIAS_CORRECTED_PATH = os.path.join(CMIP6_PATH, "bias_corrected")
 os.makedirs(BIAS_CORRECTED_PATH, exist_ok=True)
+
+
+
+CONVERSION_NAMES: Dict[str, str] = {"tos": "sst", "hus": "q", "ta": "t", "psl": "msl"}
+CONVERSION_MULTIPLES: Dict[str, float] = {
+    "hus": 1000,
+    "psl": 0.01,  # "plev": 0.01
+}
+CONVERSION_ADDITIONS: Dict[str, float] = {"ta": -273.15}
+CONVERSION_UNITS: Dict[str, str] = {
+    "hus": "g/kg",
+    "psl": "hPa",
+    "tos": "degC",
+    "ta": "degC",  # "plev": "hPa"
+}

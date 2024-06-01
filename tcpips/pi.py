@@ -6,10 +6,10 @@ import xarray as xr
 from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
-from sithom.plot import feature_grid, plot_defaults, get_dim, axis_formatter
+from sithom.plot import feature_grid, plot_defaults, get_dim # , axis_formatter
 from sithom.place import Point, BoundingBox
 from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
-from tcpips.pangeo import convert, regrid_2d_1degree
+from tcpips.pangeo import convert # , regrid_2d_1degree
 
 TCPYPI_SAMPLE_DATA: str = "../tcpypi/data/sample_data.nc"
 CKCD: float = 0.9

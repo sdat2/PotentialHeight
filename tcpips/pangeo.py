@@ -18,8 +18,7 @@ import dask
 import xarray as xr
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit
-from tcpips.constants import RAW_PATH
-from tcpips.convert import conversion_names
+from tcpips.constants import RAW_PATH, CONVERSION_NAMES
 
 
 # url = intake_esm.tutorial.get_url('google_cmip6')
@@ -84,7 +83,7 @@ def combined_experiments_from_dset_dict(
                         engine="h5netcdf",
                         encoding={
                             var: {"dtype": "float32", "zlib": True, "complevel": 6}
-                            for var in conversion_names.keys()
+                            for var in CONVERSION_NAMES.keys()
                             if var in ds
                         },
                     )
@@ -150,7 +149,7 @@ def get_atmos(experiments: List[str] = ["ssp585"]) -> None:  # ["historical", "s
         institution_id="NCAR",
         # member_id="r10i1p1f1",
         source_id="CESM2",
-        variable_id=conversion_names.keys(),
+        variable_id=CONVERSION_NAMES.keys(),
         # grid_label="gn",
     )
     for member_id in cat_subset_obj.unique()["member_id"]:
@@ -176,7 +175,7 @@ def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
         institution_id="NCAR",
         # member_id="r10i1p1f1",
         source_id="CESM2",
-        variable_id=conversion_names.keys(),
+        variable_id=CONVERSION_NAMES.keys(),
         # dcpp_init_year="20200528",
         grid_label="gn",
     )
@@ -214,7 +213,7 @@ def get_data_part(
         institution_id=institution_id,
         # member_id="r10i1p1f1",
         source_id=source_id,
-        variable_id=conversion_names.keys(),
+        variable_id=CONVERSION_NAMES.keys(),
         # dcpp_init_year="20200528",
         # grid_label="gn",
     )
