@@ -21,7 +21,7 @@
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
 # try to activate micromamba
-source ~/.bashrc
+source /work/n02/n02/sdat2/.bashrc
 micromamba activate tcpips
 
 # print out the python version

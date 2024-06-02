@@ -26,7 +26,7 @@
 
 # work=/mnt/lustre/a2fs-work1/work/n02/n02/b
 
-source ~/.bashrc
+source /work/n02/n02/sdat2/.bashrc
 
 micromamba activate tcpips
 
