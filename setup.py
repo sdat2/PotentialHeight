@@ -10,7 +10,7 @@ REQUIRED: List[str] = [
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility
     #"sithom>=0.0.5",  # common utilities
-    "git+ssh://git@github.com/sdat2/worstsurge.git@main",
+    "git+https://github.com/user_name/repo_name",
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
     "intake",  # to read CMIP6 data (tcpips)
