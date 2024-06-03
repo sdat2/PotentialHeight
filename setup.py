@@ -9,7 +9,8 @@ REQUIRED: List[str] = [
     "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility
-    "sithom>=0.0.5",  # common utilities
+    #"sithom>=0.0.5",  # common utilities
+    "git+ssh://git@github.com/sdat2/worstsurge.git@main",
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
     "intake",  # to read CMIP6 data (tcpips)
