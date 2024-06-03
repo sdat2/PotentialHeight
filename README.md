@@ -46,6 +46,10 @@ conda activate tcpips
 micromamba create -n tcpips -f env.yml
 micromamba create -n worstsurge -f env.yml
 
+micromamba create -n worst -f env.yml
+pip install -e ../sithom
+
+
 micromamba activate tcpips
 
 # Install repository in editable version

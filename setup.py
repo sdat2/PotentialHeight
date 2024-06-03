@@ -2,13 +2,14 @@ from setuptools import setup
 from typing import List
 
 REQUIRED: List[str] = [
+    # "sithom"
     "xarray[complete]",  # to process netCDF4 files (adforce, tcpips).
     "xarray-datatree",  # to process netCDF4 files with groups (adforce).
     "netCDF4",  # to process netCDF4 files (adforce, tcpips).
     "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility
-    # "sithom>=0.0.5",  # common utilities
+    "sithom>=0.0.5",  # common utilities
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
     "intake",  # to read CMIP6 data (tcpips)
