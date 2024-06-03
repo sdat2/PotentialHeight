@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:0
+#SBATCH --time=12:00:0
 
 # slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
@@ -22,15 +22,17 @@
 
 # try to activate micromamba
 source /work/n02/n02/sdat2/.bashrc
-micromamba activate tcpips
+which micromamba
+micromamba --version
+micromamba activate t1
 
 # print out the python version
 echo "which python"
 which python
 
 # define variables
-case_name=$SLURM_JOB_NAME # name for printing
-np=$SLURM_NTASKS  # how many parallel tasks to define
+#case_name=$SLURM_JOB_NAME # name for printing
+# np=$SLURM_NTASKS  # how many parallel tasks to define
 # export OMP_NUM_THREADS=1
 
 # Propagate the cpus-per-task setting from script to srun commands
