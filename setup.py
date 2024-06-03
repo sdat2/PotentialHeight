@@ -5,6 +5,7 @@ REQUIRED: List[str] = [
     "xarray[complete]",  # to process netCDF4 files (adforce, tcpips).
     "xarray-datatree",  # to process netCDF4 files with groups (adforce).
     "netCDF4",  # to process netCDF4 files (adforce, tcpips).
+    "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility
     # "sithom>=0.0.5",  # common utilities
@@ -14,6 +15,7 @@ REQUIRED: List[str] = [
     "aiohttp",  # to read CMIP6 data (tcpips)
     "intake-esm",  # to read CMIP6 data (tcpips)
     "intake-xarray",  # to read CMIP6 data (tcpips)
+    "dask[complete]",  # to read CMIP6 data (tcpips)
     "xesmf",  # to regrid CMIP6 data (tcpips) # really this needs to be installed by
     "gcsfs",  # to read CMIP6 data (tcpips)
     "xmip",  # to preprocess CMIP6 data (tcpips)
@@ -22,6 +24,9 @@ REQUIRED: List[str] = [
     "trieste[plotting]",  # to run bayesian optimisation (adbo)
     "trieste[qhsri]",  # to run bayesian optimisation (adbo)
     "slurmpy",  # to run SLURM jobs (adforce)
+    "adcircpy", # to process ADIRC inputs (adforce)
+    "tcpypi", # to calculate potential intensity (tcpips)
+
 ]
 
 setup(

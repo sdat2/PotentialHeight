@@ -23,9 +23,7 @@ from tcpips.constants import DATA_PATH, FIGURE_PATH
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from sithom.time import timeit
 from sithom.plot import plot_defaults
-from sithom.place import Point
 from sithom.io import read_json
-from src.conversions import angle_between_points
 
 
 def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:

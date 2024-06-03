@@ -28,7 +28,7 @@
 
 source /work/n02/n02/sdat2/.bashrc
 
-micromamba activate tcpips
+micromamba activate worstsurge
 
 # eval "$(conda shell.bash hook)"
 
