@@ -28,6 +28,9 @@ module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5paralle
 # ls ~/
 source /work/n02/n02/sdat2/.bashrc
 
+which micromamba
+micromamba --version
+
 # Create a new conda environment
 micromamba create -n t1 -y -f env.yml
 micromamba activate t1
