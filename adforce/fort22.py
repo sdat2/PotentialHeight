@@ -109,7 +109,7 @@ def blank_fort22():
 
 @timeit
 def trajectory_ds_from_time(
-    angle,
+    angle: float,
     trans_speed: float,
     impact_lon: float,
     impact_lat: float,
@@ -188,7 +188,7 @@ def pressures_profile(  # add pressure profile to wind profile
 def gen_ps_f(
     profile_path: str = os.path.join(
         CLE_DATA_PATH, "outputs.json"
-    )  # "/work/n01/n01/sithom/adcirc-swan/tcpips/cle/data/outputs.json",
+    )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
 ) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
     """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
 
@@ -457,7 +457,7 @@ def return_new_input(
 
 
 def save_forcing(
-    path: str = "/work/n01/n01/sithom/adcirc-swan/NWS13set3",
+    path: str = "/work/n02/n02/sdat2/adcirc-swan/NWS13set3",
     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
     angle: float = 0,
     trans_speed: float = 7.71,
@@ -469,13 +469,13 @@ def save_forcing(
     Save the forcing file for ADCIRC.
 
     Args:
-        path (str, optional): Defaults to "/work/n01/n01/sithom/adcirc-swan/NWS13set3".
+        path (str, optional): Defaults to "/work/n02/n02/sdat2/adcirc-swan/NWS13set3".
         profile_path (str, optional): Defaults to os.path.join(CLE_DATA_PATH, "outputs.json").
         angle (float, optional): Defaults to 0 [deg].
         trans_speed (float, optional): Defaults to 7.71 [m/s].
         impact_lon (float, optional): Defaults to -89.4715 [deg].
         impact_lat (float, optional): Defaults to 29.9511 [deg].
-        impact_time (_type_, optional): Defaults to np.datetime64("2004-08-13T12", "ns").
+        impact_time (np.datetime64, optional): Defaults to np.datetime64("2004-08-13T12", "ns").
     """
     node0 = return_new_input(
         profile_path=profile_path,
@@ -496,11 +496,9 @@ def save_forcing(
 if __name__ == "__main__":
     # python -m adforce.fort22
     blank_fort22()
-
-
     # node0 = return_new_input()
     # # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
-    # path = "/work/n01/n01/sithom/adcirc-swan/NWS13set3"
+    # path = "/work/n02/n02/sdat2/adcirc-swan/NWS13set3"
     # enc = {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
     # node0.to_netcdf(
     #     os.path.join(path, "fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}

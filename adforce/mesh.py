@@ -6,7 +6,6 @@ This is the shared functionality for processing ADCIRC meshes.
 from typing import Union, Tuple
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix
-import matplotlib.pyplot as plt
 import netCDF4 as nc
 import xarray as xr
 from sithom.time import timeit

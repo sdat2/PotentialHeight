@@ -73,6 +73,15 @@ SLURM_ACCOUNT: str = "n02-bas"
 PARTITION: str = "standard"
 TASKS_PER_NODE: int = 128
 MODULES: str = "PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1"
+FILES_TO_COPY: list = [
+        "fort.13",  # node attributes
+        "fort.14",  # mesh
+        "fort.15",  # model settings
+        # setup files
+        # "fort.64.nc",
+        # "fort.73.nc",
+        # "fort.74.nc",
+    ]
 
 
 @timeit
@@ -93,17 +102,8 @@ def setup_new(
         new_path (str): New model directory.
     """
     # original path to copy setting files from
-    files = [
-        "fort.13",  # node attributes
-        "fort.14",  # mesh
-        "fort.15",  # model settings
-        # setup files
-        "fort.64.nc",
-        "fort.73.nc",
-        "fort.74.nc",
-    ]
     os.makedirs(new_path, exist_ok=True)
-    for file in files:
+    for file in FILES_TO_COPY:
         shutil.copy(
             os.path.join(MODEL_PATHS_DICT[resolution], file),
             os.path.join(new_path, file),
