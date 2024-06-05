@@ -13,7 +13,7 @@ TODO: Could do with some unit tests.
 TODO: is 1015 mb as normal too high?
 """
 
-from typing import Optional, List, Tuple, Callable
+from typing import Optional, Tuple, Callable
 import os
 import numpy as np
 import xarray as xr
@@ -23,7 +23,7 @@ from tcpips.constants import DATA_PATH, FIGURE_PATH
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from sithom.time import timeit
 from sithom.plot import plot_defaults
-from sithom.io import read_json
+from .profile import read_profile
 
 
 def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
@@ -120,8 +120,7 @@ def trajectory_ds_from_time(
     Create a trajectory dataset for the center eye of the tropical cylone.
 
     Args:
-        run_up (float, optional): How many meters to run up. Defaults to 1e6.
-        run_down (float, optional): How many meters to run down. Defaults to 3.5e5.
+        time_array (np.datetime64): time array for the trajectory.
 
     Returns:
         xr.Dataset: trajectory dataset with variables lon, lat and time.
@@ -144,46 +143,6 @@ def trajectory_ds_from_time(
     )
 
 
-def pressures_profile(  # add pressure profile to wind profile
-    profile: dict,
-    fcor: float = 5e-5,  # fcor
-    p0: float = 1015 * 100,  # [Pa]
-    rho0: float = 1.15,  # [kg m-3]
-) -> dict:
-    """
-    Add pressure profile to wind profile.
-
-    Args:
-        profile (dict): Wind profile.
-        fcor (float, optional): Coriolis parameter. Defaults to 5e-5.
-        p0 (float, optional): Background pressure. Defaults to 1015 * 100.
-        rho0 (float, optional): Background density. Defaults to 1.15.
-
-    Returns:
-        dict: Wind profile with pressure profile.
-    """
-
-    # integrate the wind profile to get the pressure profile
-    # assume wind-pressure gradient balance
-    # could speed up but is very quick anyway
-    rr = np.array(profile["rr"])  # [m]
-    vv = np.array(profile["VV"])  # [m/s]
-    p = np.zeros(rr.shape)  # [Pa]
-    # rr ascending
-    assert np.all(rr == np.sort(rr))
-    p[-1] = p0
-    for j in range(len(rr) - 1):
-        i = -j - 2
-        # Assume Coriolis force and pressure-gradient balance centripetal force.
-        p[i] = p[i + 1] - rho0 * (
-            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
-        ) * (rr[i + 1] - rr[i])
-        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
-
-    profile["p"] = p / 100  # pressures in hPa
-
-    return profile
-
 
 def gen_ps_f(
     profile_path: str = os.path.join(
@@ -200,20 +159,11 @@ def gen_ps_f(
 
     TODO: Make it possible to feed a profile file in some way.
     """
-    chavas_profile = read_json(profile_path)
-    # print(chavas_profile.keys())
-    chavas_profile = pressures_profile(chavas_profile)
-    radii = np.array(chavas_profile["rr"], dtype="float32")
-    windspeeds = np.array(chavas_profile["VV"], dtype="float32")
-    pressures = np.array(chavas_profile["p"], dtype="float32")
+    profile = read_profile(profile_path)
+    radii = profile["radii"].values
+    windspeeds = profile["windspeeds"].values
+    pressures = profile["pressures"].values
     # print(radii[0:10], windspeeds[0:10], pressures[0:10])
-    if False:
-        import matplotlib.pyplot as plt
-
-        fig, axs = plt.subplots(2, 1)
-        axs[0].plot(radii, pressures)
-        axs[1].plot(radii, windspeeds)
-        plt.savefig("prof.png")
 
     def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
