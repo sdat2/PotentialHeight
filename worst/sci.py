@@ -8,7 +8,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.plot import get_dim, label_subplots, plot_defaults
 from sithom.time import timeit
-from tcpips.constants import FIGURE_PATH
+from tcpips.constants import FIGURE_PATH, DATA_PATH
 import os
 
 
@@ -34,7 +34,7 @@ def gev_pdf(z: np.ndarray, alpha: float, beta: float, gamma: float) -> np.ndarra
     )
 
 
-# assume gamma < 0
+# assume gamma < 0 (Weibull class)
 def z_star_from_alpha_beta_gamma(alpha: float, beta: float, gamma: float) -> float:
     return alpha - beta / gamma
 
@@ -188,6 +188,25 @@ def fit_seeds(
     return xr.concat(results, dim="seed")
 
 
+def get_evt_fit_data(
+    z_star: float,
+    beta: float,
+    gamma: float,
+    seeds: np.ndarray,
+    nums: np.ndarray,
+    load: bool = True,
+):
+    data_name = os.path.join(
+        DATA_PATH, f"evt_fig_scipy_{z_star:.2f}_{beta:.2f}_{gamma:.2f}.nc"
+    )
+    if load and os.path.exists(data_name):
+        return xr.open_dataarray(data_name)
+    else:
+        data = fit_seeds(z_star, beta, gamma, seeds, nums)
+        data.to_netcdf(data_name)
+        return data
+
+
 @timeit
 def evt_fig_scipy(
     z_star: float = 7,
@@ -197,29 +216,35 @@ def evt_fig_scipy(
     ex_num: int = 50,
     min_samp: int = 20,
     max_samp: int = 1000,
-    samp_steps: int = 50,
+    samp_steps: int = 100,
     seed_steps: int = 1000,
     save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_scipy.pdf"),
     color_true: str = "black",
     color_max_known: str = "purple",
-    color_max_unknown: str = "blue",
+    color_max_unknown: str = "orange",
 ):
 
     plot_defaults()
-    res_ds = fit_seeds(
+    res_ds = get_evt_fit_data(
         z_star,
         beta,
         gamma,
-        seeds=np.linspace(0, 10000, num=seed_steps).astype(int),
+        seeds=np.linspace(0, 10000, num=seed_steps, dtype="int16"),
         nums=np.logspace(
-            np.log(min_samp), np.log(max_samp), num=samp_steps, base=np.e, dtype="int32"
+            np.log(min_samp), np.log(max_samp), num=samp_steps, base=np.e, dtype="int16"
         ),
+        load=True,
     )
+    # calculate statistics to work out sampling error
     mn = res_ds.mean(dim="seed")
     std = res_ds.std(dim="seed")
+
+    # setup figure
     _, axs = plt.subplots(
         3, 1, height_ratios=[2, 1, 1], figsize=get_dim(ratio=0.6180339887498949 * 2)
     )
+
+    # plot an example fit
     np.random.seed(ex_seed)
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     zs = gen_samples_from_gev(z_star, beta, gamma, ex_num)
@@ -237,12 +262,14 @@ def evt_fig_scipy(
         color=color_true,
         label="Sampled data points",
     )
+
+    # plot the systematic fits for the known upper bound and the unbounded case
     plot_rp(
         bg_alpha,
         bg_beta,
         bg_gamma,
         color=color_max_known,
-        label="Known upper bound GEV fit",
+        label="I: Known upper bound GEV fit",
         ax=axs[0],
     )
     plot_rp(
@@ -250,7 +277,7 @@ def evt_fig_scipy(
         s_beta,
         s_gamma,
         color=color_max_unknown,
-        label="Unbounded GEV fit",
+        label="II: Unbounded GEV fit",
         ax=axs[0],
     )
 
@@ -349,6 +376,7 @@ def evt_fig_scipy(
     # plt.clf()
     plt.savefig(save_fig_path)
     plt.clf()
+    print("alpha", alpha, "beta", beta, "gamma", gamma, "z_star", z_star)
 
 
 # plot_vals(mn)
