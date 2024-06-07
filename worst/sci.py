@@ -1,6 +1,7 @@
 """Fit GEV using scipy and compare to known upper bound."""
 
 from typing import Callable, Tuple, List
+import os
 import numpy as np
 from scipy.stats import genextreme
 from scipy.optimize import minimize
@@ -9,7 +10,7 @@ import matplotlib.pyplot as plt
 from sithom.plot import get_dim, label_subplots, plot_defaults
 from sithom.time import timeit
 from tcpips.constants import FIGURE_PATH, DATA_PATH
-import os
+from .utils import z_star_from_alpha_beta_gamma, alpha_from_z_star_beta_gamma, plot_rp
 
 
 def bg_cdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarray:
@@ -34,15 +35,6 @@ def gev_pdf(z: np.ndarray, alpha: float, beta: float, gamma: float) -> np.ndarra
     )
 
 
-# assume gamma < 0 (Weibull class)
-def z_star_from_alpha_beta_gamma(alpha: float, beta: float, gamma: float) -> float:
-    return alpha - beta / gamma
-
-
-def alpha_from_z_star_beta_gamma(z_star: float, beta: float, gamma: float) -> float:
-    return z_star + beta / gamma
-
-
 def return_ll_beta_gamma(
     z: np.ndarray, z_star: float
 ) -> Callable[[float, float], float]:
@@ -65,33 +57,6 @@ def min_ll_bg(z: np.ndarray, z_star: float) -> Tuple[float, float]:
 def fit_gev(z: np.ndarray) -> Tuple[float, float, float]:
     c, mu, sigma = genextreme.fit(z)
     return mu, sigma, -c
-
-
-def plot_rp(
-    alpha: float, beta: float, gamma: float, color: str = "blue", label="", ax=None
-):
-    z1yr = genextreme.isf(0.8, c=-gamma, loc=alpha, scale=beta)
-    z1myr = genextreme.isf(1 / 1_000_000, c=-gamma, loc=alpha, scale=beta)
-    znew = np.linspace(z1yr, z1myr, num=100)
-
-    print(z1yr, z1myr)
-    if gamma < 0:  # Weibull class have upper bound
-        z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
-        if ax is None:
-            plt.hlines(z_star, 2, 1_000_000, color=color, linestyles="dashed")
-        else:
-            ax.hlines(z_star, 2, 1_000_000, color=color, linestyles="dashed")
-        rp = 1 / (1 - bg_cdf(znew, z_star, beta, gamma))
-    else:
-        rp = 1 / genextreme.sf(znew, c=-gamma, loc=alpha, scale=beta)
-    if ax is None:
-        plt.semilogx(rp, znew, color=color, label=label, alpha=0.5)
-        plt.ylabel("Return Value [m]")
-        plt.xlabel("Return Period [years]")
-    else:
-        ax.semilogx(rp, znew, color=color, label=label, alpha=0.5)
-        ax.set_ylabel("Return Value [m]")
-        ax.set_xlabel("Return Period [years]")
 
 
 def gen_samples_from_gev(
@@ -135,7 +100,7 @@ def try_fits(
     gamma: float = -0.3,
     seed: float = 100,
     nums: List[int] = [20, 22, 25, 27, 30, 33, 35, 40, 50, 60, 75, 100, 200, 500, 1000],
-):
+) -> xr.DataArray:
     results = []
     for n in nums:
         results.append(
@@ -172,7 +137,7 @@ def fit_seeds(
     gamma: float,
     seeds=np.linspace(0, 10000, num=1000).astype(int),
     nums=np.logspace(np.log(20), np.log(1000), num=50, dtype="int16"),
-):
+) -> xr.DataArray:
     print("nums", nums, type(nums))
     results = []
     for seed in seeds:
@@ -195,16 +160,77 @@ def get_evt_fit_data(
     seeds: np.ndarray,
     nums: np.ndarray,
     load: bool = True,
-):
+) -> xr.DataArray:
     data_name = os.path.join(
         DATA_PATH, f"evt_fig_scipy_{z_star:.2f}_{beta:.2f}_{gamma:.2f}.nc"
     )
+    print(data_name)
     if load and os.path.exists(data_name):
         return xr.open_dataarray(data_name)
     else:
         data = fit_seeds(z_star, beta, gamma, seeds, nums)
         data.to_netcdf(data_name)
         return data
+
+
+def plot_ex(
+    z_star: float,
+    beta: float,
+    gamma: float,
+    ex_seed: int,
+    ex_num: int,
+    color_true: str,
+    color_max_known: str,
+    color_max_unknown: str,
+    ax=None,
+):
+
+    if ax is None:
+        _, ax = plt.subplots(
+            1,
+            1,
+        )
+    # plot an example fit
+    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
+    np.random.seed(ex_seed)
+    zs = gen_samples_from_gev(z_star, beta, gamma, ex_num)
+    ## fit the known upper bound and the unbounded case
+    bg_beta, bg_gamma = min_ll_bg(zs, z_star)
+    bg_alpha = alpha_from_z_star_beta_gamma(z_star, bg_beta, bg_gamma)
+    s_alpha, s_beta, s_gamma = fit_gev(zs)
+    # plot the original data
+    plot_rp(alpha, beta, gamma, color=color_true, label="Original GEV", ax=ax)
+    sorted_zs = np.sort(zs)
+    empirical_rps = len(zs) / np.arange(1, len(zs) + 1)[::-1]
+
+    ax.scatter(
+        empirical_rps,
+        sorted_zs,
+        s=3,
+        alpha=0.8,
+        color=color_true,
+        label="Sampled data points",
+    )
+
+    plot_rp(
+        bg_alpha,
+        bg_beta,
+        bg_gamma,
+        color=color_max_known,
+        label="I: Known upper bound GEV fit",
+        ax=ax,
+    )
+    plot_rp(
+        s_alpha,
+        s_beta,
+        s_gamma,
+        color=color_max_unknown,
+        label="II: Unbounded GEV fit",
+        ax=ax,
+    )
+
+    ax.legend()
+    ax.set_xlim([0.6, 1e6])  # up to 1 in 1million year return period
 
 
 @timeit
@@ -220,9 +246,10 @@ def evt_fig_scipy(
     seed_steps: int = 1000,
     save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_scipy.pdf"),
     color_true: str = "black",
-    color_max_known: str = "purple",
-    color_max_unknown: str = "orange",
+    color_max_known: str = "#1b9e77",
+    color_max_unknown: str = "#d95f02",
 ):
+    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 
     plot_defaults()
     res_ds = get_evt_fit_data(
@@ -243,46 +270,20 @@ def evt_fig_scipy(
     _, axs = plt.subplots(
         3, 1, height_ratios=[2, 1, 1], figsize=get_dim(ratio=0.6180339887498949 * 2)
     )
-
-    # plot an example fit
-    np.random.seed(ex_seed)
-    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
-    zs = gen_samples_from_gev(z_star, beta, gamma, ex_num)
-    bg_beta, bg_gamma = min_ll_bg(zs, z_star)
-    bg_alpha = alpha_from_z_star_beta_gamma(z_star, bg_beta, bg_gamma)
-    s_alpha, s_beta, s_gamma = fit_gev(zs)
-    plot_rp(alpha, beta, gamma, color=color_true, label="Original GEV", ax=axs[0])
-    sorted_zs = np.sort(zs)
-    empirical_rps = len(zs) / np.arange(1, len(zs) + 1)[::-1]
-    axs[0].scatter(
-        empirical_rps,
-        sorted_zs,
-        s=3,
-        alpha=0.8,
-        color=color_true,
-        label="Sampled data points",
+    # plot example fit
+    plot_ex(
+        z_star,
+        beta,
+        gamma,
+        ex_seed,
+        ex_num,
+        color_true,
+        color_max_known,
+        color_max_unknown,
+        ax=axs[0],
     )
 
     # plot the systematic fits for the known upper bound and the unbounded case
-    plot_rp(
-        bg_alpha,
-        bg_beta,
-        bg_gamma,
-        color=color_max_known,
-        label="I: Known upper bound GEV fit",
-        ax=axs[0],
-    )
-    plot_rp(
-        s_alpha,
-        s_beta,
-        s_gamma,
-        color=color_max_unknown,
-        label="II: Unbounded GEV fit",
-        ax=axs[0],
-    )
-
-    axs[0].legend()
-    axs[0].set_xlim([0.6, 1e6])
 
     numbers = res_ds.number.values
 
