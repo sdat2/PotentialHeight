@@ -1,15 +1,21 @@
 """Tensorflow optimization for the worst-case analysis of random variables."""
 
+from typing import List
 import numpy as np
+import os
+import xarray as xr
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 from .utils import z_star_from_alpha_beta_gamma, alpha_from_z_star_beta_gamma, plot_rp
-from sithom.utils import plot_defaults, plot_rp
+from scipy.stats import genextreme
+from sithom.plot import plot_defaults, label_subplots, get_dim
+from tcpips.constants import DATA_PATH, FIGURE_PATH
+from sithom.time import timeit
 
 
-def gen_data(alpha, beta, gamma, n=1000):
+def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000):
     gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
     return gev.sample(n).numpy()
 
@@ -166,5 +172,315 @@ def plot_ex_fits(
     plt.show()
 
 
+def try_fit(
+    z_star: float = 7,
+    beta: float = 4,
+    gamma: float = -0.1,
+    n: int = 40,
+    seed: int = 42,
+    quantiles: List[float] = [1 / 100, 1 / 200],
+) -> None:
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
+    zs = gen_data(alpha, beta, gamma, n)
+    bg_alpha, bg_beta, bg_gamma = fit_upknown(zs, z_star)
+    s_alpha, s_beta, s_gamma = fit_gev(zs)
+
+    return (
+        genextreme.isf(quantiles, c=-gamma, loc=alpha, scale=beta),
+        genextreme.isf(quantiles, c=-bg_gamma, loc=bg_alpha, scale=bg_beta),
+        genextreme.isf(quantiles, c=-s_gamma, loc=s_alpha, scale=s_beta),
+    )
+
+
+@timeit
+def try_fits(
+    z_star: float = 7,
+    beta: float = 1,
+    gamma: float = -0.3,
+    seed: float = 100,
+    nums: List[int] = [20, 22, 25, 27, 30, 33, 35, 40, 50, 60, 75, 100, 200, 500, 1000],
+) -> xr.DataArray:
+    results = []
+    for n in nums:
+        results.append(
+            try_fit(
+                z_star=z_star,
+                beta=beta,
+                gamma=gamma,
+                n=int(n),
+                quantiles=[1 / 100, 1 / 500],
+                seed=seed,
+            )
+        )
+    return xr.Dataset(
+        data_vars={
+            "rv": (
+                ("number", "fit", "rp", "seed"),
+                np.expand_dims(np.array(results), -1),
+                {"units": "m"},
+            )
+        },
+        coords={
+            "number": nums,
+            "fit": ["true", "max_known", "scipy"],
+            "rp": (("rp"), [100, 500], {"units": "years"}),
+            "seed": (("seed"), [seed]),
+        },
+    )["rv"]
+
+
+@timeit
+def fit_seeds(
+    z_star: float,
+    beta: float,
+    gamma: float,
+    seeds=np.linspace(0, 10000, num=1000).astype(int),
+    nums=np.logspace(np.log(20), np.log(1000), num=50, dtype="int16"),
+) -> xr.DataArray:
+    print("nums", nums, type(nums))
+    results = []
+    for seed in seeds:
+        results.append(
+            try_fits(
+                z_star=z_star,
+                beta=beta,
+                gamma=gamma,
+                seed=seed,
+                nums=nums,
+            )
+        )
+    return xr.concat(results, dim="seed")
+
+
+def get_evt_fit_data(
+    z_star: float,
+    beta: float,
+    gamma: float,
+    seeds: np.ndarray,
+    nums: np.ndarray,
+    load: bool = True,
+) -> xr.DataArray:
+    data_name = os.path.join(
+        DATA_PATH, f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}.nc"
+    )
+    print(data_name)
+    if load and os.path.exists(data_name):
+        return xr.open_dataarray(data_name)
+    else:
+        data = fit_seeds(z_star, beta, gamma, seeds, nums)
+        data.to_netcdf(data_name)
+        return data
+
+
+def plot_ex(
+    z_star: float,
+    beta: float,
+    gamma: float,
+    ex_seed: int,
+    ex_num: int,
+    color_true: str,
+    color_max_known: str,
+    color_max_unknown: str,
+    ax=None,
+):
+
+    if ax is None:
+        _, ax = plt.subplots(
+            1,
+            1,
+        )
+    # plot an example fit
+    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
+    np.random.seed(ex_seed)
+    zs = gen_data(alpha, beta, gamma, ex_num)
+    ## fit the known upper bound and the unbounded case
+    bg_alpha, bg_beta, bg_gamma = fit_upknown(zs, z_star)
+    bg_alpha = alpha_from_z_star_beta_gamma(z_star, bg_beta, bg_gamma)
+    s_alpha, s_beta, s_gamma = fit_gev(zs)
+    # plot the original data
+    plot_rp(alpha, beta, gamma, color=color_true, label="Original GEV", ax=ax)
+    sorted_zs = np.sort(zs)
+    empirical_rps = len(zs) / np.arange(1, len(zs) + 1)[::-1]
+
+    ax.scatter(
+        empirical_rps,
+        sorted_zs,
+        s=3,
+        alpha=0.8,
+        color=color_true,
+        label="Sampled data points",
+    )
+
+    plot_rp(
+        bg_alpha,
+        bg_beta,
+        bg_gamma,
+        color=color_max_known,
+        label="I: Known upper bound GEV fit",
+        ax=ax,
+    )
+    plot_rp(
+        s_alpha,
+        s_beta,
+        s_gamma,
+        color=color_max_unknown,
+        label="II: Unbounded GEV fit",
+        ax=ax,
+    )
+
+    ax.legend()
+    ax.set_xlim([0.6, 1e6])  # up to 1 in 1million year return period
+
+
+@timeit
+def evt_fig_tens(
+    z_star: float = 7,
+    beta: float = 1,
+    gamma: float = -0.3,
+    ex_seed: int = 42,
+    ex_num: int = 50,
+    min_samp: int = 20,
+    max_samp: int = 1000,
+    samp_steps: int = 10,
+    seed_steps: int = 10,
+    save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_tens.pdf"),
+    color_true: str = "black",
+    color_max_known: str = "#1b9e77",
+    color_max_unknown: str = "#d95f02",
+):
+    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
+
+    plot_defaults()
+    res_ds = get_evt_fit_data(
+        z_star,
+        beta,
+        gamma,
+        seeds=np.linspace(0, 10000, num=seed_steps, dtype="int16"),
+        nums=np.logspace(
+            np.log(min_samp), np.log(max_samp), num=samp_steps, base=np.e, dtype="int16"
+        ),
+        load=False,
+    )
+    # calculate statistics to work out sampling error
+    mn = res_ds.mean(dim="seed")
+    std = res_ds.std(dim="seed")
+
+    # setup figure
+    _, axs = plt.subplots(
+        3, 1, height_ratios=[2, 1, 1], figsize=get_dim(ratio=0.6180339887498949 * 2)
+    )
+    # plot example fit
+    plot_ex(
+        z_star,
+        beta,
+        gamma,
+        ex_seed,
+        ex_num,
+        color_true,
+        color_max_known,
+        color_max_unknown,
+        ax=axs[0],
+    )
+
+    # plot the systematic fits for the known upper bound and the unbounded case
+
+    numbers = res_ds.number.values
+
+    axs[1].fill_between(
+        numbers,
+        mn.isel(rp=0, fit=0).values - std.isel(rp=0, fit=0).values,
+        mn.isel(rp=0, fit=0).values + std.isel(rp=0, fit=0).values,
+        alpha=0.2,
+        color=color_true,
+    )
+    axs[2].fill_between(
+        numbers,
+        mn.isel(rp=1, fit=0).values - std.isel(rp=1, fit=0).values,
+        mn.isel(rp=1, fit=0).values + std.isel(rp=1, fit=0).values,
+        alpha=0.2,
+        color=color_true,
+        linestyle="-",
+    )
+    axs[1].fill_between(
+        numbers,
+        mn.isel(rp=0, fit=1).values - std.isel(rp=0, fit=1).values,
+        mn.isel(rp=0, fit=1).values + std.isel(rp=0, fit=1).values,
+        alpha=0.2,
+        color=color_max_known,
+        linestyle="-",
+    )
+
+    axs[2].fill_between(
+        numbers,
+        mn.isel(rp=1, fit=1).values - std.isel(rp=1, fit=1).values,
+        mn.isel(rp=1, fit=1).values + std.isel(rp=1, fit=1).values,
+        alpha=0.2,
+        color=color_max_known,
+        linestyle="-",
+    )
+    axs[1].fill_between(
+        numbers,
+        mn.isel(rp=0, fit=2).values - std.isel(rp=0, fit=2).values,
+        mn.isel(rp=0, fit=2).values + std.isel(rp=0, fit=2).values,
+        alpha=0.2,
+        color=color_max_unknown,
+        linestyle="-",
+    )
+    axs[2].fill_between(
+        numbers,
+        mn.isel(rp=1, fit=2).values - std.isel(rp=1, fit=2).values,
+        mn.isel(rp=1, fit=2).values + std.isel(rp=1, fit=2).values,
+        alpha=0.2,
+        color=color_max_unknown,
+        linestyle="-",
+    )
+
+    axs[1].plot(numbers, res_ds.isel(rp=0, fit=0).values, color=color_true, linewidth=1)
+    axs[2].plot(
+        numbers,
+        mn.isel(rp=1, fit=0).values,
+        color=color_true,
+        linewidth=1,
+        label="True GEV",
+    )
+    axs[1].plot(
+        numbers, mn.isel(rp=0, fit=1).values, color=color_max_known, linewidth=1
+    )
+    axs[2].plot(
+        numbers,
+        mn.isel(rp=1, fit=1).values,
+        color=color_max_known,
+        linewidth=1,
+        label="Max known GEV",
+    )
+    axs[1].plot(
+        numbers, mn.isel(rp=0, fit=2).values, color=color_max_unknown, linewidth=1
+    )
+    axs[2].plot(
+        numbers,
+        mn.isel(rp=1, fit=2).values,
+        color=color_max_unknown,
+        linewidth=1,
+        label="Unbounded GEV",
+    )
+    axs[1].set_xscale("log")
+    axs[2].set_xscale("log")
+    axs[2].set_xlabel("Number of samples")
+    axs[1].set_ylabel("1 in 100 year RV [m]")
+    axs[2].set_ylabel("1 in 500 year RV [m]")
+    axs[1].set_xlim([min_samp, max_samp])
+    axs[2].set_xlim([min_samp, max_samp])
+    label_subplots(axs)
+    # plt.legend()
+    # plt.show()
+    # plt.clf()
+    plt.savefig(save_fig_path)
+    plt.clf()
+    print("alpha", alpha, "beta", beta, "gamma", gamma, "z_star", z_star)
+
+
 if __name__ == "__main__":
-    plot_ex_fits(seed=42)
+    # python -m worst.tens
+    evt_fig_tens()

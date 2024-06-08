@@ -26,26 +26,25 @@ def plot_rp(
     label: str = "",
     ax=None,
     plot_alpha: float = 0.8,
-):
+) -> None:
     z1yr = genextreme.isf(0.8, c=-gamma, loc=alpha, scale=beta)
     z1myr = genextreme.isf(1 / 1_000_000, c=-gamma, loc=alpha, scale=beta)
     znew = np.linspace(z1yr, z1myr, num=100)
 
+    if ax is None:
+        _, ax = plt.subplots(
+            1,
+            1,
+        )
+
     print(label, "rp1yr", z1yr, "rv1Myr", z1myr)
     if gamma < 0:  # Weibull class have upper bound
         z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
-        if ax is None:
-            plt.hlines(z_star, 2, 1_000_000, color=color, linestyles="dashed")
-        else:
-            ax.hlines(z_star, 2, 1_000_000, color=color, linestyles="dashed")
+        ax.hlines(z_star, 2, 1_000_000, color=color, linestyles="dashed")
         rp = 1 / (1 - bg_cdf(znew, z_star, beta, gamma))
     else:
         rp = 1 / genextreme.sf(znew, c=-gamma, loc=alpha, scale=beta)
-    if ax is None:
-        plt.semilogx(rp, znew, color=color, label=label, alpha=plot_alpha)
-        plt.ylabel("Return Value [m]")
-        plt.xlabel("Return Period [years]")
-    else:
-        ax.semilogx(rp, znew, color=color, label=label, alpha=plot_alpha)
-        ax.set_ylabel("Return Value [m]")
-        ax.set_xlabel("Return Period [years]")
+
+    ax.semilogx(rp, znew, color=color, label=label, alpha=plot_alpha)
+    ax.set_ylabel("Return Value [m]")
+    ax.set_xlabel("Return Period [years]")

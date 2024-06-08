@@ -77,7 +77,7 @@ def try_fit(
     gamma: float = -0.1,
     n: int = 40,
     seed: int = 42,
-    quantiles=[1 / 100, 1 / 200],
+    quantiles: List[float] = [1 / 100, 1 / 200],
 ) -> None:
     np.random.seed(seed)
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
