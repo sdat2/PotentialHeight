@@ -5,6 +5,7 @@ Sometimes breaks for no clear reason."""
 from typing import List, Tuple
 import numpy as np
 import os
+import logging
 import xarray as xr
 import matplotlib.pyplot as plt
 import tensorflow as tf
@@ -14,7 +15,10 @@ from scipy.stats import genextreme
 from tcpips.constants import DATA_PATH, FIGURE_PATH
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from sithom.time import timeit
-from .utils import alpha_from_z_star_beta_gamma, plot_rp
+from .utils import alpha_from_z_star_beta_gamma, plot_rp, plot_sample_points
+
+# logger = logging.getLogger(__name__)
+# logging.basicConfig(filename="log.log", level=logging.INFO)
 
 
 def seed_all(seed: int) -> None:
@@ -29,15 +33,30 @@ def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000) -> np.ndarr
     return gev.sample(n).numpy()
 
 
-def fit_gev(
+def fit_gev_upper_bound_not_known(
     data: np.ndarray,
-    opt_steps: int = 2000,
+    opt_steps: int = 1000,
     lr: float = 0.01,
     alpha_guess: float = 0.0,
     beta_guess: float = 1.0,
     gamma_guess: float = -0.1,
     force_weibull: bool = False,
 ) -> Tuple[float, float, float]:
+    """
+    Fit a Generalized Extreme Value distribution to data when the upper bound is not known.
+
+    Args:
+        data (np.ndarray): Data to fit the GEV distribution to.
+        opt_steps (int, optional): Optimization steps. Defaults to 1000.
+        lr (float, optional): Learning rate. Defaults to 0.01.
+        alpha_guess (float, optional): Initial location. Defaults to 0.0.
+        beta_guess (float, optional): Initial scale. Defaults to 1.0.
+        gamma_guess (float, optional): Initial concentration. Defaults to -0.1.
+        force_weibull (bool, optional): Force gamma<0. Defaults to False.
+
+    Returns:
+        Tuple[float, float, float]: Estimated alpha, beta, gamma.
+    """
     print("Fitting upper bound not known, N=", len(data))
 
     # Define the parameters of the model
@@ -85,16 +104,16 @@ def fit_gev(
         loss = train_step()
         if step % 100 == 0:
             print(
-                f"Step {step}, Loss: {loss.numpy()}, Alpha: {alpha.numpy()}, Beta: {beta.numpy()}, Concentration: {-neg_gamma.numpy()}"
+                f"Step {step}, Loss: {loss.numpy()}, Alpha: {alpha.numpy()}, Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
             )
 
     print(
-        f"Estimated Alpha: {alpha.numpy()}, Estimated Beta: {beta.numpy()}, Estimated Concentration: {-neg_gamma.numpy()}"
+        f"Estimated Alpha: {alpha.numpy()}, Estimated Beta: {beta.numpy()}, Estimated Gamma: {-neg_gamma.numpy()}"
     )
     return alpha.numpy(), beta.numpy(), -neg_gamma.numpy()
 
 
-def fit_upknown(
+def fit_gev_upper_bound_known(
     data: np.ndarray,
     z_star: float,
     opt_steps: int = 1000,
@@ -102,6 +121,20 @@ def fit_upknown(
     beta_guess=1.0,
     gamma_guess=-0.1,
 ) -> Tuple[float, float, float]:
+    """
+    Fit a Generalized Extreme Value distribution to data when the upper bound is known.
+
+    Args:
+        data (np.ndarray): Data to fit the GEV distribution to.
+        z_star (float): Known upper bound.
+        opt_steps (int, optional): Optimization steps. Defaults to 1000.
+        lr (float, optional): Learning rate. Defaults to 0.01.
+        beta_guess (float, optional): Initial scale. Defaults to 1.0.
+        gamma_guess (float, optional): Initial concentration. Defaults to -0.1.
+
+    Returns:
+        Tuple[float, float, float]: Estimated alpha, beta, gamma.
+    """
     print("Fitting upper bound known, N=", len(data))
     # Initial guess for sigma and xi
     beta = tf.Variable(
@@ -163,14 +196,24 @@ def plot_ex_fits(
     seed: int = 42,
     n: int = 50,
 ) -> None:
+    """
+    Show some example fits.
+
+    Args:
+        z_star (float, optional): . Defaults to 7.0.
+        beta (float, optional): _description_. Defaults to 1.0.
+        gamma (float, optional): _description_. Defaults to -0.2.
+        seed (int, optional): _description_. Defaults to 42.
+        n (int, optional): _description_. Defaults to 50.
+    """
     plot_defaults()
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     seed_all(seed)
     # alpha = 0.0
     # z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
     data = gen_data(alpha, beta, gamma, n=n)
-    alpha_unb, beta_unb, gamma_unb = fit_gev(data)
-    alpha_bound, beta_bound, gamma_bound = fit_upknown(data, z_star)
+    alpha_unb, beta_unb, gamma_unb = fit_gev_upper_bound_not_known(data)
+    alpha_bound, beta_bound, gamma_bound = fit_gev_upper_bound_known(data, z_star)
     plt.hist(data, bins=50, density=True, alpha=0.5)
     x = np.linspace(np.min(data), np.max(data), 1000)
     gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
@@ -186,18 +229,8 @@ def plot_ex_fits(
     )
     plt.plot(x, gev_bound.prob(x).numpy(), color="purple")
     plt.show()
-    fig, ax = plt.subplots()
-    sorted_zs = np.sort(data)
-    empirical_rps = len(data) / np.arange(1, len(data) + 1)[::-1]
-
-    ax.scatter(
-        empirical_rps,
-        sorted_zs,
-        s=3,
-        alpha=0.8,
-        color="black",
-        label="Sampled data points",
-    )
+    _, ax = plt.subplots()
+    plot_sample_points(data, color="black", ax=ax, label="Samples")
     plot_rp(alpha, beta, gamma, color="black", ax=ax, label="Original GEV")
     plot_rp(
         alpha_bound,
@@ -221,12 +254,30 @@ def try_fit(
     n: int = 40,
     seed: int = 42,
     quantiles: List[float] = [1 / 100, 1 / 500],
-) -> None:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Try fitting the GEV distributions to some data, and calculate the return values for some quantiles.
+
+    Args:
+        z_star (float, optional): Upper bound of GEV. Defaults to 7.
+        beta (float, optional): Scale. Defaults to 4.
+        gamma (float, optional): Concentration. Defaults to -0.1.
+        n (int, optional): Number of data samples. Defaults to 40.
+        seed (int, optional): Random seed. Defaults to 42.
+        quantiles (List[float], optional): Quantiles to get. Defaults to [1 / 100, 1 / 500].
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: Return values for the quantiles for the true GEV,
+            the GEV with the known upper bound, and the GEV with no upper bound.
+    """
     seed_all(seed)
+    print(
+        "Fitting for z_star", z_star, "beta", beta, "gamma", gamma, "n", n, "seed", seed
+    )
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     zs = gen_data(alpha, beta, gamma, n)
-    bg_alpha, bg_beta, bg_gamma = fit_upknown(zs, z_star)
-    s_alpha, s_beta, s_gamma = fit_gev(zs)
+    bg_alpha, bg_beta, bg_gamma = fit_gev_upper_bound_known(zs, z_star)
+    s_alpha, s_beta, s_gamma = fit_gev_upper_bound_not_known(zs)
 
     return (
         genextreme.isf(quantiles, c=-gamma, loc=alpha, scale=beta),
@@ -243,6 +294,19 @@ def try_fits(
     seed: float = 100,
     nums: List[int] = [20, 22, 25, 27, 30, 33, 35, 40, 50, 60, 75, 100, 200, 500, 1000],
 ) -> xr.DataArray:
+    """
+    Try fitting the GEV distributions to some data, and calculate the return values for some quantiles.
+
+    Args:
+        z_star (float, optional): Upper bound. Defaults to 7.
+        beta (float, optional): Scale. Defaults to 1.
+        gamma (float, optional): Shape. Defaults to -0.3.
+        seed (float, optional): Seed. Defaults to 100.
+        nums (List[int], optional): Number of samples. Defaults to [20, 22, 25, 27, 30, 33, 35, 40, 50, 60, 75, 100, 200, 500, 1000].
+
+    Returns:
+        xr.DataArray: Return values for the quantiles for the true GEV,
+    """
     results = []
 
     for n in nums:
@@ -289,7 +353,7 @@ def try_fits(
 
 
 @timeit
-def fit_seeds(
+def fit_for_seeds(
     z_star: float,
     beta: float,
     gamma: float,
@@ -326,7 +390,7 @@ def get_evt_fit_data(
     if load and os.path.exists(data_name):
         return xr.open_dataarray(data_name)
     else:
-        data = fit_seeds(z_star, beta, gamma, seeds, nums)
+        data = fit_for_seeds(z_star, beta, gamma, seeds, nums)
         data.to_netcdf(data_name)
         return data
 
@@ -343,33 +407,39 @@ def plot_ex(
     ax=None,
     fig_path: str = os.path.join(FIGURE_PATH, "evt_fit_ex_tens.pdf"),
 ) -> None:
+    """
+    Plot single example fit.
 
+    Args:
+        z_star (float): Upper bound.
+        beta (float): Scale parameter.
+        gamma (float): Shape parameter.
+        ex_seed (int): Example seed.
+        ex_num (int): Example number of samples.
+        color_true (str): Color of original GEV.
+        color_max_known (str): Color of known upper bound GEV.
+        color_max_unknown (str): Color of unknown upper bound GEV.
+        ax (_type_, optional): Axes. Defaults to None.
+        fig_path (str, optional): Figure path to save to. Defaults to os.path.join(FIGURE_PATH, "evt_fit_ex_tens.pdf").
+    """
+    plot_individually = False
     if ax is None:
         _, ax = plt.subplots(
             1,
             1,
         )
+        plot_individually = True
     # plot an example fit
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     np.random.seed(ex_seed)
     zs = gen_data(alpha, beta, gamma, ex_num)
     ## fit the known upper bound and the unbounded case
-    bg_alpha, bg_beta, bg_gamma = fit_upknown(zs, z_star)
+    bg_alpha, bg_beta, bg_gamma = fit_gev_upper_bound_known(zs, z_star)
     bg_alpha = alpha_from_z_star_beta_gamma(z_star, bg_beta, bg_gamma)
-    s_alpha, s_beta, s_gamma = fit_gev(zs)
+    s_alpha, s_beta, s_gamma = fit_gev_upper_bound_not_known(zs)
     # plot the original data
     plot_rp(alpha, beta, gamma, color=color_true, label="Original GEV", ax=ax)
-    sorted_zs = np.sort(zs)
-    empirical_rps = len(zs) / np.arange(1, len(zs) + 1)[::-1]
-
-    ax.scatter(
-        empirical_rps,
-        sorted_zs,
-        s=3,
-        alpha=0.8,
-        color=color_true,
-        label="Sampled data points",
-    )
+    plot_sample_points(zs, color="black", ax=ax, label="Samples")
 
     plot_rp(
         bg_alpha,
@@ -390,20 +460,21 @@ def plot_ex(
 
     ax.legend()
     ax.set_xlim([0.6, 1e6])  # up to 1 in 1million year return period
-    plt.savefig(fig_path)
+    if plot_individually:
+        plt.savefig(fig_path)
 
 
 @timeit
 def evt_fig_tens(
     z_star: float = 7,
     beta: float = 1,
-    gamma: float = -0.3,
-    ex_seed: int = 42,
+    gamma: float = -0.2,
+    ex_seed: int = 57,
     ex_num: int = 50,
     min_samp: int = 20,
     max_samp: int = 1000,
-    samp_steps: int = 100,
-    seed_steps: int = 100,
+    samp_steps: int = 500,
+    seed_steps: int = 20,  # 100,
     save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_tens.pdf"),
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
@@ -420,7 +491,7 @@ def evt_fig_tens(
         nums=np.logspace(
             np.log(min_samp), np.log(max_samp), num=samp_steps, base=np.e, dtype="int16"
         ),
-        load=False,
+        load=True,
     )
     # calculate statistics to work out sampling error
     mn = res_ds.mean(dim="seed")
@@ -537,7 +608,7 @@ def evt_fig_tens(
     # plt.clf()
     plt.savefig(save_fig_path)
     plt.clf()
-    print("alpha", alpha, "beta", beta, "gamma", gamma, "z_star", z_star)
+    print(("alpha", alpha, "beta", beta, "gamma", gamma, "z_star", z_star))
 
 
 if __name__ == "__main__":

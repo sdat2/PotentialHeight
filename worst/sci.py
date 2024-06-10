@@ -10,11 +10,7 @@ import matplotlib.pyplot as plt
 from sithom.plot import get_dim, label_subplots, plot_defaults
 from sithom.time import timeit
 from tcpips.constants import FIGURE_PATH, DATA_PATH
-from .utils import z_star_from_alpha_beta_gamma, alpha_from_z_star_beta_gamma, plot_rp
-
-
-def bg_cdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarray:
-    return np.exp(-((gamma / beta * (z - z_star)) ** (-1 / gamma)))
+from .utils import alpha_from_z_star_beta_gamma, plot_rp, bg_cdf
 
 
 def bg_pdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarray:
@@ -237,7 +233,7 @@ def plot_ex(
 def evt_fig_scipy(
     z_star: float = 7,
     beta: float = 1,
-    gamma: float = -0.3,
+    gamma: float = -0.2,
     ex_seed: int = 42,
     ex_num: int = 50,
     min_samp: int = 20,
@@ -249,6 +245,30 @@ def evt_fig_scipy(
     color_max_known: str = "#1b9e77",
     color_max_unknown: str = "#d95f02",
 ):
+    """
+    Fit GEV using scipy with or without knowing an upper bound.
+
+
+    Plot the systematic comparison of what difference it makes for the 1 in 100
+    and 1 in 500 year return values when fitting a GEV distribution to data sampled
+    from a known upper bound GEV distribution, varying the random seed and the number of
+    samples to plot how the sampling error decreases in each case.
+
+    Args:
+        z_star (float, optional): Upper bound. Defaults to 7.
+        beta (float, optional): Scale. Defaults to 1.
+        gamma (float, optional): Shape. Defaults to -0.2.
+        ex_seed (int, optional): Example fit seed for (a). Defaults to 42.
+        ex_num (int, optional): Example number. Defaults to 50.
+        min_samp (int, optional): Minimum number of samples. Defaults to 20.
+        max_samp (int, optional): Maximum number of samples. Defaults to 1000.
+        samp_steps (int, optional): How many different sample sizes to choose. Defaults to 100.
+        seed_steps (int, optional): _description_. Defaults to 1000.
+        save_fig_path (str, optional): _description_. Defaults to os.path.join(FIGURE_PATH, "evt_fig_scipy.pdf").
+        color_true (str, optional): _description_. Defaults to "black".
+        color_max_known (str, optional): _description_. Defaults to "#1b9e77".
+        color_max_unknown (str, optional): _description_. Defaults to "#d95f02".
+    """
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 
     plot_defaults()
