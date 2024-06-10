@@ -17,6 +17,13 @@ from sithom.time import timeit
 from .utils import alpha_from_z_star_beta_gamma, plot_rp
 
 
+def seed_all(seed: int) -> None:
+    """Seed all random number generators."""
+    np.random.seed(seed)
+    #  tf.set_random_seed(seed)
+    tf.random.set_seed(seed)
+
+
 def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000) -> np.ndarray:
     gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
     return gev.sample(n).numpy()
@@ -26,14 +33,16 @@ def fit_gev(
     data: np.ndarray,
     opt_steps: int = 2000,
     lr: float = 0.01,
-    alpha_guess=0.0,
-    beta_guess=1.0,
-    gamma_guess=-0.1,
+    alpha_guess: float = 0.0,
+    beta_guess: float = 1.0,
+    gamma_guess: float = -0.1,
     force_weibull: bool = False,
 ) -> Tuple[float, float, float]:
+    print("Fitting upper bound not known, N=", len(data))
+
     # Define the parameters of the model
-    loc = tf.Variable(alpha_guess, dtype=tf.float32)
-    scale = tf.Variable(
+    alpha = tf.Variable(alpha_guess, dtype=tf.float32)
+    beta = tf.Variable(
         beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
     )
     if force_weibull:
@@ -46,9 +55,11 @@ def fit_gev(
         )  # Start with zero for stability
 
     # Define the log likelihood function
-    def neg_log_likelihood(loc, scale, neg_gamma, data):
+    def neg_log_likelihood(
+        alpha: tf.Variable, beta: tf.Variable, neg_gamma: tf.Variable, data: np.ndarray
+    ) -> tf.Tensor:
         dist = tfd.GeneralizedExtremeValue(
-            loc=loc, scale=scale, concentration=-neg_gamma
+            loc=alpha, scale=beta, concentration=-neg_gamma
         )
         log_likelihoods = dist.log_prob(data)
         return -tf.reduce_sum(log_likelihoods)
@@ -58,15 +69,15 @@ def fit_gev(
     #    return -log_likelihood(loc, scale, concentration, data)
 
     # Set up the optimizer
-    optimizer = tf.optimizers.Adam(learning_rate=lr)
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=lr)
 
     # Define the training step
     @tf.function
-    def train_step():
+    def train_step() -> tf.Tensor:
         with tf.GradientTape() as tape:
-            loss = neg_log_likelihood(loc, scale, neg_gamma, data)
-        gradients = tape.gradient(loss, [loc, scale, neg_gamma])
-        optimizer.apply_gradients(zip(gradients, [loc, scale, neg_gamma]))
+            loss = neg_log_likelihood(alpha, beta, neg_gamma, data)
+        gradients = tape.gradient(loss, [alpha, beta, neg_gamma])
+        optimizer.apply_gradients(zip(gradients, [alpha, beta, neg_gamma]))
         return loss
 
     # Training loop
@@ -74,23 +85,24 @@ def fit_gev(
         loss = train_step()
         if step % 100 == 0:
             print(
-                f"Step {step}, Loss: {loss.numpy()}, Loc: {loc.numpy()}, Scale: {scale.numpy()}, Concentration: {-neg_gamma.numpy()}"
+                f"Step {step}, Loss: {loss.numpy()}, Alpha: {alpha.numpy()}, Beta: {beta.numpy()}, Concentration: {-neg_gamma.numpy()}"
             )
 
     print(
-        f"Estimated Loc: {loc.numpy()}, Estimated Scale: {scale.numpy()}, Estimated Concentration: {-neg_gamma.numpy()}"
+        f"Estimated Alpha: {alpha.numpy()}, Estimated Beta: {beta.numpy()}, Estimated Concentration: {-neg_gamma.numpy()}"
     )
-    return loc.numpy(), scale.numpy(), -neg_gamma.numpy()
+    return alpha.numpy(), beta.numpy(), -neg_gamma.numpy()
 
 
 def fit_upknown(
     data: np.ndarray,
     z_star: float,
-    opt_steps: int = 5000,
+    opt_steps: int = 1000,
     lr: float = 0.01,
     beta_guess=1.0,
     gamma_guess=-0.1,
 ) -> Tuple[float, float, float]:
+    print("Fitting upper bound known, N=", len(data))
     # Initial guess for sigma and xi
     beta = tf.Variable(
         beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
@@ -102,7 +114,7 @@ def fit_upknown(
     )
 
     # Define the optimizer
-    optimizer = tf.optimizers.Adam(learning_rate=lr)
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=lr)
 
     def neg_log_likelihood(
         beta: tf.Variable, neg_gamma: tf.Variable, data: np.ndarray
@@ -121,7 +133,7 @@ def fit_upknown(
 
     # Optimization step function
     @tf.function
-    def train_step() -> None:
+    def train_step() -> tf.Tensor:
         with tf.GradientTape() as tape:
             loss = neg_log_likelihood(beta, neg_gamma, data)
         grads = tape.gradient(loss, [beta, neg_gamma])
@@ -131,9 +143,9 @@ def fit_upknown(
     # Training loop
     for step in range(opt_steps):
         loss = train_step()
-        if step % 500 == 0:
+        if step % 100 == 0:
             print(
-                f"Step {step}, Loss: {loss.numpy()}, Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
+                f"Step {step}, Loss: {loss.numpy()}, Alpha: {alpha_from_z_star_beta_gamma(z_star, beta.numpy(), -neg_gamma.numpy())}, Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
             )
 
     # Extract the fitted parameters
@@ -153,8 +165,7 @@ def plot_ex_fits(
 ) -> None:
     plot_defaults()
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
-    tf.random.set_seed(seed)
-    np.random.seed(seed)
+    seed_all(seed)
     # alpha = 0.0
     # z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
     data = gen_data(alpha, beta, gamma, n=n)
@@ -211,8 +222,7 @@ def try_fit(
     seed: int = 42,
     quantiles: List[float] = [1 / 100, 1 / 500],
 ) -> None:
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
+    seed_all(seed)
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     zs = gen_data(alpha, beta, gamma, n)
     bg_alpha, bg_beta, bg_gamma = fit_upknown(zs, z_star)
@@ -234,17 +244,33 @@ def try_fits(
     nums: List[int] = [20, 22, 25, 27, 30, 33, 35, 40, 50, 60, 75, 100, 200, 500, 1000],
 ) -> xr.DataArray:
     results = []
+
     for n in nums:
-        results.append(
-            try_fit(
-                z_star=z_star,
-                beta=beta,
-                gamma=gamma,
-                n=int(n),
-                quantiles=[1 / 100, 1 / 500],
-                seed=seed,
-            )
-        )
+
+        def _retry(max_retries: int = 10) -> None:
+            # sometimes the optimization randomly fails, so we retry
+            try:
+                return try_fit(
+                    z_star=z_star,
+                    beta=beta,
+                    gamma=gamma,
+                    n=int(n),
+                    quantiles=[1 / 100, 1 / 500],
+                    seed=seed,
+                )
+            except Exception as e:
+                print("Exception", e)
+                print("Failed for n", n)
+                print("Seed", seed)
+                print("z_star", z_star)
+                print("beta", beta)
+                print("gamma", gamma)
+                if max_retries == 0:
+                    raise e
+                return _retry(max_retries - 1)
+
+        results.append(_retry())
+
     return xr.Dataset(
         data_vars={
             "rv": (
@@ -516,6 +542,6 @@ def evt_fig_tens(
 
 if __name__ == "__main__":
     # python -m worst.tens
-    # evt_fig_tens()
-    plot_defaults()
-    plot_ex(7, 1, -0.3, 42, 50, "black", "#1b9e77", "#d95f02")
+    evt_fig_tens()
+    # plot_defaults()
+    # plot_ex(7, 1, -0.3, 42, 50, "black", "#1b9e77", "#d95f02")
