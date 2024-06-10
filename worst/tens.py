@@ -1,6 +1,8 @@
-"""Tensorflow optimization for the worst-case analysis of random variables."""
+"""Tensorflow optimization for the worst-case analysis of random variables.
 
-from typing import List
+Sometimes breaks for no clear reason."""
+
+from typing import List, Tuple
 import numpy as np
 import os
 import xarray as xr
@@ -8,105 +10,135 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
-from .utils import z_star_from_alpha_beta_gamma, alpha_from_z_star_beta_gamma, plot_rp
 from scipy.stats import genextreme
-from sithom.plot import plot_defaults, label_subplots, get_dim
 from tcpips.constants import DATA_PATH, FIGURE_PATH
+from sithom.plot import plot_defaults, label_subplots, get_dim
 from sithom.time import timeit
+from .utils import alpha_from_z_star_beta_gamma, plot_rp
 
 
-def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000):
+def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000) -> np.ndarray:
     gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
     return gev.sample(n).numpy()
 
 
-def fit_gev(data):
+def fit_gev(
+    data: np.ndarray,
+    opt_steps: int = 2000,
+    lr: float = 0.01,
+    alpha_guess=0.0,
+    beta_guess=1.0,
+    gamma_guess=-0.1,
+    force_weibull: bool = False,
+) -> Tuple[float, float, float]:
     # Define the parameters of the model
-    loc = tf.Variable(0.0, dtype=tf.float32)
-    scale = tf.Variable(1.0, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg())
-    concentration = tf.Variable(0.0, dtype=tf.float32)  # Start with zero for stability
+    loc = tf.Variable(alpha_guess, dtype=tf.float32)
+    scale = tf.Variable(
+        beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+    )
+    if force_weibull:
+        neg_gamma = tf.Variable(
+            -gamma_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+        )  # Start with zero for stability
+    else:
+        neg_gamma = tf.Variable(
+            -gamma_guess, dtype=tf.float32
+        )  # Start with zero for stability
 
     # Define the log likelihood function
-    def log_likelihood(loc, scale, concentration, data):
+    def neg_log_likelihood(loc, scale, neg_gamma, data):
         dist = tfd.GeneralizedExtremeValue(
-            loc=loc, scale=scale, concentration=concentration
+            loc=loc, scale=scale, concentration=-neg_gamma
         )
         log_likelihoods = dist.log_prob(data)
-        return tf.reduce_sum(log_likelihoods)
+        return -tf.reduce_sum(log_likelihoods)
 
     # Define the loss function (negative log likelihood)
-    def neg_log_likelihood():
-        return -log_likelihood(loc, scale, concentration, data)
+    # def neg_log_likelihood() -> tf.Tensor:
+    #    return -log_likelihood(loc, scale, concentration, data)
 
     # Set up the optimizer
-    optimizer = tf.optimizers.Adam(learning_rate=0.01)
+    optimizer = tf.optimizers.Adam(learning_rate=lr)
 
     # Define the training step
     @tf.function
     def train_step():
         with tf.GradientTape() as tape:
-            loss = neg_log_likelihood()
-        gradients = tape.gradient(loss, [loc, scale, concentration])
-        optimizer.apply_gradients(zip(gradients, [loc, scale, concentration]))
+            loss = neg_log_likelihood(loc, scale, neg_gamma, data)
+        gradients = tape.gradient(loss, [loc, scale, neg_gamma])
+        optimizer.apply_gradients(zip(gradients, [loc, scale, neg_gamma]))
         return loss
 
     # Training loop
-    for step in range(2000):
+    for step in range(opt_steps):
         loss = train_step()
         if step % 100 == 0:
             print(
-                f"Step {step}, Loss: {loss.numpy()}, Loc: {loc.numpy()}, Scale: {scale.numpy()}, Concentration: {concentration.numpy()}"
+                f"Step {step}, Loss: {loss.numpy()}, Loc: {loc.numpy()}, Scale: {scale.numpy()}, Concentration: {-neg_gamma.numpy()}"
             )
 
     print(
-        f"Estimated Loc: {loc.numpy()}, Estimated Scale: {scale.numpy()}, Estimated Concentration: {concentration.numpy()}"
+        f"Estimated Loc: {loc.numpy()}, Estimated Scale: {scale.numpy()}, Estimated Concentration: {-neg_gamma.numpy()}"
     )
-    return loc.numpy(), scale.numpy(), concentration.numpy()
+    return loc.numpy(), scale.numpy(), -neg_gamma.numpy()
 
 
-def fit_upknown(data, z_star, steps=5000):
+def fit_upknown(
+    data: np.ndarray,
+    z_star: float,
+    opt_steps: int = 5000,
+    lr: float = 0.01,
+    beta_guess=1.0,
+    gamma_guess=-0.1,
+) -> Tuple[float, float, float]:
     # Initial guess for sigma and xi
-    initial_params = [1.0, -0.1]
     beta = tf.Variable(
-        initial_params[0], dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+        beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
     )
-    gamma = tf.Variable(
-        initial_params[1],
+    neg_gamma = tf.Variable(
+        -gamma_guess,
         dtype=tf.float32,  # , constraint =tf.keras.constraints.NonPos()
+        constraint=tf.keras.constraints.NonNeg(),
     )
 
     # Define the optimizer
-    optimizer = tf.optimizers.Adam(learning_rate=0.01)
+    optimizer = tf.optimizers.Adam(learning_rate=lr)
 
-    def log_likelihood(beta, gamma, data):
+    def neg_log_likelihood(
+        beta: tf.Variable, neg_gamma: tf.Variable, data: np.ndarray
+    ) -> tf.Tensor:
         dist = tfd.GeneralizedExtremeValue(
-            loc=alpha_from_z_star_beta_gamma(z_star, beta, gamma),
+            loc=alpha_from_z_star_beta_gamma(z_star, beta, -neg_gamma),
             scale=beta,
-            concentration=gamma,
+            concentration=-neg_gamma,
         )
         log_likelihoods = dist.log_prob(data)
-        return tf.reduce_sum(log_likelihoods)
+        return -tf.reduce_sum(log_likelihoods)
+
+    # Define the loss function (negative log likelihood)
+    # def neg_log_likelihood() -> tf.Tensor:
+    #    return -log_likelihood(beta, gamma, data)
 
     # Optimization step function
     @tf.function
-    def train_step():
+    def train_step() -> None:
         with tf.GradientTape() as tape:
-            loss = -log_likelihood(beta, gamma, data)
-        grads = tape.gradient(loss, [beta, gamma])
-        optimizer.apply_gradients(zip(grads, [beta, gamma]))
+            loss = neg_log_likelihood(beta, neg_gamma, data)
+        grads = tape.gradient(loss, [beta, neg_gamma])
+        optimizer.apply_gradients(zip(grads, [beta, neg_gamma]))
         return loss
 
     # Training loop
-    for step in range(steps):
+    for step in range(opt_steps):
         loss = train_step()
         if step % 500 == 0:
             print(
-                f"Step {step}, Loss: {loss.numpy()}, Beta: {beta.numpy()}, Gamma: {gamma.numpy()}"
+                f"Step {step}, Loss: {loss.numpy()}, Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
             )
 
     # Extract the fitted parameters
     beta = beta.numpy()
-    gamma = gamma.numpy()
+    gamma = -neg_gamma.numpy()
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     print(f"Estimated Alpha: {alpha}, Estimated Beta: {beta}, Estimated Gamma: {gamma}")
     return alpha, beta, gamma
@@ -118,7 +150,7 @@ def plot_ex_fits(
     gamma: float = -0.2,
     seed: int = 42,
     n: int = 50,
-):
+) -> None:
     plot_defaults()
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     tf.random.set_seed(seed)
@@ -168,7 +200,6 @@ def plot_ex_fits(
         alpha_unb, beta_unb, gamma_unb, color="orange", label="II: GEV no bound", ax=ax
     )
     plt.legend()
-
     plt.show()
 
 
@@ -178,7 +209,7 @@ def try_fit(
     gamma: float = -0.1,
     n: int = 40,
     seed: int = 42,
-    quantiles: List[float] = [1 / 100, 1 / 200],
+    quantiles: List[float] = [1 / 100, 1 / 500],
 ) -> None:
     np.random.seed(seed)
     tf.random.set_seed(seed)
@@ -236,7 +267,7 @@ def fit_seeds(
     z_star: float,
     beta: float,
     gamma: float,
-    seeds=np.linspace(0, 10000, num=1000).astype(int),
+    seeds=np.linspace(0, 10000, num=1000, dtype="int16"),
     nums=np.logspace(np.log(20), np.log(1000), num=50, dtype="int16"),
 ) -> xr.DataArray:
     print("nums", nums, type(nums))
@@ -284,7 +315,8 @@ def plot_ex(
     color_max_known: str,
     color_max_unknown: str,
     ax=None,
-):
+    fig_path: str = os.path.join(FIGURE_PATH, "evt_fit_ex_tens.pdf"),
+) -> None:
 
     if ax is None:
         _, ax = plt.subplots(
@@ -332,6 +364,7 @@ def plot_ex(
 
     ax.legend()
     ax.set_xlim([0.6, 1e6])  # up to 1 in 1million year return period
+    plt.savefig(fig_path)
 
 
 @timeit
@@ -349,7 +382,7 @@ def evt_fig_tens(
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
     color_max_unknown: str = "#d95f02",
-):
+) -> None:
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 
     plot_defaults()
@@ -483,4 +516,6 @@ def evt_fig_tens(
 
 if __name__ == "__main__":
     # python -m worst.tens
-    evt_fig_tens()
+    # evt_fig_tens()
+    plot_defaults()
+    plot_ex(7, 1, -0.3, 42, 50, "black", "#1b9e77", "#d95f02")
