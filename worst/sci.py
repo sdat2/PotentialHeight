@@ -14,6 +14,18 @@ from .utils import alpha_from_z_star_beta_gamma, plot_rp, bg_cdf
 
 
 def bg_pdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarray:
+    """
+    Upper bound known GEV probability density function.
+
+    Args:
+        z (np.ndarray): data.
+        z_star (float): Upper bound.
+        beta (float): Scale parameter.
+        gamma (float): Shape parameter.
+
+    Returns:
+        np.ndarray: Probability density function.
+    """
     return (
         1
         / beta
@@ -23,6 +35,18 @@ def bg_pdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarra
 
 
 def gev_pdf(z: np.ndarray, alpha: float, beta: float, gamma: float) -> np.ndarray:
+    """
+    Generalized extreme value probability density function.
+
+    Args:
+        z (np.ndarray): data.
+        alpha (float): Location parameter.
+        beta (float): Scale parameter.
+        gamma (float): Shape parameter.
+
+    Returns:
+        np.ndarray: Probability density function.
+    """
     return (
         1
         / beta
@@ -264,7 +288,7 @@ def evt_fig_scipy(
         max_samp (int, optional): Maximum number of samples. Defaults to 1000.
         samp_steps (int, optional): How many different sample sizes to choose. Defaults to 100.
         seed_steps (int, optional): _description_. Defaults to 1000.
-        save_fig_path (str, optional): _description_. Defaults to os.path.join(FIGURE_PATH, "evt_fig_scipy.pdf").
+        save_fig_path (str, optional): Defaults to os.path.join(FIGURE_PATH, "evt_fig_scipy.pdf").
         color_true (str, optional): _description_. Defaults to "black".
         color_max_known (str, optional): _description_. Defaults to "#1b9e77".
         color_max_unknown (str, optional): _description_. Defaults to "#d95f02".

@@ -473,13 +473,31 @@ def evt_fig_tens(
     ex_num: int = 50,
     min_samp: int = 20,
     max_samp: int = 1000,
-    samp_steps: int = 500,
+    samp_steps: int = 200,
     seed_steps: int = 20,  # 100,
     save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_tens.pdf"),
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
     color_max_unknown: str = "#d95f02",
 ) -> None:
+    """
+    Plot the EVT fits for the known upper bound and the unbounded case.
+
+    Args:
+        z_star (float, optional): Upper bound. Defaults to 7.
+        beta (float, optional): Scale parameter. Defaults to 1.
+        gamma (float, optional): Shape parameter. Defaults to -0.2.
+        ex_seed (int, optional): Example seed. Defaults to 57.
+        ex_num (int, optional): Example number of samples. Defaults to 50.
+        min_samp (int, optional): Minimum number of samples. Defaults to 20.
+        max_samp (int, optional): Maximum number of samples. Defaults to 1000.
+        samp_steps (int, optional): Number of different samples. Defaults to 500.
+        seed_steps (int, optional): Number of different seeds. Defaults to 20.
+        save_fig_path (str, optional): Save fig. Defaults to os.path.join(FIGURE_PATH, "evt_fig_tens.pdf").
+        color_true (str, optional): Color or original GEV. Defaults to "black".
+        color_max_known (str, optional): Color of GEV with max known. Defaults to "#1b9e77".
+        color_max_unknown (str, optional): Color of GEV with unknown max. Defaults to "#d95f02".
+    """
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 
     plot_defaults()
