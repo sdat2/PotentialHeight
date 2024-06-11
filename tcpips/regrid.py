@@ -8,13 +8,18 @@ CMIP6/{STAGE}/{EXP}{TYPE}/{MODEL}/{MEMBER}.nc
 
 import os
 import xarray as xr
+import subprocess
 from dask.diagnostics import ProgressBar
 import xesmf as xe
 from matplotlib import pyplot as plt
 from sithom.misc import in_notebook
 from sithom.plot import feature_grid, plot_defaults, label_subplots
-from sithom.time import timeit
+from sithom.time import timeit, time_stamp
 from tcpips.constants import FIGURE_PATH, CMIP6_PATH, RAW_PATH, REGRIDDED_PATH, CONVERSION_NAMES
+
+
+def get_git_revision_hash() -> str:
+    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
 
 
 def run_tasks():
@@ -54,6 +59,10 @@ def regrid_any(output_res: float = 1.0, time_chunk: int = 10, exp: str="ssp585",
     Args:
         output_res (float, optional): Resolution of the output grid. Defaults to 1.0.
         time_chunk (int, optional): Chunk size for time. Defaults to 10.
+        exp (str, optional): Experiment name. Defaults to "ssp585".
+        typ (str, optional): Type of data. Defaults to "ocean". Can be "ocean" or "atmos".
+        model (str, optional): Model name. Defaults to "CESM2".
+        member (str, optional): Member name. Defaults to "r4i1p1f1".
     """
 
     if os.path.exists(os.path.join(REGRIDDED_PATH, f"{exp}.{typ}.{model}.{member}.lock")):
@@ -98,7 +107,7 @@ def regrid_any(output_res: float = 1.0, time_chunk: int = 10, exp: str="ssp585",
 
     new_coords = xe.util.grid_global(
         output_res, output_res
-    )  # make regular lat/lon grid
+    )  # make a regular lat/lon grid
 
     def regrid_and_save(input_ds: xr.Dataset, output_name: str) -> xr.Dataset:
         """
@@ -120,12 +129,12 @@ def regrid_any(output_res: float = 1.0, time_chunk: int = 10, exp: str="ssp585",
             keep_attrs=True,
             skipna=True,
             # ignore_degenerate=True,
-        )
+        ).chunk(chunks={"time": time_chunk})
+        out_ds.attrs["regrid_info"] = regridder.__str__() + "git " + get_git_revision_hash() + " " + time_stamp()
         delayed_obj = out_ds.to_netcdf(
             os.path.join(CMIP6_PATH, output_name),
             format="NETCDF4",
             engine="h5netcdf",  # should be better at parallel writing/dask
-            chunks={"time": time_chunk},
             encoding={
                 var: {"dtyp": "float32", "zlib": True, "complevel": 6}
                 for var in CONVERSION_NAMES.keys()

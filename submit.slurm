@@ -4,14 +4,14 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=00:20:0
+#SBATCH --time=24:00:00
 #SBATCH --output=logs/%x-%j.out
 
 # Replace [budget code] below with your project code (e.g. t01)
 
 #SBATCH --account=n02-bas
 #SBATCH --partition=standard
-#SBATCH --qos=short
+#SBATCH --qos=standard
 
 # emailing for start and end.
 #SBATCH --mail-type=BEGIN
