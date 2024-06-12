@@ -174,14 +174,14 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
             format="NETCDF4",
             engine="h5netcdf",  # should be better at parallel writing/dask
             encoding={
-                var: {"dtype": "float32", "zlib": True, "complevel": 6}
+                var: {"dtype": "float32"} #, "zlib": True, "complevel": 6}
                 for var in CONVERSION_NAMES.keys()
                 if var in out_ds
             },
             compute=False,
         )
         with ProgressBar():
-            results = delayed_obj.compute()
+            _ = delayed_obj.compute()
         return out_ds  # return for later plotting.
 
     folder = os.path.join(REGRIDDED_PATH, exp, typ, model)
@@ -200,7 +200,6 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
         plt.show()
 
     os.remove(lock_file_path) # remove lock file
-
 
 
 if __name__ == "__main__":

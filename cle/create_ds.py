@@ -11,7 +11,7 @@ from sithom.time import timeit
 from chavas15.intersect import curveintersect
 
 
-# from tcpips.pi import get_gom
+from tcpips.pi import gom_combined_inout_timestep_cmip6
 from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH
 from .find import (
     run_cle15,
@@ -168,7 +168,7 @@ def find_solution():
 def gom_time(time: str = "1850-09-15", plot: bool = False) -> np.ndarray:
     # find_solution()
     # find_solution_rmaxv()
-    ds = get_gom(time=time, verbose=True)
+    ds = gom_combined_inout_timestep_cmip6(time=time, verbose=True)
     print(ds)
     soln = find_solution_rmaxv(
         vmax_pi=ds["vmax"].values,
@@ -238,7 +238,7 @@ def ds_solns(
     dates = [str(t) + "-08-15" for t in times]
     for i, date in enumerate(dates):
         print(i, date)
-        ds = find_solution_ds(get_gom(time=date, verbose=True), plot=True)
+        ds = find_solution_ds(gom_combined_inout_timestep_cmip6(time=date, verbose=True), plot=True)
         ds = ds.expand_dims("time", axis=-1)
         ds.coords["time"] = ("time", [times[i]])
         ds = ds.rename({"r": str(f"r{i+1}")})  # radii can be different lengths

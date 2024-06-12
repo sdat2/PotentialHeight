@@ -229,6 +229,7 @@ def get_data_part(
 
 @timeit
 def get_data_pair(
+    exp: str = "ssp585",
     institution_id: str = "THU",  # "MOHC",  # "NCAR",
     source_id: str = "CIESM",  # "HadGEM3-GC31-HH",  # "CESM2-SE",
 ) -> None:
@@ -244,14 +245,14 @@ def get_data_pair(
         source_id (str, optional): Defaults to "HadGEM3-GC31-HH".
     """
     get_data_part(
-        experiments=["ssp585"],
+        experiments=[exp],
         table="Amon",
         oc_or_at="atmos",
         institution_id=institution_id,
         source_id=source_id,
     )
     get_data_part(
-        experiments=["ssp585"],
+        experiments=[exp],
         table="Omon",
         oc_or_at="ocean",
         institution_id=institution_id,
@@ -261,7 +262,8 @@ def get_data_pair(
 
 if __name__ == "__main__":
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE
-    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2
+    # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
+    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-HH
     # regrid_2d()
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
@@ -280,9 +282,14 @@ if __name__ == "__main__":
         default="CESM2",
         help="Source id",
     )
+    parser.add_argument(
+        "--exp",
+        default="ssp585",
+        help="Experiment",
+    )
     args = parser.parse_args()
 
-    get_data_pair(institution_id=args.institution_id, source_id=args.source_id)
+    get_data_pair(institution_id=args.institution_id, source_id=args.source_id, exp=args.exp)
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # regrid_2d()

@@ -1,27 +1,31 @@
 """Potential Intensity Calculation script."""
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List, Optional
 import os
 import xarray as xr
 from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
-from sithom.plot import feature_grid, plot_defaults, get_dim # , axis_formatter
+from sithom.plot import feature_grid, plot_defaults, get_dim, label_subplots # , axis_formatter
 from sithom.place import Point, BoundingBox
+from sithom.misc import in_notebook
 from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
 from tcpips.pangeo import convert # , regrid_2d_1degree
 
-TCPYPI_SAMPLE_DATA: str = "../tcpypi/data/sample_data.nc"
-CKCD: float = 0.9
+TCPYPI_SAMPLE_DATA: str = "../tcpypi/data/sample_data.nc" # Sample data for the tcpyPI package
+CKCD: float = 0.9 # Enthalpy exchange coefficient / drag coefficient [dimensionless]
+PTOP: float = 50.0 # Top pressure level for the calculation [hPa]
 
 
 @timeit
 def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
     """Calculate the potential intensity using the tcpyPI package.
 
+    Data must have been converted to the tcpyPI units by `tcpips.convert'.
+
     Args:
         ds (xr.Dataset): xarray dataset containing the necessary variables.
-        dim (str, optional): Vertical dimension. Defaults to "p".
+        dim (str, optional): Vertical dimension. Defaults to "p" for pressure level.
 
     Returns:
         xr.Dataset: xarray dataset containing the calculated variables.
@@ -33,7 +37,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         ds[dim],
         ds["t"],
         ds["q"],
-        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=50, miss_handle=1),
+        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=PTOP, miss_handle=1),
         input_core_dims=[
             [],
             [],
@@ -87,12 +91,13 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
 
 @timeit
 def calc_pi_example() -> None:
-    """Calculate the potential intensity using the tcpyPI package."""
+    """Calculate the potential intensity using the initial regridded data using the tcpyPI package."""
     ds = xr.open_dataset(os.path.join(DATA_PATH, "all_regridded.nc"), engine="h5netcdf")
     input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
     input.tos.isel(time=0).plot(x="lon", y="lat")
-    plt.show()
+    if in_notebook():
+        plt.show()
     input.hus.isel(time=0, plev=0).plot(x="lon", y="lat")
     plt.show()
     pi_ds = calculate_pi(input, dim="plev")
@@ -102,8 +107,21 @@ def calc_pi_example() -> None:
 
 
 def plot_features(
-    plot_ds: xr.Dataset, features, units=None, names=None, vlim=None, super_titles=None
+    plot_ds: xr.Dataset, features:List[List[str]], units: Optional[List[List[str]]]=None, names: Optional[List[List[str]]]=None, vlim: Optional[List[List[Tuple[str, float, float]]]]=None, super_titles: Optional[List[str]]=None
 ) -> None:
+    """
+    A wrapper around the feature_grid function to plot the features of a dataset for the potential intensity inputs/outputs.
+
+    Args:
+        plot_ds (xr.Dataset): The dataset to plot data from.
+        features (List[List[str]]): List of feature names to plot.
+        units (Optional[List[List[str]]], optional): Units to plot. Defaults to None.
+        names (Optional[List[List[str]]], optional): Names to plot. Defaults to None.
+        vlim (Optional[List[List[Tuple[str, float, float]]]], optional): Colormap/vlim to plot. Defaults to None.
+        super_titles (Optional[List[str]], optional): Supertitles to plot. Defaults to None.
+    """
+
+
     if names is None:
         names = [
             [
@@ -122,7 +140,7 @@ def plot_features(
     if super_titles is None:
         super_titles = ["" for x in range(len(features))]
 
-    feature_grid(
+    fig, axs = feature_grid(
         plot_ds,
         features,
         units,
@@ -131,12 +149,19 @@ def plot_features(
         super_titles,
         figsize=(12, 6),
     )
+    label_subplots(axs)
 
 
 @timeit
-def plot_combined(time: str = "2015-01-15") -> None:
+def plot_pi_inputs_map(time: str = "2015-01-15") -> None:
+    """
+    Plot the inputs to the potential intensity calculation after conversion.
+
+    Args:
+        time (str, optional): Time string. Defaults to "2015-01-15".
+    """
     plot_defaults()
-    ds = convert(combined_data_timestep(time=time).isel(plev=0))
+    ds = convert(combined_inout_timestep_cmip6(time=time).isel(plev=0))
     plot_features(
         ds.isel(y=slice(20, -20)), [["sst", "t"], ["msl", "q"]], super_titles=["", ""]
     )
@@ -145,9 +170,15 @@ def plot_combined(time: str = "2015-01-15") -> None:
     plt.clf()
 
 
-def plot_pi(time: str = "2015-01-15") -> None:
+def plot_pi_outputs_map(time: str = "2015-01-15") -> None:
+    """
+    Plot the potential intensity calculation results.
+
+    Args:
+        time (str, optional): Time string. Defaults to "2015-01-15".
+    """
     plot_defaults()
-    ds = convert(combined_data_timestep(time=time))
+    ds = convert(combined_inout_timestep_cmip6(time=time))
     print(ds)
     pi_ds = calculate_pi(ds, dim="p")
     for var in pi_ds:
@@ -164,7 +195,7 @@ def plot_pi(time: str = "2015-01-15") -> None:
     plt.clf()
 
 
-def elevate_standards(ds: xr.Dataset) -> xr.Dataset:
+def standard_name_to_long_name(ds: xr.Dataset) -> xr.Dataset:
     """
     Turn the standard_name attribute into a long_name attribute.
 
@@ -180,7 +211,7 @@ def elevate_standards(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def propagate_names(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
+def propagate_attrs(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
     """
     Propagate the standard_name and units attributes from one dataset to another.
 
@@ -214,12 +245,12 @@ def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")) -> None:
         times (Tuple[str, str], optional): Defaults to ("1850-09-15", "2099-09-15").
     """
     plot_defaults()
-    ds_l = [convert(combined_data_timestep(time=time)) for time in times]
-    pi_ds_l = [elevate_standards(calculate_pi(ds, dim="p")) for ds in ds_l]
+    ds_l = [convert(combined_inout_timestep_cmip6(time=time)) for time in times]
+    pi_ds_l = [standard_name_to_long_name(calculate_pi(ds, dim="p")) for ds in ds_l]
     diff_ds = ds_l[1] - ds_l[0]
     pi_diff_ds = pi_ds_l[1] - pi_ds_l[0]
-    diff_ds = propagate_names(ds_l[0], diff_ds)
-    pi_diff_ds = propagate_names(pi_ds_l[0], pi_diff_ds)
+    diff_ds = propagate_attrs(ds_l[0], diff_ds)
+    pi_diff_ds = propagate_attrs(pi_ds_l[0], pi_diff_ds)
     print(diff_ds)
     print(pi_diff_ds)
     plot_features(
@@ -241,7 +272,7 @@ def plot_diffs(times: Tuple[str, str] = ("1850-09-15", "2099-09-15")) -> None:
 
 
 @timeit
-def plot_example() -> None:
+def plot_tcpypi_in_out_ex() -> None:
     """
     Plot example data from the sample_data.nc file.
     """
@@ -267,7 +298,7 @@ def plot_example() -> None:
     plt.clf()
 
 
-def gom() -> None:
+def plot_seasonality_in_gom_tcypi_ex() -> None:
     """
     Process sample data for the Gulf of Mexico.
     """
@@ -362,7 +393,7 @@ def gom() -> None:
     plt.clf()
 
 
-def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
+def combined_inout_timestep_cmip6(time: str = "2015-01-15") -> xr.Dataset:
     """
     Combined data from the ocean and atmosphere datasets at a given time.
 
@@ -382,8 +413,8 @@ def combined_data_timestep(time: str = "2015-01-15") -> xr.Dataset:
     return xr.merge([ocean_ds, atmos_ds])
 
 
-def processed_timestep(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
-    ds = combined_data_timestep(time=time)
+def processed_inout_timestep_cmip6(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
+    ds = combined_inout_timestep_cmip6(time=time)
     lats = ds.lat.values
     lons = ds.lon.values
     ds = ds.drop_vars(["lat", "lon"])
@@ -396,7 +427,7 @@ def processed_timestep(time: str = "2015-01-15", verbose: bool = False) -> xr.Da
     return ds
 
 
-def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
+def gom_combined_inout_timestep_cmip6(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
     """Get the Gulf of Mexico centre data at a given time.
 
     Args:
@@ -406,7 +437,7 @@ def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
     Returns:
         xr.Dataset: Gulf of Mexico centre data at a given time.
     """
-    ds = processed_timestep(time=time, verbose=verbose)
+    ds = processed_inout_timestep_cmip6(time=time, verbose=verbose)
     # select point closest to GOM centre
     ds = ds.sel(lat=GOM[0], lon=GOM[1], method="nearest")
     ds = convert(ds)
@@ -417,13 +448,13 @@ def get_gom(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
 
 
 @timeit
-def get_gom_bbox(
+def gom_bbox_combined_inout_timestep_cmip6(
     time: str = "2015-01-15", verbose: bool = False, pad: float = 5
 ) -> xr.Dataset:
     GOM_BBOX: BoundingBox = Point(GOM[1], GOM[0], desc="Gulf of Mexico Centre").bbox(
         pad
     )
-    ds = processed_timestep(time=time, verbose=verbose)
+    ds = processed_inout_timestep_cmip6(time=time, verbose=verbose)
     ds = ds.sel(lon=slice(*GOM_BBOX.lon), lat=slice(*GOM_BBOX.lat))
     ds = convert(ds)
     pi = calculate_pi(ds, dim="p")
@@ -434,25 +465,25 @@ def get_gom_bbox(
 
 if __name__ == "__main__":
     # python tcpips/pi.py
-    # gom()
+    # plot_seasonality_in_gom_tcypi_ex()
     # regrid_2d_1degree()
     # ds = xr.open_dataset("data/ocean_regridded.nc")
     # ds.tos.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
-    # plot_example()
+    # plot_tcpypi_in_out_ex()
 
-    print(get_gom_bbox(time="2015-01-15", verbose=True, pad=5))
+    print(gom_bbox_combined_inout_timestep_cmip6(time="2015-01-15", verbose=True, pad=5))
 
-    # print(get_gom())
+    # print(gom_combined_inout_timestep_cmip6())
 
     # plot_diffs()
 
     # for time in ["1850-09-15", "1950-09-15", "2015-09-15", "2099-09-15"]:
-    #    # print(convert(combined_data_timestep(time=time)))
-    #    plot_pi(time=time)
-    # print(combined_data_timestep(time="2015-01-15"))
-    # print(combined_data_timestep(time="1850-01-15"))
-    # print(combined_data_timestep(time="2099-01-15"))
+    #    # print(convert(combined_inout_timestep_cmip6(time=time)))
+    #    plot_pi_outputs_map(time=time)
+    # print(combined_inout_timestep_cmip6(time="2015-01-15"))
+    # print(combined_inout_timestep_cmip6(time="1850-01-15"))
+    # print(combined_inout_timestep_cmip6(time="2099-01-15"))
 
     # atmos_ds.psl.isel(time=0).plot(x="lon", y="lat")
     # plt.show()
