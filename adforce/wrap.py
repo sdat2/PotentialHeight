@@ -39,7 +39,7 @@ import xarray as xr
 from slurmpy import Slurm
 from sithom.time import timeit
 from cle.constants import DATA_PATH as CLE_DATA_PATH
-from .constants import NEW_ORLEANS # , KATRINA_TIDE_NC
+from .constants import NEW_ORLEANS  # , KATRINA_TIDE_NC
 from .fort22 import save_forcing
 from .mesh import xr_loader
 from .profile import read_profile
@@ -73,28 +73,31 @@ EMAIL_ADDRESS: str = "sdat2@cam.ac.uk"
 SLURM_ACCOUNT: str = "n02-bas"
 PARTITION: str = "standard"
 TASKS_PER_NODE: int = 128
-MODULES: str = "PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1"
+MODULES: str = (
+    "PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1"
+)
 FILES_TO_COPY: List[str] = [
-        "fort.13",  # node attributes
-        "fort.14",  # mesh
-        "fort.15",  # model settings
-        # setup files
-        # "fort.64.nc",
-        # "fort.73.nc",
-        # "fort.74.nc",
-    ]
+    "fort.13",  # node attributes
+    "fort.14",  # mesh
+    "fort.15",  # model settings
+    # setup files
+    # "fort.64.nc",
+    # "fort.73.nc",
+    # "fort.74.nc",
+]
 DEFAULT_PROFILE: str = os.path.join(CLE_DATA_PATH, "outputs.json")
 
 
-def run_struct(angle: float = 0,
-               trans_speed: float = 7.71,
-               impact_lon: float = -89.4715,
-               impact_lat: float = 29.9511,
-               impact_time: np.datetime64 = np.datetime64("2004-08-13T12"),
-               resolution: str = "mid",
-               profile: Union[str, xr.Dataset] = DEFAULT_PROFILE,
-               out_path: str = os.path.join(EXP_PATH, "test-run"),
-               ) -> xr.Dataset:
+def run_struct(
+    angle: float = 0,
+    trans_speed: float = 7.71,
+    impact_lon: float = -89.4715,
+    impact_lat: float = 29.9511,
+    impact_time: np.datetime64 = np.datetime64("2004-08-13T12"),
+    resolution: str = "mid",
+    profile: Union[str, xr.Dataset] = DEFAULT_PROFILE,
+    out_path: str = os.path.join(EXP_PATH, "test-run"),
+) -> xr.Dataset:
     """
     Run the ADCIRC model and wait for it to finish.
 
@@ -119,16 +122,42 @@ def run_struct(angle: float = 0,
     if isinstance(profile, str):
         profile = read_profile(profile)
 
-    param = xr.Dataset(data_vars={"angle": ([], [angle], {"units": "degrees", "description": "Bearing of the storm track"}),
-                        "trans_speed": ([], [trans_speed], {"units": "m/s", "description": "Translation speed of the storm"}),
-                        "impact_lon": ([], [impact_lon], {"units": "degrees", "description": "Longitude of the storm impact"}),
-                        "impact_lat": ([], [impact_lat], {"units": "degrees", "description": "Latitude of the storm impact"}),
-                        "impact_time": ([], [impact_time], {"units": "ns", "description": "Time of the storm impact"}),
-                        "resolution": ([], [resolution], {"description": "Resolution of the ADCIRC model"}),
-                        "out_path": ([], [out_path], {"description": "Path to ADCIRC run folder"}),
-                        },
-                # coords={"time": impact_time,},
-                )
+    param = xr.Dataset(
+        data_vars={
+            "angle": (
+                [],
+                [angle],
+                {"units": "degrees", "description": "Bearing of the storm track"},
+            ),
+            "trans_speed": (
+                [],
+                [trans_speed],
+                {"units": "m/s", "description": "Translation speed of the storm"},
+            ),
+            "impact_lon": (
+                [],
+                [impact_lon],
+                {"units": "degrees", "description": "Longitude of the storm impact"},
+            ),
+            "impact_lat": (
+                [],
+                [impact_lat],
+                {"units": "degrees", "description": "Latitude of the storm impact"},
+            ),
+            "impact_time": (
+                [],
+                [impact_time],
+                {"units": "ns", "description": "Time of the storm impact"},
+            ),
+            "resolution": (
+                [],
+                [resolution],
+                {"description": "Resolution of the ADCIRC model"},
+            ),
+            "out_path": ([], [out_path], {"description": "Path to ADCIRC run folder"}),
+        },
+        # coords={"time": impact_time,},
+    )
 
     return xr.merge([param, profile])
 
@@ -300,7 +329,7 @@ def select_point_f(stationid: int, resolution: str = "mid") -> Callable[[str], f
         Callable: Function to select the maximum elevation near a given stationid.
     """
     # = xr.open_dataset(KATRINA_TIDE_NC)
-    #lon, lat = (
+    # lon, lat = (
     #    tide_ds.isel(stationid=stationid).lon.values,
     #    tide_ds.isel(stationid=stationid).lat.values,
     # )
@@ -393,10 +422,10 @@ def read_results(path: str = OG_PATH, stationid: int = 3) -> float:
     ys = mele_ds.y.values
 
     # tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
-    #lon, lat = (
+    # lon, lat = (
     #    tide_ds.isel(stationid=stationid).lon.values,
     #    tide_ds.isel(stationid=stationid).lat.values,
-    #)
+    # )
 
     # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
     dist = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2) ** 0.5
@@ -427,7 +456,9 @@ if __name__ == "__main__":
         default="2025.json",
         help="Path to ADCIRC run folder.",
     )
-    parser.add_argument("--resolution", type=str, default="mid", help="Resolution of the ADCIRC model.")
+    parser.add_argument(
+        "--resolution", type=str, default="mid", help="Resolution of the ADCIRC model."
+    )
     parser.add_argument(
         "--stationid",
         type=int,

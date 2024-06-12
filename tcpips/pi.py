@@ -6,15 +6,22 @@ import xarray as xr
 from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
-from sithom.plot import feature_grid, plot_defaults, get_dim, label_subplots # , axis_formatter
+from sithom.plot import (
+    feature_grid,
+    plot_defaults,
+    get_dim,
+    label_subplots,
+)  # , axis_formatter
 from sithom.place import Point, BoundingBox
 from sithom.misc import in_notebook
 from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
-from tcpips.pangeo import convert # , regrid_2d_1degree
+from tcpips.convert import convert  # , regrid_2d_1degree
 
-TCPYPI_SAMPLE_DATA: str = "../tcpypi/data/sample_data.nc" # Sample data for the tcpyPI package
-CKCD: float = 0.9 # Enthalpy exchange coefficient / drag coefficient [dimensionless]
-PTOP: float = 50.0 # Top pressure level for the calculation [hPa]
+TCPYPI_SAMPLE_DATA: str = (
+    "../tcpypi/data/sample_data.nc"  # Sample data for the tcpyPI package
+)
+CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
+PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
 
 
 @timeit
@@ -107,7 +114,12 @@ def calc_pi_example() -> None:
 
 
 def plot_features(
-    plot_ds: xr.Dataset, features:List[List[str]], units: Optional[List[List[str]]]=None, names: Optional[List[List[str]]]=None, vlim: Optional[List[List[Tuple[str, float, float]]]]=None, super_titles: Optional[List[str]]=None
+    plot_ds: xr.Dataset,
+    features: List[List[str]],
+    units: Optional[List[List[str]]] = None,
+    names: Optional[List[List[str]]] = None,
+    vlim: Optional[List[List[Tuple[str, float, float]]]] = None,
+    super_titles: Optional[List[str]] = None,
 ) -> None:
     """
     A wrapper around the feature_grid function to plot the features of a dataset for the potential intensity inputs/outputs.
@@ -120,7 +132,6 @@ def plot_features(
         vlim (Optional[List[List[Tuple[str, float, float]]]], optional): Colormap/vlim to plot. Defaults to None.
         super_titles (Optional[List[str]], optional): Supertitles to plot. Defaults to None.
     """
-
 
     if names is None:
         names = [
@@ -413,7 +424,19 @@ def combined_inout_timestep_cmip6(time: str = "2015-01-15") -> xr.Dataset:
     return xr.merge([ocean_ds, atmos_ds])
 
 
-def processed_inout_timestep_cmip6(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
+def processed_inout_timestep_cmip6(
+    time: str = "2015-01-15", verbose: bool = False
+) -> xr.Dataset:
+    """
+    Process the combined data from the ocean and atmosphere datasets at a given time to produce potential intensity.
+
+    Args:
+        time (str, optional): Time string. Defaults to "2015-01-15".
+        verbose (bool, optional): Whether to print info. Defaults to False.
+
+    Returns:
+        xr.Dataset: Processed dataset.
+    """
     ds = combined_inout_timestep_cmip6(time=time)
     lats = ds.lat.values
     lons = ds.lon.values
@@ -427,7 +450,9 @@ def processed_inout_timestep_cmip6(time: str = "2015-01-15", verbose: bool = Fal
     return ds
 
 
-def gom_combined_inout_timestep_cmip6(time: str = "2015-01-15", verbose: bool = False) -> xr.Dataset:
+def gom_combined_inout_timestep_cmip6(
+    time: str = "2015-01-15", verbose: bool = False
+) -> xr.Dataset:
     """Get the Gulf of Mexico centre data at a given time.
 
     Args:
@@ -451,6 +476,16 @@ def gom_combined_inout_timestep_cmip6(time: str = "2015-01-15", verbose: bool = 
 def gom_bbox_combined_inout_timestep_cmip6(
     time: str = "2015-01-15", verbose: bool = False, pad: float = 5
 ) -> xr.Dataset:
+    """Get the Gulf of Mexico bounding box data at a given time.
+
+    Args:
+        time (str, optional): Defaults to "2015-01-15".
+        verbose (bool, optional): Defaults to False.
+        pad (float, optional): Padding around the bounding box. Defaults to 5.
+
+    Returns:
+        xr.Dataset: Gulf of Mexico bounding box data at a given time.
+    """
     GOM_BBOX: BoundingBox = Point(GOM[1], GOM[0], desc="Gulf of Mexico Centre").bbox(
         pad
     )
@@ -463,6 +498,55 @@ def gom_bbox_combined_inout_timestep_cmip6(
     return xr.merge([ds, pi])
 
 
+def find_atmos_ocean_pairs():
+    """
+    Find the atmospheric and oceanic data pairs that can be combined to calculate potential intensity.
+    """
+    import os
+    from tcpips.constants import REGRIDDED_PATH
+
+    pairs = {}
+    for exp in [
+        x
+        for x in os.listdir(REGRIDDED_PATH)
+        if os.path.isdir(os.path.join(REGRIDDED_PATH, x))
+    ]:
+        print(exp)
+        for model in os.listdir(os.path.join(REGRIDDED_PATH, exp, "ocean")):
+            print(model)
+            for member in [
+                x.strip(".nc")
+                for x in os.listdir(os.path.join(REGRIDDED_PATH, exp, "ocean", model))
+            ]:
+                key = f"{exp}.{model}.{member}"
+                print(key)
+                oc_path = (
+                    os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
+                )
+                oc_lock = (
+                    os.path.join(REGRIDDED_PATH) + f"{exp}.ocean.{model}.{member}.lock"
+                )
+                at_path = (
+                    os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
+                )
+                at_lock = (
+                    os.path.join(REGRIDDED_PATH) + f"{exp}.at.{model}.{member}.lock"
+                )
+                if os.path.exists(oc_path) and os.path.exists(at_path):
+                    if not os.path.exists(oc_lock) and not os.path.exists(at_lock):
+                        pairs[f"{exp}.{model}.{member}"] = {
+                            "exp": exp,
+                            "model": model,
+                            "member": member,
+                        }
+                    else:
+                        print(f"Regrid lock file exists for {key}")
+                else:
+                    print(f"File missing for {exp}.{model}.{member}")
+
+    return pairs
+
+
 if __name__ == "__main__":
     # python tcpips/pi.py
     # plot_seasonality_in_gom_tcypi_ex()
@@ -472,7 +556,11 @@ if __name__ == "__main__":
     # plt.show()
     # plot_tcpypi_in_out_ex()
 
-    print(gom_bbox_combined_inout_timestep_cmip6(time="2015-01-15", verbose=True, pad=5))
+    # print(
+    #    gom_bbox_combined_inout_timestep_cmip6(time="2015-01-15", verbose=True, pad=5)
+    # )
+    pairs = find_atmos_ocean_pairs()
+    print(pairs)
 
     # print(gom_combined_inout_timestep_cmip6())
 

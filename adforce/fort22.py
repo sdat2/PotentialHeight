@@ -143,7 +143,6 @@ def trajectory_ds_from_time(
     )
 
 
-
 def gen_ps_f(
     profile_path: str = os.path.join(
         CLE_DATA_PATH, "outputs.json"

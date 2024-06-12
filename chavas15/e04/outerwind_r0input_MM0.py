@@ -72,9 +72,7 @@ def E04_outerwind_r0input_nondim_MM0(
 
         # Update dMfracM0/drfracr0 at next step inwards
         dMfracM0_drfracr0_temp = (
-            gamma
-            * ((MfracM0_temp - rrfracr0_temp**2) ** 2)
-            / (1 - rrfracr0_temp**2)
+            gamma * ((MfracM0_temp - rrfracr0_temp**2) ** 2) / (1 - rrfracr0_temp**2)
         )
 
         # Integrate M/M0 radially inwards

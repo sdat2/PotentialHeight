@@ -238,7 +238,9 @@ def ds_solns(
     dates = [str(t) + "-08-15" for t in times]
     for i, date in enumerate(dates):
         print(i, date)
-        ds = find_solution_ds(gom_combined_inout_timestep_cmip6(time=date, verbose=True), plot=True)
+        ds = find_solution_ds(
+            gom_combined_inout_timestep_cmip6(time=date, verbose=True), plot=True
+        )
         ds = ds.expand_dims("time", axis=-1)
         ds.coords["time"] = ("time", [times[i]])
         ds = ds.rename({"r": str(f"r{i+1}")})  # radii can be different lengths

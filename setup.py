@@ -9,7 +9,7 @@ REQUIRED: List[str] = [
     "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility for linear error propagation
-    #"sithom>=0.0.5",  # common utilities
+    # "sithom>=0.0.5",  # common utilities
     "sithom @ git+https://github.com/sdat2/sithom",
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
@@ -25,9 +25,9 @@ REQUIRED: List[str] = [
     "trieste",  # to run bayesian optimisation (adbo)
     "trieste[plotting]",  # to run bayesian optimisation (adbo)
     "trieste[qhsri]",  # to run bayesian optimisation (adbo)
-    "slurmpy", # to run SLURM jobs (adforce)
-    "adcircpy", # to process ADIRC inputs (adforce)
-    "tcpypi", # to calculate potential intensity (tcpips)
+    "slurmpy",  # to run SLURM jobs (adforce)
+    "adcircpy",  # to process ADIRC inputs (adforce)
+    "tcpypi",  # to calculate potential intensity (tcpips)
 ]
 
 

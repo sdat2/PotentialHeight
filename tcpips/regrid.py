@@ -3,6 +3,7 @@
 Add a lock file to highlight that the regridding is in progress, to allow more flexible parallel processing.
 
 CMIP6/{STAGE}/{EXP}/{TYPE}/{MODEL}/{MEMBER}.nc
+locks are created in CMIP6/{STAGE}/{exp}.{typ}.{model}.{member}.lock
 
 """
 
@@ -16,21 +17,28 @@ from dask.diagnostics import ProgressBar
 import xesmf as xe
 from matplotlib import pyplot as plt
 from sithom.misc import in_notebook
-from sithom.plot import plot_defaults # feature_grid, label_subplots
+from sithom.plot import plot_defaults  # feature_grid, label_subplots
 from sithom.time import timeit, time_stamp
-from tcpips.constants import FIGURE_PATH, CMIP6_PATH, RAW_PATH, REGRIDDED_PATH, CONVERSION_NAMES
+from tcpips.constants import (
+    FIGURE_PATH,
+    CMIP6_PATH,
+    RAW_PATH,
+    REGRIDDED_PATH,
+    CONVERSION_NAMES,
+)
 
 
 def get_git_revision_hash() -> str:
-    return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
+    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
 
 
-def run_tasks(force_regrid: bool = False,
-              output_res: float = 0.5,
-              worker: int = 10,
-              memory_per_worker: str = "20GiB",
-              parallel=False
-              ) -> None:
+def run_tasks(
+    force_regrid: bool = False,
+    output_res: float = 0.5,
+    worker: int = 10,
+    memory_per_worker: str = "20GiB",
+    parallel=False,
+) -> None:
     """Run all tasks sequentially.
 
     Args:
@@ -67,7 +75,11 @@ def define_tasks() -> dict:
     """Find all tasks to be done."""
     tasks = {}
     for exp in os.listdir(RAW_PATH):
-        for typ in [x for x in os.listdir(os.path.join(RAW_PATH, exp)) if os.path.isdir(os.path.join(RAW_PATH, exp))]:
+        for typ in [
+            x
+            for x in os.listdir(os.path.join(RAW_PATH, exp))
+            if os.path.isdir(os.path.join(RAW_PATH, exp))
+        ]:
             for model in os.listdir(os.path.join(RAW_PATH, exp, typ)):
                 for member in os.listdir(os.path.join(RAW_PATH, exp, typ, model)):
                     member = member.replace(".nc", "")
@@ -77,14 +89,27 @@ def define_tasks() -> dict:
                         "typ": typ,
                         "model": model,
                         "member": member,
-                        "regridded_exists": os.path.exists(os.path.join(REGRIDDED_PATH, exp, typ, model, member) + ".nc"),
-                        "locked": os.path.exists(os.path.join(REGRIDDED_PATH, key) + ".lock"),
+                        "regridded_exists": os.path.exists(
+                            os.path.join(REGRIDDED_PATH, exp, typ, model, member)
+                            + ".nc"
+                        ),
+                        "locked": os.path.exists(
+                            os.path.join(REGRIDDED_PATH, key) + ".lock"
+                        ),
                     }
     return tasks
 
 
 @timeit
-def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", typ: str="ocean", model: str ="CESM2", member: str="r4i1p1f1", **kwargs) -> None:
+def regrid_any(
+    output_res: float = 0.5,
+    time_chunk: int = 1,
+    exp: str = "ssp585",
+    typ: str = "ocean",
+    model: str = "CESM2",
+    member: str = "r4i1p1f1",
+    **kwargs,
+) -> None:
     """
     Regrid 2d data to a certain resolution using xesmf.
 
@@ -100,10 +125,10 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
     lock_file_path = os.path.join(REGRIDDED_PATH, f"{exp}.{typ}.{model}.{member}.lock")
     if os.path.exists(lock_file_path):
         print(f"Already regridding {exp}.{typ}.{model}.{member}")
-        return # already regridding this file.
+        return  # already regridding this file.
     else:
         with open(lock_file_path, "w") as f:
-            f.write(time_stamp()) # create lock file
+            f.write(time_stamp())  # create lock file
     print(f"Regridding {exp}.{typ}.{model}.{member}")
     plot_defaults()
 
@@ -135,7 +160,9 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
         )
         return ds.chunk(chunks={"time": time_chunk})
 
-    in_ds = open_ds(os.path.join(RAW_PATH, exp, typ, model, member)+".nc") #.isel(time=slice(0, 10))
+    in_ds = open_ds(
+        os.path.join(RAW_PATH, exp, typ, model, member) + ".nc"
+    )  # .isel(time=slice(0, 10))
     print("in_ds", in_ds)
     # atmos_ds = open_ds(os.path.join(RAW_PATH, "ssp585", "atmos", "CESM2", 'r4i1p1f1.nc'))
 
@@ -144,6 +171,7 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
     )  # make a regular lat/lon grid
 
     print("new_coords", new_coords)
+
     @timeit
     def regrid_and_save(input_ds: xr.Dataset, output_name: str) -> xr.Dataset:
         """
@@ -157,7 +185,11 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
             xr.Dataset: regridded dataset.
         """
         regridder = xe.Regridder(
-            input_ds, new_coords, "bilinear", periodic=True, ignore_degenerate=True,
+            input_ds,
+            new_coords,
+            "bilinear",
+            periodic=True,
+            ignore_degenerate=True,
         )
         print(regridder)
         out_ds = regridder(
@@ -167,14 +199,16 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
             output_chunks={"time": time_chunk, "lat": 90, "lon": 90},
             # ignore_degenerate=True,
         ).chunk(chunks={"time": time_chunk})
-        out_ds.attrs["regrid_info"] = regridder.__str__() + "git " + get_git_revision_hash() + " " + time_stamp()
+        out_ds.attrs["regrid_info"] = (
+            regridder.__str__() + "git " + get_git_revision_hash() + " " + time_stamp()
+        )
         print("out_ds", out_ds)
         delayed_obj = out_ds.to_netcdf(
             os.path.join(CMIP6_PATH, output_name),
             format="NETCDF4",
             engine="h5netcdf",  # should be better at parallel writing/dask
             encoding={
-                var: {"dtype": "float32"} #, "zlib": True, "complevel": 6}
+                var: {"dtype": "float32"}  # , "zlib": True, "complevel": 6}
                 for var in CONVERSION_NAMES.keys()
                 if var in out_ds
             },
@@ -186,9 +220,7 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
 
     folder = os.path.join(REGRIDDED_PATH, exp, typ, model)
     os.makedirs(folder, exist_ok=True)
-    out_ds = regrid_and_save(
-        in_ds, os.path.join(folder, member)+ ".nc"
-    )
+    out_ds = regrid_and_save(in_ds, os.path.join(folder, member) + ".nc")
     print("out_ds", out_ds)
     if typ == "ocean" and in_notebook():
         out_ds.tos.isel(time=0).plot(x="lon", y="lat")
@@ -199,21 +231,23 @@ def regrid_any(output_res: float = 0.5, time_chunk: int = 1, exp: str="ssp585", 
         out_ds.tas.isel(time=0, p=0).plot(x="lon", y="lat")
         plt.show()
 
-    os.remove(lock_file_path) # remove lock file
+    os.remove(lock_file_path)  # remove lock file
 
 
 if __name__ == "__main__":
     # python -m tcpips.regrid
-    #regrid_2d_1degree()
-    #regrid_2d()
-    #regrid_1d()
+    # regrid_2d_1degree()
+    # regrid_2d()
+    # regrid_1d()
     # regrid_1d(xesmf=True)
     # define_tasks()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-w", "--worker", type=int, default=10)
     parser.add_argument("-m", "--memory", type=str, default="4GiB")
-    parser.add_argument("-f", "--force", type=lambda x: (str(x).lower() == "true"), default=False)
+    parser.add_argument(
+        "-f", "--force", type=lambda x: (str(x).lower() == "true"), default=False
+    )
     parser.add_argument("-r", "--resolution", type=float, default=0.5)
     parser.add_argument(
         "-p", "--parallel", type=lambda x: (str(x).lower() == "true"), default=True

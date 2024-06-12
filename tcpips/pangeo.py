@@ -271,7 +271,9 @@ if __name__ == "__main__":
     # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
     import argparse
 
-    parser = argparse.ArgumentParser(description="Pangeo download and processing scripts.")
+    parser = argparse.ArgumentParser(
+        description="Pangeo download and processing scripts."
+    )
     parser.add_argument(
         "--institution_id",
         default="NCAR",
@@ -289,7 +291,9 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    get_data_pair(institution_id=args.institution_id, source_id=args.source_id, exp=args.exp)
+    get_data_pair(
+        institution_id=args.institution_id, source_id=args.source_id, exp=args.exp
+    )
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # regrid_2d()

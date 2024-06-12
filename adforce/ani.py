@@ -359,9 +359,7 @@ def run_animation() -> None:
         "--x_pos", type=float, default=0.9, help="relative x position of quiver label"
     )
     # add in option flag for with or without winds
-    parser.add_argument(
-        "--winds", action="store_true", help="plot winds with heights"
-    )
+    parser.add_argument("--winds", action="store_true", help="plot winds with heights")
 
     args = parser.parse_args()
 

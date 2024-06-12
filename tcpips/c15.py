@@ -9,7 +9,7 @@ Python code taken originally from:
 	url = {https://purr.purdue.edu/publications/4066/1},
 	year = {2022},
 	doi = {doi:/10.4231/CZ4P-D448},
-	author = {Daniel Robert Chavas ,}
+	author = {Daniel Robert Chavas}
 }
 ```
 
@@ -30,23 +30,23 @@ Part II: Wind field variability. J. Atmos. Sci., 73(8):
 3093-3113. doi:10.1175/JAS-D-15-0185.1.
 
 # TODO: work out if units are SI or not
+
+TODO: Does not work! Need to fix this code (or just use matlab version).
+
+TODO: Why does all of the code call itself nondim when the inputs have units?
 """
 from typing import Tuple, List, Dict, Union
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import sys
 import copy
 import hydra
 from shapely.geometry import LineString
-from scipy.optimize import fsolve
 from scipy.interpolate import interp1d
 from omegaconf import DictConfig
 from sithom.plot import plot_defaults
 from sithom.time import timeit
-
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "tcpips", "config")
-FIGURE_PATH = os.path.join(os.path.dirname(__file__), "img")
+from tcpips.constants import FIGURE_PATH, CONFIG_PATH
 
 #######################################################################
 # NOTES FOR USER:
@@ -65,13 +65,13 @@ def E04_outerwind_r0input_nondim_MM0(
     Args:
         r0 (float): outer radius of storm.
         fcor (float): coriolis parameter.
-        Cdvary (bool): _description_
-        C_d (float): _description_
-        w_cool (float): _description_
+        Cdvary (bool): Whether to vary the drag coefficient.
+        C_d (float): Drag coefficient.
+        w_cool (float): Cooling rate.
         Nr (int): Number of radial points.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: _description_
+        Tuple[np.ndarray, np.ndarray]: radii as a fraction of r0, angular momentum as a fraction of M0.
     """
 
     # Initialization
@@ -167,12 +167,12 @@ def ER11_radprof_raw(
     This version does not sanitize the outputs.
 
     Args:
-        Vmax (float): _description_
-        r_in (float): _description_
-        rmax_or_r0 (str): _description_
-        fcor (float): _description_
-        CkCd (float): _description_
-        rr_ER11 (np.ndarray): _description_
+        Vmax (float): Maximum azimuthal wind speed.
+        r_in (float): Radius, either rmax or r0.
+        rmax_or_r0 (str): Whether r_in is rmax or r0.
+        fcor (float): Coriolis parameter.
+        CkCd (float): Ratio of enthalpy exchange and drag coefficients.
+        rr_ER11 (np.ndarray): Radii.
 
     Returns:
         Tuple[np.ndarray, float]: V_ER11, r_out
@@ -324,10 +324,10 @@ def ER11E04_nondim_r0input(
         Cdvary (bool): whether C_d varies.
         C_d (float): Drag coefficient.
         w_cool (float): Cooling rate.
-        CkCdvary (bool, optional): _description_. Defaults to False.
-        CkCd (float, optional): _description_. Defaults to 1.9.
-        eye_adj (float, optional): _description_. Defaults to 1.
-        alpha_eye (float, optional): _description_. Defaults to 1.
+        CkCdvary (bool, optional): Whether to vary exchange ratio. Defaults to False.
+        CkCd (float, optional): Ratio of enthalpy exchange to drag coefficients. Defaults to 1.9.
+        eye_adj (float, optional): Whether to adjust eye. Defaults to 1.
+        alpha_eye (float, optional): Eye parameter. Defaults to 1.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, float, float, float]: rr, VV, rmerge, Vmerge, rmax
@@ -735,17 +735,17 @@ def ER11E04_nondim_rfitinput(
     ER11E04_nondim_rfitinput.
 
     Args:
-        Vmax (float): _description_
-        rfit (float): _description_
-        Vfit (float): _description_
-        fcor (float): _description_
-        Cdvary (bool): _description_
-        C_d (float): _description_
-        w_cool (float): _description_
-        CkCdvary (bool): _description_
-        CkCd (float): _description_
-        eye_adj (bool): _description_
-        alpha_eye (float): _description_
+        Vmax (float): Maximum azimuthal wind speed.
+        rfit (float): Radius of fit.
+        Vfit (float): Velocity at rfit.
+        fcor (float): Coriolis parameter.
+        Cdvary (bool): Whether C_d varies.
+        C_d (float): Drag coefficient.
+        w_cool (float): Cooling rate.
+        CkCdvary (bool): Whether to vary ratio of enthalpy exchange to drag coefficients.
+        CkCd (float): Ratio of enthalpy exchange to drag coefficients.
+        eye_adj (bool): Whether to adjust eye.
+        alpha_eye (float): Alpha parameter for eye adjustment.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, float, float, float]: rr, VV, rmax, r0, rmerge, Vmerge
@@ -927,8 +927,13 @@ def ER11E04_nondim_rfitinput(
 
 
 @hydra.main(config_path=CONFIG_PATH, config_name="chavas15.yaml")
-def default_run(cfg: DictConfig):
-    """Run the default experiment."""
+def default_run(cfg: DictConfig) -> None:
+    """Run the default experiment.
+
+    Args:
+        cfg (DictConfig): Hydra configuration object
+
+    """
     print(cfg)
     rr, VV, r0, rmerge, Vmerge = ER11E04_nondim_rmaxinput(
         cfg.Vmax,
@@ -963,12 +968,12 @@ def default_run(cfg: DictConfig):
     plt.legend()
 
     os.makedirs(os.path.join(FIGURE_PATH, "chavas15_test"), exist_ok=True)
-    plt.savefig(os.path.join(FIGURE_PATH, "chavas15_test", "chavas15_rmax_test.png"))
+    plt.savefig(os.path.join(FIGURE_PATH, "chavas15_test", "chavas15_rmax_test.pdf"))
     # plt.show()
 
 
 if __name__ == "__main__":
-    # python src/models/chavas15.py
+    # python -m tcpips.c15.py
     # import matplotlib.pyplot as plt
     # import numpy as np
     default_run()

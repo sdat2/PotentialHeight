@@ -1,7 +1,14 @@
 """Convert CMIP6 variables to be PI input variables."""
+
 import xarray as xr
 from sithom.time import timeit
-from tcpips.constants import CONVERSION_NAMES, CONVERSION_MULTIPLES, CONVERSION_ADDITIONS, CONVERSION_UNITS
+from tcpips.constants import (
+    CONVERSION_NAMES,
+    CONVERSION_MULTIPLES,
+    CONVERSION_ADDITIONS,
+    CONVERSION_UNITS,
+)
+
 # CMIP6 equivalent names
 # tos: Sea Surface Temperature [degC] [same]
 # hus: Specific Humidity [kg/kg] [to g/kg]
@@ -37,5 +44,3 @@ def convert(ds: xr.Dataset) -> xr.Dataset:
         ds["plev"].attrs["units"] = "hPa"
         ds = ds.rename({"plev": "p"})
     return ds
-
-

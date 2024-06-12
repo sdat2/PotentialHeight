@@ -20,9 +20,7 @@ def ER11_radprof_raw(
     if rmax_or_r0 == "r0":
         r0 = r_in  # [m]
         # Assume V>>fr (ER11, e.q. 38)
-        rmax_simple = ((0.5 * fcor * r0**2) / Vmax) * (
-            (0.5 * CkCd) ** (1 / (2 - CkCd))
-        )
+        rmax_simple = ((0.5 * fcor * r0**2) / Vmax) * ((0.5 * CkCd) ** (1 / (2 - CkCd)))
 
         # Define equation to solve for rmax
 

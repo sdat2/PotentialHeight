@@ -1,9 +1,11 @@
 from datetime import timedelta, datetime
 import os
-from adcircpy import AdcircMesh, AdcircRun #, Tides
+from adcircpy import AdcircMesh, AdcircRun  # , Tides
 from .constants import SETUP_PATH
+
 # from adcircpy.forcing.winds import BestTrackForcing
-#from adcircpy.server import SlurmConfig
+# from adcircpy.server import SlurmConfig
+
 
 def create_fort15():
     # load an ADCIRC mesh grid from a `fort.14` file to a new mesh object
@@ -22,9 +24,8 @@ def create_fort15():
     # create a wind forcing object for Hurricane Sandy (2012)
     # wind_forcing = BestTrackForcing("Sandy2012")
 
-
     # add wind forcing data to the mesh object
-    #mesh.add_forcing(wind_forcing)
+    # mesh.add_forcing(wind_forcing)
 
     # create a Slurm (HPC job manager) configuration object.
 
@@ -36,7 +37,7 @@ def create_fort15():
         # server_config=slurm,
         spinup_time=timedelta(days=15),
         netcdf=True,
-        #output_interval=timedelta(hours=1),
+        # output_interval=timedelta(hours=1),
         # output_variables=["zeta", "u", "v"],
         # output_netcdf=True,
         # output_directory=SETUP_PATH,
@@ -52,12 +53,13 @@ def create_fort15():
     # mesh.generate_tau0()
     # driver.set_elevation_stations_output(sampling_rate=timedelta(minutes=60), )
 
-
-
     # write configuration files to the specified directory
-    driver.write(output_directory=os.path.join(SETUP_PATH, "test_adpy_sandy2012"), overwrite=True)
+    driver.write(
+        output_directory=os.path.join(SETUP_PATH, "test_adpy_sandy2012"), overwrite=True
+    )
 
     # python -m adforce.adpy
+
 
 if __name__ == "__main__":
     create_fort15()

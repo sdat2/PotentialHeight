@@ -55,8 +55,10 @@ REGRIDDED_PATH = os.path.join(CMIP6_PATH, "regridded")
 os.makedirs(REGRIDDED_PATH, exist_ok=True)
 BIAS_CORRECTED_PATH = os.path.join(CMIP6_PATH, "bias_corrected")
 os.makedirs(BIAS_CORRECTED_PATH, exist_ok=True)
-
-
+PI_NBC_PATH = os.path.join(DATA_PATH, "pi")  # pi no bias correction before
+os.makedirs(PI_NBC_PATH, exist_ok=True)
+BC_PI_PATH = os.path.join(DATA_PATH, "bc_pi")
+os.makedirs(BC_PI_PATH, exist_ok=True)
 
 CONVERSION_NAMES: Dict[str, str] = {"tos": "sst", "hus": "q", "ta": "t", "psl": "msl"}
 CONVERSION_MULTIPLES: Dict[str, float] = {

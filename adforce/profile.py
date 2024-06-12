@@ -1,4 +1,5 @@
 """adforce/profile.py: Profile module for adforce."""
+
 import numpy as np
 import xarray as xr
 from sithom.io import read_json
@@ -40,7 +41,7 @@ def pressures_profile(  # add pressure profile to wind profile
         ) * (rr[i + 1] - rr[i])
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
 
-    return  p / 100  # pressures in hPa
+    return p / 100  # pressures in hPa
 
 
 def read_profile(profile_path: str) -> dict:
@@ -52,6 +53,10 @@ def read_profile(profile_path: str) -> dict:
     radii = np.array(chavas_profile["rr"], dtype="float32")
     windspeeds = np.array(chavas_profile["VV"], dtype="float32")
     pressures = np.array(chavas_profile["p"], dtype="float32")
-    return xr.Dataset(data_vars={"windspeeds": (["radii"], windspeeds, {"units": "m/s"}),
-                                 "pressures": (["radii"], pressures, {"units": "hPa"})},
-                        coords={"radii": (["radii"], radii, {"units": "m"})})
+    return xr.Dataset(
+        data_vars={
+            "windspeeds": (["radii"], windspeeds, {"units": "m/s"}),
+            "pressures": (["radii"], pressures, {"units": "hPa"}),
+        },
+        coords={"radii": (["radii"], radii, {"units": "m"})},
+    )
