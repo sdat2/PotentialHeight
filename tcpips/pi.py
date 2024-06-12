@@ -14,8 +14,16 @@ from sithom.plot import (
 )  # , axis_formatter
 from sithom.place import Point, BoundingBox
 from sithom.misc import in_notebook
-from tcpips.constants import FIGURE_PATH, GOM, MONTHS, DATA_PATH
+from tcpips.constants import (
+    FIGURE_PATH,
+    GOM,
+    MONTHS,
+    DATA_PATH,
+    REGRIDDED_PATH,
+    PI_PATH,
+)
 from tcpips.convert import convert  # , regrid_2d_1degree
+from tcpips.plot import plot_features
 
 TCPYPI_SAMPLE_DATA: str = (
     "../tcpypi/data/sample_data.nc"  # Sample data for the tcpyPI package
@@ -98,7 +106,9 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
 
 @timeit
 def calc_pi_example() -> None:
-    """Calculate the potential intensity using the initial regridded data using the tcpyPI package."""
+    """Calculate the potential intensity using the initial regridded data using the tcpyPI package.
+
+    Use first 5 time steps of the regridded data."""
     ds = xr.open_dataset(os.path.join(DATA_PATH, "all_regridded.nc"), engine="h5netcdf")
     input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
@@ -111,56 +121,6 @@ def calc_pi_example() -> None:
     print(pi_ds)
     pi_ds.vmax.plot(x="lon", y="lat", col="time", col_wrap=2)
     plt.show()
-
-
-def plot_features(
-    plot_ds: xr.Dataset,
-    features: List[List[str]],
-    units: Optional[List[List[str]]] = None,
-    names: Optional[List[List[str]]] = None,
-    vlim: Optional[List[List[Tuple[str, float, float]]]] = None,
-    super_titles: Optional[List[str]] = None,
-) -> None:
-    """
-    A wrapper around the feature_grid function to plot the features of a dataset for the potential intensity inputs/outputs.
-
-    Args:
-        plot_ds (xr.Dataset): The dataset to plot data from.
-        features (List[List[str]]): List of feature names to plot.
-        units (Optional[List[List[str]]], optional): Units to plot. Defaults to None.
-        names (Optional[List[List[str]]], optional): Names to plot. Defaults to None.
-        vlim (Optional[List[List[Tuple[str, float, float]]]], optional): Colormap/vlim to plot. Defaults to None.
-        super_titles (Optional[List[str]], optional): Supertitles to plot. Defaults to None.
-    """
-
-    if names is None:
-        names = [
-            [
-                plot_ds[features[x][y]].attrs["long_name"]
-                for y in range(len(features[x]))
-            ]
-            for x in range(len(features))
-        ]
-    if units is None:
-        units = [
-            [plot_ds[features[x][y]].attrs["units"] for y in range(len(features[x]))]
-            for x in range(len(features))
-        ]
-    if vlim is None:
-        vlim = [[None for y in range(len(features[x]))] for x in range(len(features))]
-    if super_titles is None:
-        super_titles = ["" for x in range(len(features))]
-
-    fig, axs = feature_grid(
-        plot_ds,
-        features,
-        units,
-        names,
-        vlim,
-        super_titles,
-        figsize=(12, 6),
-    )
-    label_subplots(axs)
 
 
 @timeit
@@ -311,7 +271,7 @@ def plot_tcpypi_in_out_ex() -> None:
 
 def plot_seasonality_in_gom_tcypi_ex() -> None:
     """
-    Process sample data for the Gulf of Mexico.
+    Process sample data for the Gulf of Mexico. Look at the seasonality, etc.
     """
     ds = xr.open_dataset(TCPYPI_SAMPLE_DATA).sel(
         lon=GOM[1], lat=GOM[0], method="nearest"
@@ -498,12 +458,13 @@ def gom_bbox_combined_inout_timestep_cmip6(
     return xr.merge([ds, pi])
 
 
-def find_atmos_ocean_pairs():
+def find_atmos_ocean_pairs() -> Dict[str, Dict[str, any]]:
     """
     Find the atmospheric and oceanic data pairs that can be combined to calculate potential intensity.
+
+    Returns:
+        Dict[str, Dict[str, any]]: Dictionary of pairs.
     """
-    import os
-    from tcpips.constants import REGRIDDED_PATH
 
     pairs = {}
     for exp in [
@@ -511,44 +472,75 @@ def find_atmos_ocean_pairs():
         for x in os.listdir(REGRIDDED_PATH)
         if os.path.isdir(os.path.join(REGRIDDED_PATH, x))
     ]:
-        print(exp)
         for model in os.listdir(os.path.join(REGRIDDED_PATH, exp, "ocean")):
-            print(model)
             for member in [
                 x.strip(".nc")
                 for x in os.listdir(os.path.join(REGRIDDED_PATH, exp, "ocean", model))
             ]:
                 key = f"{exp}.{model}.{member}"
+                pi_lock = os.path.join(PI_PATH, key + ".lock")
                 print(key)
-                oc_path = (
+                oc_path = os.path.exists(
                     os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
                 )
-                oc_lock = (
+                oc_lock = os.path.exists(
                     os.path.join(REGRIDDED_PATH) + f"{exp}.ocean.{model}.{member}.lock"
                 )
-                at_path = (
-                    os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
+                at_path = os.path.exists(
+                    os.path.join(REGRIDDED_PATH, exp, "atmos", model, member) + ".nc"
                 )
-                at_lock = (
-                    os.path.join(REGRIDDED_PATH) + f"{exp}.at.{model}.{member}.lock"
+                at_lock = os.path.exists(
+                    os.path.join(REGRIDDED_PATH) + f"{exp}.atmos.{model}.{member}.lock"
                 )
-                if os.path.exists(oc_path) and os.path.exists(at_path):
-                    if not os.path.exists(oc_lock) and not os.path.exists(at_lock):
-                        pairs[f"{exp}.{model}.{member}"] = {
-                            "exp": exp,
-                            "model": model,
-                            "member": member,
-                        }
-                    else:
-                        print(f"Regrid lock file exists for {key}")
-                else:
-                    print(f"File missing for {exp}.{model}.{member}")
+                if oc_path and at_path and not oc_lock and not at_lock:
+                    pairs[f"{exp}.{model}.{member}"] = {
+                        "exp": exp,
+                        "model": model,
+                        "member": member,
+                        "locked": os.path.exists(pi_lock),
+                    }
+                if oc_lock:
+                    print(f"Ocean lock file exists for {key}")
+                if at_lock:
+                    print(f"Atmos lock file exists for {key}")
+                if not oc_path:
+                    print(f"File missing for {exp}.ocean.{model}.{member}")
+                if not at_path:
+                    print(f"File missing for {exp}.atmos.{model}.{member}")
 
     return pairs
 
 
+def investigate_cmip6_pairs() -> None:
+    """
+    Investigate the CMIP6 pairs to see if they are the correct size.
+    """
+    from sithom.misc import human_readable_size
+
+    def hr_file_size(filename: str) -> str:
+        st = os.stat(filename)
+        return human_readable_size(st.st_size)
+
+    pairs = find_atmos_ocean_pairs()
+    for key in pairs:
+        print(key)
+        for i in ["ocean", "atmos"]:
+            print(
+                i,
+                hr_file_size(
+                    os.path.join(
+                        REGRIDDED_PATH,
+                        pairs[key]["exp"],
+                        i,
+                        pairs[key]["model"],
+                        pairs[key]["member"] + ".nc",
+                    )
+                ),
+            )
+
+
 if __name__ == "__main__":
-    # python tcpips/pi.py
+    # python -m  tcpips.pi
     # plot_seasonality_in_gom_tcypi_ex()
     # regrid_2d_1degree()
     # ds = xr.open_dataset("data/ocean_regridded.nc")
@@ -559,8 +551,9 @@ if __name__ == "__main__":
     # print(
     #    gom_bbox_combined_inout_timestep_cmip6(time="2015-01-15", verbose=True, pad=5)
     # )
-    pairs = find_atmos_ocean_pairs()
-    print(pairs)
+    # pairs = find_atmos_ocean_pairs()
+    # print(pairs)
+    investigate_cmip6_pairs()
 
     # print(gom_combined_inout_timestep_cmip6())
 

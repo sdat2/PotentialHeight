@@ -47,19 +47,23 @@ QUARTERS = [  # 3-letter quarter names Q1, Q2, Q3, Q4
     "OND",
 ]
 
+# Directories for CMIP6 data processing steps
 CMIP6_PATH = os.path.join(DATA_PATH, "cmip6")
 os.makedirs(CMIP6_PATH, exist_ok=True)
-RAW_PATH = os.path.join(CMIP6_PATH, "raw")
+RAW_PATH = os.path.join(CMIP6_PATH, "raw")  # download data here
 os.makedirs(RAW_PATH, exist_ok=True)
-REGRIDDED_PATH = os.path.join(CMIP6_PATH, "regridded")
+REGRIDDED_PATH = os.path.join(CMIP6_PATH, "regridded")  # regridded data here
 os.makedirs(REGRIDDED_PATH, exist_ok=True)
-BIAS_CORRECTED_PATH = os.path.join(CMIP6_PATH, "bias_corrected")
+BIAS_CORRECTED_PATH = os.path.join(
+    CMIP6_PATH, "bias_corrected"
+)  # bias corrected data here
 os.makedirs(BIAS_CORRECTED_PATH, exist_ok=True)
-PI_NBC_PATH = os.path.join(DATA_PATH, "pi")  # pi no bias correction before
-os.makedirs(PI_NBC_PATH, exist_ok=True)
+PI_PATH = os.path.join(DATA_PATH, "pi")  # pi no bias correction before
+os.makedirs(PI_PATH, exist_ok=True)
 BC_PI_PATH = os.path.join(DATA_PATH, "bc_pi")
 os.makedirs(BC_PI_PATH, exist_ok=True)
 
+# Constants for converting CMIP6 variables to PI input variables
 CONVERSION_NAMES: Dict[str, str] = {"tos": "sst", "hus": "q", "ta": "t", "psl": "msl"}
 CONVERSION_MULTIPLES: Dict[str, float] = {
     "hus": 1000,

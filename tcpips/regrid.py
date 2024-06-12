@@ -26,6 +26,7 @@ from tcpips.constants import (
     REGRIDDED_PATH,
     CONVERSION_NAMES,
 )
+from tcpips.files import locker
 
 
 def get_git_revision_hash() -> str:
@@ -63,7 +64,7 @@ def run_tasks(
     for key in tasks:
         if not tasks[key]["locked"]:
             if not tasks[key]["regridded_exists"] or force_regrid:
-                regrid_any(output_res, **tasks[key])
+                regrid_cmip6_part(output_res, **tasks[key])
             else:
                 print(f"Already regridded {key}, not regridding.")
 
@@ -101,7 +102,8 @@ def define_tasks() -> dict:
 
 
 @timeit
-def regrid_any(
+@locker(REGRIDDED_PATH)
+def regrid_cmip6_part(
     output_res: float = 0.5,
     time_chunk: int = 1,
     exp: str = "ssp585",
@@ -122,14 +124,6 @@ def regrid_any(
         member (str, optional): Member name. Defaults to "r4i1p1f1".
 
     """
-    lock_file_path = os.path.join(REGRIDDED_PATH, f"{exp}.{typ}.{model}.{member}.lock")
-    if os.path.exists(lock_file_path):
-        print(f"Already regridding {exp}.{typ}.{model}.{member}")
-        return  # already regridding this file.
-    else:
-        with open(lock_file_path, "w") as f:
-            f.write(time_stamp())  # create lock file
-    print(f"Regridding {exp}.{typ}.{model}.{member}")
     plot_defaults()
 
     @timeit
@@ -230,8 +224,6 @@ def regrid_any(
     elif typ == "atmos" and in_notebook():
         out_ds.tas.isel(time=0, p=0).plot(x="lon", y="lat")
         plt.show()
-
-    os.remove(lock_file_path)  # remove lock file
 
 
 if __name__ == "__main__":
