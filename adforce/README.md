@@ -43,10 +43,8 @@ When changing to new machines, it is likely that `wrap` is the main file that ne
 
 Possible new TC characteristics:
 
- - Curve / alow angle/trakc displacement to be specified in another way.
- - Profile varying over time
- 
-
+ - Add curve or alow angle / track displacement to be specified in another way.
+ - Profile varying over time.
 
 
 ## Run an idealized storm surge

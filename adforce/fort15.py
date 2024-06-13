@@ -9,7 +9,7 @@ from .constants import SETUP_PATH
 # from adcircpy.server import SlurmConfig
 
 
-def create_fort15():
+def create_fort15() -> None:
     """
     Create the main namelist for ADCIRC (fort.15) given the mesh (fort.14) and the nodal attributes (fort.13).
     """

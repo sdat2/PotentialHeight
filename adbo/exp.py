@@ -33,7 +33,7 @@ from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
 import matplotlib.pyplot as plt
-from adforce.wrap import run_wrapped, select_point_f
+from adforce.wrap import run_wrapped, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
@@ -102,7 +102,7 @@ def objective_f(
     os.makedirs(exp_dir, exist_ok=True)
     call_number = -1
     output = {}
-    select_point = select_point_f(stationid, resolution=resolution)
+    select_point = maxele_observation_func(stationid, resolution=resolution)
     dimension_inputs = len(config["order"])
     print("dimension_inputs", dimension_inputs)
 

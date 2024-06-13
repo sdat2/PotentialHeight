@@ -89,7 +89,7 @@ FILES_TO_COPY: List[str] = [
 DEFAULT_PROFILE: str = os.path.join(CLE_DATA_PATH, "outputs.json")
 
 
-def run_struct(
+def adcirc_run_struct(
     angle: float = 0,
     trans_speed: float = 7.71,
     impact_lon: float = -0.6,
@@ -139,30 +139,49 @@ def run_struct(
             "impact_lon": (
                 [],
                 [impact_lon],
-                {"units": "degrees", "description": "Longitude of the storm impact relative to the observation point"},
+                {
+                    "units": "degrees",
+                    "description": "Longitude of the storm impact relative to the observation point",
+                },
             ),
             "impact_lat": (
                 [],
                 [impact_lat],
-                {"units": "degrees", "description": "Latitude of the storm impact relative to the observation point"},
+                {
+                    "units": "degrees",
+                    "description": "Latitude of the storm impact relative to the observation point",
+                },
             ),
             "impact_time": (
                 [],
                 [impact_time],
                 {"units": "ns", "description": "Time of the storm impact"},
             ),
-            "obs_lon": ([], [obs.lon], {"description": "Longitude of the observation point", "units": "degrees_east"}),
-            "obs_lat": ([], [obs.lat], {"description": "Latitude of the observation point", "units": "degrees_north"}),
+            "obs_lon": (
+                [],
+                [obs.lon],
+                {
+                    "description": "Longitude of the observation point",
+                    "units": "degrees_east",
+                },
+            ),
+            "obs_lat": (
+                [],
+                [obs.lat],
+                {
+                    "description": "Latitude of the observation point",
+                    "units": "degrees_north",
+                },
+            ),
             "resolution": (
                 [],
                 [resolution],
                 {"description": "Resolution of the ADCIRC model"},
             ),
             "out_path": ([], [out_path], {"description": "Path to ADCIRC run folder"}),
-            "velocity": (["radius"], profile["vv"], {"units": "m/s"}),
-
+            "velocity": (["radius"], profile["VV"], {"units": "m/s"}),
         },
-        coords={"radius": profile["radius"]},
+        coords={"radius": profile["rr"]},
         # coords={"time": impact_time,},
     )
 
@@ -170,7 +189,7 @@ def run_struct(
 
 
 @timeit
-def setup_new(
+def setup_adcirc_run_folder(
     new_path: str,
     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
     angle: float = 0,
@@ -212,7 +231,7 @@ def setup_new(
     )
 
 
-def is_job_finished(jid: int) -> bool:
+def is_slurm_job_finished(jid: int) -> bool:
     """
     Check if a SLURM job is finished using sacct.
 
@@ -233,11 +252,13 @@ def is_job_finished(jid: int) -> bool:
 
 
 @timeit
-def run_and_wait(
+def setoff_slurm_job_and_wait(
     direc: str, jobname: str = "run", time_limit: float = 20 * 60, nodes: int = 1
 ) -> int:
     """
     Run the ADCIRC model and wait for it to finish.
+
+    Uses slurmpy to set off a slurm job and sacct to check if it has finished.
 
     Args:
         direc (str): Path to ADCIRC run folder.
@@ -316,12 +337,12 @@ echo ""
     )
 
     time_total = 0
-    is_finished = is_job_finished(jid)
+    is_finished = is_slurm_job_finished(jid)
     tinc = 1
     # wait twice as long as the time limit given to the slurm job
     # to account for queueing.
     while not is_finished and time_total < time_limit * 2:
-        is_finished = is_job_finished(jid)
+        is_finished = is_slurm_job_finished(jid)
         time.sleep(tinc)
         time_total += tinc
 
@@ -332,15 +353,13 @@ echo ""
     return jid
 
 
-def select_point_f(
+def maxele_observation_func(
     point: Union[Point, int], resolution: str = "mid"
 ) -> Callable[[str], float]:
     """
     Create a function to select the maximum elevation near a given stationid.
 
     TODO: Curently now just selects based on the closest point to NEW_ORLEANS.
-
-    TODO:
 
     Args:
         stationid (int): Stationid to select.
@@ -362,7 +381,7 @@ def select_point_f(
         # work out closest point to NEW_ORLEANS
         xs = mele_og.x.values
         ys = mele_og.y.values
-        distsq = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2)
+        distsq = (xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2
         min_p = np.argmin(distsq)  # closest point to stationid
 
     def select_max(path: str) -> float:
@@ -382,10 +401,10 @@ def select_point_f(
 
 
 @timeit
-def run_wrapped(
+def run_adcirc_idealized_tc(
     out_path: str = "test-run",
     profile_name: str = "2025.json",
-    select_point: str = select_point_f(3, resolution="mid"),
+    select_point: str = maxele_observation_func(3, resolution="mid"),
     angle: float = 0,
     trans_speed: float = 7.71,
     impact_lon: float = -89.4715,
@@ -398,7 +417,7 @@ def run_wrapped(
 
     Args:
         out_path (str, optional): Path to ADCIRC run folder. Defaults to OG_PATH.
-        select_point (Callable, optional): Function to select the maximum elevation near a given stationid. Defaults to select_point_f(3).
+        select_point (Callable, optional): Function to select the maximum elevation near a given stationid. Defaults to maxele_observation_func(3).
         angle (float, optional): Angle of the storm. Defaults to 0.
         trans_speed (float, optional): Translation speed of the storm. Defaults to 7.71.
         impact_lon (float, optional): Longitude of the storm impact. Defaults to -89.4715.
@@ -410,7 +429,7 @@ def run_wrapped(
         float: Maximum elevation near a given stationid.
     """
     # add new forcing
-    setup_new(
+    setup_adcirc_run_folder(
         out_path,
         profile_path=os.path.join(CLE_DATA_PATH, profile_name),
         angle=angle,
@@ -421,40 +440,9 @@ def run_wrapped(
         resolution=resolution,
     )
     # set off sbatch.
-    run_and_wait(out_path, nodes=NODE_DICT[resolution])
+    setoff_slurm_job_and_wait(out_path, nodes=NODE_DICT[resolution])
     # look at results.
     return select_point(out_path)
-
-
-@timeit
-def read_results(path: str = OG_PATH, stationid: Point) -> float:
-    """
-    Read the results of the ADCIRC run.
-
-    Args:
-        path (str, optional): Path to ADCIRC run folder. Defaults to OG_PATH.
-        stationid (int, optional): Stationid to select. Defaults to 3.
-
-    Returns:
-        float: Maximum elevation near a given stationid.
-    """
-    mele_ds = xr_loader(os.path.join(path, "maxele.63.nc"))
-    # read zeta_max point closes to the
-    # work out closest point to NEW_ORLEANS
-    xs = mele_ds.x.values
-    ys = mele_ds.y.values
-
-    # tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
-    # lon, lat = (
-    #    tide_ds.isel(stationid=stationid).lon.values,
-    #    tide_ds.isel(stationid=stationid).lat.values,
-    # )
-
-    # lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
-    dist = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2) ** 0.5
-    min_p = np.argmin(dist)
-    # Read the maximum elevation for that point
-    return mele_ds["zeta_max"].values[min_p]
 
 
 if __name__ == "__main__":
@@ -491,10 +479,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    res = run_wrapped(
+    res = run_adcirc_idealized_tc(
         out_path=os.path.join(EXP_PATH, args.exp_name),
         profile_name=args.profile_name,
-        select_point=select_point_f(args.stationid, resolution=args.resolution),
+        select_point=maxele_observation_func(
+            args.stationid, resolution=args.resolution
+        ),
         angle=0,
         resolution=args.resolution,
     )

@@ -1,6 +1,4 @@
-"""Fort.22.nc file reader and writer.
-
-NWS 13 format:
+"""Fort.22.nc file reader and writer for NWS=13 format (netCDF):
 
 https://wiki.adcirc.org/NWS13
 
@@ -105,6 +103,20 @@ def blank_fort22():
     ds = Dataset(os.path.join(DATA_PATH, "fort.22.nc"))
     print(ds)
     print(ds.groups["Main"])
+
+
+def data_free_f22_coords() -> None:
+    f22 = read_fort22(os.path.join(DATA_PATH, "blank.nc"))
+    print(f22)
+    del f22["Main"]["PSFC"]
+    del f22["Main"]["U10"]
+    del f22["Main"]["V10"]
+    del f22["TC1"]["PSFC"]
+    del f22["TC1"]["U10"]
+    del f22["TC1"]["V10"]
+
+    f22.to_netcdf(os.path.join(DATA_PATH, "coords.nc"))
+    print(f22)
 
 
 @timeit
@@ -444,7 +456,8 @@ def save_forcing(
 
 if __name__ == "__main__":
     # python -m adforce.fort22
-    blank_fort22()
+    # blank_fort22()
+    data_free_f22_coords()
     # node0 = return_new_input()
     # # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
     # path = "/work/n02/n02/sdat2/adcirc-swan/NWS13set3"
