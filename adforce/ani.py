@@ -1,4 +1,4 @@
-"""Animate the outputs and inputs to ADCIRC simulations."""
+"""Animate the outputs and inputs of ADCIRC simulations."""
 
 from typing import Optional
 import os

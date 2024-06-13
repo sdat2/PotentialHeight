@@ -38,6 +38,7 @@ from datetime import timedelta
 import xarray as xr
 from slurmpy import Slurm
 from sithom.time import timeit
+from sithom.place import Point
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from .constants import NEW_ORLEANS  # , KATRINA_TIDE_NC
 from .fort22 import save_forcing
@@ -91,21 +92,22 @@ DEFAULT_PROFILE: str = os.path.join(CLE_DATA_PATH, "outputs.json")
 def run_struct(
     angle: float = 0,
     trans_speed: float = 7.71,
-    impact_lon: float = -89.4715,
-    impact_lat: float = 29.9511,
+    impact_lon: float = -0.6,
+    impact_lat: float = 0,
     impact_time: np.datetime64 = np.datetime64("2004-08-13T12"),
+    obs: Point = NEW_ORLEANS,
     resolution: str = "mid",
     profile: Union[str, xr.Dataset] = DEFAULT_PROFILE,
     out_path: str = os.path.join(EXP_PATH, "test-run"),
 ) -> xr.Dataset:
     """
-    Run the ADCIRC model and wait for it to finish.
+    Run characteristics to pass between parts of adforce.
 
     Args:
         angle (float, optional): Angle of the storm. Defaults to 0.
         trans_speed (float, optional): Translation speed of the storm. Defaults to 7.71.
-        impact_lon (float, optional): Longitude of the storm impact. Defaults to -89.4715.
-        impact_lat (float, optional): Latitude of the storm impact. Defaults to 29.9511.
+        impact_lon (float, optional): Longitude of the storm impact. Defaults to -0.6.
+        impact_lat (float, optional): Latitude of the storm impact. Defaults to 0.
         impact_time (np.datetime64, optional): Time of the storm impact. Defaults to np.datetime64("2004-08-13T12").
         resolution (str, optional): Resolution of the ADCIRC model. Defaults to "mid".
         profile (Union[str, xr.dataset], optional): Profile of the storm. Defaults to DEFAULT_PROFILE.
@@ -137,25 +139,30 @@ def run_struct(
             "impact_lon": (
                 [],
                 [impact_lon],
-                {"units": "degrees", "description": "Longitude of the storm impact"},
+                {"units": "degrees", "description": "Longitude of the storm impact relative to the observation point"},
             ),
             "impact_lat": (
                 [],
                 [impact_lat],
-                {"units": "degrees", "description": "Latitude of the storm impact"},
+                {"units": "degrees", "description": "Latitude of the storm impact relative to the observation point"},
             ),
             "impact_time": (
                 [],
                 [impact_time],
                 {"units": "ns", "description": "Time of the storm impact"},
             ),
+            "obs_lon": ([], [obs.lon], {"description": "Longitude of the observation point", "units": "degrees_east"}),
+            "obs_lat": ([], [obs.lat], {"description": "Latitude of the observation point", "units": "degrees_north"}),
             "resolution": (
                 [],
                 [resolution],
                 {"description": "Resolution of the ADCIRC model"},
             ),
             "out_path": ([], [out_path], {"description": "Path to ADCIRC run folder"}),
+            "velocity": (["radius"], profile["vv"], {"units": "m/s"}),
+
         },
+        coords={"radius": profile["radius"]},
         # coords={"time": impact_time,},
     )
 
@@ -178,6 +185,13 @@ def setup_new(
 
     Args:
         new_path (str): New model directory.
+        profile_path (str, optional): Path to the storm profile. Defaults to os.path.join(CLE_DATA_PATH, "outputs.json").
+        angle (float, optional): Angle of the storm. Defaults to 0. Degrees from North.
+        trans_speed (float, optional): Translation speed of the storm. Defaults to 7.71 m/s.
+        impact_lon (float, optional): Longitude of the storm impact. Defaults to -89.4715.
+        impact_lat (float, optional): Latitude of the storm impact. Defaults to 29.9511.
+        impact_time (np.datetime64, optional): Time of the storm impact. Defaults to np.datetime64("2004-08-13T12", "ns").
+        resolution (str, optional): Resolution of the ADCIRC model. Defaults to "mid".
     """
     # original path to copy setting files from
     os.makedirs(new_path, exist_ok=True)
@@ -229,6 +243,7 @@ def run_and_wait(
         direc (str): Path to ADCIRC run folder.
         jobname (str, optional): Job name. Defaults to "run".
         time_limit (float, optional): Time limit in seconds, before leaving without answer. Defaults to 60*60 (3 hours).
+        nodes (int, optional): Number of nodes to use. Defaults to 1.
 
     Returns:
         int: Slurm Job ID.
@@ -317,9 +332,15 @@ echo ""
     return jid
 
 
-def select_point_f(stationid: int, resolution: str = "mid") -> Callable[[str], float]:
+def select_point_f(
+    point: Union[Point, int], resolution: str = "mid"
+) -> Callable[[str], float]:
     """
     Create a function to select the maximum elevation near a given stationid.
+
+    TODO: Curently now just selects based on the closest point to NEW_ORLEANS.
+
+    TODO:
 
     Args:
         stationid (int): Stationid to select.
@@ -333,14 +354,16 @@ def select_point_f(stationid: int, resolution: str = "mid") -> Callable[[str], f
     #    tide_ds.isel(stationid=stationid).lon.values,
     #    tide_ds.isel(stationid=stationid).lat.values,
     # )
-    mele_og = xr_loader(os.path.join(MODEL_PATHS_DICT[resolution], "maxele.63.nc"))
-    # read zeta_max point closes to the
-    # work out closest point to NEW_ORLEANS
-    xs = mele_og.x.values
-    ys = mele_og.y.values
-    lon, lat = NEW_ORLEANS.lon, NEW_ORLEANS.lat
-    dist = ((xs - lon) ** 2 + (ys - lat) ** 2) ** 0.5
-    min_p = np.argmin(dist)  # closest point to stationid
+    if isinstance(point, int):
+        min_p = 1000
+    else:
+        mele_og = xr_loader(os.path.join(MODEL_PATHS_DICT[resolution], "maxele.63.nc"))
+        # read zeta_max point closes to the
+        # work out closest point to NEW_ORLEANS
+        xs = mele_og.x.values
+        ys = mele_og.y.values
+        distsq = ((xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2)
+        min_p = np.argmin(distsq)  # closest point to stationid
 
     def select_max(path: str) -> float:
         """
@@ -404,7 +427,7 @@ def run_wrapped(
 
 
 @timeit
-def read_results(path: str = OG_PATH, stationid: int = 3) -> float:
+def read_results(path: str = OG_PATH, stationid: Point) -> float:
     """
     Read the results of the ADCIRC run.
 

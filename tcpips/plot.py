@@ -1,5 +1,9 @@
+"""tcpips.plot utilities."""
+
 from typing import Optional, List, Tuple
 import xarray as xr
+from sithom.plot import label_subplots, feature_grid
+import matplotlib.pyplot as plt
 
 
 def plot_features(
@@ -9,7 +13,7 @@ def plot_features(
     names: Optional[List[List[str]]] = None,
     vlim: Optional[List[List[Tuple[str, float, float]]]] = None,
     super_titles: Optional[List[str]] = None,
-) -> None:
+) -> Tuple[plt.Figure, List[List[plt.Axes]]]:
     """
     A wrapper around the feature_grid function to plot the features of a dataset for the potential intensity inputs/outputs.
 
@@ -20,6 +24,9 @@ def plot_features(
         names (Optional[List[List[str]]], optional): Names to plot. Defaults to None.
         vlim (Optional[List[List[Tuple[str, float, float]]]], optional): Colormap/vlim to plot. Defaults to None.
         super_titles (Optional[List[str]], optional): Supertitles to plot. Defaults to None.
+
+    Returns:
+        Tuple[plt.Figure, List[List[plt.Axes]]]: The figure and axes of the plot.
     """
 
     if names is None:
@@ -50,3 +57,4 @@ def plot_features(
         figsize=(12, 6),
     )
     label_subplots(axs)
+    return fig, axs

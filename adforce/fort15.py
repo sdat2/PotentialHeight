@@ -1,3 +1,5 @@
+"""fort.15 (namelist) file creation for ADCIRC."""
+
 from datetime import timedelta, datetime
 import os
 from adcircpy import AdcircMesh, AdcircRun  # , Tides
@@ -8,6 +10,9 @@ from .constants import SETUP_PATH
 
 
 def create_fort15():
+    """
+    Create the main namelist for ADCIRC (fort.15) given the mesh (fort.14) and the nodal attributes (fort.13).
+    """
     # load an ADCIRC mesh grid from a `fort.14` file to a new mesh object
     mesh = AdcircMesh.open(os.path.join(SETUP_PATH, "fort.14.mid"), crs="epsg:4326")
 

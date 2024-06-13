@@ -1,6 +1,8 @@
 """
-Process ADCIRC meshes efficiently.
+Process ADCIRC meshes efficiently vectorized/sparses.
 This is the shared functionality for processing ADCIRC meshes.
+
+TODO: Add the dual graph calculation for SurgeNet.
 """
 
 from typing import Union, Tuple

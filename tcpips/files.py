@@ -14,7 +14,7 @@ def locker(path: str) -> callable:
         callable: decorator function
     """
 
-    def decorator(func) -> callable:
+    def decorator(func: callable) -> callable:
         def wrapper(*args, **kwargs) -> callable:
             exp = kwargs["exp"]
             model = kwargs["model"]

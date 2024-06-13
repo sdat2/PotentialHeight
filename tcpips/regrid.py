@@ -235,14 +235,17 @@ if __name__ == "__main__":
     # define_tasks()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-w", "--worker", type=int, default=10)
-    parser.add_argument("-m", "--memory", type=str, default="4GiB")
+    parser.add_argument("-w", "--worker", type=int, default=10)  # number of workers
+    parser.add_argument("-m", "--memory", type=str, default="4GiB")  # memory per worker
     parser.add_argument(
         "-f", "--force", type=lambda x: (str(x).lower() == "true"), default=False
-    )
-    parser.add_argument("-r", "--resolution", type=float, default=0.5)
+    )  # force regrid
     parser.add_argument(
-        "-p", "--parallel", type=lambda x: (str(x).lower() == "true"), default=True
+        "-r", "--resolution", type=float, default=0.5
+    )  # output resolution
+    parser.add_argument(
+        "-p", "--parallel", type=lambda x: (str(x).lower() == "true"), default=True,
+        description="Run in parallel?"
     )
 
     args = parser.parse_args()

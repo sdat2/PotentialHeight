@@ -1,5 +1,7 @@
 # WorstSurge repository
 
+We want to answer the question of what the potential height of a storm surge could be now and in a changing climate. To do this we first calculate the potential intensity and size from CMIP6 (`tcpips`), and then use a Bayesian optimization loop (`adbo`) to drive an storm surge model ADCIRC with idealised tropical cyclones (`adforce`). We then show that knowing the upper bound can be useful (`worst`).
+
 ## adforce
 
 ADCIRC forcing and processing. Some generic mesh processing.
@@ -11,7 +13,7 @@ python -m adforce.ani --path_in . --step_size 1
 
 ## adbo
 
-Bayesian optimization using `adforce` to force adcirc with a `trieste` Bayesian optimization loop.
+Bayesian optimization using `adforce` to force ADCIRC with a `trieste` Bayesian optimization loop.
 
 ## cle
 
@@ -29,7 +31,7 @@ Uses the `tcpypi` package to calculate potential intensity.
 
 ## worst
 
-Statistical worst-case GEV/GPD fit using `scipy`.
+Statistical worst-case GEV/GPD fit using `scipy` or `tensorflow`.
 
 
 ## Getting started
@@ -59,20 +61,24 @@ pip install -e .
 
 ## Bayesian optimization loop
 
+Run `ADFORCE` 
 ```bash
 python -m adbo.exp &> logs/bo_test3.txt
 ```
 
-## Priorities
+## Task list:
 
-Done:
+### Done:
 
  - Get 430k node mesh working.
  - BayesOpt animations/graphs.
     - Impact animation (still need to add winds in).
     - GP convergence animation (2D).
+ - Sync times up & animate winds.
+ - GEV with maxima Scipy distribution fitting for CMIP6.
 
-In Progress:
+
+### In Progress:
 
  - CMIP6 processing for potential size and intensity.
     - Good folder structure for processing.
@@ -80,14 +86,16 @@ In Progress:
     - Paralize potential size calculation as much as possible.
  - BayesOpt for different places along the coast.
  - Fix 430k wrapping.
- - Sync times up & animate winds.
 
-TODO:
+### TODO:
 
+ - Reformat adforce/adbo to allow:
+   - flexible profile forcing.
+   - xarray struct passing.
+   - keep time/coordinates of moving cyclones in repo.
  - Could we produce uncertainty estimates in the upper bound based on MVES.
  - How to quantify the performance of BO better.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
- - GEV with maxima Scipy distribution fitting for CMIP6.
  - How to distribute optimisation points more uniformly along the coast.
  - Better tidal gauge comparisons for different events.
 
