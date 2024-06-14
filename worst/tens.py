@@ -29,6 +29,18 @@ def seed_all(seed: int) -> None:
 
 
 def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000) -> np.ndarray:
+    """
+    Generate data from a Generalized Extreme Value distribution.
+
+    Args:
+        alpha (float): Location parameter.
+        beta (float): Scale parameter.
+        gamma (float): Shape parameter.
+        n (int, optional): Number of samples. Defaults to 1000.
+
+    Returns:
+        np.ndarray: Generated sample data.
+    """
     gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
     return gev.sample(n).numpy()
 
