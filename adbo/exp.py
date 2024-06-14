@@ -1,6 +1,7 @@
 """Run BayesOpt experiments.
 
-Should contain all tensorflow imports so that other scripts are easier to use/test without waiting for tensorflow to load.
+Should contain all tensorflow imports so that other scripts
+are easier to use/test without waiting for tensorflow to load.
 """
 
 from typing import Callable, Optional
@@ -33,7 +34,7 @@ from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
 import matplotlib.pyplot as plt
-from adforce.wrap import run_wrapped, maxele_observation_func
+from adforce.wrap import run_adcirc_idealized_tc, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
@@ -162,7 +163,7 @@ def objective_f(
             if wrap_test:
                 real_result = min(7 + np.random.normal(), 10)
             else:
-                real_result = run_wrapped(
+                real_result = run_adcirc_idealized_tc(
                     out_path=tmp_dir,
                     profile_name=profile_name,
                     resolution=resolution,
