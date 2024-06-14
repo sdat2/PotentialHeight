@@ -140,10 +140,10 @@ def plot_nearby(
             ax=axs[2], x="time", label=f"Node {i+1}", color=colors[i]
         )
 
-    axs[0].set_ylabel("Latitude [$^\circ$N]")
-    axs[0].set_xlabel("Longitude [$^\circ$E]")
+    axs[0].set_ylabel(r"Latitude [$^\circ$N]")
+    axs[0].set_xlabel(r"Longitude [$^\circ$E]")
 
-    axs[1].set_ylabel("Latitude [$^\circ$N]")
+    axs[1].set_ylabel(r"Latitude [$^\circ$N]")
 
     bbox.ax_lim(axs[0])
     bbox.ax_lim(axs[1])
@@ -259,8 +259,8 @@ def plot_quiver_height(
     cbar = plt.colorbar(label="Height [m]")
     cbar.set_ticks(cbar_levels)
     cbar.set_ticklabels(["{:.2f}".format(x) for x in cbar_levels.tolist()])
-    plt.xlabel("Longitude [$^{\circ}$E]")
-    plt.ylabel("Latitude [$^{\circ}$N]")
+    plt.xlabel(r"Longitude [$^{\circ}$E]")
+    plt.ylabel(r"Latitude [$^{\circ}$N]")
     time = ds.isel(time=time_i).time.values
     ts = pd.to_datetime(str(time))
     print(ts)

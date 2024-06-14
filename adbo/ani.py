@@ -101,8 +101,8 @@ def plot_gps(
                 ["", "", ""],
                 figsize=(4 * 3, 4),
                 xy=(
-                    ("x1", "Track Bearing, $\chi$", "$^{\circ}$"),
-                    ("x2", "Track Displacement, $c$", "$^{\circ}$E"),
+                    ("x1", r"Track Bearing, $\chi$", r"$^{\circ}$"),
+                    ("x2", r"Track Displacement, $c$", r"$^{\circ}$E"),
                 ),
             )
         else:
@@ -112,16 +112,16 @@ def plot_gps(
                 [["m", "m"]],
                 [
                     [
-                        "GP prediction, $\hat{y}$",
-                        "GP standard deviation, $\sigma_{\hat{y}}$",
+                        r"GP prediction, $\hat{y}$",
+                        r"GP standard deviation, $\sigma_{\hat{y}}$",
                     ]
                 ],
                 [[[vminm, vmaxm, "cmo.amp"], [0, vmaxstd, "cmo.amp"]]],
                 ["", ""],
                 figsize=(4 * 2, 4),
                 xy=(
-                    ("x1", "Track Bearing", "$^{\circ}$"),
-                    ("x2", "Displacement East of New Orleans", "$^{\circ}$"),
+                    ("x1", "Track Bearing", r"$^{\circ}$"),
+                    ("x2", "Displacement East of New Orleans", r"$^{\circ}$"),
                 ),
             )
         # this seems not to work properly

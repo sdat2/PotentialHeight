@@ -89,8 +89,8 @@ def plot_diff(
         axs[3].axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Result [m]")
-    axs[1].set_ylabel("Displacement [$^\circ$]")
-    axs[2].set_ylabel("Angle [$^\circ$]")
+    axs[1].set_ylabel(r"Displacement [$^\circ$]")
+    axs[2].set_ylabel(r"Angle [$^\circ$]")
     axs[3].set_ylabel("Trans Speed [m/s]")
     axs[3].set_xlabel("Samples")
     axs[0].legend()
@@ -164,8 +164,8 @@ def plot_many() -> None:
         # axs[3].axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Result [m]")
-    axs[1].set_ylabel("Displacement [$^\circ$]")
-    axs[2].set_ylabel("Angle [$^\circ$]")
+    axs[1].set_ylabel(r"Displacement [$^\circ$]")
+    axs[2].set_ylabel(r"Angle [$^\circ$]")
     axs[-1].set_xlabel("Samples")
     axs[0].legend()
     plt.legend()
