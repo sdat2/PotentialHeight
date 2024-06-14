@@ -8,14 +8,48 @@ import matplotlib.pyplot as plt
 
 # assume gamma < 0 (Weibull class)
 def z_star_from_alpha_beta_gamma(alpha: float, beta: float, gamma: float) -> float:
+    """
+    Calculate the upper bound of the Weibull class GEV distribution.
+
+    Args:
+        alpha (float): Location parameter of the GEV distribution.
+        beta (float): Scale parameter of the GEV distribution (should be positive).
+        gamma (float): Shape parameter of the GEV distribution (should be negative).
+
+    Returns:
+        float: The upper bound of the GEV distribution, z_star.
+    """
     return alpha - beta / gamma
 
 
 def alpha_from_z_star_beta_gamma(z_star: float, beta: float, gamma: float) -> float:
+    """
+    Calculate the location parameter of the Weibull class GEV distribution.
+
+    Args:
+        z_star (float): Upper bound of the GEV distribution.
+        beta (float): Scale parameter of the GEV distribution (should be positive).
+        gamma (float): Shape parameter of the GEV distribution (should be negative).
+
+    Returns:
+        float: The location parameter of the GEV distribution, alpha.
+    """
     return z_star + beta / gamma
 
 
 def bg_cdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarray:
+    """
+    CDF of the Weibull class GEV distribution with a known upper bound.
+
+    Args:
+        z (np.ndarray): Data points to find the CDF for.
+        z_star (float): Upper bound of the GEV distribution.
+        beta (float): Scale parameter of the GEV distribution.
+        gamma (float): Shape parameter of the GEV distribution.
+
+    Returns:
+        np.ndarray: The CDF of the GEV distribution for different z values.
+    """
     return np.exp(-((gamma / beta * (z - z_star)) ** (-1 / gamma)))
 
 
@@ -25,7 +59,7 @@ def plot_rp(
     gamma: float,
     color: str = "blue",
     label: str = "",
-    ax=None,
+    ax: Optional[plt.Axis] = None,
     plot_alpha: float = 0.8,
 ) -> None:
     """
@@ -37,7 +71,7 @@ def plot_rp(
         gamma (float): The shape parameter.
         color (str, optional): The color of the line. Defaults to "blue".
         label (str, optional): The line label. Defaults to "".
-        ax (_type_, optional): The axes to add the figure too. Defaults to None.
+        ax (Optional[plt.Axis], optional): The axes to add the figure too. Defaults to None.
         plot_alpha (float, optional): Transparency parameter of line. Defaults to 0.8.
     """
     z1yr = genextreme.isf(0.8, c=-gamma, loc=alpha, scale=beta)
@@ -66,16 +100,17 @@ def plot_rp(
 def plot_sample_points(
     data: np.ndarray,
     color: str = "black",
-    ax: Optional[any] = None,
+    ax: Optional[plt.Axis] = None,
     label: str = "Sampled data points",
-):
+) -> None:
     """
     Plot the sample points on the return period vs return value curve.
 
     Args:
         data (np.ndarray): The sample points to plot.
         color (str, optional): The color of the points. Defaults to "black".
-        ax (_type_, optional): The axes to add the figure too. Defaults to None.
+        ax (Optional[plt.Axis], optional): The axes to add the figure too. Defaults to None.
+        label (str, optional): The label of the points. Defaults to "Sampled data points".
     """
     if ax is None:
         _, ax = plt.subplots(

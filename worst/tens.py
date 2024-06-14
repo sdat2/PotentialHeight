@@ -5,11 +5,9 @@ Sometimes breaks for no clear reason."""
 from typing import List, Tuple
 import numpy as np
 import os
-import logging
 import xarray as xr
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import tensorflow_probability as tfp
 from tensorflow_probability import distributions as tfd
 from scipy.stats import genextreme
 from tcpips.constants import DATA_PATH, FIGURE_PATH
@@ -22,7 +20,11 @@ from .utils import alpha_from_z_star_beta_gamma, plot_rp, plot_sample_points
 
 
 def seed_all(seed: int) -> None:
-    """Seed all random number generators."""
+    """Seed all random number generators.
+
+    Args:
+        seed (int): Random seed.
+    """
     np.random.seed(seed)
     #  tf.set_random_seed(seed)
     tf.random.set_seed(seed)
@@ -89,6 +91,18 @@ def fit_gev_upper_bound_not_known(
     def neg_log_likelihood(
         alpha: tf.Variable, beta: tf.Variable, neg_gamma: tf.Variable, data: np.ndarray
     ) -> tf.Tensor:
+        """
+        Negative log likelihood function for the Generalized Extreme Value distribution.
+
+        Args:
+            alpha (tf.Variable): Location parameter.
+            beta (tf.Variable): Scale parameter.
+            neg_gamma (tf.Variable): Shape parameter.
+            data (np.ndarray): Data to fit the GEV distribution to.
+
+        Returns:
+            tf.Tensor: Negative log likelihood loss.
+        """
         dist = tfd.GeneralizedExtremeValue(
             loc=alpha, scale=beta, concentration=-neg_gamma
         )
@@ -164,6 +178,18 @@ def fit_gev_upper_bound_known(
     def neg_log_likelihood(
         beta: tf.Variable, neg_gamma: tf.Variable, data: np.ndarray
     ) -> tf.Tensor:
+        """
+        Negative log likelihood function for the Generalized Extreme Value distribution
+        with a known upper bound.
+
+        Args:
+            beta (tf.Variable): Scale parameter.
+            neg_gamma (tf.Variable): Shape parameter.
+            data (np.ndarray): Data to fit the GEV distribution to.
+
+        Returns:
+            tf.Tensor: Negative log likelihood loss.
+        """
         dist = tfd.GeneralizedExtremeValue(
             loc=alpha_from_z_star_beta_gamma(z_star, beta, -neg_gamma),
             scale=beta,
@@ -190,7 +216,9 @@ def fit_gev_upper_bound_known(
         loss = train_step()
         if step % 100 == 0:
             print(
-                f"Step {step}, Loss: {loss.numpy()}, Alpha: {alpha_from_z_star_beta_gamma(z_star, beta.numpy(), -neg_gamma.numpy())}, Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
+                f"Step {step}, Loss: {loss.numpy()}, Alpha: "
+                + f"{alpha_from_z_star_beta_gamma(z_star, beta.numpy(), -neg_gamma.numpy())},"
+                + f" Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
             )
 
     # Extract the fitted parameters
@@ -372,6 +400,20 @@ def fit_for_seeds(
     seeds=np.linspace(0, 10000, num=1000, dtype="int16"),
     nums=np.logspace(np.log(20), np.log(1000), num=50, dtype="int16"),
 ) -> xr.DataArray:
+    """
+    Fit for different seeds.
+
+    Args:
+        z_star (float): Upper bound.
+        beta (float): Scale parameter.
+        gamma (float): Shape parameter.
+        seeds (np.ndarray): Seeds.
+        nums (np.ndarray): Number of samples.
+
+    Returns:
+        xr.DataArray: Return values for the quantiles for the true GEV,
+        the GEV with the known upper bound, and the GEV with no upper bound.
+    """
     print("nums", nums, type(nums))
     results = []
     for seed in seeds:
@@ -395,6 +437,21 @@ def get_evt_fit_data(
     nums: np.ndarray,
     load: bool = True,
 ) -> xr.DataArray:
+    """
+    Either load or calculate the EVT fit 1 in 100 year and 1 in 500 year events.
+
+    Args:
+        z_star (float): Upper bound.
+        beta (float): Scale parameter.
+        gamma (float): Shape parameter.
+        seeds (np.ndarray): Seeds.
+        nums (np.ndarray): Number of samples.
+        load (bool, optional): Load or calculate. Defaults to True.
+
+    Returns:
+        xr.DataArray: Return values for the quantiles for the true GEV,
+        the GEV with the known upper bound, and the GEV with no upper bound.
+    """
     data_name = os.path.join(
         DATA_PATH, f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}.nc"
     )
