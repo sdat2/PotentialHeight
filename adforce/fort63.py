@@ -18,7 +18,7 @@ from sithom.time import timeit
 from sithom.place import BoundingBox, Point
 from sithom.xr import plot_units
 from sithom.plot import label_subplots, plot_defaults
-from .mesh import select_coast, filter_mesh, select_nearby, bbox_mesh
+from .mesh import select_nearby, bbox_mesh  # select_coast, filter_mesh,
 from .fort22 import read_fort22
 
 
@@ -33,7 +33,7 @@ def plot_nearby(
     number: int = 10,
     pad: float = 2,
     plot_mesh: bool = True,
-    overtopping=False,
+    overtopping: bool = False,
 ) -> None:
     """
     Plot zeta timeseries points from the mesh near a point.

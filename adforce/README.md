@@ -1,6 +1,6 @@
 # ADFORCE
 
-Force ADCIRC with an idealized azimuthally symetric straight-track tropical cyclone using netcdf (NWS=13, ADCIRC>=55.02).
+Force ADCIRC with an idealized azimuthally symmetric straight-track tropical cyclone using netcdf (NWS=13, ADCIRC>=55.02).
 
 At the moment it takes the time and space coordinates from an existing netcdf in `fort22.py` to create the forcing file.
 
@@ -43,8 +43,8 @@ When changing to new machines, it is likely that `wrap` is the main file that ne
 
 Possible new TC characteristics:
 
- - Add curve or alow angle / track displacement to be specified in another way.
- - Profile varying over time.
+ - Add curve or allow angle / track displacement to be specified in another way.
+ - Idealized profile varying over time.
 
 
 ## Run an idealized storm surge

@@ -86,8 +86,8 @@ def plot_gps(
                 [["m", "m", None]],
                 [
                     [
-                        "GP prediction, $\hat{y}$",
-                        "GP standard deviation, $\sigma_{\hat{y}}$",
+                        r"GP prediction, $\hat{y}$",
+                        r"GP standard deviation, $\sigma_{\hat{y}}$",
                         r"Acquisition function, $\alpha$ [dimensionless]",
                     ]
                 ],

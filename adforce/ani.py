@@ -84,8 +84,8 @@ def plot_heights(
         ax.set_title("Water Height [m]")
         cbar.set_ticks(cbar_levels)
         cbar.set_ticklabels(["{:.1f}".format(x) for x in cbar_levels.tolist()])
-        plt.xlabel("Longitude [$^{\circ}$E]")
-        plt.ylabel("Latitude [$^{\circ}$N]")
+        plt.xlabel(r"Longitude [$^{\circ}$E]")
+        plt.ylabel(r"Latitude [$^{\circ}$N]")
         time = ds.isel(time=time_i).time.values
         ts = pd.to_datetime(str(time))
         print(ts)
@@ -216,8 +216,8 @@ def plot_heights_and_winds(
             # ,
         )
         print(ts)
-        plt.xlabel("Longitude [$^{\circ}$E]")
-        plt.ylabel("Latitude [$^{\circ}$N]")
+        plt.xlabel(r"Longitude [$^{\circ}$E]")
+        plt.ylabel(r"Latitude [$^{\circ}$N]")
         plt.scatter(
             NEW_ORLEANS.lon,
             NEW_ORLEANS.lat,

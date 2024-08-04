@@ -78,7 +78,7 @@ def rescale_inverse(
 
 
 # let's design a simple round trip test
-def _test_rescale_test(verbose: bool = True) -> None:
+def test_rescale_test(verbose: bool = True) -> None:
     """Test rescale function can round trip/ is self inverse and accurate.
 
     Args:
@@ -118,4 +118,4 @@ def _test_rescale_test(verbose: bool = True) -> None:
 
 if __name__ == "__main__":
     # python -m adbo.rescale
-    _test_rescale_test()
+    test_rescale_test()
