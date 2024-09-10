@@ -209,7 +209,16 @@ def moving_coords_from_tj(
         tj (xr.DataArray): dataarray with the tropical cyclone trajectory.
 
     Returns:
-        xr.Dataset: Dataset with the moving grid with tropical cyclone surface velocities and pressure.
+        xr.Dataset: Dataset with the moving grid with tropical cyclone surface velocities and pressure. The dataset has the following data variables:
+            - clon: center longitude of feature.
+            - clat: center latitude of feature.
+            - PSFC: Surface pressure [mb].
+            - U10: Surface zonal wind speed [m/s].
+            - V10: Surface meridional wind speed [m/s].
+            The dataset has the following coordinates:
+            - lon: Longitude [degrees_east].
+            - lat: Latitude [degrees_north].
+            - time: Time [minutes since 1990-01-01T01:00:00].
     """
     coords.lon[:] = coords.lon[:] - coords.lon.mean()
     coords.lat[:] = coords.lat[:] - coords.lat.mean()

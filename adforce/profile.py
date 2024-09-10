@@ -45,7 +45,19 @@ def pressures_profile(  # add pressure profile to wind profile
 
 
 def read_profile(profile_path: str) -> xr.Dataset:
-    """Read a TC profile from a JSON file."""
+    """Read a TC profile from a JSON file.
+
+    Args:
+        profile_path (str): Path to the JSON file.
+
+    Returns:
+        xr.Dataset: Dataset containing the wind speeds and pressures
+            of the TC profile. The dataset has the following data variables:
+            - windspeeds: Wind speeds [m/s].
+            - pressures: Pressures [hPa].
+            The dataset has the following coordinate:
+            - radii: Radii [m].
+    """
     chavas_profile = read_json(profile_path)
     rr = np.array(chavas_profile["rr"], dtype="float32")
     vv = np.array(chavas_profile["VV"], dtype="float32")
