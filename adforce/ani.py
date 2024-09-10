@@ -273,9 +273,9 @@ def line_up_f22(f22_main_ds: xr.Dataset, path_in: str, point: Point) -> xr.Datas
     Line up fort.22.
 
     Args:
-        f22_main_ds (xr.Dataset):
-        path_in (str):
-        point (Point):
+        f22_main_ds (xr.Dataset): main fort.22.nc dataset.
+        path_in (str): path for inputs.
+        point (Point): point to compare at.
 
     Returns:
         xr.Dataset: f22_main_ds

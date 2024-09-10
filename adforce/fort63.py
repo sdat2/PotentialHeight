@@ -157,7 +157,7 @@ def plot_nearby(
     return fig, axs
 
 
-def kat2():
+def kat2() -> None:
     from src.constants import KATRINA_TIDE_NC
 
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)

@@ -43,7 +43,7 @@ def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
     return dt.open_datatree(fort22_path)
 
 
-def trim_fort22():
+def trim_fort22() -> None:
     fort22 = read_fort22()
     print(fort22)
     f22 = fort22.drop_nodes(["2004223N11301", "2004227N09314"])
@@ -67,7 +67,8 @@ def trim_fort22():
 
 
 @timeit
-def blank_fort22():
+def blank_fort22() -> None:
+
     plot_defaults()
     fort22 = read_fort22()
     print(fort22)

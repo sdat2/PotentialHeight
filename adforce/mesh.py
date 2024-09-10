@@ -10,6 +10,7 @@ import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix
 import netCDF4 as nc
 import xarray as xr
+import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
 from .constants import NO_BBOX
@@ -227,8 +228,8 @@ def select_nearby(
     lon: float,
     lat: float,
     number: int = 10,
-    overtopping=False,
-    verbose=False,
+    overtopping: bool = False,
+    verbose: bool = False,
 ) -> np.ndarray:
     """
     Select edge cells near a point.
@@ -254,7 +255,7 @@ def select_nearby(
     print("Central point", lon, "degrees_East", lat, "degrees_North")
 
     # compute Euclidean (flat-world) distance in degrees**2
-    nsq_distances = -((lons - lon) ** 2) - (lats - lat) ** 2
+    nsq_distances = -((lons - lon) ** 2) - ((lats - lat) ** 2)
 
     if verbose:
         print("Central point", lon, "degrees_East", lat, "degrees_North")
@@ -272,11 +273,21 @@ def select_nearby(
 
 
 def plot_contour(
-    ax,
+    ax: plt.Axes,
     x_values: np.ndarray,
     y_values: np.ndarray,
     adj_matrix: Union[np.ndarray, csr_matrix],
-):
+) -> None:
+    """
+    Plot a mesh with edges.
+
+    Args:
+        ax: matplotlib axis.
+        x_values (np.ndarray): x values of nodes.
+        y_values (np.ndarray): y values of nodes.
+        adj_matrix (Union[np.ndarray, csr_matrix]): adjacency matrix.
+    """
+
     if isinstance(adj_matrix, csr_matrix):
         adj_coo = coo_matrix(adj_matrix)
         for i, j, _ in zip(adj_coo.row, adj_coo.col, adj_coo.data):
