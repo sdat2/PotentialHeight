@@ -65,6 +65,12 @@ def calculate_adjacency_matrix(
 
     Returns:
         Union[np.ndarray, csr_matrix]: NxN symetric boolean adjacency matrix.
+
+    Examples::
+        >>> calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3) == np.array([[False, True, True], [True, False, True], [True, True, False]])
+            True
+        >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4) == np.array([[False, True, True, False], [True, False, True, True], [True, True, False, True], [False, True, True, False]]))
+            True
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
