@@ -44,6 +44,7 @@ def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
 
 
 def trim_fort22() -> None:
+    """Trim the fort.22.nc file."""
     fort22 = read_fort22()
     print(fort22)
     f22 = fort22.drop_nodes(["2004223N11301", "2004227N09314"])
@@ -68,6 +69,7 @@ def trim_fort22() -> None:
 
 @timeit
 def blank_fort22() -> None:
+    """Create a blank fort.22.nc file."""
 
     plot_defaults()
     fort22 = read_fort22()
@@ -434,7 +436,7 @@ def save_forcing(
     trans_speed: float = 7.71,
     impact_lon: float = -89.4715,
     impact_lat: float = 29.9511,
-    impact_time=np.datetime64("2004-08-13T12", "ns"),
+    impact_time: np.datetime64 = np.datetime64("2004-08-13T12", "ns"),
 ) -> None:
     """
     Save the forcing file for ADCIRC.

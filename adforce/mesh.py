@@ -61,6 +61,7 @@ def calculate_adjacency_matrix(
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
         N (int): Number of nodes in the mesh.
+        sparse (bool, optional): Whether to return a sparse matrix. Defaults to True.
 
     Returns:
         Union[np.ndarray, csr_matrix]: NxN symetric boolean adjacency matrix.
