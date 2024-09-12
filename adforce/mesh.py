@@ -7,6 +7,7 @@ TODO: Add the dual graph calculation for SurgeNet.
 
 from typing import Union, Tuple
 import numpy as np
+import collections
 from scipy.sparse import csr_matrix, coo_matrix
 import netCDF4 as nc
 import xarray as xr
@@ -56,8 +57,6 @@ def calculate_adjacency_matrix(
     Assumes that nodes are numbered from 0 to N-1.
     Assumes nodes are not self-adjacent.
 
-    TODO: Could go to 3M long rows/cols if called twice. Is this a speedup? Is there a sym=True option?
-
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
         N (int): Number of nodes in the mesh.
@@ -74,14 +73,10 @@ def calculate_adjacency_matrix(
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
-    rows = np.repeat(
-        triangles[:, ::-1], 2, axis=0
-    ).flatten()  # 6M long # np.roll(triangles, shift=1, axis=1)
+    rows = np.repeat(triangles[:, ::-1], 2, axis=0).flatten()  # 6M long
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
     cols = np.repeat(triangles, 2, axis=None)  # 6M long
     # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
-    # print("rows", rows)
-    # print("cols", cols)
     if not sparse:
         adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
         adjacency_matrix[rows, cols] = (
@@ -91,7 +86,60 @@ def calculate_adjacency_matrix(
         adjacency_matrix = csr_matrix(
             (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool
         )
-    # adjacency_matrix[cols, rows] = True # already symetric without second call
+    return adjacency_matrix
+
+
+def calculate_dual_graph_adjacency_matrix(
+    triangles: np.ndarray, sparse: bool = True
+) -> Union[np.ndarray, csr_matrix]:
+    """
+    Calculate the dual graph adjacency matrix for a mesh of triangles.
+
+    A dual graph is a graph where each face of the original graph is a node,
+    and the new nodes are adjacent if they share an edge.
+
+    Args:
+        triangles (np.ndarray): Mx3 array of triangle indices.
+        sparse (bool, optional): Whether to return a sparse matrix. Defaults to True.
+
+    Returns:
+        Union[np.ndarray, csr_matrix]: MxM symetric boolean adjacency matrix.
+
+    Examples::
+        >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), sparse=False) == np.array([[False, True], [True, False]]))
+        True
+        >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2]]), sparse=False) == np.array([[False]]))
+        True
+    """
+
+    edge_dict = collections.defaultdict(list)
+
+    for i, triangle in enumerate(triangles):
+        edge_dict[tuple(triangle[0:2])].append(i)
+        edge_dict[tuple(triangle[1:3])].append(i)
+        edge_dict[tuple(triangle[[0, 2]])].append(i)
+
+    M = len(triangles)
+
+    rows = []
+    cols = []
+
+    for edge in edge_dict:
+        nodes = edge_dict[edge]
+        for i in range(len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                rows.append(nodes[i])
+                rows.append(nodes[j])
+                cols.append(nodes[j])
+                cols.append(nodes[i])
+
+    if not sparse:
+        adjacency_matrix = np.zeros((M, M), dtype=bool)  # NxN boolean matrix
+        adjacency_matrix[rows, cols] = True
+    else:
+        adjacency_matrix = csr_matrix(
+            (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(M, M), dtype=bool
+        )
     return adjacency_matrix
 
 
