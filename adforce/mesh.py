@@ -47,7 +47,7 @@ def xr_loader(
         return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc))
 
 
-@timeit
+# @timeit
 def calculate_adjacency_matrix(
     triangles: np.ndarray, N: int, sparse: bool = True
 ) -> Union[np.ndarray, csr_matrix]:
@@ -70,16 +70,18 @@ def calculate_adjacency_matrix(
         >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False) == np.array([[False, True, True], [True, False, True], [True, True, False]]))
             True
         >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False) == np.array([[False, True, True, False], [True, False, True, True], [True, True, False, True], [False, True, True, False]]))
-        True
+            True
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
-    rows = np.repeat(triangles, 2, axis=0).flatten()  # 6M long
-    # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
-    cols = np.repeat(np.roll(triangles, shift=1, axis=1), 2, axis=None)  # 6M long
+    rows = np.repeat(
+        triangles[:, ::-1], 2, axis=0
+    ).flatten()  # 6M long # np.roll(triangles, shift=1, axis=1)
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
-    print(rows)
-    print(cols)
+    cols = np.repeat(triangles, 2, axis=None)  # 6M long
+    # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
+    # print("rows", rows)
+    # print("cols", cols)
     if not sparse:
         adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
         adjacency_matrix[rows, cols] = (
@@ -330,4 +332,4 @@ if __name__ == "__main__":
     print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
     print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
     print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
-    # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
+    print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
