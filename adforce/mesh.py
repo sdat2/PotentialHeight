@@ -5,7 +5,7 @@ This is the shared functionality for processing ADCIRC meshes.
 TODO: Add the dual graph calculation for SurgeNet.
 """
 
-from typing import Union, Tuple
+from typing import Union, Tuple, List
 import numpy as np
 import collections
 from scipy.sparse import csr_matrix, coo_matrix
@@ -48,6 +48,101 @@ def xr_loader(
         return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc))
 
 
+def row_column_to_adjacency_matrix(
+    rows: np.ndarray, cols: np.ndarray, size: int, sparse: bool = True
+) -> Union[np.ndarray, csr_matrix]:
+    """
+    Convert row, column indices to adjacency matrix.
+
+    Args:
+        rows (np.ndarray): row indices.
+        cols (np.ndarray): column indices.
+        size (int): number of nodes.
+        sparse (bool, optional): Whether to return a sparse matrix. Defaults to True.
+
+    Returns:
+        Union[np.ndarray, csr_matrix]: adjacency matrix.
+    """
+    if not sparse:
+        adjacency_matrix = np.zeros((size, size), dtype=bool)  # NxN boolean matrix
+        adjacency_matrix[rows, cols] = True
+    else:
+        adjacency_matrix = csr_matrix(
+            (np.ones_like(rows, dtype=bool), (rows, cols)),
+            shape=(size, size),
+            dtype=bool,
+        )
+    return adjacency_matrix
+
+
+def standard_row_column_from_triangles(
+    triangles: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Generate row, column indices for the adjacency matrix.
+
+    Args:
+        triangles (np.ndarray): Mx3 array of triangle indices.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: row, column indices for the adjacency matrix.
+
+    Examples::
+        >>> row, column = standard_row_column_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(row == np.array([2, 1, 0, 2, 1, 0, 3, 2, 1, 3, 2, 1]))
+        True
+        >>> np.all(column == np.array([0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 3, 3]))
+        True
+    """
+    # M is the number of triangles
+    # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
+    rows = np.repeat(triangles[:, ::-1], 2, axis=0).flatten()  # 6M long
+    # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
+    cols = np.repeat(triangles, 2, axis=None)  # 6M long
+    # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
+    return rows, cols
+
+
+def dual_graph_row_column_from_triangles(
+    triangles: np.ndarray,
+) -> Tuple[List[int], List[int]]:
+    """
+
+    Args:
+        triangles (np.ndarray): Mx3 array of triangle indices.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: row, column indices for the dual graph.
+
+    Examples::
+        >>> row, column = dual_graph_row_column_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(row == np.array([0, 1]))
+        True
+        >>> np.all(column == np.array([1, 0]))
+        True
+
+    """
+    edge_dict = collections.defaultdict(list)
+
+    for i, triangle in enumerate(triangles):
+        edge_dict[tuple(triangle[0:2])].append(i)
+        edge_dict[tuple(triangle[1:3])].append(i)
+        edge_dict[tuple(triangle[[0, 2]])].append(i)
+
+    rows = []
+    cols = []
+
+    for edge in edge_dict:
+        nodes = edge_dict[edge]
+        for i in range(len(nodes)):
+            for j in range(i + 1, len(nodes)):
+                rows.append(nodes[i])
+                rows.append(nodes[j])
+                cols.append(nodes[j])
+                cols.append(nodes[i])
+    return rows, cols
+
+
 # @timeit
 def calculate_adjacency_matrix(
     triangles: np.ndarray, N: int, sparse: bool = True
@@ -67,26 +162,13 @@ def calculate_adjacency_matrix(
 
     Examples::
         >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False) == np.array([[False, True, True], [True, False, True], [True, True, False]]))
-            True
+        True
         >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False) == np.array([[False, True, True, False], [True, False, True, True], [True, True, False, True], [False, True, True, False]]))
-            True
+        True
     """
-    # M is the number of triangles
-    # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
-    rows = np.repeat(triangles[:, ::-1], 2, axis=0).flatten()  # 6M long
-    # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
-    cols = np.repeat(triangles, 2, axis=None)  # 6M long
-    # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
-    if not sparse:
-        adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
-        adjacency_matrix[rows, cols] = (
-            True  # "smart indexing" in numpy is very fast and efficient
-        )
-    else:
-        adjacency_matrix = csr_matrix(
-            (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(N, N), dtype=bool
-        )
-    return adjacency_matrix
+    return row_column_to_adjacency_matrix(
+        *standard_row_column_from_triangles(triangles), N, sparse=sparse
+    )
 
 
 def calculate_dual_graph_adjacency_matrix(
@@ -108,39 +190,15 @@ def calculate_dual_graph_adjacency_matrix(
     Examples::
         >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), sparse=False) == np.array([[False, True], [True, False]]))
         True
-        >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2]]), sparse=False) == np.array([[False]]))
+        >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2], [2, 3, 4]]), sparse=False) == np.array([[False, False], [False, False]]))
         True
     """
 
-    edge_dict = collections.defaultdict(list)
-
-    for i, triangle in enumerate(triangles):
-        edge_dict[tuple(triangle[0:2])].append(i)
-        edge_dict[tuple(triangle[1:3])].append(i)
-        edge_dict[tuple(triangle[[0, 2]])].append(i)
-
     M = len(triangles)
 
-    rows = []
-    cols = []
-
-    for edge in edge_dict:
-        nodes = edge_dict[edge]
-        for i in range(len(nodes)):
-            for j in range(i + 1, len(nodes)):
-                rows.append(nodes[i])
-                rows.append(nodes[j])
-                cols.append(nodes[j])
-                cols.append(nodes[i])
-
-    if not sparse:
-        adjacency_matrix = np.zeros((M, M), dtype=bool)  # NxN boolean matrix
-        adjacency_matrix[rows, cols] = True
-    else:
-        adjacency_matrix = csr_matrix(
-            (np.ones_like(rows, dtype=bool), (rows, cols)), shape=(M, M), dtype=bool
-        )
-    return adjacency_matrix
+    return row_column_to_adjacency_matrix(
+        *dual_graph_row_column_from_triangles(triangles), M, sparse=sparse
+    )
 
 
 @timeit
