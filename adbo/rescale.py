@@ -22,7 +22,8 @@ def rescale(inputs: np.ndarray, config: dict, verbose: bool = False) -> np.ndarr
         np.ndarray: Rescaled array [N, F].
     """
     # this will only deal with 1 dimensional arrays at the moment
-    print("inputs", inputs, inputs.shape)
+    if verbose:
+        print("inputs", inputs, inputs.shape)
     # print("config", config)
     order = config["order"]
     ones = np.ones((inputs.shape[0]))
@@ -83,6 +84,10 @@ def test_rescale_test(verbose: bool = True) -> None:
 
     Args:
         verbose (bool): Print debug information. Default is True.
+
+    Examples:
+        >>> test_rescale_test(verbose=False)
+        Rescaling round trip test passed.
     """
 
     def test_roundtrip(real_ex, scaled_ex, config):
