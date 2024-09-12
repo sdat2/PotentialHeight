@@ -67,9 +67,9 @@ def calculate_adjacency_matrix(
         Union[np.ndarray, csr_matrix]: NxN symetric boolean adjacency matrix.
 
     Examples::
-        >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3) == np.array([[False, True, True], [True, False, True], [True, True, False]]))
+        >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False) == np.array([[False, True, True], [True, False, True], [True, True, False]]))
             True
-        >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4) == np.array([[False, True, True, False], [True, False, True, True], [True, True, False, True], [False, True, True, False]]))
+        >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False) == np.array([[False, True, True, False], [True, False, True, True], [True, True, False, True], [False, True, True, False]]))
         True
     """
     # M is the number of triangles
@@ -78,6 +78,8 @@ def calculate_adjacency_matrix(
     # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
     cols = np.repeat(np.roll(triangles, shift=1, axis=1), 2, axis=None)  # 6M long
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
+    print(rows)
+    print(cols)
     if not sparse:
         adjacency_matrix = np.zeros((N, N), dtype=bool)  # NxN boolean matrix
         adjacency_matrix[rows, cols] = (
@@ -324,4 +326,8 @@ def plot_contour(
 
 if __name__ == "__main__":
     # python -m adforce.mesh
-    bbox_mesh()
+    # bbox_mesh()
+    print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
+    print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
+    print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
