@@ -82,7 +82,7 @@ def standard_starts_ends_from_triangles(
     triangles: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate start, end indices for the adjacency matrix.
+    Generate start, end indices from the triangles for the regular graph.
 
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
@@ -110,6 +110,7 @@ def dual_graph_starts_ends_from_triangles(
     triangles: np.ndarray,
 ) -> Tuple[List[int], List[int]]:
     """
+    Generate start, end indices for the dual graph from the triangles.
 
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
@@ -201,6 +202,36 @@ def calculate_dual_graph_adjacency_matrix(
 
     return starts_ends_to_adjacency_matrix(
         *dual_graph_starts_ends_from_triangles(triangles), M, sparse=sparse
+    )
+
+
+def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
+    """
+    Calculate the dual graph adjacency matrix for a mesh of triangles.
+
+    Args:
+        triangles (np.ndarray): Mx3 array of triangle indices.
+
+    Returns:
+        xr.Dataset: Dual graph dataset.
+
+    Examples::
+        >>> ds = dual_graph_dataset(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(ds.start.values == np.array([0, 1]))
+        True
+        >>> np.all(ds.end.values == np.array([1, 0]))
+        True
+        >>> np.all(ds.triangles.values == np.array([[0, 1, 2], [1, 2, 3]]))
+        True
+    """
+    starts, ends = dual_graph_starts_ends_from_triangles(triangles)
+    return xr.Dataset(
+        {
+            "triangles": (["triangle", "vertex"], triangles),
+            "start": ("edge", starts),
+            "end": ("edge", ends),
+        },
+        coords={"edge": np.arange(len(starts))},
     )
 
 
