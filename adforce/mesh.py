@@ -48,15 +48,18 @@ def xr_loader(
         return xr.open_dataset(xr.backends.NetCDF4DataStore(ds_nc))
 
 
-def row_column_to_adjacency_matrix(
-    rows: np.ndarray, cols: np.ndarray, size: int, sparse: bool = True
+def starts_ends_to_adjacency_matrix(
+    starts: Union[List[int], np.ndarray],
+    ends: Union[List[int], np.ndarray],
+    size: int,
+    sparse: bool = True,
 ) -> Union[np.ndarray, csr_matrix]:
     """
-    Convert row, column indices to adjacency matrix.
+    Convert start, end indices to adjacency matrix.
 
     Args:
-        rows (np.ndarray): row indices.
-        cols (np.ndarray): column indices.
+        starts (Union[List[int], np.ndarray]): start indices.
+        ends (Union[List[int], np.ndarray]): end indices.
         size (int): number of nodes.
         sparse (bool, optional): Whether to return a sparse matrix. Defaults to True.
 
@@ -65,45 +68,45 @@ def row_column_to_adjacency_matrix(
     """
     if not sparse:
         adjacency_matrix = np.zeros((size, size), dtype=bool)  # NxN boolean matrix
-        adjacency_matrix[rows, cols] = True
+        adjacency_matrix[starts, ends] = True
     else:
         adjacency_matrix = csr_matrix(
-            (np.ones_like(rows, dtype=bool), (rows, cols)),
+            (np.ones_like(starts, dtype=bool), (starts, ends)),
             shape=(size, size),
             dtype=bool,
         )
     return adjacency_matrix
 
 
-def standard_row_column_from_triangles(
+def standard_starts_ends_from_triangles(
     triangles: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate row, column indices for the adjacency matrix.
+    Generate start, end indices for the adjacency matrix.
 
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: row, column indices for the adjacency matrix.
+        Tuple[np.ndarray, np.ndarray]: start, end indices for the adjacency matrix.
 
     Examples::
-        >>> row, column = standard_row_column_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
-        >>> np.all(row == np.array([2, 1, 0, 2, 1, 0, 3, 2, 1, 3, 2, 1]))
+        >>> start, end = standard_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(start == np.array([2, 1, 0, 2, 1, 0, 3, 2, 1, 3, 2, 1]))
         True
-        >>> np.all(column == np.array([0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 3, 3]))
+        >>> np.all(end == np.array([0, 0, 1, 1, 2, 2, 1, 1, 2, 2, 3, 3]))
         True
     """
     # M is the number of triangles
     # triangles = np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4], ...])
-    rows = np.repeat(triangles[:, ::-1], 2, axis=0).flatten()  # 6M long
+    starts = np.repeat(triangles[:, ::-1], 2, axis=0).flatten()  # 6M long
     # [2, 1, 0, 2, 1, 0, ...] values 0 to N-1
-    cols = np.repeat(triangles, 2, axis=None)  # 6M long
+    ends = np.repeat(triangles, 2, axis=None)  # 6M long
     # [0, 0, 1, 1, 2, 2, ...] values 0 to N-1
-    return rows, cols
+    return starts, ends
 
 
-def dual_graph_row_column_from_triangles(
+def dual_graph_starts_ends_from_triangles(
     triangles: np.ndarray,
 ) -> Tuple[List[int], List[int]]:
     """
@@ -112,13 +115,13 @@ def dual_graph_row_column_from_triangles(
         triangles (np.ndarray): Mx3 array of triangle indices.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: row, column indices for the dual graph.
+        Tuple[np.ndarray, np.ndarray]: start, end indices for the dual graph.
 
     Examples::
-        >>> row, column = dual_graph_row_column_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
-        >>> np.all(row == np.array([0, 1]))
+        >>> start, end = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(start == np.array([0, 1]))
         True
-        >>> np.all(column == np.array([1, 0]))
+        >>> np.all(end == np.array([1, 0]))
         True
 
     """
@@ -129,18 +132,18 @@ def dual_graph_row_column_from_triangles(
         edge_dict[tuple(triangle[1:3])].append(i)
         edge_dict[tuple(triangle[[0, 2]])].append(i)
 
-    rows = []
-    cols = []
+    starts = []
+    ends = []
 
     for edge in edge_dict:
         nodes = edge_dict[edge]
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
-                rows.append(nodes[i])
-                rows.append(nodes[j])
-                cols.append(nodes[j])
-                cols.append(nodes[i])
-    return rows, cols
+                starts.append(nodes[i])
+                starts.append(nodes[j])
+                ends.append(nodes[j])
+                ends.append(nodes[i])
+    return starts, ends
 
 
 # @timeit
@@ -166,8 +169,8 @@ def calculate_adjacency_matrix(
         >>> np.all(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False) == np.array([[False, True, True, False], [True, False, True, True], [True, True, False, True], [False, True, True, False]]))
         True
     """
-    return row_column_to_adjacency_matrix(
-        *standard_row_column_from_triangles(triangles), N, sparse=sparse
+    return starts_ends_to_adjacency_matrix(
+        *standard_starts_ends_from_triangles(triangles), N, sparse=sparse
     )
 
 
@@ -196,8 +199,8 @@ def calculate_dual_graph_adjacency_matrix(
 
     M = len(triangles)
 
-    return row_column_to_adjacency_matrix(
-        *dual_graph_row_column_from_triangles(triangles), M, sparse=sparse
+    return starts_ends_to_adjacency_matrix(
+        *dual_graph_starts_ends_from_triangles(triangles), M, sparse=sparse
     )
 
 
@@ -407,7 +410,7 @@ def plot_contour(
 
     if isinstance(adj_matrix, csr_matrix):
         adj_coo = coo_matrix(adj_matrix)
-        for i, j, _ in zip(adj_coo.row, adj_coo.col, adj_coo.data):
+        for i, j, _ in zip(adj_coo.start, adj_coo.col, adj_coo.data):
             ax.plot(
                 [x_values[i], x_values[j]],
                 [y_values[i], y_values[j]],

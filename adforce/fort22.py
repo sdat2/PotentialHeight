@@ -27,16 +27,11 @@ from .profile import read_profile
 def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
     """Read fort.22.nc file.
 
-    Parameters
-    ----------
-    fort22_path : str, optional
-        Path to fort.22.nc file. If not provided, the default path will be used.
+    Args:
+        fort22_path (Optional[str], optional): Path to fort.22.nc file. Defaults to None. If not provided, the default path will be used.
 
-    Returns
-    -------
-    xr.Dataset
-        Dataset containing fort.22.nc data.
-
+    Returns:
+        xr.Dataset: Dataset containing fort.22.nc data.
     """
     if fort22_path is None:
         fort22_path = os.path.join(DATA_PATH, "fort.22.nc")
