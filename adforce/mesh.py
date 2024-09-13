@@ -272,6 +272,56 @@ def mean_for_triangle(values: np.ndarray, triangles: np.ndarray) -> np.ndarray:
     return np.mean(values[triangles], axis=1)
 
 
+def grad_for_triangle(
+    x_lon: np.ndarray, y_lat: np.ndarray, values: np.ndarray, triangles: np.ndarray
+) -> np.ndarray:
+    """
+    Calculate the gradient of the values for each triangle.
+
+    Three points define a plane, so we can calculate the gradient of the plane.
+
+    Args:
+        x_lon (np.ndarray): N array of longitudes. The x values.
+        y_lat (np.ndarray): N array of latitudes. The y values.
+        values (np.ndarray): N array of values. The z values.
+        triangles (np.ndarray): Mx3 array of triangle indices. The indices of each plane.
+
+    Returns:
+        np.ndarray: Mx2 array of gradients (dz/dx, dz/dy) for each triangle.
+
+    Examples::
+        >>> np.all(np.isclose(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 1, 0]), np.array([[0, 1, 2]])), np.array([[-1], [0]]), atol=1e-6))
+        True
+        >>> np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-1], [-1]]))
+        True
+        >>> np.all(grad_for_triangle(np.array([0, 0, 2]), np.array([0, 2, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2], [1, 2, 0]])) == np.array([[-0.5, -0.5], [-0.5, -0.5]]))
+        True
+        >>> np.all(grad_for_triangle(np.array([0, 0, 0.5]), np.array([0, 0.5, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-2], [-2]]))
+        True
+        >>> np.all(grad_for_triangle(np.array([0, 0, 0.5]), np.array([0, 0.5, 0]), np.array([2, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-4], [-4]]))
+        True
+        >>> np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 0, 0]), np.array([[0, 1, 2]])) == np.array([[0], [0]]))
+        True
+        >>> assert np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 1, 0]), np.array([[0, 1, 2]])) == np.array([[0], [1]]))
+    """
+    x = x_lon[triangles]
+    y = y_lat[triangles]
+    z = values[triangles]
+
+    # get normal vectors
+    c = np.stack((x, y, z), axis=2)
+    # print(c)
+    # (B-A) x (C-A)
+    n = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)
+    # print(n)
+    # To avoid dividing by zero in case the triangles are degenerate, we check if 'c' is not zero
+    with np.errstate(divide="ignore", invalid="ignore"):
+        grad_x = -n[:, 0] / n[:, 2]  # dz/dx
+        grad_y = -n[:, 1] / n[:, 2]  # dz/dy
+    # print(grad_x, grad_y)
+    return np.stack((grad_x, grad_y))
+
+
 @timeit
 def select_coast(
     mesh_ds: xr.Dataset, overtopping: bool = False, keep_sparse: bool = False
