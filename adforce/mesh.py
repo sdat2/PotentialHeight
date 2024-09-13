@@ -209,11 +209,18 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
     """
     Calculate the dual graph adjacency matrix for a mesh of triangles.
 
+    Nodes are the faces of the original graph, and adjacent if they share an edge.
+    There are E shared edges between the faces.
+
     Args:
-        triangles (np.ndarray): Mx3 array of triangle indices.
+        triangles (np.ndarray): Mx3 array of triangle indices. Assumes nodes are numbered from 0 to N-1.
+            where N is the number of nodes in the original mesh.
 
     Returns:
         xr.Dataset: Dual graph dataset.
+         - "triangles": Mx3 array of triangle indices.
+         - "start": 2E array of start indices. (Double counting)
+         - "end": 2E array of end indices. (Double counting)
 
     Examples::
         >>> ds = dual_graph_dataset(np.array([[0, 1, 2], [1, 2, 3]]))
@@ -221,18 +228,48 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
         True
         >>> np.all(ds.end.values == np.array([1, 0]))
         True
-        >>> np.all(ds.triangles.values == np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(ds.triangle.values == np.array([[0, 1, 2], [1, 2, 3]]))
         True
     """
     starts, ends = dual_graph_starts_ends_from_triangles(triangles)
     return xr.Dataset(
         {
-            "triangles": (["triangle", "vertex"], triangles),
-            "start": ("edge", starts),
-            "end": ("edge", ends),
+            "triangle": (
+                ["node", "vertex"],
+                triangles,
+                {
+                    "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
+                },
+            ),
+            "start": ("edge", starts, {"description": "Start indices of the edges."}),
+            "end": ("edge", ends, {"description": "End indices of the edges."}),
         },
-        coords={"edge": np.arange(len(starts))},
+        coords={
+            "edge": np.arange(len(starts)),
+            "node": np.arange(len(triangles)),
+        },
+        attrs={"description": "Dual graph of the mesh."},
     )
+
+
+def mean_for_triangle(values: np.ndarray, triangles: np.ndarray) -> np.ndarray:
+    """
+    Calculate the mean value for each triangle.
+
+    Args:
+        values (np.ndarray): N array of values.
+        triangles (np.ndarray): Mx3 array of triangle indices.
+
+    Returns:
+        np.ndarray: M array of mean values for each triangle.
+
+    Examples::
+        >>> np.all(mean_for_triangle(np.array([1, 2, 3, 4]), np.array([[0, 1, 2], [1, 2, 3]])) == np.array([2, 3]))
+        True
+        >>> np.all(mean_for_triangle(np.array([1, 2, 3, 4]), np.array([[0, 1, 2]])) == np.array([2]))
+        True
+    """
+    return np.mean(values[triangles], axis=1)
 
 
 @timeit
