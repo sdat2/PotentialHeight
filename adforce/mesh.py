@@ -287,7 +287,7 @@ def grad_for_triangle(
         triangles (np.ndarray): Mx3 array of triangle indices. The indices of each plane.
 
     Returns:
-        np.ndarray: Mx2 array of gradients (dz/dx, dz/dy) for each triangle.
+        np.ndarray: 2xM array of gradients (dz/dx, dz/dy) for each triangle.
 
     Examples::
         >>> np.all(np.isclose(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 1, 0]), np.array([[0, 1, 2]])), np.array([[-1], [0]]), atol=1e-6))
@@ -304,22 +304,22 @@ def grad_for_triangle(
         True
         >>> assert np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 1, 0]), np.array([[0, 1, 2]])) == np.array([[0], [1]]))
     """
-    x = x_lon[triangles]
-    y = y_lat[triangles]
-    z = values[triangles]
+    x = x_lon[triangles]  # Mx3
+    y = y_lat[triangles]  # Mx3
+    z = values[triangles]  # Mx3
 
     # get normal vectors
-    c = np.stack((x, y, z), axis=2)
-    # print(c)
+    c = np.stack((x, y, z), axis=2)  # stack the x, y, z values into columns (Mx3x3)
     # (B-A) x (C-A)
-    n = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)
-    # print(n)
-    # To avoid dividing by zero in case the triangles are degenerate, we check if 'c' is not zero
+    normal = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)  # Mx3
+    # To avoid dividing by zero in case the triangles are degenerate
     with np.errstate(divide="ignore", invalid="ignore"):
-        grad_x = -n[:, 0] / n[:, 2]  # dz/dx
-        grad_y = -n[:, 1] / n[:, 2]  # dz/dy
-    # print(grad_x, grad_y)
-    return np.stack((grad_x, grad_y))
+        grad_x = -normal[:, 0] / normal[:, 2]  # dz/dx  # M
+        grad_y = -normal[:, 1] / normal[:, 2]  # dz/dy  # M
+    return np.stack((grad_x, grad_y))  # 2xM
+
+
+# print(xr_loader("../data/fort.63.nc", use_dask=False))
 
 
 @timeit
