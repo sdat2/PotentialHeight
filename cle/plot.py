@@ -30,6 +30,7 @@ from .find import (
     wang_diff,
     wang_consts,
 )
+from .create_ds import find_solution_ds, gom_time
 
 plot_defaults()
 

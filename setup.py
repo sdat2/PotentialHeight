@@ -11,6 +11,7 @@ REQUIRED: List[str] = [
     "uncertainties",  # common utility for linear error propagation
     # "sithom>=0.0.5",  # common utilities
     "sithom @ git+https://github.com/sdat2/sithom",
+    "oct2py",  # oct2py for running MATLAB code (cle)
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
     "intake",  # to read CMIP6 data (tcpips)

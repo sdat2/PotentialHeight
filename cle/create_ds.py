@@ -9,21 +9,18 @@ from matplotlib import pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
-
-
 from tcpips.pi import gom_combined_inout_timestep_cmip6
 from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH
 from .find import (
     run_cle15,
     wang_diff,
     wang_consts,
-    bisection,
-    buck_sat_vap_pressure,
     vary_r0_c15,
     vary_r0_w22,
     find_solution_rmaxv,
 )
-from .utils import coriolis_parameter_from_lat
+from .utils import coriolis_parameter_from_lat, buck_sat_vap_pressure
+from .solve import bisection
 
 
 def find_solution_ds(
