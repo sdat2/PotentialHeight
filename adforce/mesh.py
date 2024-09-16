@@ -289,7 +289,7 @@ def _test_xr_dataset() -> xr.Dataset:
     )
 
 
-def process_dual_graph(ds: xr.Dataset = xr_loader(FORT63_EXAMPLE)) -> xr.Dataset:
+def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
     """
     Create a dual graph dataset from an ADCIRC output dataset.
 

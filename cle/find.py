@@ -18,6 +18,13 @@ from .constants import (
     FIGURE_PATH,
     SRC_PATH,
 )
+from .utils import (
+    pressure_from_wind,
+    absolute_angular_momentum,
+    carnot_factor,
+    buck_sat_vap_pressure,
+)
+from .solve import bisection
 
 plot_defaults()
 
@@ -99,44 +106,6 @@ def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
 
     # read in the output from r0_pm.m
     return read_json(os.path.join(DATA_PATH, "outputs.json"))
-
-
-def pressure_from_wind(
-    rr: np.ndarray,  # [m]
-    vv: np.ndarray,  # [m/s]
-    p0: float = 1015 * 100,  # Pa
-    rho0: float = 1.15,  # kg m-3
-    fcor: float = 5e-5,  # m s-2
-) -> np.ndarray:  # [Pa]
-    """
-    Use coriolis force and pressure gradient force to find physical
-    pressure profile to correspond to the velocity profile.
-
-    TODO: decrease air density in response to decreased pressure (will make central pressure lower).
-
-    Args:
-        rr (np.ndarray): radii array [m].
-        vv (np.ndarray): velocity array [m/s]
-        p0 (float): ambient pressure [Pa].
-        rho0 (float): Air density at ambient pressure [kg/m3].
-        fcor (float): Coriolis force.
-
-    Returns:
-        np.ndarray: Pressure array [Pa].
-    """
-    p = np.zeros(rr.shape)  # [Pa]
-    # rr ascending
-    assert np.all(rr == np.sort(rr))
-    p[-1] = p0
-    for j in range(len(rr) - 1):
-        i = -j - 2
-        # Assume Coriolis force and pressure-gradient balance centripetal force.
-        # delta P = - rho * ( v^2/r + fcor * vv[i] ) * delta r
-        p[i] = p[i + 1] - rho0 * (
-            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
-        ) * (rr[i + 1] - rr[i])
-        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
-    return p  # pressure profile [Pa]
 
 
 @timeit
@@ -251,86 +220,6 @@ def wang_diff(
     return f
 
 
-@timeit
-def bisection(f: Callable, left: float, right: float, tol: float) -> float:
-    """
-    Bisection numerical method.
-
-    https://en.wikipedia.org/wiki/Root-finding_algorithms#Bisection_method
-
-    Args:
-        f (Callable): Function to find root of.
-        left (float): Left boundary.
-        right (float): Right boundary.
-        tol (float): tolerance for convergence.
-
-    Returns:
-        float: x such that |f(x)| < tol.
-    """
-    fleft = f(left)
-    fright = f(right)
-    if fleft * fright > 0:
-        print("Error: f(left) and f(right) must have opposite signs.")
-        return np.nan
-
-    while fleft * fright < 0 and right - left > tol:
-        mid = (left + right) / 2
-        fmid = f(mid)
-        if fleft * fmid < 0:
-            right = mid
-            fright = fmid
-        else:
-            left = mid
-            fleft = fmid
-    return (left + right) / 2
-
-
-def buck(temp: float) -> float:  # temp in K -> saturation vapour pressure in Pa
-    """
-    Arden Buck equation.
-
-    https://en.wikipedia.org/wiki/Arden_Buck_equation
-
-    Args:
-        temp (float): temperature in Kelvin.
-
-    Returns:
-        float: saturation vapour pressure in Pa.
-    """
-    # https://en.wikipedia.org/wiki/Arden_Buck_equation
-    temp: float = temp - TEMP_0K  # convert from degK to degC
-    return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
-
-
-def carnot(temp_hot: float, temp_cold: float) -> float:
-    """
-    Calculate carnot factor.
-
-    Args:
-        temp_hot (float): Temperature of hot reservoir [K].
-        temp_cold (float): Temperature of cold reservoir [K].
-
-    Returns:
-        float: Carnot factor [dimensionless].
-    """
-    return (temp_hot - temp_cold) / temp_hot
-
-
-def absolute_angular_momentum(v: float, r: float, f: float) -> float:
-    """
-    Calculate absolute angular momentum.
-
-    Args:
-        v (float): Azimuthal wind speed [m/s].
-        r (float): Radius from storm centre [m].
-        f (float): Coriolis parameter [s-1].
-
-    Returns:
-        float: Absolute angular momentum [m2/s].
-    """
-    return v * r + 0.5 * f * r**2  # [m2/s]
-
-
 def wang_consts(
     near_surface_air_temperature: float = 299,  # K
     outflow_temperature: float = 200,  # K
@@ -369,8 +258,10 @@ def wang_consts(
     absolute_angular_momentum_at_vmax = absolute_angular_momentum(
         maximum_wind_speed, radius_of_max_wind, coriolis_parameter
     )
-    carnot_efficiency = carnot(near_surface_air_temperature, outflow_temperature)
-    near_surface_saturation_vapour_presure = buck(near_surface_air_temperature)
+    carnot_efficiency = carnot_factor(near_surface_air_temperature, outflow_temperature)
+    near_surface_saturation_vapour_presure = buck_sat_vap_pressure(
+        near_surface_air_temperature
+    )
 
     return (
         (
@@ -468,7 +359,7 @@ def find_solution_rmaxv(
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=background_pressure
-                    - buck(near_surface_air_temperature),
+                    - buck_sat_vap_pressure(near_surface_air_temperature),
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=outflow_temperature,
                 )
@@ -478,9 +369,9 @@ def find_solution_rmaxv(
             1e-6,
         )
         # convert solution to pressure
-        pm_car = (background_pressure - buck(near_surface_air_temperature)) / ys + buck(
-            near_surface_air_temperature
-        )
+        pm_car = (
+            background_pressure - buck_sat_vap_pressure(near_surface_air_temperature)
+        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
 
         pcs.append(pm_cle)
         pcw.append(pm_car)
@@ -512,6 +403,79 @@ def find_solution_rmaxv(
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
     return intersect[0][0], vmax_pi, intersect[1][0]  # rmax, vmax, pm
+
+
+def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
+    """
+    Vary r0 for CLE15.
+
+    Args:
+        r0s (np.ndarray): r0s.
+
+    Returns:
+        np.ndarray: pcs.
+    """
+    pcs = np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
+    plt.plot(r0s / 1000, pcs / 100, "k")
+    plt.xlabel("Radius, $r_a$, [km]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.savefig(os.path.join(DATA_PATH, "r0_pc.pdf"))
+    plt.clf()
+    return pcs
+
+
+def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
+    """
+    Vary r0 for W22.
+
+    Args:
+        r0s (np.ndarray): r0s.
+
+    Returns:
+        np.ndarray: pms.
+    """
+    ys = np.array(
+        [
+            bisection(wang_diff(*wang_consts(radius_of_inflow=r0)), 0.3, 1.2, 1e-6)
+            for r0 in r0s
+        ]
+    )
+    pms = (
+        BACKGROUND_PRESSURE - buck_sat_vap_pressure(DEFAULT_SURF_TEMP)
+    ) / ys + buck_sat_vap_pressure(DEFAULT_SURF_TEMP)
+    plt.plot(r0s / 1000, np.array(pms) / 100, "r")
+    plt.xlabel("Radius, $r_a$, [km]")
+    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_wang.pdf"))
+    plt.clf()
+    return pms
+
+
+def profile_from_vals(
+    rmax: float, vmax: float, r0: float, fcor=7.836084948051749e-05, p0=1016 * 100
+):
+    """
+    Profile from values.
+
+    Args:
+        rmax (float): rmax [m]
+        vmax (float): vmax [m/s]
+        r0 (float): r0 [m]
+        fcor (float, optional): fcor. Defaults to 7.836084948051749e-05.
+        p0 (float, optional): p0. Defaults to 1016 * 100.
+
+    Returns:
+        dict: Dictionary of values using pressure wind relationship.
+    """
+    # rr = np.linspace(0, r0, num=1000)
+    ou = _run_cle15_oct2py(
+        **{"r0": r0, "Vmax": vmax, "rmax": rmax, "fcor": fcor, "p0": p0 / 100}
+    )
+    for key in ou:
+        if isinstance(ou[key], np.ndarray):
+            ou[key] = ou[key].flatten()
+    ou["p"] = pressure_from_wind(ou["rr"], ou["VV"], fcor=fcor, p0=p0)
+    return ou
 
 
 if __name__ == "__main__":

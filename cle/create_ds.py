@@ -18,11 +18,12 @@ from .find import (
     wang_diff,
     wang_consts,
     bisection,
-    buck,
+    buck_sat_vap_pressure,
     vary_r0_c15,
     vary_r0_w22,
     find_solution_rmaxv,
 )
+from .utils import coriolis_parameter_from_lat
 
 
 def find_solution_ds(
@@ -32,12 +33,12 @@ def find_solution_ds(
     Find the solution for a given dataset.
 
     Args:
-        ds (xr.Dataset): _description_
-        plot (bool, optional): _description_. Defaults to False.
-        supergradient_factor (float, optional): _description_. Defaults to 1.2.
+        ds (xr.Dataset): Dataset with the input values.
+        plot (bool, optional): Whether to plot. Defaults to False.
+        supergradient_factor (float, optional): Supergradient. Defaults to 1.2.
 
     Returns:
-        xr.Dataset: Find the solution dataset
+        xr.Dataset: Find the solution dataset.
     """
     r0s = np.linspace(200, 5000, num=30) * 1000  # [m] try different outer radii
     pcs = []
@@ -45,7 +46,7 @@ def find_solution_ds(
     rmaxs = []
     near_surface_air_temperature = ds["sst"].values + TEMP_0K - 1
     outflow_temperature = ds["t0"].values
-    coriolis_parameter = 2 * 7.2921e-5 * np.sin(np.deg2rad(ds["lat"].values))
+    coriolis_parameter = coriolis_parameter_from_lat(ds["lat"].values)
 
     for r0 in r0s:
         pm_cle, rmax_cle, vmax, pc = run_cle15(
@@ -67,7 +68,7 @@ def find_solution_ds(
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=ds["msl"].values * 100
-                    - buck(near_surface_air_temperature),
+                    - buck_sat_vap_pressure(near_surface_air_temperature),
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=outflow_temperature,
                 )
@@ -78,8 +79,8 @@ def find_solution_ds(
         )
         # convert solution to pressure
         pm_car = (
-            ds["msl"].values * 100 - buck(near_surface_air_temperature)
-        ) / ys + buck(near_surface_air_temperature)
+            ds["msl"].values * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
+        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
 
         pcs.append(pm_cle)
         pcw.append(pm_car)
@@ -146,7 +147,7 @@ def find_solution_ds(
 
 
 @timeit
-def find_solution():
+def find_solution() -> None:
     # without rmax adjustment
     r0s = np.linspace(200, 5000, num=30) * 1000  # [m]
 
@@ -174,7 +175,7 @@ def gom_time(time: str = "1850-09-15", plot: bool = False) -> np.ndarray:
         vmax_pi=ds["vmax"].values,
         outflow_temperature=ds["t0"].values,
         near_surface_air_temperature=ds["sst"].values + TEMP_0K - 1,
-        coriolis_parameter=2 * 7.2921e-5 * np.sin(np.deg2rad(ds["lat"].values)),
+        coriolis_parameter=coriolis_parameter_from_lat(ds["lat"].values),
         background_pressure=ds["msl"].values * 100,
         plot=plot,
     )
@@ -253,6 +254,7 @@ def ds_solns(
 
 
 if __name__ == "__main__":
+    # python -m cle.create_ds
     ds_solns(
         num=200,
         verbose=True,
