@@ -145,6 +145,10 @@ def find_solution_ds(
 
 @timeit
 def find_solution() -> None:
+    """
+    Find a single solution and plot the results.
+    """
+
     # without rmax adjustment
     r0s = np.linspace(200, 5000, num=30) * 1000  # [m]
 
@@ -164,6 +168,16 @@ def find_solution() -> None:
 
 
 def gom_time(time: str = "1850-09-15", plot: bool = False) -> np.ndarray:
+    """
+    Find the solution for a given time.
+
+    Args:
+        time (str, optional): Time. Defaults to "1850-09-15".
+        plot (bool, optional): Whether to plot. Defaults to False.
+
+    Returns:
+        np.ndarray: Solution.
+    """
     # find_solution()
     # find_solution_rmaxv()
     ds = gom_combined_inout_timestep_cmip6(time=time, verbose=True)

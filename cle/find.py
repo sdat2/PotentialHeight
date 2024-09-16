@@ -11,7 +11,6 @@ from sithom.plot import plot_defaults
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from .constants import (
-    TEMP_0K,
     BACKGROUND_PRESSURE,
     DEFAULT_SURF_TEMP,
     DATA_PATH,
@@ -31,8 +30,12 @@ plot_defaults()
 os.environ["OCTAVE_CLI_OPTIONS"] = str(
     "--no-gui --no-gui-libs"  # disable gui to improve performance
 )
-oc = Oct2Py(logger=get_log())
-oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
+try:
+    oc = Oct2Py(logger=get_log())
+    oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
+except Exception as e:
+    print(e)
+    oc = None
 # oc.addpath(".")
 # oc.addpath("mfiles/")
 # path = "/Users/simon/tcpips/cle/"
