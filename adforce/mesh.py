@@ -14,7 +14,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from .constants import NO_BBOX
+from .constants import NO_BBOX, FORT63_EXAMPLE
 
 
 @timeit
@@ -218,7 +218,7 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
 
     Returns:
         xr.Dataset: Dual graph dataset.
-         - "triangles": Mx3 array of triangle indices.
+         - "element": Mx3 array of triangle indices.
          - "start": 2E array of start indices. (Double counting)
          - "end": 2E array of end indices. (Double counting)
 
@@ -228,15 +228,15 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
         True
         >>> np.all(ds.end.values == np.array([1, 0]))
         True
-        >>> np.all(ds.triangle.values == np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
         True
     """
     starts, ends = dual_graph_starts_ends_from_triangles(triangles)
     return xr.Dataset(
         {
-            "triangle": (
-                ["node", "vertex"],
-                triangles,
+            "element": (
+                ["nele", "nvertex"],
+                triangles + 1,
                 {
                     "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
                 },
@@ -246,10 +246,77 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
         },
         coords={
             "edge": np.arange(len(starts)),
-            "node": np.arange(len(triangles)),
+            "nele": np.arange(len(triangles)),
+            "nvertex": np.arange(3),
         },
         attrs={"description": "Dual graph of the mesh."},
     )
+
+
+def _test_xr_dataset() -> xr.Dataset:
+    """
+    Test xr.Dataset for dual graph.
+
+    Returns:
+        xr.Dataset: Dual graph dataset.
+    """
+    return xr.Dataset(
+        {
+            "element": (
+                ["nele", "nvertex"],
+                np.array([[0, 1, 2], [1, 2, 3]]) + 1,
+                {
+                    "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
+                },
+            ),
+            "depth": (["node"], np.array([1, 2, 3, 4])),
+            "x": (["node"], np.array([0, 1, 2, 3])),
+            "y": (["node"], np.array([0, -1, -1, -2])),
+        },
+        coords={
+            "nele": np.arange(2),
+            "nvertex": np.arange(3),
+            "node": np.arange(4),
+        },
+        attrs={"description": "Test original dataset."},
+    )
+
+
+def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Process the dual graph of a mesh.
+
+    Args:
+        path (str, optional): Path to ADCIRC output file. Defaults to FORT63_EXAMPLE.
+
+    Returns:
+        xr.Dataset: Dual graph dataset.
+
+    Examples::
+        >>> ds = process_dual_graph(_test_xr_dataset())
+        >>> np.isclose(ds.depth.values, np.array([2, 3]), atol=1e-6).all()
+        True
+        >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3]), atol=1e-6).all()
+        True
+        >>> np.isclose(ds.x.values, np.array([1, 2]), atol=1e-6).all()
+        True
+        >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
+        True
+    """
+    # ds = xr_loader(path)
+    dg = dual_graph_dataset(ds.element.values - 1)
+    for val in ["x", "y", "depth"]:
+        dg[val] = (
+            ["nele"],
+            mean_for_triangle(ds[val].values, ds["element"].values - 1),
+        )
+    dg["depth_grad"] = (
+        ["direction", "nele"],
+        grad_for_triangle(
+            ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
+        ),
+    )
+    return dg.assign_coords({"direction": ["x", "y"]})
 
 
 def mean_for_triangle(values: np.ndarray, triangles: np.ndarray) -> np.ndarray:
@@ -559,4 +626,6 @@ if __name__ == "__main__":
     print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
     print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
     print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
-    print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
+    print(process_dual_graph())
+    print(xr_loader(FORT63_EXAMPLE))

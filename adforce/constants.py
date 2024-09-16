@@ -14,3 +14,6 @@ NEW_ORLEANS = Point(-90.0715, 29.9511, desc="New Orleans")  # lon , lat
 
 SRC_PATH = Path(__file__).parent
 SETUP_PATH = os.path.join(SRC_PATH, "setup")
+PROJ_PATH = Path(SRC_PATH).parent
+DATA_PATH = os.path.join(PROJ_PATH, "data")
+FORT63_EXAMPLE = os.path.join(DATA_PATH, "fort.63.nc")
