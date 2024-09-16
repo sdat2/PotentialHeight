@@ -272,22 +272,29 @@ def _test_xr_dataset() -> xr.Dataset:
             "depth": (["node"], np.array([1, 2, 3, 4])),
             "x": (["node"], np.array([0, 1, 2, 3])),
             "y": (["node"], np.array([0, -1, -1, -2])),
+            "zeta": (["time", "node"], np.array([[1, 2, 3, 4], [2, 3, 4, 5]])),
         },
         coords={
             "nele": np.arange(2),
             "nvertex": np.arange(3),
             "node": np.arange(4),
+            "time": np.array(
+                [
+                    np.datetime64("2021-01-01 00:00:00"),
+                    np.datetime64("2021-01-01 01:00:00"),
+                ]
+            ),
         },
         attrs={"description": "Test original dataset."},
     )
 
 
-def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
+def process_dual_graph(ds: xr.Dataset = xr_loader(FORT63_EXAMPLE)) -> xr.Dataset:
     """
-    Process the dual graph of a mesh.
+    Create a dual graph dataset from an ADCIRC output dataset.
 
     Args:
-        path (str, optional): Path to ADCIRC output file. Defaults to FORT63_EXAMPLE.
+        ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
 
     Returns:
         xr.Dataset: Dual graph dataset.
@@ -302,14 +309,22 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
         True
         >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
         True
+        >>> np.isclose(ds.zeta.values, np.array([[2, 3], [3, 4]]), atol=1e-6).all()
+        True
     """
     # ds = xr_loader(path)
     dg = dual_graph_dataset(ds.element.values - 1)
-    for val in ["x", "y", "depth"]:
+    for val in ["x", "y", "depth"]:  # static fields
         dg[val] = (
             ["nele"],
             mean_for_triangle(ds[val].values, ds["element"].values - 1),
         )
+    for val in ["zeta"]:  # time varying fields
+        dg[val] = (
+            ["time", "nele"],
+            np.mean(ds[val].values[:, ds["element"].values - 1], axis=2),
+        )
+    # calculate the gradient of the depth
     dg["depth_grad"] = (
         ["direction", "nele"],
         grad_for_triangle(
@@ -319,7 +334,9 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
     return dg.assign_coords({"direction": ["x", "y"]})
 
 
-def mean_for_triangle(values: np.ndarray, triangles: np.ndarray) -> np.ndarray:
+def mean_for_triangle(
+    values: np.ndarray, triangles: np.ndarray, mean_axis=1
+) -> np.ndarray:
     """
     Calculate the mean value for each triangle.
 
@@ -627,5 +644,5 @@ if __name__ == "__main__":
     print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
     print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
     # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
-    print(process_dual_graph())
+    print(process_dual_graph(xr_loader(FORT63_EXAMPLE)))
     print(xr_loader(FORT63_EXAMPLE))
