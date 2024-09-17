@@ -9,9 +9,11 @@ E1104_nondim_r0input also calls ER11_radprof a large number of times.
 
 `curveintersect` is called a huge number of times after nondimensionalising.
 
-# currently includes code to couple matlab to python for wang22 PS calculation
+## currently includes code to couple matlab to python for wang22 PS calculation
 
 - Direct coupling and indirect coupling.
+
+## Potential size calculation module
 
 potential_size.py - Calculate potential size.
 ps_dataset.py - Put potential size calculations into xarray dataset.

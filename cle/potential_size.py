@@ -16,6 +16,9 @@ from .constants import (
     DATA_PATH,
     FIGURE_PATH,
     SRC_PATH,
+    F_COR_DEFAULT,
+    W_COOL_DEFAULT,
+    RHO_AIR_DEFAULT,
 )
 from .utils import (
     pressure_from_wind,
@@ -168,7 +171,7 @@ def run_cle15(
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
     p0 = ins["p0"] * 100  # [Pa]
-    rho0 = 1.15  # [kg m-3]
+    rho0 = RHO_AIR_DEFAULT  # [kg m-3]
     rr = np.array(ou["rr"])  # [m]
     vv = np.array(ou["VV"])  # [m/s]
     p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
@@ -225,7 +228,7 @@ def wang_consts(
     beta_lift_parameterization: float = 1.25,  # dimensionless
     efficiency_relative_to_carnot: float = 0.5,  # dimensionless
     pressure_dry_at_inflow: float = 985 * 100,  # Pa
-    coriolis_parameter: float = 5e-5,  # s-1
+    coriolis_parameter: float = F_COR_DEFAULT,  # s-1
     maximum_wind_speed: float = 83,  # m/s
     radius_of_inflow: float = 2193 * 1000,  # m
     radius_of_max_wind: float = 64 * 1000,  # m
@@ -307,10 +310,10 @@ def wang_consts(
 
 def find_solution_rmaxv(
     vmax_pi: float = 86,  # m/s
-    coriolis_parameter: float = 5e-5,  # s-1
+    coriolis_parameter: float = F_COR_DEFAULT,  # s-1
     background_pressure: float = BACKGROUND_PRESSURE,  # Pa
     near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
-    w_cool: float = 0.002,
+    w_cool: float = W_COOL_DEFAULT,  # K m s-1
     outflow_temperature: float = 200,  # K
     supergradient_factor: float = 1.2,  # dimensionless
     plot: bool = False,
@@ -437,7 +440,7 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
 
 
 def profile_from_vals(
-    rmax: float, vmax: float, r0: float, fcor=7.836084948051749e-05, p0=1016 * 100
+    rmax: float, vmax: float, r0: float, fcor=F_COR_DEFAULT, p0=1016 * 100
 ):
     """
     Profile from values.

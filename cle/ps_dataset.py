@@ -10,7 +10,7 @@ from sithom.io import read_json
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from tcpips.pi import gom_combined_inout_timestep_cmip6
-from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH
+from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH, W_COOL_DEFAULT
 from .potential_size import (
     run_cle15,
     wang_diff,
@@ -51,7 +51,7 @@ def find_solution_ds(
             inputs={
                 "r0": r0,
                 "Vmax": ds["vmax"].values,
-                "w_cool": 0.002,
+                "w_cool": W_COOL_DEFAULT,
                 "fcor": coriolis_parameter,
                 "p0": float(ds["msl"].values),
             },

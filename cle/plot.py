@@ -343,6 +343,7 @@ def plot_gom_bbox() -> None:
 
 
 def plot_gom_bbox_soln() -> None:
+    """Plot the solution for the GOM bbox."""
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
     folder = SUP_PATH
@@ -408,6 +409,8 @@ def plot_gom_solns() -> None:
 
 
 def plot_and_calc_gom() -> None:
+    """Plot the solution curves for different years
+    for the Gulf of Mexico."""
     solns = []
     # times = [1850, 1900, 1950, 2000, 2050, 2099]
     times = [int(x) for x in range(1850, 2100, 20)]
@@ -477,12 +480,6 @@ def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
             color="red",
             s=marker_size,
         )
-        """        axs[1].scatter(
-            0,
-            dst["pmin"].values / 100,
-            color="red",
-            s=marker_size,
-        )"""
         write_json(ou, os.path.join(DATA_PATH, f"{time}.json"))
 
     axs[0].set_ylabel("Wind speed, $V$ [m s$^{-1}$]")
