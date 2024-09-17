@@ -12,3 +12,9 @@ E1104_nondim_r0input also calls ER11_radprof a large number of times.
 # currently includes code to couple matlab to python for wang22 PS calculation
 
 - Direct coupling and indirect coupling.
+
+potential_size.py - Calculate potential size.
+ps_dataset.py - Put potential size calculations into xarray dataset.
+utils.py - generic climate calculation utilities.
+solve.py - equation solving functions.
+plot.py - functions for visualizing results.

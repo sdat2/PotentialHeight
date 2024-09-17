@@ -15,6 +15,7 @@ from .constants import (
     DEFAULT_SURF_TEMP,
     FIGURE_PATH,
     DATA_PATH,
+    SUP_PATH,
 )
 
 from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
@@ -86,7 +87,7 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
         ds_name (str, optional): Defaults to os.path.join(DATA_PATH, "gom_soln_new.nc").
     """
     ds = xr.open_dataset(ds_name)
-    folder = "sup"
+    folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -164,7 +165,7 @@ def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) 
     """
     plot_defaults()
     ds = xr.open_dataset(ds_name)
-    folder = "sup"
+    folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     for time in range(len(ds.time.values)):
@@ -243,7 +244,7 @@ def plot_profiles(ds_name: str = os.path.join(DATA_PATH, "gom_soln_2.nc")) -> No
     """
     plot_defaults()
     ds = xr.open_dataset(ds_name)
-    folder = "sup"
+    folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     for time in range(len(ds.time.values)):
@@ -268,7 +269,7 @@ def plot_gom_bbox() -> None:
     plot_defaults()
 
     ds = gom_bbox_combined_inout_timestep_cmip6(time="2015-01-15", pad=10)
-    folder = "sup"
+    folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     print(ds)
     ds.vmax.plot()
@@ -344,7 +345,7 @@ def plot_gom_bbox() -> None:
 def plot_gom_bbox_soln() -> None:
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
-    folder = "sup"
+    folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}

@@ -34,16 +34,9 @@ try:
     oc = Oct2Py(logger=get_log())
     oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
 except Exception as e:
+    # allow the code to be tested without octave
     print(e)
     oc = None
-# oc.addpath(".")
-# oc.addpath("mfiles/")
-# path = "/Users/simon/tcpips/cle/"
-# oc.addpath("/Users/simon/tcpips/cle/")
-# oc.addpath("/Users/simon/tcpips/cle/mfiles")
-# oc.eval("addpath(genpath('.'))")
-# oc.eval("addpath(genpath('mfiles/'))")
-# print("dir", dir(oc))
 
 
 @timeit

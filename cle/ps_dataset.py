@@ -1,5 +1,5 @@
 """
-Create dataset.
+Create dataset for potential size / intensity.
 """
 
 import os
@@ -203,6 +203,7 @@ def calc_solns_for_times(
 
     Args:
         num (int, optional): How many timesteps to process. Defaults to 50.
+        ds_name ([type], optional): Name of the dataset. Defaults to os.path.join(DATA_PATH, "gom_solns.nc").
     """
     print("NUM", num)
     solns = []

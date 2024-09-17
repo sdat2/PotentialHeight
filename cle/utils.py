@@ -18,7 +18,7 @@ def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
 
     Example::
         >>> cp_out = coriolis_parameter_from_lat(30)
-        >>> cp_manual = 2 * 2 * np.pi / 24 / 60 / 60 * 1/2
+        >>> cp_manual = 2 * 2 * np.pi / 24 / 60 / 60 * 1/2  ## 2 * omega * sin(30deg)
         >>> np.isclose(cp_out, cp_manual, rtol=1e-3, atol=1e-6)
         True
     """
@@ -31,7 +31,7 @@ def pressure_from_wind(
     vv: np.ndarray,  # [m/s]
     p0: float = 1015 * 100,  # Pa
     rho0: float = 1.15,  # kg m-3
-    fcor: float = 5e-5,  # m s-2
+    fcor: float = 5e-5,  # s-2
 ) -> np.ndarray:  # [Pa]
     """
     Use coriolis force and pressure gradient force to find physical
@@ -44,7 +44,7 @@ def pressure_from_wind(
         vv (np.ndarray): velocity array [m/s]
         p0 (float): ambient pressure [Pa].
         rho0 (float): Air density at ambient pressure [kg/m3].
-        fcor (float): Coriolis force.
+        fcor (float): Coriolis force [s-1].
 
     Returns:
         np.ndarray: Pressure array [Pa].
