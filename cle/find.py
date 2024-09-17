@@ -336,7 +336,7 @@ def find_solution_rmaxv(
         plot (bool, optional): Plot the output. Defaults to False.
 
     Returns:
-        Tuple[float, float, float]: rmax, vmax_pi, pm
+        Tuple[float, float, float]: rmax, vmax_pi, pm.
     """
     r0s = np.linspace(200, 5000, num=30) * 1000
     pcs = []
@@ -418,13 +418,7 @@ def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: pcs.
     """
-    pcs = np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
-    plt.plot(r0s / 1000, pcs / 100, "k")
-    plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig(os.path.join(DATA_PATH, "r0_pc.pdf"))
-    plt.clf()
-    return pcs
+    return np.array([run_cle15(plot=False, inputs={"r0": r0})[0] for r0 in r0s])
 
 
 def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
@@ -446,11 +440,6 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
     pms = (
         BACKGROUND_PRESSURE - buck_sat_vap_pressure(DEFAULT_SURF_TEMP)
     ) / ys + buck_sat_vap_pressure(DEFAULT_SURF_TEMP)
-    plt.plot(r0s / 1000, np.array(pms) / 100, "r")
-    plt.xlabel("Radius, $r_a$, [km]")
-    plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
-    plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_wang.pdf"))
-    plt.clf()
     return pms
 
 

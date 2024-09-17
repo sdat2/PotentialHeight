@@ -167,9 +167,9 @@ def find_solution() -> None:
     run_cle15(inputs={"r0": intersect[0][0]}, plot=True)
 
 
-def gom_time(time: str = "1850-09-15", plot: bool = False) -> np.ndarray:
+def gom_timestep(time: str = "1850-09-15", plot: bool = False) -> np.ndarray:
     """
-    Find the solution for a given time.
+    Find the solution at the Gulf of Mexico point for a given time.
 
     Args:
         time (str, optional): Time. Defaults to "1850-09-15".
@@ -210,7 +210,7 @@ def calc_solns_for_times(
     times = [int(x) for x in np.linspace(1850, 2099, num=num)]
 
     for time in [str(t) + "-08-15" for t in times]:
-        solns += [gom_time(time=time, plot=False)]
+        solns += [gom_timestep(time=time, plot=False)]
 
     solns = np.array(solns)
     print("solns", solns)
@@ -222,6 +222,7 @@ def calc_solns_for_times(
             "pm": ("year", solns[:, 2]),
         },
         coords={"year": times},
+        attrs={"description": "GOM midpoints solutions"},
     )
     ds.to_netcdf(ds_name)
 
@@ -240,7 +241,7 @@ def ds_solns(
     Args:
         num (int, optional): Number of years to calculate for. Defaults to 50.
         verbose (bool, optional): Verbose. Defaults to False.
-        ds_name (str, optional): Name of the dataset. Defaults to os.path.join(DATA_PATH, "gom_soln_new.nc").
+        ds_name (str, optional): Name of the dataset. Defaults to os.path.join(DATA_PATH, "gom_soln_timeseries.nc").
 
     """
     times = [int(x) for x in np.linspace(1850, 2099, num=num)]

@@ -9,9 +9,6 @@ from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from sithom.io import write_json
-
-
-# from tcpips.pi import get_gom_bbox
 from .constants import (
     TEMP_0K,
     BACKGROUND_PRESSURE,
@@ -20,7 +17,7 @@ from .constants import (
     DATA_PATH,
 )
 
-# from .create_ds import gom_time
+from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
 from .find import (
     carnot_factor,
     profile_from_vals,
@@ -30,12 +27,13 @@ from .find import (
     wang_diff,
     wang_consts,
 )
-from .create_ds import find_solution_ds, gom_time
+
+from .create_ds import find_solution_ds, gom_timestep
 
 plot_defaults()
 
 
-def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
+def vary_r0_c15_plot(r0s: np.ndarray) -> np.ndarray:
     """
     Plot the pressure at maximum winds for different radii.
 
@@ -55,7 +53,7 @@ def vary_r0_c15(r0s: np.ndarray) -> np.ndarray:
     return pms
 
 
-def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
+def vary_r0_w22_plot(r0s: np.ndarray, plot=False) -> np.ndarray:
     """
     Plot the pressure at maximum winds for different radii.
 
@@ -87,10 +85,11 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     Plot the relationships between the variables.
 
     Args:
-        ds_name (str, optional): Defaults to "gom_soln_new.nc".
+        ds_name (str, optional): Defaults to os.path.join(DATA_PATH, "gom_soln_new.nc").
     """
     ds = xr.open_dataset(ds_name)
     folder = "sup"
+    os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(ds["time"], ds["r0"] / 1000, "k")
@@ -168,6 +167,7 @@ def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) 
     plot_defaults()
     ds = xr.open_dataset(ds_name)
     folder = "sup"
+    os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     for time in range(len(ds.time.values)):
         dst = ds.isel(time=time)
@@ -236,7 +236,7 @@ def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) 
     plt.clf()
 
 
-def plot_profiles(ds_name: str = "gom_soln_2.nc") -> None:
+def plot_profiles(ds_name: str = os.path.join(DATA_PATH, "gom_soln_2.nc")) -> None:
     """
     Plot the azimuthal wind profiles for different times.
 
@@ -246,6 +246,7 @@ def plot_profiles(ds_name: str = "gom_soln_2.nc") -> None:
     plot_defaults()
     ds = xr.open_dataset(ds_name)
     folder = "sup"
+    os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     for time in range(len(ds.time.values)):
         dst = ds.isel(time=time)
@@ -268,8 +269,9 @@ def plot_gom_bbox() -> None:
     """Try and calculate the solution for the GOM bbox."""
     plot_defaults()
 
-    ds = get_gom_bbox(time="2015-01-15", pad=10)
+    ds = gom_bbox_combined_inout_timestep_cmip6(time="2015-01-15", pad=10)
     folder = "sup"
+    os.makedirs(folder, exist_ok=True)
     print(ds)
     ds.vmax.plot()
     plt.xlabel(r"Longitude, $\lambda$, [$^\circ$]")
@@ -345,6 +347,7 @@ def plot_gom_bbox_soln() -> None:
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
     folder = "sup"
+    os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
@@ -412,7 +415,7 @@ def plot_and_calc_gom() -> None:
 
     # pick the August average in the data sets
     for time in [str(t) + "-08-15" for t in times]:
-        solns += [gom_time(time=time, plot=False)]
+        solns += [gom_timestep(time=time, plot=False)]
 
     solns = np.array(solns)
     print("solns", solns)
@@ -502,7 +505,13 @@ if __name__ == "__main__":
     # plot_from_ds()
     # plot_and_calc_gom()
     # plot_gom_solns()
-    plot_c15_profiles_over_time()
+    # plot_c15_profiles_over_time()
+    # plot_and_calc_gom()
+    plot_gom_solns()
+    plot_gom_bbox_soln()
+    plot_soln_curves()
+    plot_profiles()
+    plot_from_ds()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
     print(ds)
     print([var for var in ds])
