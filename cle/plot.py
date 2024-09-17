@@ -94,10 +94,12 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     axs[0].plot(ds["time"], ds["r0"] / 1000, "k")
     axs[1].plot(ds["time"], ds["vmax"], "k")
     axs[2].plot(ds["time"], ds["pm"] / 100, "k")
+    label_subplots(axs)
     plt.xlabel("Year")
     axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    label_subplots(axs)
     plt.savefig(os.path.join(folder, "rmax_time_new.pdf"))
     plt.clf()
 
@@ -126,6 +128,7 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     axs[0].plot(ds["time"], ds["sst"], "k")
     axs[1].plot(ds["time"], ds["vmax"], "k")
     axs[2].plot(ds["time"], ds["r0"] / 1000, "k")
+    label_subplots(axs)
     plt.xlabel("Year")
     axs[0].set_ylabel("Sea surface temperature, $T_s$, [$^\circ$C]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
@@ -141,6 +144,7 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     axs[0].plot(ds["time"], ds["carnot"], "k")
     axs[1].plot(ds["time"], ds["vmax"], "k")
     axs[2].plot(ds["time"], ds["r0"] / 1000, "k")
+    label_subplots(axs)
     plt.xlabel("Year")
     axs[0].set_ylabel(
         r"Carnot factor, $\eta_c$, $\frac{T_h}{T_h- T_c}$ [dimensionless]"
@@ -405,6 +409,7 @@ def plot_gom_solns() -> None:
     axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
 
 
@@ -429,6 +434,7 @@ def plot_and_calc_gom() -> None:
     axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
 
 
