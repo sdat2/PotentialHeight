@@ -1,4 +1,4 @@
-"""Run the CLE15 model with json files."""
+"""Run the CLE15 model with json files or octopy."""
 
 from typing import Callable, Tuple, Optional, Dict
 import os
