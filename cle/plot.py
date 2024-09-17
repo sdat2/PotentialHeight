@@ -18,17 +18,15 @@ from .constants import (
 )
 
 from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
-from .find import (
-    carnot_factor,
+from .solve import bisection
+from .potential_size import (
     profile_from_vals,
     run_cle15,
-    bisection,
-    buck_sat_vap_pressure,
     wang_diff,
     wang_consts,
 )
-
-from .create_ds import find_solution_ds, gom_timestep
+from .utils import coriolis_parameter_from_lat, buck_sat_vap_pressure, carnot_factor
+from .ps_dataset import find_solution_ds, gom_timestep
 
 plot_defaults()
 

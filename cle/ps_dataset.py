@@ -11,7 +11,7 @@ from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from tcpips.pi import gom_combined_inout_timestep_cmip6
 from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH
-from .find import (
+from .potential_size import (
     run_cle15,
     wang_diff,
     wang_consts,
