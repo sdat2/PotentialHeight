@@ -11,6 +11,8 @@ from scipy.stats import pearsonr
 from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from sithom.io import write_json
+from sithom.curve import fit
+from sithom.unc import tex_uf
 from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
 from tcpips.constants import GOM
 from .constants import (
@@ -202,6 +204,22 @@ def figure2() -> None:
 
     axs[0, 1].text(0.8, 0.9, f"$\\rho$ = {r_vmax:.2f}", transform=axs[0, 1].transAxes)
     axs[1, 1].text(0.8, 0.9, f"$\\rho$ = {r_r0:.2f}", transform=axs[1, 1].transAxes)
+
+    # work out gradient with error bars for same period
+    fit_vmax, _ = fit(years, vmaxs)
+    fit_r0, _ = fit(years, r0s / 1000)
+    axs[0, 1].text(
+        0.66,
+        0.05,
+        f"$m=$  " "${:.1eL}$".format(fit_vmax[0]) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+        transform=axs[0, 1].transAxes,
+    )
+    axs[1, 1].text(
+        0.66,
+        0.1,
+        f"$m=$" + "${:.2L}$".format(fit_r0[0]) + " km yr$^{-1}$",
+        transform=axs[1, 1].transAxes,
+    )
 
     axs[0, 1].plot(timeseries_ds["time"], timeseries_ds["vmax"], "k")
     axs[1, 1].plot(timeseries_ds["time"], timeseries_ds["r0"] / 1000, "k")
