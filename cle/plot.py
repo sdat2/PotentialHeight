@@ -160,6 +160,47 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     plt.clf()
 
 
+def figure2() -> None:
+    fig, axs = plt.subplots(
+        2,
+        2,
+        figsize=(9, 5),
+        width_ratios=[1, 1.5],
+        height_ratios=[1, 1],
+    )
+    from tcpips.constants import GOM
+
+    # axs[].plot(ds["time"], ds["sst"], "k")
+    plot_defaults()
+    ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
+    folder = SUP_PATH
+    os.makedirs(folder, exist_ok=True)
+    print("ds", ds)
+    ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
+    ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+
+    timeseries_ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
+
+    (ds["r0"] / 1000).plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
+    axs[0, 0].scatter(GOM[0], GOM[1], color="k", s=10, marker="x")
+    axs[0, 0].set_title("Potential size, $r_a$ [km]")
+    axs[0, 1].set_title("Potential size, $r_a$ [km]")
+    ds["vmax"].plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
+    axs[1, 0].scatter(GOM[0], GOM[1], color="k", s=10, marker="x")
+    axs[1, 0].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
+    axs[1, 1].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
+
+    axs[1, 1].plot(timeseries_ds["time"], timeseries_ds["vmax"], "k")
+    axs[0, 1].plot(timeseries_ds["time"], timeseries_ds["r0"] / 1000, "k")
+    label_subplots(axs)
+    axs[0, 0].set_xlabel("")
+    axs[1, 1].set_xlabel("Year")
+    # axs[0, 1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    # axs[1, 1].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    plt.savefig(os.path.join(folder, "figure2.pdf"))
+    plt.clf()
+
+
 def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> None:
     """
     Plot the solution curves for different.
@@ -509,12 +550,13 @@ if __name__ == "__main__":
     # plot_gom_solns()
     # plot_c15_profiles_over_time()
     # plot_and_calc_gom()
-    plot_gom_solns()
-    plot_gom_bbox_soln()
-    plot_soln_curves()
-    plot_profiles()
-    plot_from_ds()
-    ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
-    print(ds)
-    print([var for var in ds])
-    print(ds["msl"].values)
+    # plot_gom_solns()
+    # plot_gom_bbox_soln()
+    # plot_soln_curves()
+    # plot_profiles()
+    # plot_from_ds()
+    # ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
+    # print(ds)
+    # print([var for var in ds])
+    # print(ds["msl"].values)
+    figure2()
