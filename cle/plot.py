@@ -6,9 +6,13 @@ import os
 import numpy as np
 import xarray as xr
 from matplotlib import pyplot as plt
+from scipy.stats import pearsonr
+
 from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from sithom.io import write_json
+from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
+from tcpips.constants import GOM
 from .constants import (
     TEMP_0K,
     BACKGROUND_PRESSURE,
@@ -18,7 +22,6 @@ from .constants import (
     SUP_PATH,
 )
 
-from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
 from .solve import bisection
 from .potential_size import (
     profile_from_vals,
@@ -26,7 +29,7 @@ from .potential_size import (
     wang_diff,
     wang_consts,
 )
-from .utils import coriolis_parameter_from_lat, buck_sat_vap_pressure, carnot_factor
+from .utils import buck_sat_vap_pressure, carnot_factor
 from .ps_dataset import find_solution_ds, gom_timestep
 
 plot_defaults()
@@ -161,44 +164,58 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
 
 
 def figure2() -> None:
-    fig, axs = plt.subplots(
+    """Plot the solution for the GOM bbox for potential size and intensity."""
+    _, axs = plt.subplots(
         2,
         2,
-        figsize=(9, 5),
+        figsize=(9, 6),
         width_ratios=[1, 1.5],
         height_ratios=[1, 1],
     )
-    from tcpips.constants import GOM
 
     # axs[].plot(ds["time"], ds["sst"], "k")
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
     folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
-    print("ds", ds)
+    # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
-
     timeseries_ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
+    (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
+    axs[1, 0].set_title("Potential size, $r_a$ [km]")
+    axs[1, 1].set_title("Potential size, $r_a$ [km]")
+    ds["vmax"].plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
+    axs[0, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    axs[1, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    axs[0, 0].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
+    axs[0, 1].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
 
-    (ds["r0"] / 1000).plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
-    axs[0, 0].scatter(GOM[0], GOM[1], color="k", s=10, marker="x")
-    axs[0, 0].set_title("Potential size, $r_a$ [km]")
-    axs[0, 1].set_title("Potential size, $r_a$ [km]")
-    ds["vmax"].plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
-    axs[1, 0].scatter(GOM[0], GOM[1], color="k", s=10, marker="x")
-    axs[1, 0].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
-    axs[1, 1].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
+    ## work out correlation between time and vmax between 2000 and 2099
+    year_min = 2014
+    year_max = 2100
+    vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
+    r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
+    years = timeseries_ds["time"].sel(time=slice(year_min, year_max)).values
+    r_vmax = pearsonr(vmaxs, years)[0]
+    r_r0 = pearsonr(r0s, years)[0]
 
-    axs[1, 1].plot(timeseries_ds["time"], timeseries_ds["vmax"], "k")
-    axs[0, 1].plot(timeseries_ds["time"], timeseries_ds["r0"] / 1000, "k")
+    axs[0, 1].text(0.8, 0.9, f"$\\rho$ = {r_vmax:.2f}", transform=axs[0, 1].transAxes)
+    axs[1, 1].text(0.8, 0.9, f"$\\rho$ = {r_r0:.2f}", transform=axs[1, 1].transAxes)
+
+    axs[0, 1].plot(timeseries_ds["time"], timeseries_ds["vmax"], "k")
+    axs[1, 1].plot(timeseries_ds["time"], timeseries_ds["r0"] / 1000, "k")
     label_subplots(axs)
     axs[0, 0].set_xlabel("")
     axs[1, 1].set_xlabel("Year")
-    # axs[0, 1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
-    # axs[1, 1].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[0, 1].set_xlim([1850, 2100])
+    axs[1, 1].set_xlim([1850, 2100])
+    # vertical black line at year_min
+    axs[0, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
+    axs[1, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
     plt.savefig(os.path.join(folder, "figure2.pdf"))
     plt.clf()
+    print(timeseries_ds)
 
 
 def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> None:
