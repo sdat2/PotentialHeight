@@ -11,6 +11,7 @@ import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 from scipy.stats import genextreme
 from tcpips.constants import DATA_PATH, FIGURE_PATH
+from tqdm import tqdm
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from sithom.time import timeit
 from .utils import alpha_from_z_star_beta_gamma, plot_rp, plot_sample_points
@@ -416,7 +417,11 @@ def fit_for_seeds(
     """
     print("nums", nums, type(nums))
     results = []
-    for seed in seeds:
+    for seed in tqdm(
+        seeds,
+        desc="Seeds",
+        total=len(seeds),
+    ):
         results.append(
             try_fits(
                 z_star=z_star,
@@ -453,9 +458,9 @@ def get_evt_fit_data(
         the GEV with the known upper bound, and the GEV with no upper bound.
     """
     data_name = os.path.join(
-        DATA_PATH, f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}.nc"
+        DATA_PATH, f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{len(nums)}.nc"
     )
-    print(data_name)
+    print(f"data_name = {data_name}")
     if load and os.path.exists(data_name):
         return xr.open_dataarray(data_name)
     else:
@@ -542,8 +547,8 @@ def evt_fig_tens(
     ex_num: int = 50,
     min_samp: int = 20,
     max_samp: int = 1000,
-    samp_steps: int = 200,
-    seed_steps: int = 20,  # 100,
+    samp_steps: int = 5,
+    seed_steps: int = 200,
     save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_tens.pdf"),
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
@@ -581,8 +586,6 @@ def evt_fig_tens(
         load=True,
     )
     # calculate statistics to work out sampling error
-    mn = res_ds.mean(dim="seed")
-    std = res_ds.std(dim="seed")
 
     # setup figure
     _, axs = plt.subplots(
@@ -605,25 +608,35 @@ def evt_fig_tens(
 
     numbers = res_ds.number.values
 
+    mn = res_ds.mean(dim="seed")
+    std = res_ds.std(dim="seed")
+    if seed_steps > 10:
+        # get 5th and 95th percentiles
+        lower_p = res_ds.quantile(0.05, dim="seed")
+        upper_p = res_ds.quantile(0.95, dim="seed")
+    else:
+        lower_p = mn - std
+        upper_p = mn + std
+
     axs[1].fill_between(
         numbers,
-        mn.isel(rp=0, fit=0).values - std.isel(rp=0, fit=0).values,
-        mn.isel(rp=0, fit=0).values + std.isel(rp=0, fit=0).values,
+        lower_p.isel(rp=0, fit=0).values,
+        upper_p.isel(rp=0, fit=0).values,
         alpha=0.2,
         color=color_true,
     )
     axs[2].fill_between(
         numbers,
-        mn.isel(rp=1, fit=0).values - std.isel(rp=1, fit=0).values,
-        mn.isel(rp=1, fit=0).values + std.isel(rp=1, fit=0).values,
+        lower_p.isel(rp=1, fit=0).values,
+        upper_p.isel(rp=1, fit=0).values,
         alpha=0.2,
         color=color_true,
         linestyle="-",
     )
     axs[1].fill_between(
         numbers,
-        mn.isel(rp=0, fit=1).values - std.isel(rp=0, fit=1).values,
-        mn.isel(rp=0, fit=1).values + std.isel(rp=0, fit=1).values,
+        lower_p.isel(rp=0, fit=1).values,
+        upper_p.isel(rp=0, fit=1).values,
         alpha=0.2,
         color=color_max_known,
         linestyle="-",
@@ -631,24 +644,24 @@ def evt_fig_tens(
 
     axs[2].fill_between(
         numbers,
-        mn.isel(rp=1, fit=1).values - std.isel(rp=1, fit=1).values,
-        mn.isel(rp=1, fit=1).values + std.isel(rp=1, fit=1).values,
+        lower_p.isel(rp=1, fit=1).values,
+        upper_p.isel(rp=1, fit=1).values,
         alpha=0.2,
         color=color_max_known,
         linestyle="-",
     )
     axs[1].fill_between(
         numbers,
-        mn.isel(rp=0, fit=2).values - std.isel(rp=0, fit=2).values,
-        mn.isel(rp=0, fit=2).values + std.isel(rp=0, fit=2).values,
+        lower_p.isel(rp=0, fit=2).values,
+        upper_p.isel(rp=0, fit=2).values,
         alpha=0.2,
         color=color_max_unknown,
         linestyle="-",
     )
     axs[2].fill_between(
         numbers,
-        mn.isel(rp=1, fit=2).values - std.isel(rp=1, fit=2).values,
-        mn.isel(rp=1, fit=2).values + std.isel(rp=1, fit=2).values,
+        lower_p.isel(rp=1, fit=2).values,
+        upper_p.isel(rp=1, fit=2).values,
         alpha=0.2,
         color=color_max_unknown,
         linestyle="-",

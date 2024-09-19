@@ -3,6 +3,7 @@
 from typing import Optional
 import numpy as np
 from scipy.stats import genextreme
+import matplotlib
 import matplotlib.pyplot as plt
 
 
@@ -59,7 +60,7 @@ def plot_rp(
     gamma: float,
     color: str = "blue",
     label: str = "",
-    ax: Optional[plt.Axis] = None,
+    ax: Optional[matplotlib.axes.Axes] = None,
     plot_alpha: float = 0.8,
 ) -> None:
     """
@@ -71,7 +72,7 @@ def plot_rp(
         gamma (float): The shape parameter.
         color (str, optional): The color of the line. Defaults to "blue".
         label (str, optional): The line label. Defaults to "".
-        ax (Optional[plt.Axis], optional): The axes to add the figure too. Defaults to None.
+        ax (Optional[matplotlib.axes.Axes], optional): The axes to add the figure too. Defaults to None.
         plot_alpha (float, optional): Transparency parameter of line. Defaults to 0.8.
     """
     z1yr = genextreme.isf(0.8, c=-gamma, loc=alpha, scale=beta)
@@ -87,7 +88,7 @@ def plot_rp(
     print(label, "rp1yr", z1yr, "rv1Myr", z1myr)
     if gamma < 0:  # Weibull class have upper bound
         z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
-        ax.hlines(z_star, 2, 1_000_000, color=color, linestyles="dashed")
+        ax.hlines(z_star, 1, 1_000_000, color=color, linestyles="dashed")
         rp = 1 / (1 - bg_cdf(znew, z_star, beta, gamma))
     else:
         rp = 1 / genextreme.sf(znew, c=-gamma, loc=alpha, scale=beta)
@@ -100,7 +101,7 @@ def plot_rp(
 def plot_sample_points(
     data: np.ndarray,
     color: str = "black",
-    ax: Optional[plt.Axis] = None,
+    ax: Optional[matplotlib.axes.Axes] = None,
     label: str = "Sampled data points",
 ) -> None:
     """
@@ -109,8 +110,13 @@ def plot_sample_points(
     Args:
         data (np.ndarray): The sample points to plot.
         color (str, optional): The color of the points. Defaults to "black".
-        ax (Optional[plt.Axis], optional): The axes to add the figure too. Defaults to None.
+        ax (Optional[matplotlib.axes.Axes], optional): The axes to add the figure too. Defaults to None.
         label (str, optional): The label of the points. Defaults to "Sampled data points".
+
+    Tests::
+        >>> data = [2, 1, 3, 0]
+        >>> [0, 1, 2, 3] == np.sort(data)
+        True
     """
     if ax is None:
         _, ax = plt.subplots(

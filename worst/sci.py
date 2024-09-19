@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from sithom.plot import get_dim, label_subplots, plot_defaults
 from sithom.time import timeit
 from tcpips.constants import FIGURE_PATH, DATA_PATH
-from .utils import alpha_from_z_star_beta_gamma, plot_rp, bg_cdf
+from .utils import alpha_from_z_star_beta_gamma, plot_rp
 
 
 def bg_pdf(z: np.ndarray, z_star: float, beta: float, gamma: float) -> np.ndarray:
