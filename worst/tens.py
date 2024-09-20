@@ -547,9 +547,8 @@ def evt_fig_tens(
     ex_num: int = 50,
     min_samp: int = 20,
     max_samp: int = 1000,
-    samp_steps: int = 5,
-    seed_steps: int = 200,
-    save_fig_path: str = os.path.join(FIGURE_PATH, "evt_fig_tens.pdf"),
+    samp_steps: int = 50,
+    seed_steps: int = 400,
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
     color_max_unknown: str = "#d95f02",
@@ -567,11 +566,15 @@ def evt_fig_tens(
         max_samp (int, optional): Maximum number of samples. Defaults to 1000.
         samp_steps (int, optional): Number of different samples. Defaults to 500.
         seed_steps (int, optional): Number of different seeds. Defaults to 20.
-        save_fig_path (str, optional): Save fig. Defaults to os.path.join(FIGURE_PATH, "evt_fig_tens.pdf").
         color_true (str, optional): Color or original GEV. Defaults to "black".
         color_max_known (str, optional): Color of GEV with max known. Defaults to "#1b9e77".
         color_max_unknown (str, optional): Color of GEV with unknown max. Defaults to "#d95f02".
     """
+    save_fig_path: str = os.path.join(
+        FIGURE_PATH,
+        f"evt_fig_tens__{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{samp_steps}_{seed_steps}.pdf",
+    )
+
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 
     plot_defaults()
