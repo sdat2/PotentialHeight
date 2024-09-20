@@ -1,6 +1,8 @@
 """Tensorflow optimization for the worst-case analysis of random variables.
 
-Sometimes breaks for no clear reason."""
+Sometimes breaks for no clear reason; in that case fit is retried 9 further times.
+It is very unlikely that the optimization will fail 10 times in a row, so this should be sufficient.
+"""
 
 from typing import List, Tuple
 import numpy as np
@@ -540,9 +542,9 @@ def plot_ex(
 
 @timeit
 def evt_fig_tens(
-    z_star: float = 7,
-    beta: float = 1,
-    gamma: float = -0.2,
+    z_star: float = 7,  # m
+    beta: float = 1,  # m
+    gamma: float = -0.2,  # [dimensionless]
     ex_seed: int = 57,
     ex_num: int = 50,
     min_samp: int = 20,
@@ -588,7 +590,6 @@ def evt_fig_tens(
         ),
         load=True,
     )
-    # calculate statistics to work out sampling error
 
     # setup figure
     _, axs = plt.subplots(
@@ -611,64 +612,32 @@ def evt_fig_tens(
 
     numbers = res_ds.number.values
 
+    # calculate statistics to work out sampling error
     mn = res_ds.mean(dim="seed")
     std = res_ds.std(dim="seed")
-    if seed_steps > 10:
-        # get 5th and 95th percentiles
-        lower_p = res_ds.quantile(0.05, dim="seed")
-        upper_p = res_ds.quantile(0.95, dim="seed")
-    else:
-        lower_p = mn - std
-        upper_p = mn + std
+    for lp, up in [(0.05, 0.95)]:  # , (0.25, 0.75)]:
+        if seed_steps > 10:
+            # get 5th and 95th percentiles
+            lower_p = res_ds.quantile(lp, dim="seed")
+            upper_p = res_ds.quantile(up, dim="seed")
+        else:
+            lower_p = mn - std
+            upper_p = mn + std
 
-    axs[1].fill_between(
-        numbers,
-        lower_p.isel(rp=0, fit=0).values,
-        upper_p.isel(rp=0, fit=0).values,
-        alpha=0.2,
-        color=color_true,
-    )
-    axs[2].fill_between(
-        numbers,
-        lower_p.isel(rp=1, fit=0).values,
-        upper_p.isel(rp=1, fit=0).values,
-        alpha=0.2,
-        color=color_true,
-        linestyle="-",
-    )
-    axs[1].fill_between(
-        numbers,
-        lower_p.isel(rp=0, fit=1).values,
-        upper_p.isel(rp=0, fit=1).values,
-        alpha=0.2,
-        color=color_max_known,
-        linestyle="-",
-    )
-
-    axs[2].fill_between(
-        numbers,
-        lower_p.isel(rp=1, fit=1).values,
-        upper_p.isel(rp=1, fit=1).values,
-        alpha=0.2,
-        color=color_max_known,
-        linestyle="-",
-    )
-    axs[1].fill_between(
-        numbers,
-        lower_p.isel(rp=0, fit=2).values,
-        upper_p.isel(rp=0, fit=2).values,
-        alpha=0.2,
-        color=color_max_unknown,
-        linestyle="-",
-    )
-    axs[2].fill_between(
-        numbers,
-        lower_p.isel(rp=1, fit=2).values,
-        upper_p.isel(rp=1, fit=2).values,
-        alpha=0.2,
-        color=color_max_unknown,
-        linestyle="-",
-    )
+        for rp in [0, 1]:
+            for fit, color in [
+                (0, color_true),
+                (1, color_max_known),
+                (2, color_max_unknown),
+            ]:
+                axs[rp + 1].fill_between(
+                    numbers,
+                    lower_p.isel(rp=rp, fit=fit).values,
+                    upper_p.isel(rp=rp, fit=fit).values,
+                    alpha=0.2,
+                    color=color,
+                    linestyle="-",
+                )
 
     axs[1].plot(numbers, res_ds.isel(rp=0, fit=0).values, color=color_true, linewidth=1)
     axs[2].plot(

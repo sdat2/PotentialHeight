@@ -113,10 +113,6 @@ def plot_sample_points(
         ax (Optional[matplotlib.axes.Axes], optional): The axes to add the figure too. Defaults to None.
         label (str, optional): The label of the points. Defaults to "Sampled data points".
 
-    Tests::
-        >>> data = [2, 1, 3, 0]
-        >>> [0, 1, 2, 3] == np.sort(data)
-        True
     """
     if ax is None:
         _, ax = plt.subplots(
