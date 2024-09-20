@@ -184,26 +184,36 @@ def figure2() -> None:
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
     print(ds)
     print(ds["sst"])
+    print("two lats", ds["sst"].isel(lat=slice(0, 2)).values.shape)
+    vmaxs = ds["vmax"].values
     lats = ds["lat"].values
     ssts = ds["sst"].values
     r0s = ds["r0"].values
+
+    print("vmaxs", vmaxs.shape)
     print("lats", lats.shape)
     print("ssts", ssts.shape)
     print("r0s", r0s.shape)
-    lats = np.array([[lats[i] for i in range(len(lats))] for _ in range(len(ds.lon))])
+    lats = np.array([lats.tolist() for _ in range(len(ds.lon))]).T
     assert np.shape(lats) == np.shape(ssts)
     ssts = ssts.ravel()
     r0s = r0s.ravel()
     lats = lats.ravel()
+    vmaxs = vmaxs.ravel()
     lats = lats[~np.isnan(ssts)]
     r0s = r0s[~np.isnan(ssts)]
+    vmaxs = vmaxs[~np.isnan(ssts)]
     ssts = ssts[~np.isnan(ssts)]
     rho = pearsonr(lats, ssts)[0]
-    print("rho (sst, lat): {:.2f}".format(rho))
+    print("space rho (sst, lat): {:.2f}".format(rho))
     lats = lats[~np.isnan(r0s)]
     r0s = r0s[~np.isnan(r0s)]
     rho = pearsonr(lats, r0s)[0]
-    print("rho (r0s, lat): {:.2f}".format(rho))
+    print("space rho (r0s, lat): {:.2f}".format(rho))
+    ssts = ssts[~np.isnan(vmaxs)]
+    vmaxs = vmaxs[~np.isnan(vmaxs)]
+    rho = pearsonr(ssts, vmaxs)[0]
+    print("space rho (sst, vmax): {:.2f}".format(rho))
 
     timeseries_ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
     (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
