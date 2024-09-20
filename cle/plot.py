@@ -12,7 +12,6 @@ from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from sithom.io import write_json
 from sithom.curve import fit
-from sithom.unc import tex_uf
 from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
 from tcpips.constants import GOM
 from .constants import (
@@ -42,7 +41,7 @@ def vary_r0_c15_plot(r0s: np.ndarray) -> np.ndarray:
     Plot the pressure at maximum winds for different radii.
 
     Args:
-        r0s (np.ndarray):
+        r0s (np.ndarray): Outer radii.
 
     Returns:
         np.ndarray: Pressure at maximum winds.
@@ -62,7 +61,7 @@ def vary_r0_w22_plot(r0s: np.ndarray, plot=False) -> np.ndarray:
     Plot the pressure at maximum winds for different radii.
 
     Args:
-        r0s (np.ndarray): Outer radii
+        r0s (np.ndarray): Outer radii.
 
     Returns:
         np.ndarray: Pressure at maximum winds.
@@ -183,6 +182,29 @@ def figure2() -> None:
     # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+    print(ds)
+    print(ds["sst"])
+    lats = ds["lat"].values
+    ssts = ds["sst"].values
+    r0s = ds["r0"].values
+    print("lats", lats.shape)
+    print("ssts", ssts.shape)
+    print("r0s", r0s.shape)
+    lats = np.array([[lats[i] for i in range(len(lats))] for _ in range(len(ds.lon))])
+    assert np.shape(lats) == np.shape(ssts)
+    ssts = ssts.ravel()
+    r0s = r0s.ravel()
+    lats = lats.ravel()
+    lats = lats[~np.isnan(ssts)]
+    r0s = r0s[~np.isnan(ssts)]
+    ssts = ssts[~np.isnan(ssts)]
+    rho = pearsonr(lats, ssts)[0]
+    print("rho (sst, lat): {:.2f}".format(rho))
+    lats = lats[~np.isnan(r0s)]
+    r0s = r0s[~np.isnan(r0s)]
+    rho = pearsonr(lats, r0s)[0]
+    print("rho (r0s, lat): {:.2f}".format(rho))
+
     timeseries_ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
     (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
     axs[1, 0].set_title("Potential size, $r_a$ [km]")
@@ -307,7 +329,6 @@ def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) 
     plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     # add in pearson correlation coefficient
-    from scipy.stats import pearsonr
 
     r = pearsonr(ds.vmax, ds.pm / 100)[0]
     plt.title(r"$\rho$ " + f"= {r:.2f}")
@@ -476,6 +497,7 @@ def plot_gom_bbox_soln() -> None:
 
 @timeit
 def plot_gom_solns() -> None:
+    """Plot the solution timeseries for the Gulf of Mexico."""
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_solns.nc"))
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(ds["year"], ds["r0"] / 1000, "k")
