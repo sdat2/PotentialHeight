@@ -88,7 +88,7 @@ def plot_rp(
     print(label, "rp1yr", z1yr, "rv1Myr", z1myr)
     if gamma < 0:  # Weibull class have upper bound
         z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
-        ax.hlines(z_star, 1, 1_000_000, color=color, linestyles="dashed")
+        ax.hlines(z_star, 0.3, 1_000_000, color=color, linestyles="dashed")
         rp = 1 / (1 - bg_cdf(znew, z_star, beta, gamma))
     else:
         rp = 1 / genextreme.sf(znew, c=-gamma, loc=alpha, scale=beta)
@@ -96,6 +96,7 @@ def plot_rp(
     ax.semilogx(rp, znew, color=color, label=label, alpha=plot_alpha)
     ax.set_ylabel("Return Value [m]")
     ax.set_xlabel("Return Period [years]")
+    ax.set_xlim(0.3, 1_000_000)
 
 
 def plot_sample_points(

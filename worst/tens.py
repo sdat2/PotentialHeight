@@ -4,10 +4,11 @@ Sometimes breaks for no clear reason; in that case fit is retried 9 further time
 It is very unlikely that the optimization will fail 10 times in a row, so this should be sufficient.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import numpy as np
 import os
 import xarray as xr
+import matplotlib
 import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
@@ -81,7 +82,7 @@ def fit_gev_upper_bound_not_known(
     beta = tf.Variable(
         beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
     )
-    if force_weibull:
+    if force_weibull:  # add some constraints to make sure gamma is negative
         neg_gamma = tf.Variable(
             -gamma_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
         )  # Start with zero for stability
@@ -122,6 +123,12 @@ def fit_gev_upper_bound_not_known(
     # Define the training step
     @tf.function
     def train_step() -> tf.Tensor:
+        """
+        One optimization step for tensorflow.
+
+        Returns:
+            tf.Tensor: return the loss.
+        """
         with tf.GradientTape() as tape:
             loss = neg_log_likelihood(alpha, beta, neg_gamma, data)
         gradients = tape.gradient(loss, [alpha, beta, neg_gamma])
@@ -208,6 +215,12 @@ def fit_gev_upper_bound_known(
     # Optimization step function
     @tf.function
     def train_step() -> tf.Tensor:
+        """
+        Train the model for one step.
+
+        Returns:
+            tf.Tensor: Loss.
+        """
         with tf.GradientTape() as tape:
             loss = neg_log_likelihood(beta, neg_gamma, data)
         grads = tape.gradient(loss, [beta, neg_gamma])
@@ -243,11 +256,11 @@ def plot_ex_fits(
     Show some example fits.
 
     Args:
-        z_star (float, optional): . Defaults to 7.0.
-        beta (float, optional): _description_. Defaults to 1.0.
-        gamma (float, optional): _description_. Defaults to -0.2.
-        seed (int, optional): _description_. Defaults to 42.
-        n (int, optional): _description_. Defaults to 50.
+        z_star (float, optional): Upper bound. Defaults to 7.0.
+        beta (float, optional): Scale parameter. Defaults to 1.0.
+        gamma (float, optional): Shape parameter. Defaults to -0.2.
+        seed (int, optional): Seed. Defaults to 42.
+        n (int, optional): Number of samples. Defaults to 50.
     """
     plot_defaults()
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
@@ -480,7 +493,7 @@ def plot_ex(
     color_true: str,
     color_max_known: str,
     color_max_unknown: str,
-    ax=None,
+    ax: Optional[matplotlib.axes.Axes] = None,
     fig_path: str = os.path.join(FIGURE_PATH, "evt_fit_ex_tens.pdf"),
 ) -> None:
     """
@@ -549,8 +562,8 @@ def evt_fig_tens(
     ex_num: int = 50,
     min_samp: int = 20,
     max_samp: int = 1000,
-    samp_steps: int = 50,
-    seed_steps: int = 400,
+    samp_steps: int = 26,
+    seed_steps: int = 600,
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
     color_max_unknown: str = "#d95f02",
