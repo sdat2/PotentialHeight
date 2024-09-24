@@ -2,6 +2,7 @@
 
 import os
 from sithom.time import time_stamp
+from tcpips.constants import CMIP6_PATH, RAW_PATH
 
 
 def locker(path: str) -> callable:
@@ -38,3 +39,32 @@ def locker(path: str) -> callable:
         return wrapper
 
     return decorator
+
+
+def file_crawler(folder_to_search: str = RAW_PATH) -> dict:
+    """Function to crawl through a directory and return a dictionary of experiments, models, members."""
+    # print(RAW_PATH)
+    # ${ROOT}/${processing-step}/${experiment}/${atm/oc}/${model}/${member_id}.nc
+    out_d = {}
+
+    experiments = os.listdir(folder_to_search)
+    for experiment in experiments:
+        print(experiment)
+        atm_oc = os.listdir(os.path.join(folder_to_search, experiment))
+        for aoc in atm_oc:
+            models = os.listdir(os.path.join(folder_to_search, experiment, aoc))
+            for model in models:
+                members = os.listdir(
+                    os.path.join(folder_to_search, experiment, aoc, model)
+                )
+                for member in members:
+                    print(member)
+                    out_d[".".join([experiment, aoc, model, member])] = os.path.join(
+                        folder_to_search, experiment, aoc, model, member
+                    )
+    return out_d
+
+
+if __name__ == "__main__":
+    # python -m tcpips.files
+    print(file_crawler())

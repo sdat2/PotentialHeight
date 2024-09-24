@@ -42,6 +42,10 @@ def combined_experiments_from_dset_dict(
     """
     Function to combine experiments together.
 
+    This is really misnamed and should be called something like `save_experiments`.
+
+    It is used to save the experiments to disk.
+
     Args:
         dset_dict (dict): dictionary of datasets.
         experiments (List[str]): list of experiments to combine.
@@ -319,7 +323,9 @@ if __name__ == "__main__":
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
 
     # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
-    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-HH
+    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-MM --exp=historical
+    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-LL --exp=historical
+    # python -m tcpips.pangeo --institution_id=MOHC --source_id=UKESM1-0-LL --exp=historical
     # regrid_2d()
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
@@ -329,9 +335,9 @@ if __name__ == "__main__":
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
         table_id=["Amon", "Omon"],
-        institution_id="THU",
-        source_id="CIESM",
-        member_id="r1i1p1f1",
+        institution_id="MOHC",
+        # source_id="CIESM",
+        # member_id="r1i1p1f1",
         # member_id="r10i1p1f1",
         variable_id=CONVERSION_NAMES.keys(),
         # grid_label="gn",
