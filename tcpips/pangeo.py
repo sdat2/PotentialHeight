@@ -192,10 +192,10 @@ def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
 @timeit
 def get_data_part(
     experiments: List[str] = ["historical", "ssp585"],
-    institution_id: str = "NCAR",
+    institution_id: str = "NCAR",  # model center
     table: str = "Omon",
     oc_or_at: str = "ocean",
-    source_id: str = "CESM2-SE",
+    source_id: str = "CESM2-SE",  # particular model
 ) -> None:
     """
     Get data part from one of the experiments.
@@ -207,6 +207,20 @@ def get_data_part(
         institution_id (str, optional): Defaults to "NCAR".
         source_id (str, optional): Defaults to "CESM2-SE".
     """
+    print(
+        "experiments",
+        experiments,
+        "\ntable",
+        table,
+        "\noc_or_at",
+        oc_or_at,
+        "\nsource_id",
+        source_id,
+        "\ninstitution_id",
+        institution_id,
+        "\nCONVERSION_NAMES.keys()",
+        CONVERSION_NAMES.keys(),
+    )
     cat_subset_obj = cat.search(
         experiment_id=experiments,
         table_id=[table],
@@ -218,6 +232,8 @@ def get_data_part(
         # grid_label="gn",
     )
     print("cat_subset_obj", cat_subset_obj)
+    print("cat_subset_obj.unique()", cat_subset_obj.unique())
+    print("cat_subset_obj.unique()['member_id']", cat_subset_obj.unique()["member_id"])
     for member_id in cat_subset_obj.unique()["member_id"]:
         print("member_id", member_id)
         cat_subset = cat_subset_obj.search(member_id=member_id)
@@ -260,15 +276,7 @@ def get_data_pair(
     )
 
 
-if __name__ == "__main__":
-    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE
-    # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
-    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-HH
-    # regrid_2d()
-    # regrid_1d(xesmf=True)
-    # regrid_2d_1degree()
-    # pass
-    # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
+def cmd_download_call() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -291,9 +299,39 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    print("args", args)
+
     get_data_pair(
         institution_id=args.institution_id, source_id=args.source_id, exp=args.exp
     )
+
+
+# def unique_model_name(centre: str, model: str, exp: str):
+
+
+if __name__ == "__main__":
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE
+    # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
+    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-HH
+    # regrid_2d()
+    # regrid_1d(xesmf=True)
+    # regrid_2d_1degree()
+    # pass
+    # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
+    cat_subset = cat.search(
+        experiment_id=["historical", "ssp585"],
+        table_id=["Amon", "Omon"],
+        institution_id="THU",
+        source_id="CIESM",
+        member_id="r1i1p1f1",
+        # member_id="r10i1p1f1",
+        variable_id=CONVERSION_NAMES.keys(),
+        # grid_label="gn",
+    ).unique()
+    print("cat_subset", cat_subset)
+
+    cat_subset.to_csv("cat_subset.csv")
+
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # regrid_2d()
