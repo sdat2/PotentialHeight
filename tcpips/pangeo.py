@@ -15,6 +15,7 @@ import os
 from typing import Dict, List, Optional
 import intake
 import dask
+from dask.diagnostics import ProgressBar
 import xarray as xr
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit
@@ -77,16 +78,20 @@ def combined_experiments_from_dset_dict(
                 new_name = os.path.join(path, f"{ds_member_id}.nc")
                 print("saving", new_name, ds, "ds")
                 with dask.config.set(**{"array.slicing.split_large_chunks": True}):
-                    ds.to_netcdf(
+                    output_file = ds.to_netcdf(
                         new_name,
                         format="NETCDF4",
                         engine="h5netcdf",
                         encoding={
-                            var: {"dtype": "float32", "zlib": True, "complevel": 6}
+                            var: {"dtype": "float32"}  # , "zlib": True, "complevel": 6
                             for var in CONVERSION_NAMES.keys()
                             if var in ds
                         },
+                        compute=False,
                     )
+
+                    with ProgressBar():
+                        output_file.compute()
 
     # put the two experiments together
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
@@ -284,12 +289,12 @@ def cmd_download_call() -> None:
     )
     parser.add_argument(
         "--institution_id",
-        default="NCAR",
+        default="THU",
         help="Institution id",
     )
     parser.add_argument(
         "--source_id",
-        default="CESM2",
+        default="CIESM",
         help="Source id",
     )
     parser.add_argument(
@@ -311,6 +316,8 @@ def cmd_download_call() -> None:
 
 if __name__ == "__main__":
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
+
     # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-HH
     # regrid_2d()
@@ -318,6 +325,7 @@ if __name__ == "__main__":
     # regrid_2d_1degree()
     # pass
     # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
+    cmd_download_call()
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
         table_id=["Amon", "Omon"],
