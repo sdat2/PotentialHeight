@@ -107,12 +107,12 @@ def hist_plot(hist_d: dict) -> None:
 
     plot_defaults()
 
-    fig, axs = plt.subplots(2, 2, sharex=True, sharey=True)
+    fig, axs = plt.subplots(2, 2, sharey=True)  # , sharex=True,
 
     for i, exp in enumerate(["historical", "ssp585"]):
         for j, aoc in enumerate(["atmos", "ocean"]):
             key = f"{exp}.{aoc}"
-            axs[i, j].hist(hist_d[key], bins=100, alpha=0.5, label=key)
+            axs[i, j].hist(hist_d[key], bins=200, alpha=0.5, label=key)
             axs[i, j].set_title(key)
 
     axs[0, 0].set_ylabel("Count")
@@ -125,6 +125,25 @@ def hist_plot(hist_d: dict) -> None:
     plt.close()
 
 
+def find_missing(file_d: dict) -> list:
+    """Find missing files in the file dictionary.
+
+    Args:
+        file_d (dict): dictionary of file sizes.
+
+    Returns:
+        list: list of missing files.
+    """
+    miss_list = []
+    for model_id in file_d:
+        for _, exp in enumerate(["historical", "ssp585"]):
+            for _, aoc in enumerate(["atmos", "ocean"]):
+                type = f"{exp}.{aoc}"
+                if type not in file_d[model_id]:
+                    miss_list.append(".".join([model_id, type]))
+    return miss_list
+
+
 if __name__ == "__main__":
     # python -m tcpips.files
     file_d = file_crawler()
@@ -132,3 +151,6 @@ if __name__ == "__main__":
     hist_d = hist_d_f(file_d)
     write_json(hist_d, os.path.join(DATA_PATH, "hist.json"))
     hist_plot(hist_d)
+    fm = find_missing(file_d)
+    print(fm)
+    # write_json(fm, os.path.join(DATA_PATH, "missing.json"))

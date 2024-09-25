@@ -326,6 +326,8 @@ if __name__ == "__main__":
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-MM --exp=historical
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-LL --exp=historical
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=UKESM1-0-LL --exp=historical
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE --exp=historical
     # regrid_2d()
     # regrid_1d(xesmf=True)
     # regrid_2d_1degree()
