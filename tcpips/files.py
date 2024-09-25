@@ -10,15 +10,26 @@ from tcpips.constants import CMIP6_PATH, RAW_PATH, DATA_PATH
 
 def locker(path: str) -> callable:
     """Decorator to lock a function to prevent multiple instances from running on the same file.
+    I plan to use this for regridding a reprocessing steps, but this could be used for downloads.
 
     Args:
-        path (str): path to stage directory where locks are stored
+        path (str): path to stage directory where locks are stored.
 
     Returns:
         callable: decorator function
     """
 
     def decorator(func: callable) -> callable:
+        """
+        Decorator to lock a function to prevent multiple instances from running on the same file.
+
+        Args:
+            func (callable): function to lock.
+
+        Returns:
+            callable: wrapper function
+        """
+
         def wrapper(*args, **kwargs) -> callable:
             exp = kwargs["exp"]
             model = kwargs["model"]
@@ -63,9 +74,13 @@ def file_crawler(folder_to_search: str = RAW_PATH) -> dict:
         for aoc in atm_oc:
             models = os.listdir(os.path.join(folder_to_search, experiment, aoc))
             for model in models:
-                member_ncs = os.listdir(
-                    os.path.join(folder_to_search, experiment, aoc, model)
-                )
+                member_ncs = [
+                    x
+                    for x in os.listdir(
+                        os.path.join(folder_to_search, experiment, aoc, model)
+                    )
+                    if x.endswith(".nc")
+                ]
                 for member_nc in member_ncs:
                     print(member_nc)
                     file_name = os.path.join(
@@ -134,14 +149,31 @@ def find_missing(file_d: dict) -> list:
     Returns:
         list: list of missing files.
     """
+    import intake
+    from tcpips.constants import CONVERSION_NAMES
+
+    url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
+    cat = intake.open_esm_datastore(url)
+
     miss_list = []
     for model_id in file_d:
-        for _, exp in enumerate(["historical", "ssp585"]):
-            for _, aoc in enumerate(["atmos", "ocean"]):
+        model, member = model_id.split(".")
+        for exp in ["historical", "ssp585"]:
+            for aoc, table in [("atmos", "Amon"), ("ocean", "Omon")]:
                 type = f"{exp}.{aoc}"
-                if type not in file_d[model_id]:
+                print((model, member, exp, table))
+                cat_subset = cat.search(
+                    experiment_id=[exp],
+                    table_id=[table],
+                    source_id=[model],
+                    member_id=[member],
+                    variable_id=CONVERSION_NAMES.keys(),
+                    # grid_label="gn",
+                ).unique()
+
+                if type not in file_d[model_id] and len(cat_subset["zstore"]) != 0:
                     miss_list.append(".".join([model_id, type]))
-    return miss_list
+    return sorted(miss_list)
 
 
 if __name__ == "__main__":
@@ -150,7 +182,7 @@ if __name__ == "__main__":
     write_json(file_d, os.path.join(DATA_PATH, "raw.json"))
     hist_d = hist_d_f(file_d)
     write_json(hist_d, os.path.join(DATA_PATH, "hist.json"))
-    hist_plot(hist_d)
+    # hist_plot(hist_d)
     fm = find_missing(file_d)
     print(fm)
-    # write_json(fm, os.path.join(DATA_PATH, "missing.json"))
+    write_json({x: "" for x in fm}, os.path.join(DATA_PATH, "missing.json"))

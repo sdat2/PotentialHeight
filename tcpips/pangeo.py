@@ -13,12 +13,14 @@ ${ROOT}/${processing-step}/${experiment}/${atm/oc}/${model}/${member_id}.nc
 
 import os
 from typing import Dict, List, Optional
+import time
 import intake
 import dask
 from dask.diagnostics import ProgressBar
 import xarray as xr
 from xmip.preprocessing import combined_preprocessing
-from sithom.time import timeit
+from sithom.time import timeit, hr_time, time_stamp
+from dask.distributed import Client
 from tcpips.constants import RAW_PATH, CONVERSION_NAMES
 
 
@@ -29,7 +31,6 @@ try:
     cat = intake.open_esm_datastore(url)
     print("cat", cat)
     unique = cat.unique()
-    print("cat", cat)
     print("unique", unique)
 except Exception as e:
     print("Exception", e)
@@ -65,6 +66,7 @@ def combined_experiments_from_dset_dict(
             ds = ds.isel(dcpp_init_year=0)
 
         print(k, ds)
+        ds = ds.chunk({"time": 1})
         for experiment in experiments:
             if experiment in k:
                 if "source_id" in kwargs:
@@ -80,7 +82,18 @@ def combined_experiments_from_dset_dict(
                 )
                 os.makedirs(path, exist_ok=True)
                 new_name = os.path.join(path, f"{ds_member_id}.nc")
+                lock = os.path.join(path, f"{ds_member_id}.nc.lock")
+                if os.path.exists(lock):
+                    print("lock exists", lock)
+                    continue
+
+                with open(lock, "w") as f:
+                    f.write(time_stamp())
+
                 print("saving", new_name, ds, "ds")
+                # print("ds", ds)
+                tick = time.perf_counter()
+
                 with dask.config.set(**{"array.slicing.split_large_chunks": True}):
                     output_file = ds.to_netcdf(
                         new_name,
@@ -96,6 +109,10 @@ def combined_experiments_from_dset_dict(
 
                     with ProgressBar():
                         output_file.compute()
+                tock = time.perf_counter()
+                print(f"Time taken: {hr_time(tock - tick)}")
+                os.remove(lock)
+                print("output_file", output_file)
 
     # put the two experiments together
     with dask.config.set(**{"array.slicing.split_large_chunks": True}):
@@ -141,61 +158,6 @@ def combined_experiments_from_cat_subset(
     ds = combined_experiments_from_dset_dict(dset_dict, experiments, oc_or_at, **kwargs)
 
     return ds
-
-
-@timeit
-def get_atmos(experiments: List[str] = ["ssp585"]) -> None:  # ["historical", "ssp585"]
-    """
-    Get atmospheric data.
-
-    Args:
-        experiments (List[str], optional): Defaults to ["historical", "ssp585"].
-    """
-
-    cat_subset_obj = cat.search(
-        experiment_id=experiments,
-        table_id=["Amon"],  # , "Omon"],
-        institution_id="NCAR",
-        # member_id="r10i1p1f1",
-        source_id="CESM2",
-        variable_id=CONVERSION_NAMES.keys(),
-        # grid_label="gn",
-    )
-    for member_id in cat_subset_obj.unique()["member_id"]:
-        print("member_id", member_id)
-        cat_subset = cat_subset_obj.search(member_id=member_id)
-        ds = combined_experiments_from_cat_subset(cat_subset, experiments, "atmos")
-        print("ds", ds)
-
-    # ds.to_netcdf(os.path.join(CMIP6_PATH, "atmos.nc"))
-
-
-@timeit
-def get_ocean(experiments: List[str] = ["historical", "ssp585"]) -> None:
-    """
-    Get ocean data.
-
-    Args:
-        experiments (List[str], optional): Defaults to ["historical", "ssp585"].
-    """
-    cat_subset_obj = cat.search(
-        experiment_id=experiments,
-        table_id=["Omon"],
-        institution_id="NCAR",
-        # member_id="r10i1p1f1",
-        source_id="CESM2",
-        variable_id=CONVERSION_NAMES.keys(),
-        # dcpp_init_year="20200528",
-        grid_label="gn",
-    )
-
-    for member_id in cat_subset_obj.unique()["member_id"]:
-        print("member_id", member_id)
-        cat_subset = cat_subset_obj.search(member_id=member_id)
-        ds = combined_experiments_from_cat_subset(cat_subset, experiments, "ocean")
-        print("ds", ds)
-
-    # ds.to_netcdf(os.path.join(CMIP6_PATH, "ocean.nc"))
 
 
 @timeit
@@ -323,16 +285,19 @@ if __name__ == "__main__":
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
 
     # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
-    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-MM --exp=historical
+    # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM --exp=historical
+
+    # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-MM --exp=ssp585
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-LL --exp=historical
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=UKESM1-0-LL --exp=historical
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE --exp=historical
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-WACCM --exp=historical
     # regrid_2d()
     # regrid_1d(xesmf=True)
-    # regrid_2d_1degree()
-    # pass
+    # regrid_2d_1degree()s
     # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
+    # client = Client(n_workers=4, threads_per_worker=1, memory_limit="4GB")
     cmd_download_call()
     cat_subset = cat.search(
         experiment_id=["historical", "ssp585"],
