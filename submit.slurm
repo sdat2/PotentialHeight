@@ -24,14 +24,9 @@
 
 
 # try to activate bashrc
-
-# work=/mnt/lustre/a2fs-work1/work/n02/n02/b
-
 source /work/n02/n02/sdat2/.bashrc
 
 micromamba activate t1
-
-# eval "$(conda shell.bash hook)"
 
 echo "which python"
 which python

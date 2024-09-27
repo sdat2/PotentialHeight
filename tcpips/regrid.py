@@ -10,7 +10,6 @@ locks are created in CMIP6/{STAGE}/{exp}.{typ}.{model}.{member}.lock
 import os
 import xarray as xr
 import argparse
-import subprocess
 import dask
 from dask.distributed import LocalCluster, Client
 from dask.diagnostics import ProgressBar
@@ -27,10 +26,8 @@ from tcpips.constants import (
     CONVERSION_NAMES,
 )
 from tcpips.files import locker
-
-
-def get_git_revision_hash() -> str:
-    return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("ascii").strip()
+from sithom.misc import get_git_revision_hash
+from sithom.io import write_json
 
 
 def run_tasks(
@@ -51,6 +48,7 @@ def run_tasks(
 
     """
     tasks = define_tasks()
+    write_json(tasks, os.path.join(DATA_PATH, "tasks.json"))
     print("tasks", tasks)
 
     if parallel:
@@ -63,7 +61,7 @@ def run_tasks(
 
     for key in tasks:
         if not tasks[key]["locked"]:
-            if not tasks[key]["regridded_exists"] or force_regrid:
+            if not tasks[key]["processed_exists"] or force_regrid:
                 regrid_cmip6_part(output_res, **tasks[key])
             else:
                 print(f"Already regridded {key}, not regridding.")
@@ -72,17 +70,25 @@ def run_tasks(
 
 
 @timeit
-def define_tasks() -> dict:
-    """Find all tasks to be done."""
+def define_tasks(original_root: str = RAW_PATH, new_root: str = REGRIDDED_PATH) -> dict:
+    """Find all tasks to be done. Return a dictionary of tasks.
+
+    Args:
+        original_root (str, optional): Original root path. Defaults to RAW_PATH.
+        new_root (str, optional): New root path. Defaults to REGRIDDED_PATH.
+
+    Returns:
+        dict: dictionary of tasks.
+    """
     tasks = {}
-    for exp in os.listdir(RAW_PATH):
+    for exp in os.listdir(original_root):
         for typ in [
             x
-            for x in os.listdir(os.path.join(RAW_PATH, exp))
-            if os.path.isdir(os.path.join(RAW_PATH, exp))
+            for x in os.listdir(os.path.join(original_root, exp))
+            if os.path.isdir(os.path.join(original_root, exp))
         ]:
-            for model in os.listdir(os.path.join(RAW_PATH, exp, typ)):
-                for member in os.listdir(os.path.join(RAW_PATH, exp, typ, model)):
+            for model in os.listdir(os.path.join(original_root, exp, typ)):
+                for member in os.listdir(os.path.join(original_root, exp, typ, model)):
                     member = member.replace(".nc", "")
                     key = f"{exp}.{typ}.{model}.{member}"
                     tasks[key] = {
@@ -90,13 +96,10 @@ def define_tasks() -> dict:
                         "typ": typ,
                         "model": model,
                         "member": member,
-                        "regridded_exists": os.path.exists(
-                            os.path.join(REGRIDDED_PATH, exp, typ, model, member)
-                            + ".nc"
+                        "processed_exists": os.path.exists(
+                            os.path.join(new_root, exp, typ, model, member) + ".nc"
                         ),
-                        "locked": os.path.exists(
-                            os.path.join(REGRIDDED_PATH, key) + ".lock"
-                        ),
+                        "locked": os.path.exists(os.path.join(new_root, key) + ".lock"),
                     }
     return tasks
 
@@ -244,8 +247,11 @@ if __name__ == "__main__":
         "-r", "--resolution", type=float, default=0.5
     )  # output resolution
     parser.add_argument(
-        "-p", "--parallel", type=lambda x: (str(x).lower() == "true"), default=True,
-        description="Run in parallel?"
+        "-p",
+        "--parallel",
+        type=lambda x: (str(x).lower() == "true"),
+        default=True,
+        # description="Run in parallel?",
     )
 
     args = parser.parse_args()
