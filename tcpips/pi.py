@@ -7,10 +7,8 @@ from tcpyPI import pi
 from matplotlib import pyplot as plt
 from sithom.time import timeit
 from sithom.plot import (
-    feature_grid,
     plot_defaults,
     get_dim,
-    label_subplots,
 )  # , axis_formatter
 from sithom.place import Point, BoundingBox
 from sithom.misc import in_notebook

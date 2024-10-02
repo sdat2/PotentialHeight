@@ -17,6 +17,20 @@ def locker(path: str) -> callable:
 
     Returns:
         callable: decorator function
+
+    Example:
+        >>> TEST_PATH = os.path.join(CMIP6_PATH, "test")
+        >>> import shutil
+        >>> shutil.rmtree(TEST_PATH, ignore_errors=True)
+        >>> os.makedirs(TEST_PATH, exist_ok=True)
+        >>> @locker(path=TEST_PATH)
+        ... def example(*args, **kw) -> bool:
+        ...     ret = os.path.exists(os.path.join(TEST_PATH, f"{kw['exp']}.{kw['model']}.{kw['member']}.lock"))
+        ...     return ret
+        >>> example(exp="historical", model="model", member="member")
+        True
+        >>> shutil.rmtree(TEST_PATH)
+
     """
 
     def decorator(func: callable) -> callable:
