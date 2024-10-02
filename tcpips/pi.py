@@ -1,6 +1,6 @@
 """Potential Intensity Calculation script."""
 
-from typing import Dict, Tuple, List, Optional
+from typing import Dict, Tuple, List, Callable
 import os
 import xarray as xr
 from tcpyPI import pi
@@ -106,7 +106,8 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
 def calc_pi_example() -> None:
     """Calculate the potential intensity using the initial regridded data using the tcpyPI package.
 
-    Use first 5 time steps of the regridded data."""
+    Use first 5 time steps of the regridded data.
+    """
     ds = xr.open_dataset(os.path.join(DATA_PATH, "all_regridded.nc"), engine="h5netcdf")
     input = ds.isel(time=slice(0, 5))  # .bfill("plev").ffill("plev")
     print("input", input)
@@ -203,6 +204,26 @@ def propagate_attrs(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
             if "standard_name" in ds_old[var].attrs:
                 ds_new[var].attrs["standard_name"] = ds_old[var].attrs["standard_name"]
     return ds_new
+
+
+def propogate_wrapper(
+    func: Callable[[xr.Dataset], xr.Dataset]
+) -> Callable[[xr.Dataset], xr.Dataset]:
+    """
+    Wrapper to propagate the standard_name and units attributes from one dataset to another.
+
+    Args:
+        func (Callable[xr.Dataset, xr.Dataset]): function to wrap.
+
+    Returns:
+        Callable[xr.Dataset, xr.Dataset]: wrapped function.
+    """
+
+    def wrapper(ds_old: xr.Dataset) -> xr.Dataset:
+        ds_new = func(ds_old)
+        return propagate_attrs(ds_old, ds_new)
+
+    return wrapper
 
 
 @timeit
@@ -312,7 +333,7 @@ def plot_seasonality_in_gom_tcypi_ex() -> None:
             lines[month],
             color=colors[month],
             label=MONTHS[month],
-        )  # , label="q")
+        )
 
     # axs[0].legend()
     axs[0].set_ylabel("Pressure [hPa]")

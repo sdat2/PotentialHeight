@@ -1,4 +1,7 @@
-"""File handling utilities for tc potential size and intensity calculations."""
+"""File handling utilities for tc potential size and intensity calculations.
+
+Keep the file pipeline clean and organized with these functions.
+"""
 
 import os
 import collections
@@ -51,6 +54,10 @@ def locker(path: str) -> callable:
         """
 
         def wrapper(*args, **kwargs) -> callable:
+            """Wrapper that runs before and after the function to create and remove lock files.
+
+            If the lock file exists, the function will not run and return None.
+            """
             exp = kwargs["exp"]
             model = kwargs["model"]
             member = kwargs["member"]
@@ -170,10 +177,9 @@ def find_missing(file_d: dict) -> list:
         list: list of missing files.
     """
     import intake
-    from tcpips.constants import CONVERSION_NAMES
+    from tcpips.constants import CONVERSION_NAMES, PANGEO_CMIP6_URL
 
-    url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
-    cat = intake.open_esm_datastore(url)
+    cat = intake.open_esm_datastore(PANGEO_CMIP6_URL)
 
     miss_list = []
     for model_id in file_d:

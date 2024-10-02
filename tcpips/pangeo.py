@@ -20,15 +20,14 @@ from dask.diagnostics import ProgressBar
 import xarray as xr
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit, hr_time, time_stamp
-from dask.distributed import Client
-from tcpips.constants import RAW_PATH, CONVERSION_NAMES
+from tcpips.constants import RAW_PATH, CONVERSION_NAMES, PANGEO_CMIP6_URL
+
+# from dask.distributed import Client
 
 
-# url = intake_esm.tutorial.get_url('google_cmip6')
-url: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
 try:
-    print("url", url)
-    cat = intake.open_esm_datastore(url)
+    print("url", PANGEO_CMIP6_URL)
+    cat = intake.open_esm_datastore(PANGEO_CMIP6_URL)
     print("cat", cat)
     unique = cat.unique()
     print("unique", unique)

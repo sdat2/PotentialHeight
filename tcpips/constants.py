@@ -14,6 +14,9 @@ from typing import Dict, List, Tuple
 import os
 import pathlib
 
+
+PANGEO_CMIP6_URL: str = "https://storage.googleapis.com/cmip6/pangeo-cmip6.json"
+
 # Note: constants should be UPPER_CASE
 constants_path = pathlib.Path(os.path.realpath(__file__))
 SRC_PATH = pathlib.Path(os.path.dirname(constants_path))
