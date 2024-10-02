@@ -29,6 +29,12 @@ def locker(path: str) -> callable:
         ...     return ret
         >>> example(exp="historical", model="model", member="member")
         True
+        >>> def write_lock_file():
+        ...    with open(os.path.join(TEST_PATH, "historical.model.member.lock"), "w") as f:
+        ...        f.write(time_stamp())
+        >>> write_lock_file()
+        >>> example(exp="historical", model="model", member="member")
+        Already running example on historical.model.member
         >>> shutil.rmtree(TEST_PATH)
 
     """
