@@ -15,19 +15,19 @@ from dask.distributed import LocalCluster, Client
 from dask.diagnostics import ProgressBar
 import xesmf as xe
 from matplotlib import pyplot as plt
-from sithom.misc import in_notebook
+from sithom.misc import in_notebook, get_git_revision_hash
 from sithom.plot import plot_defaults  # feature_grid, label_subplots
 from sithom.time import timeit, time_stamp
+from sithom.io import write_json
 from tcpips.constants import (
+    DATA_PATH,
     FIGURE_PATH,
     CMIP6_PATH,
     RAW_PATH,
     REGRIDDED_PATH,
     CONVERSION_NAMES,
 )
-from tcpips.files import locker
-from sithom.misc import get_git_revision_hash
-from sithom.io import write_json
+from tcpips.files import locker, define_tasks
 
 
 def run_tasks(
@@ -67,41 +67,6 @@ def run_tasks(
                 print(f"Already regridded {key}, not regridding.")
 
     dask.distributed.print("finished", time_stamp())
-
-
-@timeit
-def define_tasks(original_root: str = RAW_PATH, new_root: str = REGRIDDED_PATH) -> dict:
-    """Find all tasks to be done. Return a dictionary of tasks.
-
-    Args:
-        original_root (str, optional): Original root path. Defaults to RAW_PATH.
-        new_root (str, optional): New root path. Defaults to REGRIDDED_PATH.
-
-    Returns:
-        dict: dictionary of tasks.
-    """
-    tasks = {}
-    for exp in os.listdir(original_root):
-        for typ in [
-            x
-            for x in os.listdir(os.path.join(original_root, exp))
-            if os.path.isdir(os.path.join(original_root, exp))
-        ]:
-            for model in os.listdir(os.path.join(original_root, exp, typ)):
-                for member in os.listdir(os.path.join(original_root, exp, typ, model)):
-                    member = member.replace(".nc", "")
-                    key = f"{exp}.{typ}.{model}.{member}"
-                    tasks[key] = {
-                        "exp": exp,
-                        "typ": typ,
-                        "model": model,
-                        "member": member,
-                        "processed_exists": os.path.exists(
-                            os.path.join(new_root, exp, typ, model, member) + ".nc"
-                        ),
-                        "locked": os.path.exists(os.path.join(new_root, key) + ".lock"),
-                    }
-    return tasks
 
 
 @timeit

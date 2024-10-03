@@ -6,9 +6,9 @@ Keep the file pipeline clean and organized with these functions.
 import os
 import collections
 from sithom.io import write_json
-from sithom.time import time_stamp
+from sithom.time import time_stamp, timeit
 from sithom.misc import human_readable_size
-from tcpips.constants import CMIP6_PATH, RAW_PATH, DATA_PATH
+from tcpips.constants import CMIP6_PATH, RAW_PATH, DATA_PATH, REGRIDDED_PATH
 
 
 def locker(path: str) -> callable:
@@ -121,7 +121,7 @@ def file_crawler(folder_to_search: str = RAW_PATH) -> dict:
     return file_d
 
 
-def hist_d_f(file_d: dict) -> dict:
+def histogram_dict_from_file_dict(file_d: dict) -> dict:
     """Function to create a dictionary of file sizes for plotting histograms.
 
     Args:
@@ -137,7 +137,7 @@ def hist_d_f(file_d: dict) -> dict:
     return hist_d
 
 
-def hist_plot(hist_d: dict) -> None:
+def hist_dict_plot(hist_d: dict) -> None:
     """Plot histogram of file sizes.
 
     Args:
@@ -167,7 +167,7 @@ def hist_plot(hist_d: dict) -> None:
     plt.close()
 
 
-def find_missing(file_d: dict) -> list:
+def find_missing_raw_cmip6_nc(file_d: dict) -> list:
     """Find missing files in the file dictionary.
 
     Args:
@@ -202,13 +202,48 @@ def find_missing(file_d: dict) -> list:
     return sorted(miss_list)
 
 
+@timeit
+def define_tasks(original_root: str = RAW_PATH, new_root: str = REGRIDDED_PATH) -> dict:
+    """Find all tasks to be done. Return a dictionary of tasks.
+
+    Args:
+        original_root (str, optional): Original root path. Defaults to RAW_PATH.
+        new_root (str, optional): New root path. Defaults to REGRIDDED_PATH.
+
+    Returns:
+        dict: dictionary of tasks.
+    """
+    tasks = {}
+    for exp in os.listdir(original_root):
+        for typ in [
+            x
+            for x in os.listdir(os.path.join(original_root, exp))
+            if os.path.isdir(os.path.join(original_root, exp))
+        ]:
+            for model in os.listdir(os.path.join(original_root, exp, typ)):
+                for member in os.listdir(os.path.join(original_root, exp, typ, model)):
+                    member = member.replace(".nc", "")
+                    key = f"{exp}.{typ}.{model}.{member}"
+                    tasks[key] = {
+                        "exp": exp,
+                        "typ": typ,
+                        "model": model,
+                        "member": member,
+                        "processed_exists": os.path.exists(
+                            os.path.join(new_root, exp, typ, model, member) + ".nc"
+                        ),
+                        "locked": os.path.exists(os.path.join(new_root, key) + ".lock"),
+                    }
+    return tasks
+
+
 if __name__ == "__main__":
     # python -m tcpips.files
     file_d = file_crawler()
     write_json(file_d, os.path.join(DATA_PATH, "raw.json"))
-    hist_d = hist_d_f(file_d)
+    hist_d = histogram_dict_from_file_dict(file_d)
     write_json(hist_d, os.path.join(DATA_PATH, "hist.json"))
-    # hist_plot(hist_d)
-    fm = find_missing(file_d)
+    # hist_dict_plot(hist_d)
+    fm = find_missing_raw_cmip6_nc(file_d)
     print(fm)
     write_json({x: "" for x in fm}, os.path.join(DATA_PATH, "missing.json"))

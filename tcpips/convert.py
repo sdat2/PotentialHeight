@@ -20,7 +20,17 @@ from tcpips.constants import (
 @timeit
 def convert(ds: xr.Dataset) -> xr.Dataset:
     """
-    Convert CMIP6 variables to be PI input variables
+    Convert CMIP6 variables to be PI input variables.
+
+    Assume that you can do a linear conversion between the variables:
+
+    y = m*x + c
+
+    m stored in CONVERSION_MULTIPLES, c stored in CONVERSION_ADDITIONS.
+
+    units are stored in CONVERSION_UNITS.
+
+    plev is a special case, it is converted to hPa, assuming it was Pa to start with.
 
     Args:
         ds (xr.Dataset): CMIP6 dataset.
