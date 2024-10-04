@@ -21,6 +21,8 @@ def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
         >>> cp_manual = 2 * 2 * np.pi / 24 / 60 / 60 * 1/2  ## 2 * omega * sin(30deg)
         >>> np.isclose(cp_out, cp_manual, rtol=1e-3, atol=1e-6)
         True
+        >>> np.isclose(coriolis_parameter_from_lat(0), 0, rtol=1e-3, atol=1e-6)
+        True
     """
 
     return 2 * 7.2921e-5 * np.sin(np.deg2rad(lat))
@@ -48,11 +50,17 @@ def pressure_from_wind(
 
     Returns:
         np.ndarray: Pressure array [Pa].
+
+    Example::
+        >>> rr = np.array([0, 1, 2, 3, 4, 5])
+        >>> vv = np.array([0, 0, 0, 0, 0, 0])
+        >>> p = pressure_from_wind(rr, vv)
+        >>> np.allclose(p, np.array([101500, 101500, 101500, 101500, 101500, 101500]))
     """
     p = np.zeros(rr.shape)  # [Pa]
     # rr ascending
-    assert np.all(rr == np.sort(rr))
-    p[-1] = p0
+    assert np.all(rr == np.sort(rr))  # check if rr is sorted
+    p[-1] = p0  # set the last value to the background pressure
     for j in range(len(rr) - 1):
         i = -j - 2
         # Assume Coriolis force and pressure-gradient balance centripetal force.
@@ -77,6 +85,7 @@ def buck_sat_vap_pressure(
 
     Returns:
         float: saturation vapour pressure in Pa.
+
     """
     # https://en.wikipedia.org/wiki/Arden_buck_sat_vap_pressure_equation
     temp: float = temp - TEMP_0K  # convert from degK to degC

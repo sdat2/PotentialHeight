@@ -8,7 +8,7 @@ from sithom.io import read_json
 def pressures_profile(  # add pressure profile to wind profile
     rr: np.ndarray,  # radii [m]
     vv: np.ndarray,  # wind speeds [m/s]
-    fcor: float = 5e-5,  # fcor
+    fcor: float = 5e-5,  # fcor [s-1] = 2 * omega * sin(lat)
     p0: float = 1015 * 100,  # [Pa]
     rho0: float = 1.15,  # [kg m-3]
 ) -> np.ndarray:
@@ -18,9 +18,9 @@ def pressures_profile(  # add pressure profile to wind profile
     Args:
         rr (np.ndarray): Radii [m].
         vv (np.ndarray): Wind speeds [m/s].
-        fcor (float, optional): Coriolis parameter. Defaults to 5e-5.
-        p0 (float, optional): Background pressure. Defaults to 1015 * 100.
-        rho0 (float, optional): Background density. Defaults to 1.15.
+        fcor (float, optional): Coriolis parameter [s-1]. Defaults to 5e-5.
+        p0 (float, optional): Background pressure [Pa]. Defaults to 1015 * 100.
+        rho0 (float, optional): Background density [kg m-3]. Defaults to 1.15.
 
     Returns:
         np.ndarray: Pressures [hPa].
@@ -39,6 +39,8 @@ def pressures_profile(  # add pressure profile to wind profile
         p[i] = p[i + 1] - rho0 * (
             vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
         ) * (rr[i + 1] - rr[i])
+        # delta p = - rho * (v^2 / <r> + fcor * v) * delta r
+        # decreases as you go in
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
 
     return p / 100  # pressures in hPa
@@ -70,14 +72,10 @@ def read_profile(profile_path: str) -> xr.Dataset:
         >>> assert "radii" in profile_ds.coords
     """
     chavas_profile = read_json(profile_path)
-    # print("profile_path", profile_path)
-    # print("chavas_profile", chavas_profile.keys())
-    # print("rr", len(chavas_profile["rr"]), type(chavas_profile["rr"]))
-    # print("VV", len(chavas_profile["VV"]), type(chavas_profile["VV"]))
 
     if "rr" not in chavas_profile or "VV" not in chavas_profile:
         raise ValueError("The profile must contain 'rr' and 'VV' keys.")
-    # print(chavas_profile)
+
     radii = np.array(chavas_profile["rr"], dtype="float32")
     windspeeds = np.array(chavas_profile["VV"], dtype="float32")
     pressures = pressures_profile(radii, windspeeds)
