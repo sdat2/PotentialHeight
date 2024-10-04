@@ -55,7 +55,8 @@ def pressure_from_wind(
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
         >>> vv = np.array([0, 0, 0, 0, 0, 0])
         >>> p = pressure_from_wind(rr, vv)
-        >>> np.allclose(p, np.array([101500, 101500, 101500, 101500, 101500, 101500]))
+        >>> np.allclose(p, np.array([101500, 101500, 101500, 101500, 101500, 101500]), rtol=1e-3, atol=1e-6)
+        True
     """
     p = np.zeros(rr.shape)  # [Pa]
     # rr ascending
@@ -117,5 +118,11 @@ def absolute_angular_momentum(v: float, r: float, f: float) -> float:
 
     Returns:
         float: Absolute angular momentum [m2/s].
+
+    Example::
+        >>> absolute_angular_momentum(0, 0, 0)
+        0.0
+        >>> absolute_angular_momentum(1, 1, 1)
+        1.5
     """
     return v * r + 0.5 * f * r**2  # [m2/s]

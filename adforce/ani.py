@@ -52,7 +52,7 @@ def plot_heights(
     vmin, vmax = ds.zeta.min().values, ds.zeta.max().values
     vmin, vmax = np.min([-vmax, vmin]), np.max([-vmin, vmax])
     print(vmin, vmax)
-    levels = np.linspace(vmin, vmax, num=400)
+    levels = np.linspace(vmin, vmax, num=1000)
     cbar_levels = np.linspace(vmin, vmax, num=5)
     ckwargs = {
         "label": "",
