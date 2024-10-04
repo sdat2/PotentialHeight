@@ -57,14 +57,31 @@ def read_profile(profile_path: str) -> xr.Dataset:
             - pressures: Pressures [hPa].
             The dataset has the following coordinate:
             - radii: Radii [m].
+
+    Raises:
+        ValueError: If the profile does not contain 'rr' and 'VV' keys.
+
+    Examples:
+        >>> import os
+        >>> from cle.constants import DATA_PATH
+        >>> profile_ds = read_profile(os.path.join(DATA_PATH, "2025.json"))
+        >>> assert "windspeeds" in profile_ds.data_vars
+        >>> assert "pressures" in profile_ds.data_vars
+        >>> assert "radii" in profile_ds.coords
     """
     chavas_profile = read_json(profile_path)
-    rr = np.array(chavas_profile["rr"], dtype="float32")
-    vv = np.array(chavas_profile["VV"], dtype="float32")
-    chavas_profile = pressures_profile(rr, vv)
+    # print("profile_path", profile_path)
+    # print("chavas_profile", chavas_profile.keys())
+    # print("rr", len(chavas_profile["rr"]), type(chavas_profile["rr"]))
+    # print("VV", len(chavas_profile["VV"]), type(chavas_profile["VV"]))
+
+    if "rr" not in chavas_profile or "VV" not in chavas_profile:
+        raise ValueError("The profile must contain 'rr' and 'VV' keys.")
+    # print(chavas_profile)
     radii = np.array(chavas_profile["rr"], dtype="float32")
     windspeeds = np.array(chavas_profile["VV"], dtype="float32")
-    pressures = np.array(chavas_profile["p"], dtype="float32")
+    pressures = pressures_profile(radii, windspeeds)
+
     return xr.Dataset(
         data_vars={
             "windspeeds": (["radii"], windspeeds, {"units": "m/s"}),

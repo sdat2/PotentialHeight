@@ -45,7 +45,7 @@ from .fort22 import save_forcing
 from .mesh import xr_loader
 from .profile import read_profile
 
-
+# some of these could be moved to a config file.
 ROOT: str = "/work/n02/n02/sdat2/adcirc-swan/"
 OG_PATH: str = "/work/n02/n02/sdat2/adcirc-swan/examples/NWS13example"
 EXE_PATH: str = "/work/n02/n02/sdat2/adcirc-swan/adcirc/work"
