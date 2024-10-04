@@ -203,7 +203,9 @@ def find_missing_raw_cmip6_nc(file_d: dict) -> list:
 
 
 @timeit
-def define_tasks(original_root: str = RAW_PATH, new_root: str = REGRIDDED_PATH) -> dict:
+def get_task_dict(
+    original_root: str = RAW_PATH, new_root: str = REGRIDDED_PATH
+) -> dict:
     """Find all tasks to be done. Return a dictionary of tasks.
 
     Args:

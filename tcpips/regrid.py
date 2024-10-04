@@ -27,10 +27,10 @@ from tcpips.constants import (
     REGRIDDED_PATH,
     CONVERSION_NAMES,
 )
-from tcpips.files import locker, define_tasks
+from tcpips.files import locker, get_task_dict
 
 
-def run_tasks(
+def run_regridding_sequentially(
     force_regrid: bool = False,
     output_res: float = 0.5,
     worker: int = 10,
@@ -47,8 +47,8 @@ def run_tasks(
         parallel (bool, optional): Run in parallel. Defaults to False.
 
     """
-    tasks = define_tasks()
-    write_json(tasks, os.path.join(DATA_PATH, "tasks.json"))
+    tasks = get_task_dict()
+    write_json(tasks, os.path.join(DATA_PATH, "regridding_tasks.json"))
     print("tasks", tasks)
 
     if parallel:
@@ -84,7 +84,7 @@ def regrid_cmip6_part(
     Regrid 2d data to a certain resolution using xesmf.
 
     Args:
-        output_res (float, optional): Resolution of the output grid. Defaults to 1.0.
+        output_res (float, optional): Resolution of the output grid. Defaults to 0.5.
         time_chunk (int, optional): Chunk size for time. Defaults to 1.
         exp (str, optional): Experiment name. Defaults to "ssp585".
         typ (str, optional): Type of data. Defaults to "ocean". Can be "ocean" or "atmos".
@@ -158,12 +158,14 @@ def regrid_cmip6_part(
             input_ds,
             keep_attrs=True,
             skipna=True,
-            output_chunks={"time": time_chunk, "lat": 90, "lon": 90},
+            # output_chunks={"time": time_chunk},  # , "lat": 90, "lon": 90},
             # ignore_degenerate=True,
-        ).chunk(chunks={"time": time_chunk})
+        )  # .chunk(chunks={"time": time_chunk})
         out_ds.attrs["regrid_info"] = (
             regridder.__str__() + "git " + get_git_revision_hash() + " " + time_stamp()
         )
+        out_ds.attrs["regridded_at_git_hash"] = get_git_revision_hash()
+        out_ds.attrs["regridded_at_time"] = time_stamp()
         print("out_ds", out_ds)
         delayed_obj = out_ds.to_netcdf(
             os.path.join(CMIP6_PATH, output_name),
@@ -200,7 +202,7 @@ if __name__ == "__main__":
     # regrid_2d()
     # regrid_1d()
     # regrid_1d(xesmf=True)
-    # define_tasks()
+    # get_task_dict()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-w", "--worker", type=int, default=10)  # number of workers
@@ -221,7 +223,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     print("args", args)
-    run_tasks(
+    run_regridding_sequentially(
         worker=args.worker,
         force_regrid=args.force,
         output_res=args.resolution,
