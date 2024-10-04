@@ -63,7 +63,9 @@ def plot_heights(
     }
 
     for time_i in range(0, len(ds.time.values), step_size):
-        im = plt.tricontourf(
+        ax = plt.gca()
+        ax.set_facecolor("#d1ffbd")
+        im = ax.tricontourf(
             ds.x.values,
             ds.y.values,
             ds.element.values - 1,
@@ -73,7 +75,6 @@ def plot_heights(
             levels=levels,
             cmap="cmo.balance",
         )
-        ax = plt.gca()
         cbar = plt.colorbar(
             im,
             ax=ax,
