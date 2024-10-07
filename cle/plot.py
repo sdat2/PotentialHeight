@@ -1,7 +1,8 @@
 """
-Plot the relationships between the variables including potential size."""
+Plot the relationships between the variables including potential size.
+"""
 
-from typing import Callable, Tuple, Optional, Dict, List
+from typing import List
 import os
 import numpy as np
 import xarray as xr
@@ -72,9 +73,28 @@ def vary_r0_w22_plot(r0s: np.ndarray, plot=False) -> np.ndarray:
             for r0 in r0s
         ]
     )
-    pms = (
-        BACKGROUND_PRESSURE - buck_sat_vap_pressure(DEFAULT_SURF_TEMP)
-    ) / ys + buck_sat_vap_pressure(DEFAULT_SURF_TEMP)
+
+    def pressure_at_maximum_wind_from_ys(
+        ys: np.ndarray,
+        background_presure: float = BACKGROUND_PRESSURE,
+        surface_temperature: float = DEFAULT_SURF_TEMP,
+    ) -> np.ndarray:
+        """Calculate the pressure at maximum winds from ys.
+
+        Args:
+            ys (np.ndarray): ys.
+            background_presure (float, optional): Background pressure [Pa]. Defaults to BACKGROUND_PRESSURE.
+            surface_temperature (float, optional): Surface temperature in Kelvin. Defaults to DEFAULT_SURF_TEMP.
+
+        Returns:
+            np.ndarray: Pressure at maximum winds [Pa].
+        """
+        return np.array(
+            (background_presure - buck_sat_vap_pressure(surface_temperature)) / ys
+            + buck_sat_vap_pressure(surface_temperature)
+        )
+
+    pms = pressure_at_maximum_wind_from_ys(ys)
     plt.plot(r0s / 1000, np.array(pms) / 100, "r")
     plt.xlabel("Radius, $r_a$, [km]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
@@ -83,15 +103,17 @@ def vary_r0_w22_plot(r0s: np.ndarray, plot=False) -> np.ndarray:
     return pms
 
 
-def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> None:
+def timeseries_plots_from_ds(
+    ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc"), folder: str = SUP_PATH
+) -> None:
     """
-    Plot the relationships between the variables.
+    Plot the timeseries relationships between the variables.
 
     Args:
         ds_name (str, optional): Defaults to os.path.join(DATA_PATH, "gom_soln_new.nc").
+        folder (str, optional): Output figure folder. Defaults to SUP_PATH.
     """
     ds = xr.open_dataset(ds_name)
-    folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     print("ds", ds)
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -104,7 +126,7 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     label_subplots(axs)
-    plt.savefig(os.path.join(folder, "rmax_time_new.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_rmax_time_new.pdf"))
     plt.clf()
 
     im = plt.scatter(
@@ -113,18 +135,18 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     plt.colorbar(im, label="Year", shrink=0.5)
     plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     plt.ylabel("Radius of outer winds, $r_a$, [km]")
-    plt.savefig(os.path.join(FIGURE_PATH, "rmax_vmax.pdf"))
+    plt.savefig(os.path.join(FIGURE_PATH, "timeseries_rmax_vmax.pdf"))
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
-    vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]  # , "time"]
+    vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]
 
     pairplot(ds[vars].to_dataframe()[vars])
-    plt.savefig(os.path.join(folder, "pairplot.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_pairplot.pdf"))
     plt.clf()
 
     vars = ["t", "q", "vmax", "r0", "pm", "t0", "year"]
     pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
-    plt.savefig(os.path.join(folder, "pairplot2.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_pairplot2.pdf"))
     plt.clf()
 
     # do a line plot of sst, vmax, and r0
@@ -137,7 +159,7 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     axs[0].set_ylabel("Sea surface temperature, $T_s$, [$^\circ$C]")
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Radius of outer winds, $r_a$, [km]")
-    plt.savefig(os.path.join(folder, "sst_vmax_rmax.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_sst_vmax_rmax.pdf"))
 
     # do a line plot of carnot factor, vmax, and r0
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -155,12 +177,12 @@ def plot_from_ds(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> N
     )
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Radius of outer winds, $r_a$, [km]")
-    plt.savefig(os.path.join(folder, "carnot_vmax_rmax.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_carnot_vmax_rmax.pdf"))
 
     # pairplot of carnot factor, vmax, and r0
     vars = ["carnot", "vmax", "r0", "year"]
     pairplot(ds[vars].to_dataframe()[vars])
-    plt.savefig(os.path.join(folder, "pairplot3.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_pairplot3.pdf"))
     plt.clf()
 
 
@@ -205,13 +227,33 @@ def figure2() -> None:
     vmaxs = vmaxs[~np.isnan(ssts)]
     ssts = ssts[~np.isnan(ssts)]
     rho = pearsonr(lats, ssts)[0]
+    fit_space_sst_lat, _ = fit(lats, ssts)
+    print(
+        "space (sst, lat) $m={:.1eL}$ ".format(fit_space_sst_lat[0])
+        + "$^{\circ}$C  $^{\circ}$N$^{-1}$",
+    )
     print("space rho (sst, lat): {:.2f}".format(rho))
     lats = lats[~np.isnan(r0s)]
     r0s = r0s[~np.isnan(r0s)]
+    fit_space_r0s_lats, _ = fit(lats, r0s / 1000)
+    print(
+        "space (r0s, lat) $m={:.1eL}$ ".format(fit_space_r0s_lats[0])
+        + "km  $^{\circ}$N$^{-1}$",
+    )
     rho = pearsonr(lats, r0s)[0]
     print("space rho (r0s, lat): {:.2f}".format(rho))
     ssts = ssts[~np.isnan(vmaxs)]
     vmaxs = vmaxs[~np.isnan(vmaxs)]
+    fit_space_vmaxs_lats, _ = fit(lats, vmaxs)
+    print(
+        "space (vmax, lat) $m={:.1eL}$ ".format(fit_space_vmaxs_lats[0])
+        + "m s$^{-1}$  $^{\circ}$N$^{-1}$",
+    )
+    fit_space_vmaxs_ssts, _ = fit(ssts, vmaxs)
+    print(
+        "space (vmax, sst) $m={:.1eL}$ ".format(fit_space_vmaxs_ssts[0])
+        + "m s$^{-1}$  $^{\circ}$C$^{-1}$",
+    )
     rho = pearsonr(ssts, vmaxs)[0]
     print("space rho (sst, vmax): {:.2f}".format(rho))
 
@@ -228,22 +270,32 @@ def figure2() -> None:
     ## work out correlation between time and vmax between 2000 and 2099
     year_min = 2014
     year_max = 2100
+    ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
     vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
     r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
     years = timeseries_ds["time"].sel(time=slice(year_min, year_max)).values
-    r_vmax = pearsonr(vmaxs, years)[0]
-    r_r0 = pearsonr(r0s, years)[0]
+    rho_vmax = pearsonr(vmaxs, years)[0]
+    rho_r0 = pearsonr(r0s, years)[0]
+    rho_sst = pearsonr(ssts, years)[0]
+    rho_sst_vmax = pearsonr(ssts, vmaxs)[0]
+    rho_sst_r0 = pearsonr(ssts, r0s)[0]
+    print("rho_sst_vmax", rho_sst_vmax)
+    print("rho_sst_r0", rho_sst_r0)
+    print("rho_sst", rho_sst)
 
-    axs[0, 1].text(0.8, 0.9, f"$\\rho$ = {r_vmax:.2f}", transform=axs[0, 1].transAxes)
-    axs[1, 1].text(0.8, 0.9, f"$\\rho$ = {r_r0:.2f}", transform=axs[1, 1].transAxes)
+    axs[0, 1].text(0.8, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0, 1].transAxes)
+    axs[1, 1].text(0.8, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1, 1].transAxes)
 
     # work out gradient with error bars for same period
     fit_vmax, _ = fit(years, vmaxs)
     fit_r0, _ = fit(years, r0s / 1000)
+    fit_r0_sst, _ = fit(ssts, r0s / 1000)
+    print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
+
     axs[0, 1].text(
         0.66,
         0.05,
-        f"$m=$  " "${:.1eL}$".format(fit_vmax[0]) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+        f"$m=$  " + "${:.1eL}$".format(fit_vmax[0]) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
         transform=axs[0, 1].transAxes,
     )
     axs[1, 1].text(
@@ -268,7 +320,9 @@ def figure2() -> None:
     print(timeseries_ds)
 
 
-def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) -> None:
+def plot_soln_curves_timeseries(
+    ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")
+) -> None:
     """
     Plot the solution curves for different.
 
@@ -346,7 +400,9 @@ def plot_soln_curves(ds_name: str = os.path.join(DATA_PATH, "gom_soln_new.nc")) 
     plt.clf()
 
 
-def plot_profiles(ds_name: str = os.path.join(DATA_PATH, "gom_soln_2.nc")) -> None:
+def plot_profiles_timeseries(
+    ds_name: str = os.path.join(DATA_PATH, "gom_soln_2.nc")
+) -> None:
     """
     Plot the azimuthal wind profiles for different times.
 
@@ -371,11 +427,11 @@ def plot_profiles(ds_name: str = os.path.join(DATA_PATH, "gom_soln_2.nc")) -> No
     plt.legend()
     plt.xlabel("Radius, $r$, [km]")
     plt.ylabel("Wind speed, $V$, [m s$^{-1}$]")
-    plt.savefig(os.path.join(folder, "profiles.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_profiles.pdf"))
     plt.clf()
 
 
-def plot_gom_bbox() -> None:
+def plot_gom_bbox_spatial() -> None:
     """Try and calculate the solution for the GOM bbox."""
     plot_defaults()
 
@@ -391,7 +447,7 @@ def plot_gom_bbox() -> None:
     ds.sst.plot()
     plt.xlabel(r"Longitude, $\lambda$, [$^\circ$]")
     plt.ylabel(r"Latitude, $\phi$, [$^\circ$]")
-    plt.savefig(os.path.join(folder, "gom_bbox_sst.pdf"))
+    plt.savefig(os.path.join(folder, "spatial_gom_bbox_sst.pdf"))
     plt.clf()
 
     new_var = [
@@ -453,7 +509,7 @@ def plot_gom_bbox() -> None:
     ds.to_netcdf(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
 
 
-def plot_gom_bbox_soln() -> None:
+def spatial_plot_gom() -> None:
     """Plot the solution for the GOM bbox."""
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
@@ -496,17 +552,17 @@ def plot_gom_bbox_soln() -> None:
     label_subplots(axs, override="outside")
     # axs[1].plot(ds["lat"], ds["vmax"], "k")
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
-    plt.savefig(os.path.join(folder, "gom_bbox_r0_pm_rmax.pdf"))
-    print("saving to ", folder + "/gom_bbox_r0_pm_rmax.pdf")
+    plt.savefig(os.path.join(folder, "spatial_gom_bbox_r0_pm_rmax.pdf"))
+    print("saving to ", folder + "/spatial_gom_bbox_r0_pm_rmax.pdf")
 
     vars: List[str] = ["t", "q", "vmax", "r0", "pc", "t0"]
     pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
-    plt.savefig(os.path.join(folder, "gom_bbox_pairplot2.pdf"))
+    plt.savefig(os.path.join(folder, "spatial_gom_bbox_pairplot2.pdf"))
     plt.clf()
 
 
 @timeit
-def plot_gom_solns() -> None:
+def plot_timeseries_gom_solns() -> None:
     """Plot the solution timeseries for the Gulf of Mexico."""
     ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_solns.nc"))
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
@@ -518,10 +574,10 @@ def plot_gom_solns() -> None:
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     label_subplots(axs)
-    plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
+    plt.savefig(os.path.join(FIGURE_PATH, "timeseries_diff_rmax_time.pdf"))
 
 
-def plot_and_calc_gom() -> None:
+def plot_and_calc_gom_soln_curve() -> None:
     """Plot the solution curves for different years
     for the Gulf of Mexico."""
     solns = []
@@ -543,7 +599,7 @@ def plot_and_calc_gom() -> None:
     axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     label_subplots(axs)
-    plt.savefig(os.path.join(FIGURE_PATH, "rmax_time.pdf"))
+    plt.savefig(os.path.join(FIGURE_PATH, "soln_curve_rmax_time.pdf"))
 
 
 @timeit
@@ -608,20 +664,21 @@ def plot_c15_profiles_over_time(marker_size: int = 1, linewidth=0.5) -> None:
 if __name__ == "__main__":
     # python -m cle.plot
     # python plot.py
-    # plot_gom_bbox()
-    # plot_gom_bbox_soln()
-    # plot_soln_curves()
-    # plot_profiles()
-    # plot_from_ds()
-    # plot_and_calc_gom()
-    # plot_gom_solns()
+    # plot_gom_bbox_spatial()
+    spatial_plot_gom()
+    # plot_soln_curves_timeseries()
+    # plot_profiles_timeseries()
+    # timeseries_plots_from_ds()
+    # plot_and_calc_gom_soln_curve()
+    # plot_timeseries_gom_solns()
     # plot_c15_profiles_over_time()
-    # plot_and_calc_gom()
-    # plot_gom_solns()
-    # plot_gom_bbox_soln()
-    # plot_soln_curves()
-    # plot_profiles()
-    # plot_from_ds()
+    # plot_and_calc_gom_soln_curve()
+    plot_timeseries_gom_solns()
+    # spatial_plot_gom()
+    #
+    plot_soln_curves_timeseries()
+    plot_profiles_timeseries()
+    timeseries_plots_from_ds()
     # ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
     # print(ds)
     # print([var for var in ds])
