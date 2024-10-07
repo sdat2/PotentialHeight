@@ -31,7 +31,7 @@ from .potential_size import (
     wang_diff,
     wang_consts,
 )
-from .utils import buck_sat_vap_pressure, carnot_factor
+from .utils import buck_sat_vap_pressure, carnot_factor, coriolis_parameter_from_lat
 from .ps_dataset import find_solution_ds, gom_timestep
 
 plot_defaults()
@@ -234,15 +234,20 @@ def figure2() -> None:
     )
     print("space rho (sst, lat): {:.2f}".format(rho))
     lats = lats[~np.isnan(r0s)]
+    ssts = ssts[~np.isnan(r0s)]
+    vmaxs = vmaxs[~np.isnan(r0s)]
+    coriolis_fs = coriolis_parameter_from_lat(lats)
     r0s = r0s[~np.isnan(r0s)]
     fit_space_r0s_lats, _ = fit(lats, r0s / 1000)
     print(
-        "space (r0s, lat) $m={:.1eL}$ ".format(fit_space_r0s_lats[0])
+        "space (r0s, lat) $m={:.2eL}$ ".format(fit_space_r0s_lats[0])
         + "km  $^{\circ}$N$^{-1}$",
     )
     rho = pearsonr(lats, r0s)[0]
     print("space rho (r0s, lat): {:.2f}".format(rho))
+
     ssts = ssts[~np.isnan(vmaxs)]
+    coriolis_fs = coriolis_fs[~np.isnan(vmaxs)]
     vmaxs = vmaxs[~np.isnan(vmaxs)]
     fit_space_vmaxs_lats, _ = fit(lats, vmaxs)
     print(
@@ -256,6 +261,17 @@ def figure2() -> None:
     )
     rho = pearsonr(ssts, vmaxs)[0]
     print("space rho (sst, vmax): {:.2f}".format(rho))
+    vmax_div_coriolis = vmaxs / coriolis_fs
+    rho = pearsonr(vmax_div_coriolis, r0s)[0]
+    print("space rho (vmax/coriolis, r0): {:.2f}".format(rho))
+    fit_space_vmaxs_div_coriolis_r0, _ = fit(vmax_div_coriolis, r0s)
+
+    print(
+        "space (vmax/coriolis, r0) $m={:.2eL}$ ".format(
+            fit_space_vmaxs_div_coriolis_r0[0]
+        )
+        + "km m$^{-1}$ s$^2$$",
+    )
 
     timeseries_ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_new.nc"))
     (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
@@ -290,7 +306,9 @@ def figure2() -> None:
     fit_vmax, _ = fit(years, vmaxs)
     fit_r0, _ = fit(years, r0s / 1000)
     fit_r0_sst, _ = fit(ssts, r0s / 1000)
-    print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
+    print("fit_r0_sst timeseries", fit_r0_sst[0], "km $^{\circ}$C$^{-1}$")
+    fit_vmax_sst, _ = fit(ssts, vmaxs)
+    print("fit_vmax_sst timeseries", fit_vmax_sst[0], "m s$^{-1}$C$ ^{-1}$")
 
     axs[0, 1].text(
         0.66,
