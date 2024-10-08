@@ -139,13 +139,13 @@ def timeseries_plots_from_ds(
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
     vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]
-
-    pairplot(ds[vars].to_dataframe()[vars], label=True)
+    pairplot(ds, vars=vars, label=True)
+    # pairplot(ds[vars].to_dataframe()[vars], label=True)
     plt.savefig(os.path.join(folder, "timeseries_pairplot.pdf"))
     plt.clf()
 
     vars = ["t", "q", "vmax", "r0", "pm", "t0", "year"]
-    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars], label=True)
+    pairplot(ds.isel(p=0), vars=vars, label=True)  # .to_dataframe()[vars], label=True)
     plt.savefig(os.path.join(folder, "timeseries_pairplot2.pdf"))
     plt.clf()
 
@@ -181,7 +181,7 @@ def timeseries_plots_from_ds(
 
     # pairplot of carnot factor, vmax, and r0
     vars = ["carnot", "vmax", "r0", "year"]
-    pairplot(ds[vars].to_dataframe()[vars], label=True)
+    pairplot(ds, vars=vars, label=True)
     plt.savefig(os.path.join(folder, "timeseries_pairplot3.pdf"))
     plt.clf()
 
@@ -574,7 +574,7 @@ def spatial_plot_gom() -> None:
     print("saving to ", folder + "/spatial_gom_bbox_r0_pm_rmax.pdf")
 
     vars: List[str] = ["t", "q", "vmax", "r0", "pc", "t0"]
-    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars], label=True)
+    pairplot(ds.isel(p=0), vars=vars, label=True)
     plt.savefig(os.path.join(folder, "spatial_gom_bbox_pairplot2.pdf"))
     plt.clf()
 
