@@ -11,20 +11,24 @@ def run_3d_exp() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stationid", type=int, default=3)
     parser.add_argument("--year", type=int, default=2097)
+    parser.add_argument("--init_steps", type=int, default=25)
+    parser.add_argument("--daf_steps", type=int, default=25)
+    parser.add_argument("--seed_offset", type=int, default=22)
+    parser.add_argument("--setup", type=str, default="mid-notide")
     args = parser.parse_args()
 
     # stationid: int = 3
     # year: int = 2097  # python -m adbo.exp_3d &> logs/bo-3-2097.log
-    # python -m adbo.exp_3d &> logs/bo-test-2-2097.log
+    # python -m adbo.exp_3d --stationid=3 --year=2025 &> logs/bo-test-3-2025-new.log
     run_bayesopt_exp(
-        seed=22 + args.stationid + args.year,
+        seed=args.seed_offset + args.stationid + args.year,
         profile_name=f"{args.year}.json",
         constraints=DEFAULT_CONSTRAINTS,
         stationid=args.stationid,
-        exp_name=f"notide-{args.stationid:01}-{args.year}-midres",
-        resolution="mid-notide",
-        init_steps=25,
-        daf_steps=25,
+        exp_name=f"{args.setup}-{args.stationid:01}-{args.year}-i-{args.init_steps}",
+        resolution=args.setup,
+        init_steps=args.init_steps,
+        daf_steps=args.daf_steps,
         wrap_test=False,
     )
 

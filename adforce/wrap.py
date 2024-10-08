@@ -354,7 +354,7 @@ echo ""
 
 
 def maxele_observation_func(
-    point: Union[Point, int], resolution: str = "mid"
+    point: Union[Point, int] = NEW_ORLEANS, resolution: str = "mid"
 ) -> Callable[[str], float]:
     """
     Create a function to select the maximum elevation near a given stationid.
@@ -362,7 +362,7 @@ def maxele_observation_func(
     TODO: Curently now just selects based on the closest point to NEW_ORLEANS.
 
     Args:
-        stationid (int): Stationid to select.
+        point (Union[Point, int]): Stationid to select.
         resolution (str, optional): Original path. Defaults to OG_PATH.
 
     Returns:
@@ -381,7 +381,7 @@ def maxele_observation_func(
         # work out closest point to NEW_ORLEANS
         xs = mele_og.x.values
         ys = mele_og.y.values
-        distsq = (xs - NEW_ORLEANS.lon) ** 2 + (ys - NEW_ORLEANS.lat) ** 2
+        distsq = (xs - point.lon) ** 2 + (ys - point.lat) ** 2
         min_p = np.argmin(distsq)  # closest point to stationid
 
     def select_max(path: str) -> float:
