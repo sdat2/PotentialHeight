@@ -10,7 +10,8 @@ REQUIRED: List[str] = [
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility for linear error propagation
     # "sithom>=0.0.5",  # common utilities
-    "sithom @ git+https://github.com/sdat2/sithom",
+    # "sithom @ git+https://github.com/sdat2/sithom",
+    "sithom >= 0.1.1",
     "oct2py",  # oct2py for running MATLAB code (cle)
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)

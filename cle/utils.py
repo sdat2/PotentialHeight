@@ -53,9 +53,9 @@ def pressure_from_wind(
 
     Example::
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
-        >>> vv = np.array([0, 0, 0, 0, 0, 0])
+        >>> vv = np.array([0] * 6)
         >>> p = pressure_from_wind(rr, vv)
-        >>> np.allclose(p, np.array([101500, 101500, 101500, 101500, 101500, 101500]), rtol=1e-3, atol=1e-6)
+        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6)
         True
     """
     p = np.zeros(rr.shape)  # [Pa]
