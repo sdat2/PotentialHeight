@@ -140,12 +140,12 @@ def timeseries_plots_from_ds(
     ds["year"] = ("time", ds["time"].values)
     vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]
 
-    pairplot(ds[vars].to_dataframe()[vars])
+    pairplot(ds[vars].to_dataframe()[vars], label=True)
     plt.savefig(os.path.join(folder, "timeseries_pairplot.pdf"))
     plt.clf()
 
     vars = ["t", "q", "vmax", "r0", "pm", "t0", "year"]
-    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
+    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars], label=True)
     plt.savefig(os.path.join(folder, "timeseries_pairplot2.pdf"))
     plt.clf()
 
@@ -181,7 +181,7 @@ def timeseries_plots_from_ds(
 
     # pairplot of carnot factor, vmax, and r0
     vars = ["carnot", "vmax", "r0", "year"]
-    pairplot(ds[vars].to_dataframe()[vars])
+    pairplot(ds[vars].to_dataframe()[vars], label=True)
     plt.savefig(os.path.join(folder, "timeseries_pairplot3.pdf"))
     plt.clf()
 
@@ -389,21 +389,21 @@ def plot_soln_curves_timeseries(
     plt.xlim([1000, 3000])
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     plt.ylim([875, 1000])
-    plt.savefig(os.path.join(folder, "r0_solns.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_r0_solns.pdf"))
     plt.clf()
 
     im = plt.scatter(ds.vmax, ds.r0 / 1000, c=ds.pm / 100, marker="x", linewidth=0.5)
     plt.colorbar(im, label="Pressure at maximum winds, $p_m$, [hPa]", shrink=0.5)
     plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     plt.ylabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
-    plt.savefig(os.path.join(folder, "r0_vmax_pm.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_r0_vmax_pm.pdf"))
     plt.clf()
 
     im = plt.scatter(ds.vmax, ds.r0 / 1000, c=ds.time, marker="x", linewidth=0.5)
     plt.colorbar(im, label="Year", shrink=0.5)
     plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
     plt.ylabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
-    plt.savefig(os.path.join(folder, "r0_vmax_time.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_r0_vmax_time.pdf"))
     plt.clf()
 
     im = plt.scatter(ds.vmax, ds.pm / 100, c=ds.r0, marker="x", linewidth=0.5)
@@ -414,7 +414,7 @@ def plot_soln_curves_timeseries(
 
     r = pearsonr(ds.vmax, ds.pm / 100)[0]
     plt.title(r"$\rho$ " + f"= {r:.2f}")
-    plt.savefig(os.path.join(folder, "pm_vmax_r0.pdf"))
+    plt.savefig(os.path.join(folder, "timeseries_pm_vmax_r0.pdf"))
     plt.clf()
 
 
@@ -574,7 +574,7 @@ def spatial_plot_gom() -> None:
     print("saving to ", folder + "/spatial_gom_bbox_r0_pm_rmax.pdf")
 
     vars: List[str] = ["t", "q", "vmax", "r0", "pc", "t0"]
-    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars])
+    pairplot(ds.isel(p=0)[vars].to_dataframe()[vars], label=True)
     plt.savefig(os.path.join(folder, "spatial_gom_bbox_pairplot2.pdf"))
     plt.clf()
 
