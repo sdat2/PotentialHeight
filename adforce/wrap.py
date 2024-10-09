@@ -1,32 +1,7 @@
-"""Wrap.
+"""Wrap the ADCIRC call into a single function for BayesOpt etc.
 
 To set off Slurm I could use (https://stackoverflow.com/questions/61704713/best-practice-submitting-slurm-jobs-via-python):
 - Slurmpy https://github.com/brentp/slurmpy
-        -- simplest
-- Snakemake
-@article{molder2021sustainable,
-  title={Sustainable data analysis with Snakemake},
-  author={M{\"o}lder, Felix and Jablonski, Kim Philipp and Letcher, Brice and Hall, Michael B and Tomkins-Tinch, Christopher H and Sochat, Vanessa and Forster, Jan and Lee, Soohyun and Twardziok, Sven O and Kanitz, Alexander and others},
-  journal={F1000Research},
-  volume={10},
-  year={2021},
-  publisher={Faculty of 1000 Ltd}
-}
-- Joblib (https://joblib.readthedocs.io/en/latest/)
-- Fireworks (https://materialsproject.github.io/fireworks/)
-@article {CPE:CPE3505,
-author = {Jain, Anubhav and Ong, Shyue Ping and Chen, Wei and Medasani, Bharat and Qu, Xiaohui and Kocher, Michael and Brafman, Miriam and Petretto, Guido and Rignanese, Gian-Marco and Hautier, Geoffroy and Gunter, Daniel and Persson, Kristin A.},
-title = {FireWorks: a dynamic workflow system designed for high-throughput applications},
-journal = {Concurrency and Computation: Practice and Experience},
-volume = {27},
-number = {17},
-issn = {1532-0634},
-url = {http://dx.doi.org/10.1002/cpe.3505},
-doi = {10.1002/cpe.3505},
-pages = {5037--5059},
-keywords = {scientific workflows, high-throughput computing, fault-tolerant computing},
-year = {2015},
-note = {CPE-14-0307.R2},
 """
 
 import os
@@ -368,7 +343,7 @@ def maxele_observation_func(
     Returns:
         Callable: Function to select the maximum elevation near a given stationid.
     """
-    # = xr.open_dataset(KATRINA_TIDE_NC)
+    # tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     # lon, lat = (
     #    tide_ds.isel(stationid=stationid).lon.values,
     #    tide_ds.isel(stationid=stationid).lat.values,
@@ -383,6 +358,12 @@ def maxele_observation_func(
         ys = mele_og.y.values
         distsq = (xs - point.lon) ** 2 + (ys - point.lat) ** 2
         min_p = np.argmin(distsq)  # closest point to stationid
+        print("Finding closest point to:\n", point)
+        print(
+            "closest node to point: {:}, {:.3f}E, {:.3f}N ".format(
+                min_p, xs[min_p], ys[min_p]
+            )
+        )
 
     def select_max(path: str) -> float:
         """
