@@ -589,6 +589,7 @@ def evt_fig_tens(
         FIGURE_PATH,
         f"evt_fig_tens__{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{samp_steps}_{seed_steps}.pdf",
     )
+    print(f"save_fig_path = {save_fig_path}")
 
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 

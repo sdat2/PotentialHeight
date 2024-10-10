@@ -4,22 +4,28 @@ Force ADCIRC with an idealized azimuthally symmetric straight-track tropical cyc
 
 At the moment it takes the time and space coordinates from an existing netcdf in `fort22.py` to create the forcing file.
 
+The tropical cyclones that force ADCIRC could come in at least four levels of complexity:
+  - Axisymetric invariant tropical cyclones (implemented)
+  - Asymetric invariant tropical cyclones
+  - Changing parametric tropical cyclones
+  - Full tropical cyclones
+
 ## Organization
 
 Some functions are organized around the file from ADCIRC they read/write.
 
-- fort15 - write example fort.15 namelists using `adcircpy`.
-- fort22 - write wind/pressure fort.22.nc files to force ADCIRC.
-- fort61 - Read the tide gauge file fort.61.nc.
-- fort63 - Read the ssh/wind output timeseries fort.63.nc file.
+  - fort15 - write example fort.15 namelists using `adcircpy`.
+  - fort22 - write wind/pressure fort.22.nc files to force ADCIRC.
+  - fort61 - Read the tide gauge file fort.61.nc.
+  - fort63 - Read the ssh/wind output timeseries fort.63.nc file.
 
 Then there are some general utility files
 
-- mesh - generic fast mesh reading/processing utilities.
-- profile - read the profiles created by `cle`.
-- ani - animate ARCHER2 runs winds/ssh.
-- plot - produce paper figures.
-- constants - some geographic constants etc. for ADFORCE.
+  - mesh - generic fast mesh reading/processing utilities.
+  - profile - read the profiles created by `cle`.
+  - ani - animate ARCHER2 runs winds/ssh.
+  - plot - produce paper figures.
+  - constants - some geographic constants etc. for ADFORCE.
 
 And the main logic to run the ADCIRC model is given in:
 
@@ -63,12 +69,3 @@ python -m adforce.wrap --exp_name notide-20sec --profile_name 2025.json  --resol
 ```bash
 python -m adforce.ani --path_in . --step_size 1
 ```
-
-### Problems with fort.15 file/owi_netCDF.nc
-
-```txt
-Error termination. Backtrace:
-At line 294 of file /work/n02/n02/sdat2/adcirc-swan/adcirc/src/owiwind_netcdf.F
-Fortran runtime error: Bad value during integer read
-```
-

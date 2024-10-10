@@ -443,6 +443,9 @@ if __name__ == "__main__":
         help="Path to ADCIRC run folder.",
     )
     parser.add_argument(
+        "--angle", type=float, default=0, help="Angle of the storm track."
+    )
+    parser.add_argument(
         "--profile_name",
         type=str,
         default="2025.json",
@@ -466,9 +469,10 @@ if __name__ == "__main__":
         select_point=maxele_observation_func(
             args.stationid, resolution=args.resolution
         ),
-        angle=0,
+        angle=args.angle,
         resolution=args.resolution,
     )
-    print(res)
+    print("args", args)
+    print("result: height near New Orleans reaches", res, "m")
 
     # python -m adforce.wrap --exp_name notide-mid --profile_name 2025.json --stationid 3 --resolution mid-notide

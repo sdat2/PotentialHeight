@@ -44,4 +44,4 @@ which python
 # run python job
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
-python -m adbo.exp
+python -m adbo.exp_2d --exp_name 2d-ani-new --profile_name 2025.json --stationid 3 --resolution mid-notide

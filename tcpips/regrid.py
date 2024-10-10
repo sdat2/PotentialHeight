@@ -16,7 +16,7 @@ from dask.diagnostics import ProgressBar
 import xesmf as xe
 from matplotlib import pyplot as plt
 from sithom.misc import in_notebook, get_git_revision_hash
-from sithom.plot import plot_defaults  # feature_grid, label_subplots
+from sithom.plot import plot_defaults
 from sithom.time import timeit, time_stamp
 from sithom.io import write_json
 from tcpips.constants import (

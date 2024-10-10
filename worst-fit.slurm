@@ -1,10 +1,10 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=data-processing
+#SBATCH --job-name=worst-fit
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=00:20:00
+#SBATCH --time=0:20:00
 #SBATCH --output=logs/%x-%j.out
 
 # Replace [budget code] below with your project code (e.g. t01)
@@ -22,5 +22,4 @@ source /work/n02/n02/sdat2/.bashrc
 micromamba activate t1 # load python environment
 echo "which python"
 which python # check python path
-python -m tcpips.regrid # run python job
-
+python -m worst.tens # run python job
