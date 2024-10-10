@@ -460,6 +460,14 @@ if __name__ == "__main__":
         default=3,
         help="Stationid to select.",
     )
+    parser.add_argument("--trans_speed", type=float, default=7.71)
+    parser.add_argument("--impact_lon", type=float, default=-89.4715)
+    parser.add_argument("--impact_lat", type=float, default=29.9511)
+    parser.add_argument(
+        "--impact_time",
+        type=np.datetime64,
+        default=np.datetime64("2004-08-13T12", "ns"),
+    )
 
     args = parser.parse_args()
 
@@ -471,6 +479,10 @@ if __name__ == "__main__":
         ),
         angle=args.angle,
         resolution=args.resolution,
+        trans_speed=args.trans_speed,
+        impact_lon=args.impact_lon,
+        impact_lat=args.impact_lat,
+        impact_time=args.impact_time,
     )
     print("args", args)
     print("result: height near New Orleans reaches", res, "m")
