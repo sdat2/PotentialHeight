@@ -638,7 +638,8 @@ def evt_fig_tens(
             lower_p = res_ds.quantile(lp, dim="seed")
             upper_p = res_ds.quantile(up, dim="seed")
             range_p = upper_p - lower_p
-            print("ranges", range_p.sel(number=50, method="nearest"))
+            print("for", lp, "to", up)
+            print("ranges at 50 samples", range_p.sel(number=50, method="nearest"))
             ratio_change = range_p.isel(fit=1) / range_p.isel(fit=2)
             print(
                 "knowing maxima makes difference",
@@ -709,6 +710,36 @@ def evt_fig_tens(
 
 if __name__ == "__main__":
     # python -m worst.tens
-    evt_fig_tens()
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument("--z_star", type=float, default=7)
+    parser.add_argument("--beta", type=float, default=1)
+    parser.add_argument("--gamma", type=float, default=-0.2)
+    parser.add_argument("--ex_seed", type=int, default=42)
+    parser.add_argument("--ex_num", type=int, default=50)
+    parser.add_argument("--min_samp", type=int, default=20)
+    parser.add_argument("--max_samp", type=int, default=1000)
+    parser.add_argument("--samp_steps", type=int, default=26)
+    parser.add_argument("--seed_steps", type=int, default=600)
+    parser.add_argument("--color_true", type=str, default="black")
+    parser.add_argument("--color_max_known", type=str, default="#1b9e77")
+    parser.add_argument("--color_max_unknown", type=str, default="#d95f02")
+    args = parser.parse_args()
+    evt_fig_tens(
+        z_star=args.z_star,
+        beta=args.beta,
+        gamma=args.gamma,
+        ex_seed=args.ex_seed,
+        ex_num=args.ex_num,
+        min_samp=args.min_samp,
+        max_samp=args.max_samp,
+        samp_steps=args.samp_steps,
+        seed_steps=args.seed_steps,
+        color_true=args.color_true,
+        color_max_known=args.color_max_known,
+        color_max_unknown=args.color_max_unknown,
+        load=True,
+    )
     # plot_defaults()
     # plot_ex(7, 1, -0.3, 42, 50, "black", "#1b9e77", "#d95f02")
