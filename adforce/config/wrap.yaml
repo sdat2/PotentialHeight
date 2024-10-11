@@ -29,11 +29,11 @@ observation_location:
   description: "Location of the observation point (x, y). Will pick the closest mesh node to this."
   units: "degrees"
 setup:
-  value: "midres"
+  value: "mid"
   type: str
   units: "dimensionless"
   description: "Configuration of the model"
-  options: ["lowres", "midres", "highres"]
+  options: ["low", "mid", "high"]
 tide:
   value: false
   type: float

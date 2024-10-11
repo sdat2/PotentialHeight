@@ -1,4 +1,7 @@
-"""fort.15 (namelist) file creation for ADCIRC."""
+"""fort.15 (namelist) file creation for ADCIRC.
+
+Using the adcircpy package.
+"""
 
 from datetime import timedelta, datetime
 import os

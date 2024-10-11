@@ -567,6 +567,7 @@ def evt_fig_tens(
     color_true: str = "black",
     color_max_known: str = "#1b9e77",
     color_max_unknown: str = "#d95f02",
+    load: bool = True,
 ) -> None:
     """
     Plot the EVT fits for the known upper bound and the unbounded case.
@@ -584,10 +585,11 @@ def evt_fig_tens(
         color_true (str, optional): Color or original GEV. Defaults to "black".
         color_max_known (str, optional): Color of GEV with max known. Defaults to "#1b9e77".
         color_max_unknown (str, optional): Color of GEV with unknown max. Defaults to "#d95f02".
+        load (bool, optional): reload if data exists or recalculate. Defaults to True for reload.
     """
     save_fig_path: str = os.path.join(
         FIGURE_PATH,
-        f"evt_fig_tens__{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{samp_steps}_{seed_steps}.pdf",
+        f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{samp_steps}_{seed_steps}.pdf",
     )
     print(f"save_fig_path = {save_fig_path}")
 
@@ -602,7 +604,7 @@ def evt_fig_tens(
         nums=np.logspace(
             np.log(min_samp), np.log(max_samp), num=samp_steps, base=np.e, dtype="int16"
         ),
-        load=True,
+        load=load,
     )
 
     # setup figure
@@ -629,11 +631,18 @@ def evt_fig_tens(
     # calculate statistics to work out sampling error
     mn = res_ds.mean(dim="seed")
     std = res_ds.std(dim="seed")
+
     for lp, up in [(0.05, 0.95)]:  # , (0.25, 0.75)]:
         if seed_steps > 10:
             # get 5th and 95th percentiles
             lower_p = res_ds.quantile(lp, dim="seed")
             upper_p = res_ds.quantile(up, dim="seed")
+            range_p = upper_p - lower_p
+            ratio_change = range_p.isel(fit=1) / range_p.isel(fit=2)
+            print(
+                "knowing maxima makes difference",
+                ratio_change.sel(number=100, method="nearest"),
+            )
         else:
             lower_p = mn - std
             upper_p = mn + std

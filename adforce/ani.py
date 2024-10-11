@@ -1,4 +1,9 @@
-"""Animate the outputs and inputs of ADCIRC simulations."""
+"""Animate the outputs and inputs of ADCIRC simulations.
+
+TODO: There is a lot of repeated code in the plotting functions. This should be refactored.
+
+TODO: Add geographic plotting options for including cartopy maps with coastlines, etc. if cartopy is installed.
+"""
 
 from typing import Optional
 import os
@@ -89,7 +94,7 @@ def plot_heights(
         plt.ylabel(r"Latitude [$^{\circ}$N]")
         time = ds.isel(time=time_i).time.values
         ts = pd.to_datetime(str(time))
-        print(ts)
+        print("time:", ts)
         plt.scatter(
             NEW_ORLEANS.lon,
             NEW_ORLEANS.lat,
@@ -128,6 +133,10 @@ def plot_heights_and_winds(
 ) -> None:
     """
     Plot heights and winds.
+
+    Assumes that the heights on the mesh are in the fort.63.nc file and the winds on the grid are in the fort.22.nc file.
+
+    Equally we might want to plot the winds on the mesh instead. This might get rid of some of the time synchronization issues.
 
     Args:
         path_in (str, optional): name of data folder. Defaults to "mult1".
@@ -168,6 +177,8 @@ def plot_heights_and_winds(
     }
 
     for time_i in range(0, len(f63_ds.time.values), step_size):
+        ax = plt.gca()
+        ax.set_facecolor("#d1ffbd")
         im = plt.tricontourf(
             f63_ds.x.values,
             f63_ds.y.values,
@@ -305,11 +316,11 @@ def line_up_f22(f22_main_ds: xr.Dataset, path_in: str, point: Point) -> xr.Datas
 
 def plot_u10_windx_at_a_point(path_in: str, point: Point, plot: bool = True) -> None:
     """
-    Plot U10.
+    Plot U10 at a point so that we can try to sync up the fort.22 and fort.74 files time coordinate.
 
     Args:
         path_in (str): path in.
-        point (Point): point to compare at.
+        point (Point): point to compare at (nearest mesh point to).
         plot (bool, optional): Defaults to True.
     """
     ds = xr_loader(os.path.join(path_in, "fort.74.nc"), use_dask=True)
@@ -343,6 +354,7 @@ def plot_u10_windx_at_a_point(path_in: str, point: Point, plot: bool = True) -> 
 
 
 def run_animation() -> None:
+    """Run the animation based on command line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--path_in",
@@ -406,4 +418,4 @@ if __name__ == "__main__":
 
 # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d --step_size 10 --coarsen 2
 # python -m adforce.ani --path_in . --step_size 10 --coarsen 2
-# python -m adforce.ani --path_in . --step_size 1
+# python -m adforce.ani --path_in . --step_size 1 --winds
