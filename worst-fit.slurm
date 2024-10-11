@@ -24,4 +24,4 @@ mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 echo "which python"
 which python # check python path
-python -m worst.tens --seed_steps=1000 # run python job
+python -m worst.tens --seed_steps=4000 # run python job

@@ -31,6 +31,6 @@ which python
 python --version
 
 # Run the job
-python -m adforce.wrap --exp_name notide-midres-tide --profile_name 2025.json --stationid 3 --resolution mid-notide
+python -m adforce.wrap --exp_name notide-midres-2025 --profile_name 2025.json --stationid 3 --resolution mid-notide
 
-python -m adforce.wrap --exp_name notide-midres-tide --profile_name 2097.json --stationid 3 --resolution mid-notide
+python -m adforce.wrap --exp_name notide-midres-2097 --profile_name 2097.json --stationid 3 --resolution mid-notide

@@ -131,5 +131,5 @@ def plot_sample_points(
         color=color,
         label=label,
     )
-    ax.set_ylabel("Return Value [m]")
-    ax.set_xlabel("Return Period [years]")
+    ax.set_ylabel("Return Value (RV) $v$ [m]")
+    ax.set_xlabel("Return Period (RP) $p$ [years]")

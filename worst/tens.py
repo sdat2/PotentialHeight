@@ -473,7 +473,8 @@ def get_evt_fit_data(
         the GEV with the known upper bound, and the GEV with no upper bound.
     """
     data_name = os.path.join(
-        DATA_PATH, f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{len(nums)}.nc"
+        DATA_PATH,
+        f"evt_fig_tens_{z_star:.2f}_{beta:.2f}_{gamma:.2f}_{len(nums)}_{len(seeds)}.nc",
     )
     print(f"data_name = {data_name}")
     if load and os.path.exists(data_name):
@@ -573,8 +574,8 @@ def evt_fig_tens(
     Plot the EVT fits for the known upper bound and the unbounded case.
 
     Args:
-        z_star (float, optional): Upper bound. Defaults to 7.
-        beta (float, optional): Scale parameter. Defaults to 1.
+        z_star (float, optional): Upper bound. Defaults to 7m.
+        beta (float, optional): Scale parameter. Defaults to 1m.
         gamma (float, optional): Shape parameter. Defaults to -0.2.
         ex_seed (int, optional): Example seed. Defaults to 57.
         ex_num (int, optional): Example number of samples. Defaults to 50.
@@ -694,7 +695,7 @@ def evt_fig_tens(
     )
     axs[1].set_xscale("log")
     axs[2].set_xscale("log")
-    axs[2].set_xlabel("Number of samples")
+    axs[2].set_xlabel("Number of samples, $N_s$")
     axs[1].set_ylabel("1 in 100 year RV [m]")
     axs[2].set_ylabel("1 in 500 year RV [m]")
     axs[1].set_xlim([min_samp, max_samp])
