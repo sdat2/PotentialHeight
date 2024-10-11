@@ -638,10 +638,11 @@ def evt_fig_tens(
             lower_p = res_ds.quantile(lp, dim="seed")
             upper_p = res_ds.quantile(up, dim="seed")
             range_p = upper_p - lower_p
+            print("ranges", range_p.sel(number=50, method="nearest"))
             ratio_change = range_p.isel(fit=1) / range_p.isel(fit=2)
             print(
                 "knowing maxima makes difference",
-                ratio_change.sel(number=100, method="nearest"),
+                ratio_change.sel(number=50, method="nearest"),
             )
         else:
             lower_p = mn - std
