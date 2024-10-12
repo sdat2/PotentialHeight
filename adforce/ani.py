@@ -21,7 +21,6 @@ from .mesh import bbox_mesh, xr_loader
 from .fort22 import read_fort22
 from .constants import NO_BBOX, NEW_ORLEANS
 
-
 # from sithom.xr import plot_units
 
 
@@ -42,8 +41,8 @@ def plot_heights(
         bbox (BoundingBox, optional): bounding box. Defaults to NO_BBOX.
     """
     plot_defaults()
-    img_folder = os.path.join(path_in, "img")
-    gif_folder = os.path.join(path_in, "gif")
+    img_folder = os.path.join(path_in, "img", "height")
+    gif_folder = os.path.join(path_in, "gif", "height")
     os.makedirs(img_folder, exist_ok=True)
     os.makedirs(gif_folder, exist_ok=True)
     figure_names = []
@@ -147,8 +146,8 @@ def plot_heights_and_winds(
         y_pos (float, optional): relative y position of quiver label.
     """
     plot_defaults()
-    img_folder = os.path.join(path_in, "img")
-    gif_folder = os.path.join(path_in, "gif")
+    img_folder = os.path.join(path_in, "img", "height_and_wind")
+    gif_folder = os.path.join(path_in, "gif", "height_and_wind")
     os.makedirs(img_folder, exist_ok=True)
     os.makedirs(gif_folder, exist_ok=True)
     figure_names = []
@@ -290,7 +289,7 @@ def line_up_f22(f22_main_ds: xr.Dataset, path_in: str, point: Point) -> xr.Datas
         point (Point): point to compare at.
 
     Returns:
-        xr.Dataset: f22_main_ds
+        xr.Dataset: f22_main_ds.
     """
     f74_ds = xr_loader(os.path.join(path_in, "fort.74.nc"), use_dask=True)
     f22_lons = f22_main_ds.lon.values
@@ -396,8 +395,179 @@ def run_animation() -> None:
     # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049 --step_size 10 --coarsen 2
 
 
+def single_wind_and_height_step(
+    path_in: str = "/work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049",
+    time_i: int = 380,
+    coarsen: int = 2,
+    bbox: Optional[BoundingBox] = NO_BBOX,
+    add_name: str = "",
+    x_pos: float = 0.4,
+    y_pos: float = 1.05,
+    scale: float = 800,
+) -> None:
+    """
+    Plot a single snapshot of height and wind.
+
+    Args:
+        path_in (str, optional): path to data. Defaults to "/work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049".
+        time_i (int, optional): time index. Defaults to 380.
+        coarsen (int, optional): coarsen the wind data by this factor. Defaults to 2.
+        bbox (Optional[BoundingBox], optional): bounding box. Defaults to NO_BBOX.
+        add_name (str, optional): additional prefix name. Defaults to "".
+        x_pos (float, optional): relative x position of quiver label. Defaults to 0.9.
+        y_pos (float, optional): relative y position of quiver label. Defaults to 1.05.
+        scale (float, optional): scale of the quiver plot. Defaults to 800.
+
+    """
+    plot_defaults()
+
+    img_folder = os.path.join(path_in, "img")
+    os.makedirs(img_folder, exist_ok=True)
+    if bbox is not None:
+        f63_ds = bbox_mesh(
+            os.path.join(path_in, "fort.63.nc"), bbox=bbox.pad(0.3), use_dask=True
+        )
+    else:
+        f63_ds = xr_loader(os.path.join(path_in, "fort.63.nc"), use_dask=True)
+    vmin_eta, vmax_eta = f63_ds.zeta.min().values, f63_ds.zeta.max().values
+    vmin_eta, vmax_eta = np.min([-vmax_eta, vmin_eta]), np.max([-vmin_eta, vmax_eta])
+    print(vmin_eta, vmax_eta)
+    levels = np.linspace(vmin_eta, vmax_eta, num=400)
+    cbar_levels = np.linspace(vmin_eta, vmax_eta, num=5)
+    f22_main_ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["Main"].to_dataset()
+    f22_main_ds = line_up_f22(f22_main_ds, path_in, NEW_ORLEANS)
+    f22_main_ds = f22_main_ds.coarsen(xi=coarsen, yi=coarsen, boundary="trim").mean()
+
+    ckwargs = {
+        "label": "Sea Surface Height [m]",
+        "format": axis_formatter(),
+        "extend": "neither",
+        "extendrect": False,
+        "extendfrac": 0,
+    }
+
+    try:
+        import cartopy
+        import cartopy.crs as ccrs
+
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.add_feature(cartopy.feature.COASTLINE, alpha=0.5)
+        ax.add_feature(cartopy.feature.LAKES, alpha=0.5)
+        # ax.add_feature(cartopy.feature.BORDERS, linestyle=":")
+        ax.add_feature(cartopy.feature.RIVERS)
+        ax.add_feature(cartopy.feature.STATES, linestyle=":")
+        fd = dict(transform=ccrs.PlateCarree())
+    except:
+        fd = dict()
+
+    ax = plt.gca()
+    ax.set_facecolor("#d1ffbd")
+    im = plt.tricontourf(
+        f63_ds.x.values,
+        f63_ds.y.values,
+        f63_ds.element.values - 1,
+        np.nan_to_num(f63_ds.zeta.isel(time=time_i).values, copy=False, nan=0),
+        vmin=vmin_eta,
+        vmax=vmax_eta,
+        levels=levels,
+        cmap="cmo.balance",
+        **fd,
+    )
+    ax = plt.gca()
+    cbar = plt.colorbar(
+        im,
+        ax=ax,
+        fraction=0.046,
+        pad=0.04,
+        shrink=0.8,  # 0.5,
+        **ckwargs,
+    )
+    ax.set_title("Water Height [m]")
+    cbar.set_ticks(cbar_levels)
+    cbar.set_ticklabels(["{:.1f}".format(x) for x in cbar_levels.tolist()])
+    time = f63_ds.isel(time=time_i).time.values
+    ts = pd.to_datetime(str(time))
+    print("time:", ts)
+    quiver = f22_main_ds.sel(time=time, method="nearest").plot.quiver(
+        ax=ax,
+        x="lon",
+        y="lat",
+        u="U10",
+        v="V10",
+        scale=scale,
+        add_guide=False,
+    )
+
+    _ = plt.quiverkey(
+        quiver,
+        # 1.08,
+        x_pos,
+        y_pos,  # 08,
+        40,
+        str(str(40) + r" m s$^{-1}$ $\vec{u}_{10}$"),  # + "\n"
+        labelpos="E",
+        coordinates="axes",
+        # transform=ccrs.PlateCarree(),
+        # coordinates="figure"
+        # ,
+        **fd,
+    )
+    # print(ts)
+    plt.xlabel(r"Longitude [$^{\circ}$E]")
+    plt.ylabel(r"Latitude [$^{\circ}$N]")
+    plt.scatter(
+        NEW_ORLEANS.lon,
+        NEW_ORLEANS.lat,
+        marker=".",
+        color="purple",
+        label="New Orleans",
+        transform=ccrs.PlateCarree(),
+    )
+    if bbox is not None:
+        bbox.ax_lim(plt.gca())
+    ax.set_aspect("equal")
+    ax.set_title("")
+    plt.title("")
+
+    if fd != {}:
+        ax.set_yticks(
+            [
+                x
+                for x in range(
+                    int((bbox.lat[0] // 1) + 1),
+                    int((bbox.lat[1] // 1) + 1),
+                )
+            ],
+            crs=ccrs.PlateCarree(),
+        )
+        ax.set_xticks(
+            [
+                x
+                for x in range(
+                    int((bbox.lon[0] // 1) + 1),
+                    int((bbox.lon[1] // 1) + 1),
+                )
+            ],
+            crs=ccrs.PlateCarree(),
+        )
+        # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+
+        # ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+        # ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
+    # plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
+    from tcpips.constants import FIGURE_PATH
+
+    figure_name = os.path.join(img_folder, add_name + f"snapshot.pdf")
+    plt.savefig(figure_name)
+    plt.savefig(os.path.join(FIGURE_PATH, "2025_mid_notide_snapshot.pdf"))
+
+    plt.clf()
+
+
 if __name__ == "__main__":
-    run_animation()
+    # python -m adforce.ani
+    # run_animation()
+    single_wind_and_height_step(path_in=".", bbox=NO_BBOX.pad(1), coarsen=3)
 
 # if __name__ == "__main__":
 #    drive_heights_and_winds()

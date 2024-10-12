@@ -454,12 +454,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--resolution", type=str, default="mid", help="Resolution of the ADCIRC model."
     )
-    parser.add_argument(
-        "--stationid",
-        type=int,
-        default=3,
-        help="Stationid to select.",
-    )
+    parser.add_argument("--obs_lon", type=float, default=-90.0715)
+    parser.add_argument("--obs_lat", type=float, default=29.9511)
     parser.add_argument("--trans_speed", type=float, default=7.71)
     parser.add_argument("--impact_lon", type=float, default=-89.4715)
     parser.add_argument("--impact_lat", type=float, default=29.9511)
@@ -469,13 +465,15 @@ if __name__ == "__main__":
         default=np.datetime64("2004-08-13T12", "ns"),
     )
 
+    parser.add_argument("--animate", action="store_true")
     args = parser.parse_args()
 
     res = run_adcirc_idealized_tc(
         out_path=os.path.join(EXP_PATH, args.exp_name),
         profile_name=args.profile_name,
         select_point=maxele_observation_func(
-            args.stationid, resolution=args.resolution
+            Point(args.obs_lon, args.obs_lat, desc="Attempted Observation Point"),
+            resolution=args.resolution,
         ),
         angle=args.angle,
         resolution=args.resolution,
@@ -484,7 +482,12 @@ if __name__ == "__main__":
         impact_lat=args.impact_lat,
         impact_time=args.impact_time,
     )
+
     print("args", args)
     print("result: height near New Orleans reaches", res, "m")
+    if args.animate:
+        from adforce.ani import plot_heights_and_winds
+
+        plot_heights_and_winds(os.path.join(EXP_PATH, args.exp_name), step_size=10)
 
     # python -m adforce.wrap --exp_name notide-mid --profile_name 2025.json --stationid 3 --resolution mid-notide
