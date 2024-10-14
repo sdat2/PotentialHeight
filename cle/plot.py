@@ -348,6 +348,7 @@ def plot_soln_curves_timeseries(
         ds_name (str, optional): Defaults to "gom_soln_new.nc".
     """
     plot_defaults()
+    plt.clf()
     ds = xr.open_dataset(ds_name)
     folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
@@ -693,7 +694,6 @@ if __name__ == "__main__":
     # plot_and_calc_gom_soln_curve()
     plot_timeseries_gom_solns()
     # spatial_plot_gom()
-    #
     plot_soln_curves_timeseries()
     plot_profiles_timeseries()
     timeseries_plots_from_ds()
