@@ -230,9 +230,10 @@ def gp_model_callback_maker(
 
         nx1, nx2 = 100, 102  # resolution of the plot
         # added some asymmetry to try to see if axes flip.
-        x1, x2 = np.linspace(0, 1, num=nx1), np.linspace(0, 1, num=nx2)
-        # TODO Does this make any sense?
-        # ah yeah to get different lengths of x1 and
+        x1 = np.linspace(0, 1, num=nx1)
+        x2 = np.linspace(0, 1, num=nx2)
+        # x1, x2 = np.linspace(0, 1, num=nx1), np.linspace(0, 1, num=nx2)
+        # To to get different lengths of x1 and
         # x2 to be rescaled, need to do them separately.
         x1_r = rescale_inverse(
             np.column_stack([x1, np.linspace(0, 1, num=nx1)]), constraints=constraints
@@ -241,13 +242,19 @@ def gp_model_callback_maker(
             np.column_stack([np.linspace(0, 1, num=nx2), x2]), constraints=constraints
         )[:, 1]
         assert x2_r.shape == x2.shape
+        assert x1.shape == (nx1,)
         assert x1_r.shape == x1.shape
         # x_r = rescale_inverse(np.column_stack([x1, x2]), constraints=constraints)
         # x1_r, x2_r = x_r[:, 0], x_r[:, 1]
-        X1, X2 = np.meshgrid(x1, x2)
+        X1, X2 = np.meshgrid(x1, x2, indexing="ij")
+        print("X1", X1.shape)
+        assert X1.shape == (nx1, nx2)
+        print("X2", X2.shape)
+        assert X2.shape == (nx1, nx2)
         x_input = np.column_stack([X1.flatten(), X2.flatten()])
-        assert np.isclose(x_input[:, 0].reshape((nx1, nx2)) == X1)
-        assert np.isclose(x_input[:, 1].reshape((nx1, nx2)) == X2)
+        assert x_input.shape == (nx1 * nx2, 2)
+        assert np.allclose(x_input[:, 0].reshape((nx1, nx2)), X1)
+        assert np.allclose(x_input[:, 1].reshape((nx1, nx2)), X2)
         ypred_list: List[np.ndarray] = []
         ystd_list: List[np.ndarray] = []
         acq_list: List[np.ndarray] = []
@@ -292,9 +299,9 @@ def gp_model_callback_maker(
                 # what's a good way to check that this puts the dimensions the right way around?
                 # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
                 y_mean, y_var = gp_models[model].predict_y(x_input)
-                y_mean, y_var = np.reshape(y_mean, (nx1, nx2)), np.reshape(
-                    y_var, (nx1, nx2)
-                )
+                y_mean, y_var = y_mean.numpy(), y_var.numpy()
+                y_mean, y_var = y_mean.reshape((nx1, nx2)), y_var.reshape((nx1, nx2))
+
                 ypred_list.append(y_mean)
                 ystd_list.append(np.sqrt(y_var))
                 print("np.array(ypred_list))", np.array(ypred_list).shape)
