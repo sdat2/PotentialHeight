@@ -1,0 +1,16 @@
+angle: 
+  min: -80
+  max: 80
+  units: degrees
+trans_speed:
+  min: 0
+  max: 15
+  units: m/s
+displacement:
+  min: -2
+  max: 2
+  units: degrees
+order: # order of input features
+  - angle
+  - trans_speed
+  - displacement

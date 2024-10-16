@@ -1,5 +1,8 @@
 """adbo.exp_2d.py"""
 
+import os
+import yaml
+from adbo.constants import CONFIG_PATH
 import argparse
 from adbo.exp import run_bayesopt_exp
 from adforce.constants import NEW_ORLEANS
@@ -9,11 +12,9 @@ def create_2d_ani_run() -> None:
     """
     Run a 2D experiment to make an animation of the GP model output being refined in BayesOpt.
     """
-    constraints_2d: dict = {
-        "angle": {"min": -80, "max": 80, "units": "degrees"},
-        "displacement": {"min": -2, "max": 2, "units": "degrees"},
-        "order": ("angle", "displacement"),  # order of input features
-    }
+    constraints_2d: dict = yaml.safe_load(
+        open(os.path.join(CONFIG_PATH, "2d_constraints.yaml"))
+    )
     print("constraints_2d", constraints_2d)
 
     parser = argparse.ArgumentParser()
@@ -35,8 +36,8 @@ def create_2d_ani_run() -> None:
         profile_name=str(args.year) + ".json",
         exp_name=args.exp_name,
         resolution=args.resolution,
-        init_steps=25,
-        daf_steps=25,
+        init_steps=args.init_steps,
+        daf_steps=args.daf_steps,
         wrap_test=args.test,
     )
 

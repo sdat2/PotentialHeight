@@ -4,9 +4,9 @@ Should contain all tensorflow imports so that other scripts
 are easier to use/test without waiting for tensorflow to load.
 """
 
-from typing import Callable, Optional
+from typing import Callable, Optional, List
 import os
-import argparse
+import yaml
 import numpy as np
 import xarray as xr
 import matplotlib
@@ -39,7 +39,7 @@ from adforce.wrap import run_adcirc_idealized_tc, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
-from .constants import FIGURE_PATH, EXP_PATH
+from .constants import FIGURE_PATH, EXP_PATH, CONFIG_PATH
 from .constants import AD_PATH as ROOT
 
 # archer 2:
@@ -75,7 +75,7 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 
 @timeit
 def objective_f(
-    config: dict,
+    constraints: dict,
     profile_name: str = "outputs.json",
     exp_name: str = "bo_test",
     obs_lon: float = NEW_ORLEANS.lon,
@@ -91,7 +91,7 @@ def objective_f(
     TODO: add wandb logging option.
 
     Args:
-        config (dict): Dictionary with the constraints for the model.
+        constraints (dict): Dictionary with the constraints for the model.
         profile_name (str, optional): Name of the profile. Defaults to "outputs.json".
         exp_name (str, optional): Name for folder. Defaults to "bo_test".
         obs_lon (float, optional): Longitude of the observation point. Defaults to NEW_ORLEANS.lon.
@@ -110,7 +110,7 @@ def objective_f(
     select_point = maxele_observation_func(
         Point(obs_lon, obs_lat), resolution=resolution
     )
-    dimension_inputs = len(config["order"])
+    dimension_inputs = len(constraints["order"])
     print("dimension_inputs", dimension_inputs)
 
     def temp_dir() -> str:
@@ -137,7 +137,10 @@ def objective_f(
         output[call_number] = {
             "": temp_dir(),
             "res": float(real_result),
-            **{name: float(real_query[j]) for j, name in enumerate(config["order"])},
+            **{
+                name: float(real_query[j])
+                for j, name in enumerate(constraints["order"])
+            },
         }
         write_json(output, os.path.join(exp_dir, "experiments.json"))
 
@@ -155,15 +158,16 @@ def objective_f(
         nonlocal call_number, select_point, resolution, wrap_test
         # put in real space
         returned_results = []  # new results, negative height [m]
-        real_queries = rescale_inverse(x, config)  # convert to real space
+        real_queries = rescale_inverse(x, constraints)  # convert to real space
         for i in range(real_queries.shape[0]):
             call_number += 1
             tmp_dir = temp_dir()
             inputs = {
                 name: float(real_queries[i][j])
-                for j, name in enumerate(config["order"])
+                for j, name in enumerate(constraints["order"])
             }
             if "displacement" in inputs:
+                # assume impact lon relative to New Orleans
                 inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
                 del inputs["displacement"]
             if wrap_test:
@@ -192,21 +196,14 @@ def objective_f(
 
 
 # maybe shift this to constants?
-DEFAULT_CONSTRAINTS: dict = {
-    "angle": {"min": -80, "max": 80, "units": "degrees"},
-    "trans_speed": {"min": 0, "max": 15, "units": "m/s"},
-    "displacement": {
-        "min": -2,
-        "max": 2,
-        "units": "degrees",
-    },  # maybe make this relative to experimental point.
-    "order": ("angle", "trans_speed", "displacement"),  # order of input features
-}
+DEFAULT_CONSTRAINTS: dict = yaml.safe_load(
+    open(os.path.join(CONFIG_PATH, "3d_constraints.yaml"))
+)
 
 
 def gp_model_callback_maker(
     direc: str,
-    config: dict = DEFAULT_CONSTRAINTS,
+    constraints: dict = DEFAULT_CONSTRAINTS,
     acq_rule: Optional[EfficientGlobalOptimization] = None,
 ) -> Callable[[any, any, any], bool]:
     """
@@ -217,7 +214,7 @@ def gp_model_callback_maker(
 
     Args:
         direc (str): Directory to save the models.
-        config (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
+        constraints (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
         acq_rule (Optional[EfficientGlobalOptimization], optional): The acquisition rule. Defaults to None.
 
     Returns:
@@ -227,7 +224,7 @@ def gp_model_callback_maker(
     os.makedirs(direc, exist_ok=True)
     # saver = gpflow.saver.Saver()
     call: int = 0
-    dimensions = len(config["order"])
+    dimensions = len(constraints["order"])
 
     if dimensions == 2:  # if 2D save GP model output
 
@@ -235,19 +232,25 @@ def gp_model_callback_maker(
         # added some asymmetry to try to see if axes flip.
         x1, x2 = np.linspace(0, 1, num=nx1), np.linspace(0, 1, num=nx2)
         # TODO Does this make any sense?
+        # ah yeah to get different lengths of x1 and
+        # x2 to be rescaled, need to do them separately.
         x1_r = rescale_inverse(
-            np.column_stack([x1, np.linspace(0, 1, num=nx1)]), config=config
+            np.column_stack([x1, np.linspace(0, 1, num=nx1)]), constraints=constraints
         )[:, 0]
         x2_r = rescale_inverse(
-            np.column_stack([np.linspace(0, 1, num=nx2), x2]), config=config
+            np.column_stack([np.linspace(0, 1, num=nx2), x2]), constraints=constraints
         )[:, 1]
-        # x_r = rescale_inverse(np.column_stack([x1, x2]), config=config)
+        assert x2_r.shape == x2.shape
+        assert x1_r.shape == x1.shape
+        # x_r = rescale_inverse(np.column_stack([x1, x2]), constraints=constraints)
         # x1_r, x2_r = x_r[:, 0], x_r[:, 1]
         X1, X2 = np.meshgrid(x1, x2)
         x_input = np.column_stack([X1.flatten(), X2.flatten()])
-        ypred_list = []
-        ystd_list = []
-        acq_list = []
+        assert np.isclose(x_input[:, 0].reshape((nx1, nx2)) == X1)
+        assert np.isclose(x_input[:, 1].reshape((nx1, nx2)) == X2)
+        ypred_list: List[np.ndarray] = []
+        ystd_list: List[np.ndarray] = []
+        acq_list: List[np.ndarray] = []
 
     @timeit
     def gp_model_callback(datasets, gp_models, state) -> bool:
@@ -263,7 +266,7 @@ def gp_model_callback_maker(
             bool: Whether to stop the optimization.
         """
         # could either save the whole model or just the predictions at particular points.
-        nonlocal call, direc, nx1, nx2, x1, x2, X1, X2, x_input, ypred_list, ystd_list, config, dimensions
+        nonlocal call, direc, nx1, nx2, x1, x2, X1, X2, x_input, ypred_list, ystd_list, constraints, dimensions
         call += 1  # increment the call number
 
         print("dimension", dimensions)
@@ -335,12 +338,12 @@ def gp_model_callback_maker(
                         "x1": (
                             ("x1"),
                             x1_r,
-                            {"units": config[config["order"][0]]["units"]},
+                            {"units": constraints[constraints["order"][0]]["units"]},
                         ),
                         "x2": (
                             ("x2"),
                             x2_r,
-                            {"units": config[config["order"][1]]["units"]},
+                            {"units": constraints[constraints["order"][1]]["units"]},
                         ),
                         "call": (
                             ("call"),

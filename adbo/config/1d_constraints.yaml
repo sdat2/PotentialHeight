@@ -1,0 +1,6 @@
+angle:
+  min: -80
+  max: 80
+  units: degrees
+order:
+  - angle

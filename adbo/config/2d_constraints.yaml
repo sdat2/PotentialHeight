@@ -1,0 +1,15 @@
+angle: 
+  min: -80
+  max: 80
+  units: degrees
+displacement:
+  min: -2
+  max: 2
+  units: degrees east and west of point of origin
+point_of_origin:
+  lon: -90
+  lat: 30
+  units: degrees
+order: # order of input features
+  - angle
+  - displacement

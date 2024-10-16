@@ -1,11 +1,11 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=2d-ani-test
+#SBATCH --job-name=2d-ani-new
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-######%SBATCH --time=12:00:0
-#SBATCH --time=00:20:00
+#SBATCH --time=12:00:0
+##%%%%SBATCH --time=00:20:00
 
 # slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
@@ -14,8 +14,8 @@
 
 #SBATCH --account=n02-bas
 #SBATCH --partition=standard
-#SBATCH --qos=short
-#####%%SBATCH --qos=standard
+##########%SBATCH --qos=short
+#SBATCH --qos=standard
 
 # emailing for start and end.
 #SBATCH --mail-type=BEGIN
@@ -36,4 +36,7 @@ echo "which python"
 which python
 
 # run python job
-python -m adbo.exp_2d --exp_name 2d-ani-new --year 2025 --resolution mid-notide --test=True
+python -m adbo.exp_2d --exp_name 2d-ani-new-redo --year 2025 --resolution mid-notide --test=False
+
+
+# python -m adbo.exp_2d --exp_name test-bo-2d --year 2025 --resolution mid-notide --test=True

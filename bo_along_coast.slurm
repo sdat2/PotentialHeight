@@ -44,4 +44,4 @@ which python
 # run python job
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
-python -m adbo.exp_3d --exp_name new --year 2025 --resolution mid-notide
+python -m adbo.exp_3d --exp_name new --year 2025 --resolution mid-notide 
