@@ -1,6 +1,7 @@
 """adbo.exp_3d.py"""
 
 import argparse
+from adforce.constants import NEW_ORLEANS
 from adbo.exp import run_bayesopt_exp, DEFAULT_CONSTRAINTS
 
 
@@ -9,10 +10,11 @@ def run_3d_exp() -> None:
     Run an experiment varying the angle, displacement and speed of the storm for a given tropical cyclone profile.
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--stationid", type=int, default=3)
     parser.add_argument("--year", type=int, default=2097)
     parser.add_argument("--init_steps", type=int, default=25)
     parser.add_argument("--daf_steps", type=int, default=25)
+    parser.add_argument("--obs_lon", type=float, default=NEW_ORLEANS.lon)
+    parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
     parser.add_argument("--seed_offset", type=int, default=22)
     parser.add_argument("--setup", type=str, default="mid-notide")
     args = parser.parse_args()
@@ -24,8 +26,9 @@ def run_3d_exp() -> None:
         seed=args.seed_offset + args.stationid + args.year,
         profile_name=f"{args.year}.json",
         constraints=DEFAULT_CONSTRAINTS,
-        stationid=args.stationid,
-        exp_name=f"{args.setup}-{args.stationid:01}-{args.year}-i-{args.init_steps}",
+        obs_lon=args.obs_lon,
+        obs_lat=args.obs_lat,
+        exp_name=f"{args.setup}-{args.year}-i-{args.init_steps}",
         resolution=args.setup,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,

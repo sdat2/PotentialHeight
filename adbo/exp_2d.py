@@ -2,6 +2,7 @@
 
 import argparse
 from adbo.exp import run_bayesopt_exp
+from adforce.constants import NEW_ORLEANS
 
 
 def create_2d_ani_run() -> None:
@@ -18,7 +19,10 @@ def create_2d_ani_run() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", type=bool, default=False)
     parser.add_argument("--year", type=int, default=2025)
-    parser.add_argument("--stationid", type=int, default=3)
+    parser.add_argument("--obs_lon", type=float, default=NEW_ORLEANS.lon)
+    parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
+    parser.add_argument("--init_steps", type=int, default=25)
+    parser.add_argument("--daf_steps", type=int, default=25)
     parser.add_argument("--resolution", type=str, default="mid-notide")
     parser.add_argument("--exp_name", type=str, default="ani-2d-3")
     args = parser.parse_args()
@@ -26,7 +30,8 @@ def create_2d_ani_run() -> None:
     run_bayesopt_exp(
         constraints=constraints_2d,
         seed=10,
-        stationid=args.stationid,
+        obs_lon=args.obs_lon,
+        obs_lat=args.obs_lat,
         profile_name=str(args.year) + ".json",
         exp_name=args.exp_name,
         resolution=args.resolution,

@@ -33,6 +33,7 @@ print(
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
+from sithom.place import Point
 import matplotlib.pyplot as plt
 from adforce.wrap import run_adcirc_idealized_tc, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
@@ -77,7 +78,8 @@ def objective_f(
     config: dict,
     profile_name: str = "outputs.json",
     exp_name: str = "bo_test",
-    stationid: int = 3,
+    obs_lon: float = NEW_ORLEANS.lon,
+    obs_lat: float = NEW_ORLEANS.lat,
     wrap_test: bool = False,
     resolution="mid",
 ) -> Callable[[tf.Tensor], tf.Tensor]:
@@ -92,8 +94,10 @@ def objective_f(
         config (dict): Dictionary with the constraints for the model.
         profile_name (str, optional): Name of the profile. Defaults to "outputs.json".
         exp_name (str, optional): Name for folder. Defaults to "bo_test".
-        stationid (int, optional): Which coast tidal gauge to sample near. Defaults to 3.
+        obs_lon (float, optional): Longitude of the observation point. Defaults to NEW_ORLEANS.lon.
+        obs_lat (float, optional): Latitude of the observation point. Defaults to NEW_ORLEANS.lat.
         wrap_test (bool, optional): If True, do not run the ADCIRC model. Defaults to False.
+        resolution (str, optional): Resolution of the model. Defaults to "mid".
 
     Returns:
         Callable[[tf.Tensor], tf.Tensor]: trieste observer function.
@@ -103,7 +107,9 @@ def objective_f(
     os.makedirs(exp_dir, exist_ok=True)
     call_number = -1
     output = {}
-    select_point = maxele_observation_func(stationid, resolution=resolution)
+    select_point = maxele_observation_func(
+        Point(obs_lon, obs_lat), resolution=resolution
+    )
     dimension_inputs = len(config["order"])
     print("dimension_inputs", dimension_inputs)
 
@@ -228,12 +234,13 @@ def gp_model_callback_maker(
         nx1, nx2 = 100, 102  # resolution of the plot
         # added some asymmetry to try to see if axes flip.
         x1, x2 = np.linspace(0, 1, num=nx1), np.linspace(0, 1, num=nx2)
+        # TODO Does this make any sense?
         x1_r = rescale_inverse(
             np.column_stack([x1, np.linspace(0, 1, num=nx1)]), config=config
-        )
+        )[:, 0]
         x2_r = rescale_inverse(
             np.column_stack([np.linspace(0, 1, num=nx2), x2]), config=config
-        )
+        )[:, 1]
         # x_r = rescale_inverse(np.column_stack([x1, x2]), config=config)
         # x1_r, x2_r = x_r[:, 0], x_r[:, 1]
         X1, X2 = np.meshgrid(x1, x2)
@@ -310,11 +317,13 @@ def gp_model_callback_maker(
                     else:
                         acq = np.zeros((nx1, nx2))
                     acq_list.append(acq)
+                    print("np.array(acq_list))", np.array(acq_list).shape)
                     data_vars["acq"] = (
                         ("call", "x1", "x2"),
                         np.array(acq_list),
                         {"units": "dimensionless", "long_name": "acquisition function"},
                     )
+                    print("np.array(acq_list))", np.array(acq_list).shape)
 
                 print(
                     "np.array([x + 1 for x in range(call)]))",
@@ -399,7 +408,8 @@ def run_bayesopt_exp(
     resolution: str = "mid",
     exp_name: str = "bo_test",
     root_exp_direc: str = EXP_PATH,
-    stationid: int = 3,
+    obs_lon: float = NEW_ORLEANS.lon,
+    obs_lat: float = NEW_ORLEANS.lat,
     init_steps: int = 10,
     daf_steps: int = 10,
     wrap_test: bool = False,
@@ -437,7 +447,8 @@ def run_bayesopt_exp(
     init_objective = objective_f(
         constraints,
         profile_name=profile_name,
-        stationid=stationid,
+        obs_lon=obs_lon,
+        obs_lat=obs_lat,
         exp_name=exp_name,
         wrap_test=wrap_test,
         resolution=resolution,

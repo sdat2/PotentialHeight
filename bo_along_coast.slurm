@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=2d-ani-new
+#SBATCH --job-name=along-coast
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -44,4 +44,4 @@ which python
 # run python job
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
-python -m adbo.exp_2d --exp_name 2d-ani-new --year 2025 --resolution mid-notide
+python -m adbo.exp_3d --exp_name new --year 2025 --resolution mid-notide
