@@ -17,7 +17,10 @@ def run_3d_exp() -> None:
     parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
     parser.add_argument("--seed_offset", type=int, default=22)
     parser.add_argument("--setup", type=str, default="mid-notide")
+    parser.add_argument("resolution", type=str, default="mid-notide")
+    parser.add_argument("--exp_name", type=str, default="3d-emulation")
     args = parser.parse_args()
+    parser.add_argument("--test", type=bool, default=False)
 
     # stationid: int = 3
     # year: int = 2097  # python -m adbo.exp_3d &> logs/bo-3-2097.log
@@ -28,8 +31,8 @@ def run_3d_exp() -> None:
         constraints=DEFAULT_CONSTRAINTS,
         obs_lon=args.obs_lon,
         obs_lat=args.obs_lat,
-        exp_name=f"{args.setup}-{args.year}-i-{args.init_steps}",
-        resolution=args.setup,
+        exp_name=args.exp_name,  # f"{args.setup}-{args.year}-i-{args.init_steps}",
+        resolution=args.resolution,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
         wrap_test=False,

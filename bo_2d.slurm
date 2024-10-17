@@ -36,7 +36,7 @@ echo "which python"
 which python
 
 # run python job
-python -m adbo.exp_2d --exp_name 2d-ani-new-redo-3 --year 2025 --resolution mid-notide --test=False
+python -m adbo.exp_2d --exp_name 2d-ani-new-redo-4 --year 2025 --resolution mid-notide
 
 # try test version
 # python -m adbo.exp_2d --exp_name test-bo-2d-3 --year 2025 --resolution mid-notide --test=True
