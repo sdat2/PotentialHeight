@@ -1,0 +1,9 @@
+year: 2097
+init_steps: 25
+daf_steps: 25
+obs_lon: -90
+obs_lat: 30
+seed_offset: 22
+resolution: mid-notide
+exp_name: 3d-emulation
+test: false

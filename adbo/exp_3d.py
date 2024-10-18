@@ -1,32 +1,20 @@
 """adbo.exp_3d.py"""
 
-import argparse
+import hydra
+from omegaconf import DictConfig
 from adforce.constants import NEW_ORLEANS
+from adbo.constants import CONFIG_PATH
 from adbo.exp import run_bayesopt_exp, DEFAULT_CONSTRAINTS
 
 
-def run_3d_exp() -> None:
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="bo_setup")
+def run_3d_exp(args: DictConfig) -> None:
     """
     Run an experiment varying the angle, displacement and speed of the storm for a given tropical cyclone profile.
     """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--year", type=int, default=2097)
-    parser.add_argument("--init_steps", type=int, default=25)
-    parser.add_argument("--daf_steps", type=int, default=25)
-    parser.add_argument("--obs_lon", type=float, default=NEW_ORLEANS.lon)
-    parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
-    parser.add_argument("--seed_offset", type=int, default=22)
-    parser.add_argument("--setup", type=str, default="mid-notide")
-    parser.add_argument("resolution", type=str, default="mid-notide")
-    parser.add_argument("--exp_name", type=str, default="3d-emulation")
-    args = parser.parse_args()
-    parser.add_argument("--test", type=bool, default=False)
-
-    # stationid: int = 3
-    # year: int = 2097  # python -m adbo.exp_3d &> logs/bo-3-2097.log
-    # python -m adbo.exp_3d --stationid=3 --year=2025 &> logs/bo-test-3-2025-new.log
+    print(args)
     run_bayesopt_exp(
-        seed=args.seed_offset + args.stationid + args.year,
+        seed=args.seed_offset + args.year,
         profile_name=f"{args.year}.json",
         constraints=DEFAULT_CONSTRAINTS,
         obs_lon=args.obs_lon,
@@ -35,8 +23,9 @@ def run_3d_exp() -> None:
         resolution=args.resolution,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
-        wrap_test=False,
+        wrap_test=args.test,
     )
+    print(args)
 
 
 if __name__ == "__main__":
