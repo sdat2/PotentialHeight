@@ -2,7 +2,6 @@
 
 import hydra
 from omegaconf import DictConfig
-from adforce.constants import NEW_ORLEANS
 from adbo.constants import CONFIG_PATH
 from adbo.exp import run_bayesopt_exp, DEFAULT_CONSTRAINTS
 

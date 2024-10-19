@@ -1,8 +1,8 @@
 year: 2097
 init_steps: 25
 daf_steps: 25
-obs_lon: -90
-obs_lat: 30
+obs_lon: -90.0715
+obs_lat: 29.9511
 seed_offset: 22
 resolution: mid-notide
 exp_name: 3d-emulation

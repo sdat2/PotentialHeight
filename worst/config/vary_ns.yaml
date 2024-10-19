@@ -1,0 +1,12 @@
+z_star: 7 # m
+beta: 1 # m
+gamma: -0.2
+ex_seed: 42
+ex_num: 50
+min_samp: 20
+max_samp: 1000
+samp_steps: 26
+seed_steps: 600
+color_true: black
+color_max_known: '#1f77b4'
+color_max_unknown: '#d95f02'

@@ -24,7 +24,7 @@ impact_time:
   type: str
   description: "Time of landfall"
 observation_location:
-  value: [-90.0715, 29.511]
+  value: [-90.0715, 29.9511]
   type: list
   description: "Location of the observation point (x, y). Will pick the closest mesh node to this."
   units: "degrees"

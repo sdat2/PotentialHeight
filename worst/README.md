@@ -37,3 +37,12 @@ However:
 ```bash
 python -m worst.tens
 ```
+
+```text
+alpha0 = 0.0 m
+beta0 = 1.0 m
+gamma0 = -0.1 [dimensionless]
+
+beta > 0
+gamma < 0
+```

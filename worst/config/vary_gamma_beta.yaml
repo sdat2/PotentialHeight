@@ -1,0 +1,11 @@
+z_star: 7
+gamma:
+  min: -0.4
+  max: -0.1
+  steps: 26
+beta:
+  min: 0.2
+  max: 1.5
+  steps: 26
+seed: 35
+seed_steps_Nr: 600
