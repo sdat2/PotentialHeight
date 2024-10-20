@@ -24,4 +24,6 @@ mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 echo "which python"
 which python # check python path
-python -m worst.vary_samples_ns seed_steps=2000 gamma=-0.25 # run python job
+#python -m worst.vary_samples_ns seed_steps=2000 gamma=-0.25 # run python job
+
+python -m worst.vary_gamma_beta

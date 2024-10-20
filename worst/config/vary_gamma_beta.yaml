@@ -1,4 +1,5 @@
 z_star: 7
+ns: 50
 gamma_range:
   min: -0.4
   max: -0.1
