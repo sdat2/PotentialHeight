@@ -1,6 +1,10 @@
 import hydra
 from omegaconf import DictConfig
-from adbo.constants import CONFIG_PATH
+from .constants import CONFIG_PATH
+
+# @timeit
+# def try_fit():
+#    def fit():
 
 
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_gamma_beta")

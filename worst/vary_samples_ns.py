@@ -6,7 +6,6 @@ import numpy as np
 import xarray as xr
 import hydra
 from omegaconf import DictConfig
-from adbo.constants import CONFIG_PATH
 import matplotlib
 import matplotlib.pyplot as plt
 from scipy.stats import genextreme
@@ -22,64 +21,7 @@ from .tens import (
     fit_gev_upper_bound_known,
     tfd,
 )
-
-
-def plot_ex_fits(
-    z_star: float = 7.0,
-    beta: float = 1.0,
-    gamma: float = -0.2,
-    seed: int = 42,
-    n: int = 50,
-) -> None:
-    """
-    Show some example fits.
-
-    Args:
-        z_star (float, optional): Upper bound. Defaults to 7.0.
-        beta (float, optional): Scale parameter. Defaults to 1.0.
-        gamma (float, optional): Shape parameter. Defaults to -0.2.
-        seed (int, optional): Seed. Defaults to 42.
-        n (int, optional): Number of samples. Defaults to 50.
-    """
-    plot_defaults()
-    alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
-    seed_all(seed)
-    # alpha = 0.0
-    # z_star = z_star_from_alpha_beta_gamma(alpha, beta, gamma)
-    data = gen_data(alpha, beta, gamma, n=n)
-    alpha_unb, beta_unb, gamma_unb = fit_gev_upper_bound_not_known(data)
-    alpha_bound, beta_bound, gamma_bound = fit_gev_upper_bound_known(data, z_star)
-    plt.hist(data, bins=50, density=True, alpha=0.5)
-    x = np.linspace(np.min(data), np.max(data), 1000)
-    gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
-    plt.plot(x, gev.prob(x).numpy(), color="black")
-    gev = tfd.GeneralizedExtremeValue(
-        loc=alpha_unb, scale=beta_unb, concentration=gamma_unb
-    )
-    plt.plot(x, gev.prob(x).numpy(), color="orange")
-    gev_bound = tfd.GeneralizedExtremeValue(
-        loc=float(alpha_bound),
-        scale=float(beta_bound),
-        concentration=float(gamma_bound),
-    )
-    plt.plot(x, gev_bound.prob(x).numpy(), color="purple")
-    plt.show()
-    _, ax = plt.subplots()
-    plot_sample_points(data, color="black", ax=ax, label="Samples")
-    plot_rp(alpha, beta, gamma, color="black", ax=ax, label="Original GEV")
-    plot_rp(
-        alpha_bound,
-        beta_bound,
-        gamma_bound,
-        color="purple",
-        ax=ax,
-        label="I: GEV upper bound known",
-    )
-    plot_rp(
-        alpha_unb, beta_unb, gamma_unb, color="orange", label="II: GEV no bound", ax=ax
-    )
-    plt.legend()
-    plt.show()
+from .constants import CONFIG_PATH
 
 
 def try_fit(
@@ -488,7 +430,7 @@ def evt_fig_tens(
     print(("alpha", alpha, "beta", beta, "gamma", gamma, "z_star", z_star))
 
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_samples_ns")
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_ns")
 def vary_samples_ns(config: DictConfig) -> None:
     print(config)
     evt_fig_tens(
