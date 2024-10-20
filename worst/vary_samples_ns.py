@@ -28,7 +28,7 @@ def try_fit(
     z_star: float = 7,
     beta: float = 4,
     gamma: float = -0.1,
-    n: int = 40,
+    ns: int = 40,
     seed: int = 42,
     quantiles: List[float] = [1 / 100, 1 / 500],
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -39,7 +39,7 @@ def try_fit(
         z_star (float, optional): Upper bound of GEV. Defaults to 7.
         beta (float, optional): Scale. Defaults to 4.
         gamma (float, optional): Concentration. Defaults to -0.1.
-        n (int, optional): Number of data samples. Defaults to 40.
+        ns (int, optional): Number of data samples. Defaults to 40.
         seed (int, optional): Random seed. Defaults to 42.
         quantiles (List[float], optional): Quantiles to get. Defaults to [1 / 100, 1 / 500].
 
@@ -49,10 +49,19 @@ def try_fit(
     """
     seed_all(seed)
     print(
-        "Fitting for z_star", z_star, "beta", beta, "gamma", gamma, "n", n, "seed", seed
+        "Fitting for z_star",
+        z_star,
+        "beta",
+        beta,
+        "gamma",
+        gamma,
+        "ns",
+        ns,
+        "seed",
+        seed,
     )
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
-    zs = gen_data(alpha, beta, gamma, n)
+    zs = gen_data(alpha, beta, gamma, ns)
     bg_alpha, bg_beta, bg_gamma = fit_gev_upper_bound_known(zs, z_star)
     s_alpha, s_beta, s_gamma = fit_gev_upper_bound_not_known(zs)
 
@@ -86,7 +95,7 @@ def try_fits(
     """
     results = []
 
-    for n in nums:
+    for ns in nums:
 
         def _retry(max_retries: int = 10) -> None:
             # sometimes the optimization randomly fails, so we retry
@@ -95,13 +104,13 @@ def try_fits(
                     z_star=z_star,
                     beta=beta,
                     gamma=gamma,
-                    n=int(n),
+                    ns=int(ns),
                     quantiles=[1 / 100, 1 / 500],
                     seed=seed,
                 )
             except Exception as e:
                 print("Exception", e)
-                print("Failed for n", n)
+                print("Failed for ns", ns)
                 print("Seed", seed)
                 print("z_star", z_star)
                 print("beta", beta)
@@ -115,13 +124,13 @@ def try_fits(
     return xr.Dataset(
         data_vars={
             "rv": (
-                ("number", "fit", "rp", "seed"),
+                ("ns", "fit", "rp", "seed"),
                 np.expand_dims(np.array(results), -1),
                 {"units": "m"},
             )
         },
         coords={
-            "number": nums,
+            "ns": nums,
             "fit": ["true", "max_known", "scipy"],
             "rp": (("rp"), [100, 500], {"units": "years"}),
             "seed": (("seed"), [seed]),
@@ -348,7 +357,7 @@ def evt_fig_tens(
 
     # plot the systematic fits for the known upper bound and the unbounded case
 
-    numbers = res_ds.number.values
+    numbers = res_ds.ns.values
 
     # calculate statistics to work out sampling error
     mn = res_ds.mean(dim="seed")
@@ -361,11 +370,11 @@ def evt_fig_tens(
             upper_p = res_ds.quantile(up, dim="seed")
             range_p = upper_p - lower_p
             print("for", lp, "to", up)
-            print("ranges at 50 samples", range_p.sel(number=50, method="nearest"))
+            print("ranges at 50 samples", range_p.sel(ns=50, method="nearest"))
             ratio_change = range_p.isel(fit=1) / range_p.isel(fit=2)
             print(
                 "knowing maxima makes difference",
-                ratio_change.sel(number=50, method="nearest"),
+                ratio_change.sel(ns=50, method="nearest"),
             )
         else:
             lower_p = mn - std
