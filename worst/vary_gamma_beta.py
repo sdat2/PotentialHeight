@@ -214,43 +214,91 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
     upper_p = da.quantile(config.figure.up, dim="seed")
     range_p = upper_p - lower_p
 
+    # remove quantile coordinate from lower_p and upper_p
+    lower_p = lower_p.drop_vars("quantile")
+    upper_p = upper_p.drop_vars("quantile")
+
     # get ready for plotting
     plot_defaults()
 
     # I want to put all of these xr.DataArrays together in a single xr.Dataset and then plot them.
-    print(
-        {
-            "mean": means,
-            "std": std,
-            "lower_p": lower_p,
-            "upper_p": upper_p,
-            "range_p": range_p,
-        }
-    )
 
-    ds = xr.merge(
-        {
-            "mean": means,
-            "std": std,
-            "lower_p": lower_p,
-            "upper_p": upper_p,
-            "range_p": range_p,
-        }
-    )
+    da_d = {
+        "mean": means,
+        "std": std,
+        "lower_p": lower_p,
+        "upper_p": upper_p,
+        "range_p": range_p,
+    }
+    da_l = []
+    for k, da in da_d.items():
+        da = da.rename(k)
+        da_d[k] = da
+        da_l.append(da)  # .to_dataset(name=k))
+        assert ("ns", "fit", "rp", "beta", "gamma") == da.dims
+        assert isinstance(da, xr.DataArray)
 
-    figure_name = os.path.join(FIGURE_PATH, f"ubkn_{_name_base(config)}.pdf")
-    feature_grid(
+    ds = xr.merge(da_l)
+    print(ds)
+
+    plot_fit_primary_var(
         ds.isel(fit=1, rp=0),
+        config,
+        os.path.join(FIGURE_PATH, f"max_known_rv100_{_name_base(config)}.pdf"),
+    )
+    plot_fit_primary_var(
+        ds.isel(fit=2, rp=0),
+        config,
+        os.path.join(FIGURE_PATH, f"max_unknown_rv100_{_name_base(config)}.pdf"),
+    )
+    plot_fit_primary_var(
+        ds.isel(fit=1, rp=1),
+        config,
+        os.path.join(FIGURE_PATH, f"max_known_rv500_{_name_base(config)}.pdf"),
+    )
+    plot_fit_primary_var(
+        ds.isel(fit=2, rp=1),
+        config,
+        os.path.join(FIGURE_PATH, f"max_unknown_rv500_{_name_base(config)}.pdf"),
+    )
+
+
+def plot_fit_primary_var(ds: xr.Dataset, config, figure_name: str) -> None:
+    """Plot fit primary variable.
+
+    Args:
+        ds (xr.Dataset): Dataset with the fit data.
+        config (DictConfig): Hydra config object.
+        figure_name (str): Figure name.
+    """
+    feature_grid(
+        ds,
         [
             ["mean", "std"],
             ["lower_p", "upper_p"],
         ],
         [["m", "m"], ["m", "m"]],
         [
-            r"Mean estimate RV100, $\mu$",
-            r"Standard deviation in estimates of RV100, $\sigma$",
-            "$q_{" + f"{config.figure.up:.2f}" + "}$",
-            "$q_{" + f"{config.figure.up:.2f}" + "}$",
+            [
+                "Mean estimate RV" + str(ds.rp.values) + r", $\mu$",
+                "Standard deviation in estimates of RV"
+                + str(ds.rp.values)
+                + r", $\sigma$",
+            ],
+            [
+                "RV"
+                + str(ds.rp.values)
+                + f" {100*config.figure.lp:.0f}"
+                + "th percentile estimate, $q_{"
+                + f"{config.figure.lp:.2f}"
+                + "}$",
+                "RV"
+                + str(ds.rp.values)
+                + f" {100*config.figure.up:.0f}"
+                + "th percentile estimate, $q_{"
+                + f"{config.figure.up:.2f}"
+                + "}$",
+            ],
         ],
         [[None, None], [None, None]],
         [None, None],
@@ -260,10 +308,11 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
                 r"Scale, $\beta$",
                 "m",
             ),
-            ("gamma", r"Shape, $\gamma$", ""),
+            ("gamma", r"Shape, $\gamma$", "dimensionless"),
         ),
     )
     plt.savefig(figure_name)
+    plt.close()
 
 
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_gamma_beta")

@@ -35,12 +35,14 @@ However:
 ## run using tensorflow optimizer
 
 ```bash
-python -m worst.tens
+python -m worst.vary_gamma_beta
+
+python -m worst.vary_ns
 ```
 
 ```text
 alpha0 = 0.0 m
-beta0 = 1.0 m
+beta0 = 1.0 mqwwq
 gamma0 = -0.1 [dimensionless]
 
 beta > 0
