@@ -42,7 +42,7 @@ python -m worst.vary_ns
 
 ```text
 alpha0 = 0.0 m
-beta0 = 1.0 mqwwq
+beta0 = 1.0 m
 gamma0 = -0.1 [dimensionless]
 
 beta > 0

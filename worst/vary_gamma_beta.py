@@ -7,7 +7,7 @@ from tqdm import tqdm
 from scipy.stats import genextreme
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
-from sithom.plot import plot_defaults, feature_grid
+from sithom.plot import plot_defaults, feature_grid, label_subplots
 from .constants import CONFIG_PATH, FIGURE_PATH, DATA_PATH
 from .tens import (
     seed_all,
@@ -234,7 +234,7 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
     for k, da in da_d.items():
         da = da.rename(k)
         da_d[k] = da
-        da_l.append(da)  # .to_dataset(name=k))
+        da_l.append(da)
         assert ("ns", "fit", "rp", "beta", "gamma") == da.dims
         assert isinstance(da, xr.DataArray)
 
@@ -261,9 +261,66 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
         config,
         os.path.join(FIGURE_PATH, f"max_unknown_rv500_{_name_base(config)}.pdf"),
     )
+    bias_max_known = ds["mean"].sel(fit="max_known") - ds["mean"].sel(fit="true")
+    bias_max_unknown = ds["mean"].sel(fit="max_unknown") - ds["mean"].sel(fit="true")
+
+    relative_std = ds["std"].isel(fit=2) / ds["std"].isel(fit=1)
+    relative_range = ds["range_p"].isel(fit=2) / ds["range_p"].isel(fit=1)
+
+    da_d = {
+        "bias_max_known": bias_max_known,
+        "bias_max_unknown": bias_max_unknown,
+        "relative_range": relative_range,
+        "relative_std": relative_std,
+    }
+    da_l = []
+    for k, da in da_d.items():
+        da = da.rename(k)
+        da_d[k] = da
+        da_l.append(da)
+        print(k, da.dims, da.shape)
+    ds = xr.merge(da_l)
+    print("ds2", ds)
+    figure_name = os.path.join(
+        FIGURE_PATH, f"bias_relative_range_RV100_{_name_base(config)}.pdf"
+    )
+    plot_diff(ds.isel(rp=0), config, figure_name)
+
+    plot_diff(
+        ds.isel(rp=1),
+        config,
+        os.path.join(
+            FIGURE_PATH, f"bias_relative_range_RV500_{_name_base(config)}.pdf"
+        ),
+    )
 
 
-def plot_fit_primary_var(ds: xr.Dataset, config, figure_name: str) -> None:
+def plot_diff(ds: xr.Dataset, config: DictConfig, figure_name: str) -> None:
+    """Plot difference.
+
+    Args:
+        ds (xr.Dataset): Dataset with the fit data.
+        config (DictConfig): Hydra config object.
+        figure_name (str): Figure name.
+    """
+    _, axs = feature_grid(
+        ds,
+        [["bias_max_known", "bias_max_unknown"], ["relative_range", "relative_std"]],
+        [["m", "m"], [None, None]],
+        [["Bias max known", "Bias max unknown"], ["Relative range", "Relative std"]],
+        [[None, None], [None, None]],
+        [None, None],
+        xy=(
+            ("beta", r"Scale, $\beta$", "m"),
+            ("gamma", r"Shape, $\gamma$", "dimensionless"),
+        ),
+    )
+    label_subplots(axs)
+    plt.savefig(figure_name)
+    plt.close()
+
+
+def plot_fit_primary_var(ds: xr.Dataset, config: DictConfig, figure_name: str) -> None:
     """Plot fit primary variable.
 
     Args:
@@ -271,7 +328,7 @@ def plot_fit_primary_var(ds: xr.Dataset, config, figure_name: str) -> None:
         config (DictConfig): Hydra config object.
         figure_name (str): Figure name.
     """
-    feature_grid(
+    _, axs = feature_grid(
         ds,
         [
             ["mean", "std"],
@@ -311,6 +368,7 @@ def plot_fit_primary_var(ds: xr.Dataset, config, figure_name: str) -> None:
             ("gamma", r"Shape, $\gamma$", "dimensionless"),
         ),
     )
+    label_subplots(axs)
     plt.savefig(figure_name)
     plt.close()
 
