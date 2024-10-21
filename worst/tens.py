@@ -50,6 +50,7 @@ def fit_gev_upper_bound_not_known(
     beta_guess: float = 1.0,
     gamma_guess: float = -0.1,
     force_weibull: bool = False,
+    verbose: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Fit a Generalized Extreme Value distribution to data when the upper bound is not known.
@@ -62,11 +63,13 @@ def fit_gev_upper_bound_not_known(
         beta_guess (float, optional): Initial scale. Defaults to 1.0.
         gamma_guess (float, optional): Initial concentration. Defaults to -0.1.
         force_weibull (bool, optional): Force gamma<0. Defaults to False.
+        verbose (bool, optional): Print progress. Defaults to False.
 
     Returns:
         Tuple[float, float, float]: Estimated alpha, beta, gamma.
     """
-    print("Fitting upper bound not known, N=", len(data))
+    if verbose:
+        print("Fitting upper bound not known, N=", len(data))
 
     # Define the parameters of the model
     alpha = tf.Variable(alpha_guess, dtype=tf.float32)
@@ -129,14 +132,14 @@ def fit_gev_upper_bound_not_known(
     # Training loop
     for step in range(opt_steps):
         loss = train_step()
-        if step % 100 == 0:
+        if step % 100 == 0 and verbose:
             print(
                 f"Step {step}, Loss: {loss.numpy()}, Alpha: {alpha.numpy()}, Beta: {beta.numpy()}, Gamma: {-neg_gamma.numpy()}"
             )
-
-    print(
-        f"Estimated Alpha: {alpha.numpy()}, Estimated Beta: {beta.numpy()}, Estimated Gamma: {-neg_gamma.numpy()}"
-    )
+    if verbose:
+        print(
+            f"Estimated Alpha: {alpha.numpy()}, Estimated Beta: {beta.numpy()}, Estimated Gamma: {-neg_gamma.numpy()}"
+        )
     return alpha.numpy(), beta.numpy(), -neg_gamma.numpy()
 
 
@@ -145,8 +148,9 @@ def fit_gev_upper_bound_known(
     z_star: float,
     opt_steps: int = 1000,
     lr: float = 0.01,
-    beta_guess=1.0,
-    gamma_guess=-0.1,
+    beta_guess: float = 1.0,
+    gamma_guess: float = -0.1,
+    verbose: bool = False,
 ) -> Tuple[float, float, float]:
     """
     Fit a Generalized Extreme Value distribution to data when the upper bound is known.
@@ -158,11 +162,13 @@ def fit_gev_upper_bound_known(
         lr (float, optional): Learning rate. Defaults to 0.01.
         beta_guess (float, optional): Initial scale. Defaults to 1.0.
         gamma_guess (float, optional): Initial concentration. Defaults to -0.1.
+        verbose (bool, optional): Print progress. Defaults to False.
 
     Returns:
         Tuple[float, float, float]: Estimated alpha, beta, gamma.
     """
-    print("Fitting upper bound known, N=", len(data))
+    if verbose:
+        print("Fitting upper bound known, N=", len(data))
     # Initial guess for sigma and xi
     beta = tf.Variable(
         beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
@@ -221,7 +227,7 @@ def fit_gev_upper_bound_known(
     # Training loop
     for step in range(opt_steps):
         loss = train_step()
-        if step % 100 == 0:
+        if step % 100 == 0 and verbose:
             print(
                 f"Step {step}, Loss: {loss.numpy()}, Alpha: "
                 + f"{alpha_from_z_star_beta_gamma(z_star, beta.numpy(), -neg_gamma.numpy())},"
@@ -232,5 +238,8 @@ def fit_gev_upper_bound_known(
     beta = beta.numpy()
     gamma = -neg_gamma.numpy()
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
-    print(f"Estimated Alpha: {alpha}, Estimated Beta: {beta}, Estimated Gamma: {gamma}")
+    if verbose:
+        print(
+            f"Estimated Alpha: {alpha}, Estimated Beta: {beta}, Estimated Gamma: {gamma}"
+        )
     return alpha, beta, gamma

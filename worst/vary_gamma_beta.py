@@ -23,7 +23,9 @@ from .utils import alpha_from_z_star_beta_gamma
 
 
 def retry_wrapper(max_retries: int = 10) -> callable:
-    """Retry wrapper.
+    """Retry wrapper. If a function fails flakeily, then wrap with this to retry it a few times.
+
+    Puts the function in a try except block and retries it a `max_retries` times if unsuccesful.
 
     Args:
         max_retries (int, optional): Number of retries. Defaults to 10.
@@ -33,27 +35,28 @@ def retry_wrapper(max_retries: int = 10) -> callable:
     """
 
     def retry_decorator(func: callable) -> callable:
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> any:
             for i in range(max_retries):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
                     print("Exception: ", e)
-                    print(f"Retrying {i+1}/{max_retries}")
-            raise Exception("Max retries exceeded")
+                    print(f"Retrying {func.__name__} {i+1}/{max_retries}")
+            raise Exception(f"Max retries exceeded for function {func.__name__}")
 
         return wrapper
 
     return retry_decorator
 
 
-# @retry_wrapper(max_retries=10)
+@retry_wrapper(max_retries=10)
 def try_fit(
     z_star: float,
     beta: float,
     gamma: float,
     ns: int,
     seed: int,
+    config: DictConfig,
     quantiles: List[float] = [1 / 100, 1 / 500],
 ) -> xr.DataArray:
     """Try fitting the data.
@@ -72,12 +75,31 @@ def try_fit(
     seed_all(seed)
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
     zs = gen_data(alpha, beta, gamma, ns)
-    bg_alpha, bg_beta, bg_gamma = fit_gev_upper_bound_known(zs, z_star)
-    s_alpha, s_beta, s_gamma = fit_gev_upper_bound_not_known(zs)
+    fit = config.fit
+    bg_alpha, bg_beta, bg_gamma = fit_gev_upper_bound_known(
+        zs,
+        z_star,
+        opt_steps=fit.steps,
+        lr=fit.lr,
+        beta_guess=fit.beta_guess,
+        gamma_guess=fit.gamma_guess,
+        verbose=config.verbose,
+    )
+    upnk_alpha, upnk_beta, upnk_gamma = fit_gev_upper_bound_not_known(
+        zs,
+        opt_steps=fit.steps,
+        lr=fit.lr,
+        alpha_guess=fit.alpha_guess,
+        beta_guess=fit.beta_guess,
+        gamma_guess=fit.gamma_guess,
+        verbose=config.verbose,
+    )
     true_q = genextreme.isf(quantiles, c=-gamma, loc=alpha, scale=beta)
-    low_q = genextreme.isf(quantiles, c=-bg_gamma, loc=bg_alpha, scale=bg_beta)
-    up_known_q = genextreme.isf(quantiles, c=-s_gamma, loc=s_alpha, scale=s_beta)
-    results = np.array([true_q, low_q, up_known_q])
+    ubk_q = genextreme.isf(quantiles, c=-bg_gamma, loc=bg_alpha, scale=bg_beta)
+    up_not_known_q = genextreme.isf(
+        quantiles, c=-upnk_gamma, loc=upnk_alpha, scale=upnk_beta
+    )
+    results = np.array([true_q, ubk_q, up_not_known_q])
     return xr.Dataset(
         data_vars={
             "rv": (
@@ -135,7 +157,7 @@ def get_fit_da(config: DictConfig) -> xr.DataArray:
         xr.DataArray: DataArray with the fit data.
     """
     data_name = os.path.join(DATA_PATH, f"vary_{_name_base(config)}.nc")
-    if not os.path.exists(data_name) or config.reload:
+    if not os.path.exists(data_name) or not config.reload:
         quantiles = list(config.quantiles)
         betas = np.linspace(
             config.beta_range.min, config.beta_range.max, config.beta_range.steps
@@ -158,6 +180,7 @@ def get_fit_da(config: DictConfig) -> xr.DataArray:
                                     gamma,
                                     config.ns,
                                     seed,
+                                    config,
                                     quantiles,
                                 )
                                 for beta in betas
@@ -185,13 +208,26 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
         config (DictConfig): Hydra config object.
         da (xr.DataArray): DataArray with the fit data.
     """
-    figure_name = os.path.join(FIGURE_PATH, f"vary_{_name_base(config)}.pdf")
     means = da.mean("seed")
     std = da.std("seed")
     lower_p = da.quantile(config.figure.lp, dim="seed")
     upper_p = da.quantile(config.figure.up, dim="seed")
     range_p = upper_p - lower_p
+
+    # get ready for plotting
     plot_defaults()
+
+    # I want to put all of these xr.DataArrays together in a single xr.Dataset and then plot them.
+    print(
+        {
+            "mean": means,
+            "std": std,
+            "lower_p": lower_p,
+            "upper_p": upper_p,
+            "range_p": range_p,
+        }
+    )
+
     ds = xr.merge(
         {
             "mean": means,
@@ -201,14 +237,21 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
             "range_p": range_p,
         }
     )
+
+    figure_name = os.path.join(FIGURE_PATH, f"ubkn_{_name_base(config)}.pdf")
     feature_grid(
-        ds,
+        ds.isel(fit=1, rp=0),
         [
             ["mean", "std"],
             ["lower_p", "upper_p"],
         ],
         [["m", "m"], ["m", "m"]],
-        [r"$\mu$", r"$\sigma$", r"$q_{0.05}$", r"$q_{0.95}$"],
+        [
+            r"Mean estimate RV100, $\mu$",
+            r"Standard deviation in estimates of RV100, $\sigma$",
+            "$q_{" + f"{config.figure.up:.2f}" + "}$",
+            "$q_{" + f"{config.figure.up:.2f}" + "}$",
+        ],
         [[None, None], [None, None]],
         [None, None],
         xy=(

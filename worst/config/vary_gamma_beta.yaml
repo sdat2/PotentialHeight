@@ -1,19 +1,30 @@
-z_star: 7
-ns: 50
-gamma_range:
+z_star: 7 # true upper bound assumed
+ns: 50 # number of samples
+gamma_range: # range of shape values to test
   min: -0.4
   max: -0.1
   steps: 6
-beta_range:
+beta_range: # range of scale values to test
   min: 0.2
   max: 1.5
   steps: 6
-seed: 35
-quantiles:
+seed: 35 # seed to offset from
+quantiles: # 1 in 100 year and 1 in 500 year quantiles
   - 0.01
   - 0.002
 seed_steps_Nr: 600
-reload: true
+fit: # settings for the fitting
+  # initial values for the parameters for fit
+  alpha_guess: 0.0
+  beta_guess: 1.0
+  gamma_guess: -0.1
+  # adam optimizer settings
+  steps: 1000
+  lr: 0.01
+  # other settings
+  force_weibull: false # for the upper bound not known fit only
+reload: true # whether to just reload the data if it exists
 figure:
-  lp: 0.01
-  up: 0.99
+  lp: 0.05 # lower percentile to plot
+  up: 0.95 # upper percentile to plot
+verbose: false # whether to print out the progress of fitting
