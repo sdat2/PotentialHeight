@@ -3,9 +3,12 @@ from typing import List
 import hydra
 import numpy as np
 import xarray as xr
+from tqdm import tqdm
 from scipy.stats import genextreme
 from omegaconf import DictConfig
-from .constants import CONFIG_PATH
+import matplotlib.pyplot as plt
+from sithom.plot import plot_defaults, feature_grid
+from .constants import CONFIG_PATH, FIGURE_PATH, DATA_PATH
 from .tens import (
     seed_all,
     gen_data,
@@ -13,7 +16,6 @@ from .tens import (
     fit_gev_upper_bound_known,
 )
 from .utils import alpha_from_z_star_beta_gamma
-from .constants import DATA_PATH
 
 # @timeit
 # def try_fit():
@@ -98,6 +100,11 @@ def try_fit(
             "seed": (
                 ("seed"),
                 [seed],
+                {
+                    "long_name": "Seed",
+                    "units": "none",
+                    "description": "Seed for the random number generator",
+                },
             ),
             "gamma": (("gamma"), [gamma]),
             "beta": (("beta"), [beta]),
@@ -105,39 +112,115 @@ def try_fit(
     )["rv"]
 
 
-def make_fit_da(config: DictConfig) -> xr.DataArray:
-    quantiles = list(config.quantiles)
+def _name_base(config: DictConfig) -> str:
+    """
+    Name base.
 
-    betas = np.linspace(
-        config.beta_range.min, config.beta_range.max, config.beta_range.steps
-    )
-    gammas = np.linspace(
-        config.gamma_range.min, config.gamma_range.max, config.gamma_range.steps
-    )
-    seed_offsets = np.linspace(0, config.seed_steps_Nr, config.seed_steps_Nr)
-    da = xr.concat(
-        [
-            xr.concat(
-                [
-                    xr.concat(
-                        [
-                            try_fit(
-                                config.z_star, beta, gamma, config.ns, seed, quantiles
-                            )
-                            for beta in betas
-                        ],
-                        dim="beta",
-                    )
-                    for gamma in gammas
-                ],
-                dim="gamma",
-            )
-            for seed in seed_offsets
-        ],
-        dim="seed",
-    )
-    da.to_netcdf(os.path.join(DATA_PATH, "vary_gamma_beta.nc"))
+    Args:
+        config (DictConfig): Hydra config object.
+
+    Returns:
+        str: Unique name based on the configuration.
+    """
+    return f"z_star_{config.z_star:.2f}_ns_{config.ns}_Nr_{config.seed_steps_Nr}_gamma_{config.gamma_range.min:.2f}_{config.gamma_range.max:.2f}_{config.gamma_range.steps}_beta_{config.beta_range.min:.2f}_{config.beta_range.max:.2f}_{config.beta_range.steps}"
+
+
+def get_fit_da(config: DictConfig) -> xr.DataArray:
+    """Get fit xr.DataArray.
+
+    Args:
+        config (DictConfig): Hydra config object.
+
+    Returns:
+        xr.DataArray: DataArray with the fit data.
+    """
+    data_name = os.path.join(DATA_PATH, f"vary_{_name_base(config)}.nc")
+    if not os.path.exists(data_name) or config.reload:
+        quantiles = list(config.quantiles)
+        betas = np.linspace(
+            config.beta_range.min, config.beta_range.max, config.beta_range.steps
+        )
+        gammas = np.linspace(
+            config.gamma_range.min, config.gamma_range.max, config.gamma_range.steps
+        )
+        seed_offsets = np.linspace(
+            0, config.seed_steps_Nr, config.seed_steps_Nr, dtype=int
+        )
+        da = xr.concat(
+            [
+                xr.concat(
+                    [
+                        xr.concat(
+                            [
+                                try_fit(
+                                    config.z_star,
+                                    beta,
+                                    gamma,
+                                    config.ns,
+                                    seed,
+                                    quantiles,
+                                )
+                                for beta in betas
+                            ],
+                            dim="beta",
+                        )
+                        for gamma in gammas
+                    ],
+                    dim="gamma",
+                )
+                for seed in tqdm(seed_offsets)
+            ],
+            dim="seed",
+        )
+        da.to_netcdf(data_name)
+    else:
+        da = xr.open_dataarray(data_name)
     return da
+
+
+def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
+    """Plot fit xr.DataArray.
+
+    Args:
+        config (DictConfig): Hydra config object.
+        da (xr.DataArray): DataArray with the fit data.
+    """
+    figure_name = os.path.join(FIGURE_PATH, f"vary_{_name_base(config)}.pdf")
+    means = da.mean("seed")
+    std = da.std("seed")
+    lower_p = da.quantile(config.figure.lp, dim="seed")
+    upper_p = da.quantile(config.figure.up, dim="seed")
+    range_p = upper_p - lower_p
+    plot_defaults()
+    ds = xr.merge(
+        {
+            "mean": means,
+            "std": std,
+            "lower_p": lower_p,
+            "upper_p": upper_p,
+            "range_p": range_p,
+        }
+    )
+    feature_grid(
+        ds,
+        [
+            ["mean", "std"],
+            ["lower_p", "upper_p"],
+        ],
+        [["m", "m"], ["m", "m"]],
+        [r"$\mu$", r"$\sigma$", r"$q_{0.05}$", r"$q_{0.95}$"],
+        [[None, None], [None, None]],
+        [None, None],
+        xy=(
+            (
+                "beta",
+                r"Scale, $\beta$",
+                "m",
+            ),
+            ("gamma", r"Shape, $\gamma$", ""),
+        ),
+    )
+    plt.savefig(figure_name)
 
 
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_gamma_beta")
@@ -150,7 +233,8 @@ def run_vary_gamma_beta(config: DictConfig) -> None:
     Args:
         config (DictConfig): Hydra config object.
     """
-    make_fit_da(config)
+    da = get_fit_da(config)
+    plot_fit_da(config, da)
 
 
 if __name__ == "__main__":

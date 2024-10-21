@@ -327,7 +327,7 @@ def evt_fig_tens(
     alpha = alpha_from_z_star_beta_gamma(z_star, beta, gamma)
 
     plot_defaults()
-    res_ds = get_evt_fit_data(
+    res_da = get_evt_fit_data(
         z_star,
         beta,
         gamma,
@@ -357,17 +357,17 @@ def evt_fig_tens(
 
     # plot the systematic fits for the known upper bound and the unbounded case
 
-    numbers = res_ds.ns.values
+    numbers = res_da.ns.values
 
     # calculate statistics to work out sampling error
-    mn = res_ds.mean(dim="seed")
-    std = res_ds.std(dim="seed")
+    mn = res_da.mean(dim="seed")
+    std = res_da.std(dim="seed")
 
     for lp, up in [(0.05, 0.95)]:  # , (0.25, 0.75)]:
         if seed_steps > 10:
             # get 5th and 95th percentiles
-            lower_p = res_ds.quantile(lp, dim="seed")
-            upper_p = res_ds.quantile(up, dim="seed")
+            lower_p = res_da.quantile(lp, dim="seed")
+            upper_p = res_da.quantile(up, dim="seed")
             range_p = upper_p - lower_p
             print("for", lp, "to", up)
             print("ranges at 50 samples", range_p.sel(ns=50, method="nearest"))
@@ -395,7 +395,7 @@ def evt_fig_tens(
                     linestyle="-",
                 )
 
-    axs[1].plot(numbers, res_ds.isel(rp=0, fit=0).values, color=color_true, linewidth=1)
+    axs[1].plot(numbers, res_da.isel(rp=0, fit=0).values, color=color_true, linewidth=1)
     axs[2].plot(
         numbers,
         mn.isel(rp=1, fit=0).values,
