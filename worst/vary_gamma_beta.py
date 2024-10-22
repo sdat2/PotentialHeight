@@ -279,20 +279,102 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
         da_d[k] = da
         da_l.append(da)
         print(k, da.dims, da.shape)
-    ds = xr.merge(da_l)
-    print("ds2", ds)
+    ds2 = xr.merge(da_l)
+    print("ds2", ds2)
     figure_name = os.path.join(
         FIGURE_PATH, f"bias_relative_range_RV100_{_name_base(config)}.pdf"
     )
-    plot_diff(ds.isel(rp=0), config, figure_name)
+    plot_diff(ds2.isel(rp=0), config, figure_name)
 
     plot_diff(
-        ds.isel(rp=1),
+        ds2.isel(rp=1),
         config,
         os.path.join(
             FIGURE_PATH, f"bias_relative_range_RV500_{_name_base(config)}.pdf"
         ),
     )
+
+    ds_d = {
+        "range_p_max_known_rp0": ds["range_p"].sel(fit="max_known").isel(rp=0),
+        "range_p_max_known_rp1": ds["range_p"].sel(fit="max_known").isel(rp=1),
+        "range_p_max_unknown_rp0": ds["range_p"].sel(fit="max_unknown").isel(rp=0),
+        "range_p_max_unknown_rp1": ds["range_p"].sel(fit="max_unknown").isel(rp=1),
+        "bias_max_known_rp0": ds2["bias_max_known"].isel(rp=0),
+        "bias_max_known_rp1": ds2["bias_max_known"].isel(rp=1),
+        "bias_max_unknown_rp0": ds2["bias_max_unknown"].isel(rp=0),
+        "bias_max_unknown_rp1": ds2["bias_max_unknown"].isel(rp=1),
+        "relative_range_rp0": ds2["relative_range"].isel(rp=0),
+        "relative_range_rp1": ds2["relative_range"].isel(rp=1),
+    }
+    ds_l = []
+
+    for k, da in ds_d.items():
+        da = da.rename(k)
+        ds_l.append(da)
+        print(k, da.dims, da.shape)
+
+    ds3 = xr.merge(ds_l, compat="override")
+
+    _, axs = feature_grid(
+        ds3,
+        [
+            [
+                "bias_max_known_rp0",
+                "range_p_max_known_rp0",
+                "bias_max_unknown_rp0",
+                "range_p_max_unknown_rp0",
+                "relative_range_rp0",
+            ],
+            [
+                "bias_max_known_rp1",
+                "range_p_max_known_rp1",
+                "bias_max_unknown_rp1",
+                "range_p_max_unknown_rp1",
+                "relative_range_rp1",
+            ],
+        ],
+        [["m", "m", "m", "m", None], ["m", "m", "m", "m", None]],
+        [
+            [
+                f"Bias max known RV{ds.rp.values[0]}",
+                f"Range max known RV{ds.rp.values[0]}",
+                f"Bias max unknown RV{ds.rp.values[0]}",
+                f"Range max unknown RV{ds.rp.values[0]}",
+                f"Range (max unknown)/known RV{ds.rp.values[0]}",
+            ],
+            [
+                f"Bias max known RV{ds.rp.values[1]}",
+                f"Range max known RV{ds.rp.values[1]}",
+                f"Bias max unknown RV{ds.rp.values[1]}",
+                f"Range max unknown RV{ds.rp.values[1]}",
+                f"Range (max unknown)/known RV{ds.rp.values[1]}",
+            ],
+        ],
+        [
+            [
+                (-3, 3, "cmo.balance"),
+                (-1, 3, "cmo.balance"),
+                (-3, 3, "cmo.balance"),
+                (-1, 3, "cmo.balance"),
+                (-1, 3, "cmo.balance"),
+            ],
+            [
+                (-3, 3, "cmo.balance"),
+                (-1, 3, "cmo.balance"),
+                (-3, 3, "cmo.balance"),
+                (-1, 3, "cmo.balance"),
+                (-1, 3, "cmo.balance"),
+            ],
+        ],
+        [None, None, None, None, None],
+        xy=(
+            ("beta", r"Scale, $\beta$", "m"),
+            ("gamma", r"Shape, $\gamma$", "dimensionless"),
+        ),
+        figsize=(17, 6),
+    )
+    label_subplots(axs, override="outside")
+    plt.savefig(os.path.join(FIGURE_PATH, f"vary_gamma_beta_{_name_base(config)}.pdf"))
 
 
 def plot_diff(ds: xr.Dataset, config: DictConfig, figure_name: str) -> None:
@@ -307,15 +389,24 @@ def plot_diff(ds: xr.Dataset, config: DictConfig, figure_name: str) -> None:
         ds,
         [["bias_max_known", "bias_max_unknown"], ["relative_range", "relative_std"]],
         [["m", "m"], [None, None]],
-        [["Bias max known", "Bias max unknown"], ["Relative range", "Relative std"]],
-        [[None, None], [None, None]],
+        [
+            [f"Bias max known RV{ds.rp.values}", f"Bias max unknown RV{ds.rp.values}"],
+            [
+                f"Relative range max unknown/known RV{ds.rp.values}",
+                f"Relative standard deviation max unknown/known RV{ds.rp.values}",
+            ],
+        ],
+        [
+            [(-3, 3, "cmo.balance"), (-3, 3, "cmo.balance")],
+            [(-1, 3, "cmo.balance"), (-1, 3, "cmo.balance")],
+        ],
         [None, None],
         xy=(
             ("beta", r"Scale, $\beta$", "m"),
             ("gamma", r"Shape, $\gamma$", "dimensionless"),
         ),
     )
-    label_subplots(axs)
+    label_subplots(axs, override="outside")
     plt.savefig(figure_name)
     plt.close()
 
@@ -368,7 +459,7 @@ def plot_fit_primary_var(ds: xr.Dataset, config: DictConfig, figure_name: str) -
             ("gamma", r"Shape, $\gamma$", "dimensionless"),
         ),
     )
-    label_subplots(axs)
+    label_subplots(axs, override="outside")
     plt.savefig(figure_name)
     plt.close()
 
