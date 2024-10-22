@@ -340,14 +340,14 @@ def plot_fit_da(config: DictConfig, da: xr.DataArray) -> None:
                 f"Range max known RV{ds.rp.values[0]}",
                 f"Bias max unknown RV{ds.rp.values[0]}",
                 f"Range max unknown RV{ds.rp.values[0]}",
-                f"Log range (max unknown)/known RV{ds.rp.values[0]}",
+                f"Log r(max unknown)/r(known) RV{ds.rp.values[0]}",
             ],
             [
                 f"Bias max known RV{ds.rp.values[1]}",
                 f"Range max known RV{ds.rp.values[1]}",
                 f"Bias max unknown RV{ds.rp.values[1]}",
                 f"Range max unknown RV{ds.rp.values[1]}",
-                f"Log range (max unknown)/known RV{ds.rp.values[1]}",
+                f"Log r(max unknown)/r(known) RV{ds.rp.values[1]}",
             ],
         ],
         [
