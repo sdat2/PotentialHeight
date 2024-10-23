@@ -17,6 +17,7 @@ import numpy as np
 import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
+import datetime
 from tcpips.constants import DATA_PATH, FIGURE_PATH
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from sithom.time import timeit
@@ -422,6 +423,71 @@ def return_new_input(
     node0[""].attrs["conventions"] = "CF-1.6 OWI-NWS13"
 
     return node0
+
+
+def time_to_datetime(time: int, units: str, calendar: str) -> any:
+    """Convert time in minutes to datetime objects.
+
+    We need to convert to the proleptic_gregorian calendar.
+
+    Args:
+        time (int): time in minutes.
+        units (str): units of time.
+        calendar (str): calendar type.
+
+    Returns:
+        datetime.datetime: datetime object
+
+    Examples::
+        >>> time_to_datetime(7680900, "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == datetime.datetime(2004, 8, 9, 0, 0)
+        True
+    """
+    assert (
+        calendar == "proleptic_gregorian"
+        and units == "minutes since 1990-01-01T01:00:00+00:00"
+    )
+    return datetime.datetime(1990, 1, 1, 1, 0, 0) + datetime.timedelta(minutes=time)
+
+
+def str_to_datetime(time_str: str) -> datetime.datetime:
+    """
+    Convert time string to datetime object.
+
+    Args:
+        time_str (str): time string in the format "%Y-%m-%dT%H:%M:%S"
+
+    Returns:
+        datetime.datetime: datetime object
+
+    Examples::
+        >>> str_to_datetime("2004-08-08T23:00:00") == datetime.datetime(2004, 8, 8, 23, 0)
+        True
+    """
+    return datetime.datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
+
+
+def datetime_to_time(dt: int, units: str, calendar: str) -> any:
+    """Convert time in minutes to datetime objects.
+
+    We need to convert to the proleptic_gregorian calendar.
+
+    Args:
+        time (int): time in minutes.
+        units (str): units of time.
+        calendar (str): calendar type.
+
+    Returns:
+        time: datetime object
+
+    Examples::
+        >>> datetime_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
+        True
+    """
+    assert (
+        calendar == "proleptic_gregorian"
+        and units == "minutes since 1990-01-01T01:00:00+00:00"
+    )
+    return int((dt - datetime.datetime(1990, 1, 1, 1, 0, 0)).total_seconds() / 60)
 
 
 def save_forcing(
