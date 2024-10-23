@@ -2,26 +2,23 @@
 # Should contain the default values for a TC
 angle:
   value: 0
-  type: float
   description: "Bearing of the TC track in degrees from true north"
   units: "degrees"
 translation_speed:
   value: 7.71
-  type: float
   description: "Speed of the TC in the direction of the track"
   units: "m/s"
 profile_name:
   value: "2025"
-  type: str
   description: "Name of the wind and pressure profile to use"
 impact_location:
-  value: [-89.4715, 29.511]
-  type: list
+  value: 
+   - -89.4715
+   -  29.5111
   description: "Location of the TC center at the time of landfall (x, y)"
   units: "degrees"
 impact_time: # roughly the same as Katrina by default
   value: "2005-08-29 06:10:00"
-  type: str
   description: "Time of landfall"
 observation_location:
   value: [-90.0715, 29.9511] # default New Orleans location
