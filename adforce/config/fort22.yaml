@@ -1,0 +1,23 @@
+Main:
+  type: rectilinear_square
+  bottom_left_corner: 
+        - -99.0
+        - 0.0
+  lateral_spacing: 0.125
+  xlen: 393
+  ylen: 385
+  tlen: 673
+  start: 7680900 # number of timesteps since 1990-01-01T01:00:00+00:00 (should change to datetime format?)
+  timestep: 15
+  time_unit: minutes since 1990-01-01T01:00:00+00:00
+  time_calendar: proleptic_gregorian
+TC1:
+  type: moving_rectilinear_square
+  lateral_spacing: 0.0125
+  xlen: 161
+  ylen: 161
+  tlen: 481
+  start: 7680900
+  timestep: 15
+  time_unit: minutes since 1990-01-01T01:00:00+00:00
+  time_calendar: proleptic_gregorian

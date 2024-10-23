@@ -19,12 +19,12 @@ impact_location:
   type: list
   description: "Location of the TC center at the time of landfall (x, y)"
   units: "degrees"
-impact_time:
+impact_time: # roughly the same as Katrina by default
   value: "2005-08-29 06:10:00"
   type: str
   description: "Time of landfall"
 observation_location:
-  value: [-90.0715, 29.9511]
+  value: [-90.0715, 29.9511] # default New Orleans location
   type: list
   description: "Location of the observation point (x, y). Will pick the closest mesh node to this."
   units: "degrees"
