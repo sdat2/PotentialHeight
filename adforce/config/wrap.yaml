@@ -18,7 +18,7 @@ impact_location:
   description: "Location of the TC center at the time of landfall (x, y)"
   units: "degrees"
 impact_time: # roughly the same as Katrina by default
-  value: "2005-08-29 06:10:00"
+  value: "2005-08-29T06:10:00"
   description: "Time of landfall"
 observation_location:
   value: [-90.0715, 29.9511] # default New Orleans location

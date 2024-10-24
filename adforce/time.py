@@ -51,12 +51,14 @@ def str_to_time(time_str: str, units: str, calendar: str) -> int:
 
     Args:
         time_str (str): time string in the format "%Y-%m-%dT%H:%M:%S"
+        units (str): units of time.
+        calendar (str): calendar type.
 
     Returns:
         int: time in minutes from 1990-01-01T01:00:00
 
     Examples::
-        >>> str_to_time("2004-08-09T00:00:00") == 7680000
+        >>> str_to_time("2004-08-09T00:00:00",  "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian" ) == 7680900
         True
     """
     return datetime_to_time(str_to_datetime(time_str), units, calendar)
@@ -68,12 +70,12 @@ def datetime_to_time(dt: int, units: str, calendar: str) -> any:
     We need to convert to the proleptic_gregorian calendar.
 
     Args:
-        time (int): time in minutes.
+        time (datetime): datetime object.
         units (str): units of time.
         calendar (str): calendar type.
 
     Returns:
-        time: datetime object
+        int: minutes since 1990-01-01T01:00:00
 
     Examples::
         >>> datetime_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
