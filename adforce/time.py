@@ -1,4 +1,6 @@
-"""Some time conversion functions to deal with time for fort.22.nc."""
+"""
+Some time conversion functions to deal with time for fort.22.nc.
+"""
 
 from typing import Union, Optional
 import datetime
@@ -103,6 +105,14 @@ def unknown_to_time(
 
     Returns:
         int: time in minutes from 1990-01-01T01:00:00
+
+    Examples::
+        >>> unknown_to_time("2004-08-09T00:00:00", "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
+        True
+        >>> unknown_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
+        True
+        >>> unknown_to_time(7680900) == 7680900
+        True
     """
 
     if isinstance(unknown_t, str):

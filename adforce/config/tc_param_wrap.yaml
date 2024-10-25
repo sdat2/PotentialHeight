@@ -2,7 +2,7 @@
 # Should contain the default values for a TC
 angle:
   value: 0
-  description: "Bearing of the TC track in degrees from true north"
+  description: "Bearing of the TC track in degrees (clockwise) from true north"
   units: "degrees"
 translation_speed:
   value: 7.71
@@ -21,18 +21,17 @@ impact_time: # roughly the same as Katrina by default
   value: "2005-08-29T06:10:00"
   description: "Time of landfall"
 observation_location:
-  value: [-90.0715, 29.9511] # default New Orleans location
-  type: list
+  value:
+    - -90.0715
+    - 29.9511 # default New Orleans location
   description: "Location of the observation point (x, y). Will pick the closest mesh node to this."
   units: "degrees"
 setup:
   value: "mid"
-  type: str
   units: "dimensionless"
   description: "Configuration of the model"
   options: ["low", "mid", "high"]
 tide:
   value: false
-  type: float
   description: "Whether to turn tides on"
   units: "dimensionless"
