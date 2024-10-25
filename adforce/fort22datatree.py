@@ -17,7 +17,6 @@ import numpy as np
 import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
-import datetime
 from tcpips.constants import DATA_PATH, FIGURE_PATH
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from sithom.time import timeit
@@ -237,6 +236,7 @@ def moving_coords_from_tj(
     u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
 
     def transpose(npa: np.ndarray) -> np.ndarray:
+        # transpose the first and second axes
         return np.moveaxis(npa, 1, -1)
 
     # print(lats, lons)

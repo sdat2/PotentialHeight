@@ -31,6 +31,10 @@ setup:
   units: "dimensionless"
   description: "Configuration of the model"
   options: ["low", "mid", "high"]
+profile_name:
+  value: "2025"
+  description: "Name of the wind and pressure profile to use. Looks by default in the cle/data directory"
+  units: "dimensionless"
 tide:
   value: false
   description: "Whether to turn tides on"

@@ -5,10 +5,14 @@ import os
 import netCDF4 as nc
 import numpy as np
 from sithom.time import timeit
+from cle.constants import DATA_PATH as CLE_DATA_PATH
+from typing import Callable, Tuple
 from adforce.time import unknown_to_time
 from .constants import DATA_PATH
+from .profile import read_profile
 
 
+@timeit
 def rectilinear_square(ds: nc.Dataset, grid_config: dict) -> nc.Dataset:
     """
     Create a rectilinear grid with square cells based on grid_config.
@@ -73,11 +77,64 @@ def rectilinear_square(ds: nc.Dataset, grid_config: dict) -> nc.Dataset:
     return ds
 
 
-def add_blank_psfc_u10(ds: nc.Dataset, background_pressure: float = 1010) -> nc.Dataset:
-    """Add blank pressure and velocity fields to an existing netcdf dataset.
+def gen_ps_f(
+    profile_path_or_dict: Union[str, dict] = os.path.join(
+        CLE_DATA_PATH, "outputs.json"
+    )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
+) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
+    """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
+
+    Maybe I should also make options for any other azimuthally symetric model automatically.
+
+    This should potentially be changed to allow each timestep to have a different profile.
+
+    That would require some clever way of interpolating each time step.
+
+    Args:
+        profile_path_or_dict (Union[str, dict], optional): path to wind profile file or dictionary containing the wind profile. Defaults to os.path.join(CLE_DATA_PATH, "outputs.json").
+
+    Returns:
+        Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]: interpolation function.
+    """
+    if isinstance(profile_path_or_dict, str):
+        profile = read_profile(profile_path_or_dict)
+    elif isinstance(profile_path_or_dict, dict):
+        profile = profile_path_or_dict
+    else:
+        raise ValueError("profile_path_or_dict must be a string or a dictionary.")
+    radii = profile["radii"].values
+    windspeeds = profile["windspeeds"].values
+    pressures = profile["pressures"].values
+    # print(radii[0:10], windspeeds[0:10], pressures[0:10])
+
+    def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Interpolate the pressure and wind fields from the wind profile file.
+
+        Args:
+            distances (np.ndarray): distances from the center of the storm.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: pressure, wind speed.
+        """
+        pressure_cube = np.interp(distances, radii, pressures)
+        velo_cube = np.interp(distances, radii, windspeeds)
+        return np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(
+            velo_cube, nan=0.0
+        )
+
+    return interp_func
+
+
+@timeit
+def add_psfc_u10(
+    ds: nc.Dataset, tc_config: Optional[dict] = None, background_pressure: float = 1010
+) -> nc.Dataset:
+    """Add pressure and velocity fields to an existing netcdf dataset.
 
     Args:
         ds (nc.Dataset): reference to input netcdf4 dataset.
+        tc_config (Optional[dict], optional): A dictionary containing the information necesary to reconstruct the tropical cyclone trajectory. Defaults to None. If None, the fields are left blank (velocity fields are zero and pressure is set to background_pressure).
         background_pressure: background pressure to assume in mb. Defaults to 1010 mb.
 
     Returns:
@@ -91,9 +148,57 @@ def add_blank_psfc_u10(ds: nc.Dataset, background_pressure: float = 1010) -> nc.
         len(ds.dimensions["yi"]),
         len(ds.dimensions["xi"]),
     )
-    ds["U10"][:] = np.zeros(shape, dtype="float32")
-    ds["V10"][:] = np.zeros(shape, dtype="float32")
-    ds["PSFC"][:] = np.zeros(shape, dtype="float32") + background_pressure
+    if tc_config is None:  # blank fields
+        ds["U10"][:] = np.zeros(shape, dtype="float32")
+        ds["V10"][:] = np.zeros(shape, dtype="float32")
+        ds["PSFC"][:] = np.zeros(shape, dtype="float32") + background_pressure
+    else:  # add fields based on tc_config
+        times = ds["time"][:]
+        tlen = len(times)
+        if "clat" in ds.variables and "clon" in ds.variables:
+            # we're dealing with the moving grid.
+            # assume that the right TC config has been given previously.
+            dist_lon = ds["lon"][:] - ds["clon"][:].reshape(tlen, 1, 1)
+            dist_lat = ds["lat"][:] - ds["clat"][:].reshape(tlen, 1, 1)
+        else:
+            # we're dealing with the static grid.
+
+            angle = tc_config["angle"]["value"]
+            speed = tc_config["translation_speed"]["value"]
+            ilon = tc_config["impact_location"]["value"][0]
+            ilat = tc_config["impact_location"]["value"][1]
+            itime = unknown_to_time(
+                tc_config["impact_time"]["value"],
+                ds["time"].units,
+                ds["time"].calendar,
+            )
+            angular_distances = (times - itime) / 60 * speed / 111e3
+            point = np.array([[ilon], [ilat]])
+            slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
+            clon_clat_array = point + slope * angular_distances
+            lons = ds["lon"][:]
+            lats = ds["lat"][:]
+            dist_lon = lons - clon_clat_array[0, :].reshape(tlen, 1, 1)
+            dist_lat = lats - clon_clat_array[1, :].reshape(tlen, 1, 1)
+            del lons, lats
+        assert dist_lat.shape == dist_lat.shape
+        assert dist_lon.shape == (
+            len(ds.dimensions["time"]),
+            len(ds.dimensions["yi"]),
+            len(ds.dimensions["xi"]),
+        )
+        interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile"])
+        dist = np.sqrt(dist_lon**2 + dist_lat**2)
+        psfc, wsp = interp_func(dist)
+        ds["PSFC"][:] = psfc
+        del psfc
+        rad = np.arctan2(np.radians(dist_lon), np.radians(dist_lat)) - np.pi / 2
+        del dist_lon, dist_lat
+        u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
+        ds["U10"][:] = u10
+        ds["V10"][:] = v10
+        del u10, v10
+
     ds["PSFC"].units = "mb"
     ds["U10"].units = "m s-1"
     ds["V10"].units = "m s-1"
@@ -106,6 +211,7 @@ def add_blank_psfc_u10(ds: nc.Dataset, background_pressure: float = 1010) -> nc.
     return ds
 
 
+@timeit
 def moving_rectilinear_square(
     ds: nc.Dataset,
     grid_config: dict,
@@ -211,24 +317,25 @@ def moving_rectilinear_square(
 
 
 @timeit
-def create_blank_fort22(grid_config: dict, tc_config: dict) -> None:
+def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     """
     Create a blank fort.22.nc file with the specified grid and TC configurations.
 
     Args:
+        nc_path (str): Path to the netCDF4 file.
         grid_config (dict): Grid configuration dictionary.
         tc_config (dict): Idealized TC configuration dictionary.
     """
     # Create a new netCDF4 file
-    ds = nc.Dataset(os.path.join(DATA_PATH, "blank_fort22.nc"), "w", format="NETCDF4")
+    ds = nc.Dataset(nc_path, "w", format="NETCDF4")
     # Create the "Main" group (rank 1)
     main_group = ds.createGroup("Main")
     main_group = rectilinear_square(main_group, grid_config["Main"])
-    main_group = add_blank_psfc_u10(main_group)
+    main_group = add_psfc_u10(main_group, tc_config)
     # Create the "TC1" group within root (rank 2)
     tc1_group = ds.createGroup("TC1")
     tc1_group = moving_rectilinear_square(tc1_group, grid_config["TC1"], tc_config)
-    tc1_group = add_blank_psfc_u10(tc1_group)
+    tc1_group = add_psfc_u10(tc1_group, tc_config=tc_config)
 
     # institution: Oceanweather Inc. (OWI)
     ds.institution = "Oceanweather Inc. (OWI)"
@@ -248,4 +355,8 @@ if __name__ == "__main__":
     grid_config = yaml.safe_load(
         open(os.path.join(CONFIG_PATH, "grid_config_fort22.yaml"))
     )
-    create_blank_fort22(grid_config, tc_config)
+    if "profile_name" in tc_config:
+        tc_config["profile"] = os.path.join(
+            CLE_DATA_PATH, f"{tc_config['profile_name']['value']}.json"
+        )
+    create_fort22(os.path.join(DATA_PATH, "default_fort22.nc"), grid_config, tc_config)

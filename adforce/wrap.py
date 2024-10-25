@@ -16,7 +16,7 @@ from sithom.time import timeit
 from sithom.place import Point
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from .constants import NEW_ORLEANS  # , KATRINA_TIDE_NC
-from .fort22 import save_forcing
+from .fort22datatree import save_forcing
 from .mesh import xr_loader
 from .profile import read_profile
 
