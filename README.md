@@ -76,7 +76,10 @@ python -m adbo.exp &> logs/bo_test3.txt
     - GP convergence animation (2D).
  - Sync times up & animate winds.
  - GEV with maxima Scipy distribution fitting for CMIP6.
-
+ - Reformat adforce/adbo to allow:
+   - flexible profile forcing.
+   - xarray struct passing.
+   - keep time/coordinates of moving cyclones in repo.
 
 ### In Progress:
 
@@ -89,10 +92,6 @@ python -m adbo.exp &> logs/bo_test3.txt
 
 ### TODO:
 
- - Reformat adforce/adbo to allow:
-   - flexible profile forcing.
-   - xarray struct passing.
-   - keep time/coordinates of moving cyclones in repo.
  - Could we produce uncertainty estimates in the upper bound based on MVES.
  - How to quantify the performance of BO better.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
@@ -102,7 +101,10 @@ python -m adbo.exp &> logs/bo_test3.txt
 
 ## SurgeNet exploration
 
+### In progress
  - Calculate dual graph as in Benteviglio et al. 2024 SWE-GNN.
+
+### TODO
  - Consider NeuralODE to fix the smoothing problem of deep GNN.
  - Would diffusion/GANs also help?
  - How to include the dynamic features and tides?

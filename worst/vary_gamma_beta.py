@@ -17,10 +17,6 @@ from .tens import (
 )
 from .utils import alpha_from_z_star_beta_gamma
 
-# @timeit
-# def try_fit():
-#    def fit():
-
 
 def retry_wrapper(max_retries: int = 10) -> callable:
     """Retry wrapper. If a function fails flakeily, then wrap with this to retry it a few times.

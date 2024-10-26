@@ -18,7 +18,7 @@ from sithom.plot import axis_formatter
 from sithom.time import timeit
 import argparse
 from .mesh import bbox_mesh, xr_loader
-from .fort22 import read_fort22
+from .fort22datatree import read_fort22
 from .constants import NO_BBOX, NEW_ORLEANS
 
 # from sithom.xr import plot_units

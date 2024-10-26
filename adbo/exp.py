@@ -35,7 +35,7 @@ from sithom.plot import plot_defaults
 from sithom.io import write_json
 from sithom.place import Point
 import matplotlib.pyplot as plt
-from adforce.wrap import run_adcirc_idealized_tc, maxele_observation_func
+from adforce.oldwrap import run_adcirc_idealized_tc, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
