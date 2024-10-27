@@ -350,7 +350,9 @@ def maxele_observation_func(
     # )
     if isinstance(point, int):
         min_p = 1000
-    else:
+        point = NEW_ORLEANS
+
+    if isinstance(point, Point):
         mele_og = xr_loader(os.path.join(MODEL_PATHS_DICT[resolution], "maxele.63.nc"))
         # read zeta_max point closes to the
         # work out closest point to NEW_ORLEANS

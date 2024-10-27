@@ -40,7 +40,6 @@ from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
 from .constants import FIGURE_PATH, EXP_PATH, CONFIG_PATH
-from .constants import AD_PATH as ROOT
 
 # archer 2:
 matplotlib.use("Agg")

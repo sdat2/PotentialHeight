@@ -1,26 +1,26 @@
+# slurm parameters for my account on archer2
 email: sdat2@cam.ac.uk
 partition: standard
 slurm_account: n02-bas
 slurm_job_name: adcirc-swan
-root: "/work/n02/n02/sdat2/adcirc-swan/"
-exe_path: "/work/n02/n02/sdat2/adcirc-swan/adcirc/work"
+root: /work/n02/n02/sdat2/adcirc-swan/
+exe_path: /work/n02/n02/sdat2/adcirc-swan/adcirc/work # path to the adcirc executables
 tasks_per_node: 128
+resolution: medium # default setup option
 options:
   high:
     nodes: 8
-    qos: "standard"
-    walltime: "01:00:00"
+    qos: standard
+    walltime: 01:00:00
   mid:
-    nodes: 4
-    qos: "short"
-    walltime: "00:20:00"
+    nodes: 1
+    qos: medium
+    walltime: 00:20:00
   low:
-    nodes: 2
-    qos: "short"
-    walltime: "00:20:00"
-modules:
- - PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1
- - cray-netcdf-hdf5parallel/4.9.0.1
+    nodes: 1
+    qos: short
+    walltime: 00:20:00
+modules: PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1 # modules to load on archer2
 input_files:
   - fort.13
   - fort.14
