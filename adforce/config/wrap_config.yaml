@@ -3,3 +3,4 @@ defaults:
   - tc: tc_param_config
   - grid: grid_fort22_config
   - adcirc: adcirc_config
+  - files: archer2_config

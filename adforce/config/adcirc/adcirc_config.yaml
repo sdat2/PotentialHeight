@@ -13,3 +13,7 @@ observation_location:
     - 29.9511 # default New Orleans location
   description: "Location of the observation point (x, y). Will pick the closest mesh node to this."
   units: "degrees"
+input_files:
+  - fort.13
+  - fort.14
+  - fort.15

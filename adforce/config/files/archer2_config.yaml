@@ -1,0 +1,3 @@
+root: /work/n02/n02/sdat2/adcirc-swan/
+exe_path: /work/n02/n02/sdat2/adcirc-swan/adcirc/work # path to the adcirc executables
+exp_path: /work/n02/n02/sdat2/adcirc-swan/exp # path to the expeiriment directory
