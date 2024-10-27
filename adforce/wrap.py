@@ -6,7 +6,8 @@ from omegaconf import DictConfig
 from .constants import CONFIG_PATH, DATA_PATH
 
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="tc_param_wrap")
+# version_base=None,
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="wrap_config")
 def idealized_tc_observe(cfg: DictConfig) -> None:
     """Wrap the adcirc call.
 

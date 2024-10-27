@@ -6,7 +6,6 @@ slurm_job_name: adcirc-swan
 root: /work/n02/n02/sdat2/adcirc-swan/
 exe_path: /work/n02/n02/sdat2/adcirc-swan/adcirc/work # path to the adcirc executables
 tasks_per_node: 128
-resolution: medium # default setup option
 options:
   high:
     nodes: 8
@@ -14,7 +13,7 @@ options:
     walltime: 01:00:00
   mid:
     nodes: 1
-    qos: medium
+    qos: short
     walltime: 00:20:00
   low:
     nodes: 1

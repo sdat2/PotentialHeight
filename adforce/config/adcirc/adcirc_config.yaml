@@ -1,0 +1,15 @@
+resolution:
+  value: "mid"
+  units: "dimensionless"
+  description: "Resolution of the model. Can be low, mid, or high"
+  options: ["low", "mid", "high"]
+tide:
+  value: false
+  description: "Whether to turn tides on"
+  units: "dimensionless"
+observation_location:
+  value:
+    - -90.0715
+    - 29.9511 # default New Orleans location
+  description: "Location of the observation point (x, y). Will pick the closest mesh node to this."
+  units: "degrees"
