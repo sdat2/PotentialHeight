@@ -23,5 +23,5 @@ impact_location:
   description: "Location of the TC center at the time of landfall (x, y)"
   units: "degrees"
 impact_time: # roughly the same as Katrina by default
-  value: 2005-08-29T06:10:00
+  value: 2005-08-12T06:00:00
   description: Time of landfall

@@ -125,13 +125,14 @@ def moving_rectilinear_square(
     speed = tc_config["translation_speed"]["value"]
     ilon = tc_config["impact_location"]["value"][0]
     ilat = tc_config["impact_location"]["value"][1]
+    #
     itime = unknown_to_time(
         tc_config["impact_time"]["value"],
         grid_config["time_unit"],
         grid_config["time_calendar"],
     )
-
-    angular_distances = (times - itime) / 60 * speed / 111e3
+    # ang (degree) = rel_time (min)  * 60 (min/second) * speed (m/s) / 111e3 (m/degree)
+    angular_distances = (times - itime) * 60 * speed / 111e3
     point = np.array([[ilon], [ilat]])
     slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
     clon_clat_array = point + slope * angular_distances
@@ -280,8 +281,8 @@ def add_psfc_u10(
                 ds["time"].units,
                 ds["time"].calendar,
             )
-            # rel_time (min)  * 60 (min/second) * speed (m/s) / 111e3 (m/degree)
-            angular_distances = (times - itime) / 60 * speed / 111e3
+            # ang (degree) = rel_time (min)  * 60 (min/second) * speed (m/s) / 111e3 (m/degree)
+            angular_distances = (times - itime) * 60 * speed / 111e3
             point = np.array([[ilon], [ilat]])
             slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
             # work out the center of the storm at each time step
@@ -292,16 +293,6 @@ def add_psfc_u10(
             dist_lon = lons - clon_clat_array[0, :].reshape(tlen, 1, 1)
             dist_lat = lats - clon_clat_array[1, :].reshape(tlen, 1, 1)
             del lons, lats
-
-            ds.createVariable("clat", "f4", ("time",), fill_value=9.96921e36)
-            ds.createVariable("clon", "f4", ("time",), fill_value=9.96921e36)
-            ds["clat"][:] = clon_clat_array[1, :]
-            ds["clon"][:] = clon_clat_array[0, :]
-
-        ds.createVariable("dist_lat", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-        ds.createVariable("dist_lon", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-        ds["dist_lat"][:] = dist_lat
-        ds["dist_lon"][:] = dist_lon
 
         assert dist_lat.shape == dist_lat.shape
         assert dist_lon.shape == (
@@ -314,19 +305,12 @@ def add_psfc_u10(
         # calculate the distance from the center of the storm
         dist = np.sqrt(np.square(dist_lon) + np.square(dist_lat)) * 111e3
         # interpolate the pressure and wind fields from the wind profile file
-        ds.createVariable("DIST", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
         psfc, wsp = interp_func(dist)
-        ds.createVariable("WSP", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-        ds["WSP"][:] = wsp
         # add the pressure field to the dataset
         ds["PSFC"][:] = psfc
         del psfc
         # calculate the u10 and v10 from the windspeed
         rad = np.arctan2(dist_lon, dist_lat) - np.pi / 2
-
-        ds.createVariable("rad", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-        ds["rad"][:] = rad
-
         del dist_lon, dist_lat
         u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
         del rad

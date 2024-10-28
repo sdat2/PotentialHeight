@@ -7,7 +7,7 @@ Main: # main stationary grid
   xlen: 393
   ylen: 385
   tlen: 673
-  start: 2004-08-09T00:00:00 # 7680900 # number of timesteps since 1990-01-01T01:00:00+00:00 (should change to datetime format?) '%Y-%m-%dT%H:%M:%S'
+  start: 2005-08-09T00:00:00 # 7680900 # number of timesteps since 1990-01-01T01:00:00+00:00 (should change to datetime format?) '%Y-%m-%dT%H:%M:%S'
   timestep: 15 # minutes
   time_unit: minutes since 1990-01-01T01:00:00+00:00
   time_calendar: proleptic_gregorian
@@ -17,7 +17,7 @@ TC1: # tropical cylone moves with the center of the grid
   xlen: 250 # 161
   ylen: 250 # 161
   tlen: 481
-  start: 2004-08-09T00:00:00 # 7680900
+  start: 2005-08-09T00:00:00 # 7680900
   timestep: 15 # minutes
   time_unit: minutes since 1990-01-01T01:00:00+00:00
   time_calendar: proleptic_gregorian
