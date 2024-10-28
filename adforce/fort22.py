@@ -351,9 +351,11 @@ if __name__ == "__main__":
     from adforce.constants import CONFIG_PATH
     import yaml
 
-    tc_config = yaml.safe_load(open(os.path.join(CONFIG_PATH, "tc_param_wrap.yaml")))
+    tc_config = yaml.safe_load(
+        open(os.path.join(CONFIG_PATH, "tc", "tc_param_config.yaml"))
+    )
     grid_config = yaml.safe_load(
-        open(os.path.join(CONFIG_PATH, "grid_config_fort22.yaml"))
+        open(os.path.join(CONFIG_PATH, "grid", "grid_fort22_config.yaml"))
     )
     if "profile_name" in tc_config:
         tc_config["profile"] = os.path.join(

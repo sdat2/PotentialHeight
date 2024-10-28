@@ -1,8 +1,8 @@
-Main:
+Main: # main stationary grid
   type: rectilinear_square
   bottom_left_corner: 
-        - -99.0
-        - 0.0
+    - -99.0
+    - 0.0
   lateral_spacing: 0.125
   xlen: 393
   ylen: 385
@@ -11,13 +11,13 @@ Main:
   timestep: 15 # minutes
   time_unit: minutes since 1990-01-01T01:00:00+00:00
   time_calendar: proleptic_gregorian
-TC1:
-  type: moving_rectilinear_square
-  lateral_spacing: 0.0125
+TC1: # tropical cylone moves with the center of the grid
+  type: moving_rectilinear_square 
+  lateral_spacing: 0.0125 # 1/10 of the spacing of the main grid
   xlen: 161
   ylen: 161
   tlen: 481
   start: 2004-08-09T00:00:00 # 7680900
-  timestep: 15
+  timestep: 15 # minutes
   time_unit: minutes since 1990-01-01T01:00:00+00:00
   time_calendar: proleptic_gregorian
