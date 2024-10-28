@@ -7,7 +7,7 @@ tide:
   value: false
   description: "Whether to turn tides on"
   units: "dimensionless"
-observation_location:
+attempted_observation_location:
   value:
     - -90.0715
     - 29.9511 # default New Orleans location
