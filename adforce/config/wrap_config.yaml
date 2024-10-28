@@ -5,4 +5,4 @@ defaults:
   - adcirc: adcirc_config
   - files: archer2_config
 
-name: test
+name: test-wrap

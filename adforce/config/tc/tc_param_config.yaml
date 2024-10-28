@@ -12,6 +12,10 @@ profile_name:
   value: "2025"
   description: "Name of the wind and pressure profile to use. Looks by default in the cle/data directory for a json with the name <profile_name.value>.json"
   units: "dimensionless"
+profile_path:
+  value: "/work/n02/n02/sdat2/adcirc-swan/cle/data"
+  description: "Path to the directory containing the wind and pressure profiles"
+  units: "dimensionless"
 impact_location:
   value: 
    - -89.4715

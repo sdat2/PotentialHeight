@@ -1,9 +1,9 @@
 """Wrap the adcirc call."""
 
-import os
+import os, shutil
 import numpy as np
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from .constants import CONFIG_PATH, DATA_PATH, SETUP_PATH
 from .fort22 import create_fort22
 from .slurm import setoff_slurm_job_and_wait
@@ -16,13 +16,20 @@ def observe_max_point(cfg: DictConfig) -> float:
     xs = mele_ds.x.values
     ys = mele_ds.y.values
     at_obs_loc = cfg.adcirc.attempted_observation_location.value
-    distsq = (xs - at_obs_lọc[0]) ** 2 + (ys - at_obs_lọc[1]) ** 2
+
+    distsq = (xs - at_obs_loc[0]) ** 2 + (ys - at_obs_loc[1]) ** 2
     min_p = np.argmin(distsq)
     maxele = mele_ds.zeta.isel(node=min_p).values
     point = (xs[min_p], ys[min_p])
-    cfg.adcirc["actual_observation_location"] = point
+    cfg.adcirc["actual_observation_location"]["value"] = point
 
     return maxele
+
+
+def save_config(cfg: DictConfig) -> None:
+    """Save the configuration file."""
+    with open(os.path.join(cfg.files.run_folder, "config.yaml"), "w") as fp:
+        OmegaConf.save(config=cfg, f=fp.name)
 
 
 # version_base=None,
@@ -36,25 +43,25 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     Returns:
         float: max water level at observation point.
     """
-    cfg.files.run_folder = os.path.join(cfg.files.exp_folder, cfg.name)
+    cfg.files["run_folder"] = os.path.join(cfg.files.exp_path, cfg.name)
     os.makedirs(cfg.files.run_folder, exist_ok=True)
     # transfer relevant ADCIRC setup files
-    os.shutil.copy(
+    shutil.copy(
         os.path.join(SETUP_PATH, "fort.15.mid.notide"),
         os.path.join(cfg.files.run_folder, "fort.15"),
     )
-    os.shutil.copy(
+    shutil.copy(
         os.path.join(SETUP_PATH, "fort.13.mid"),
         os.path.join(cfg.files.run_folder, "fort.13"),
     )
-    os.shutil.copy(
+    shutil.copy(
         os.path.join(SETUP_PATH, "fort.14.mid"),
         os.path.join(cfg.files.run_folder, "fort.14"),
     )
 
     print(cfg)
     # save config file
-    hydra.utils.to_yaml(cfg, os.path.join(cfg.files.run_folder, "config.yaml"))
+    save_config(cfg)
     # create forcing files
     create_fort22(cfg.files.run_folder, cfg.grid, cfg.tc)
     # run ADCIRC
@@ -62,7 +69,7 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     # observe ADCIRC
     maxele = observe_max_point(cfg)
     # save config file
-    hydra.utils.to_yaml(cfg, os.path.join(cfg.files.run_folder, "config.yaml"))
+    save_config(cfg)
     return maxele  # not yet implemented
 
 

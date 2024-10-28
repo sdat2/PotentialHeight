@@ -3,8 +3,7 @@ import numpy as np
 import time
 from omegaconf import DictConfig
 from slurmpy import Slurm
-from sithom.timeit import timeit
-from sithom.constants import CONFIG_PATH
+from sithom.time import timeit
 
 
 def is_slurm_job_finished(jid: int) -> bool:
@@ -27,6 +26,26 @@ def is_slurm_job_finished(jid: int) -> bool:
     )
 
 
+def is_slurm_job_failed(jid: int) -> bool:
+    """
+    Check if a SLURM job is failed using sacct.
+
+    Args:
+        jid (int): Job ID.
+
+    Returns:
+        bool: Whether the job is failed.
+    """
+
+    args = f"sacct -j {jid} -o state"
+    job_states = [x.strip() for x in os.popen(args).read().strip().split("\n")]
+    return (
+        np.any([x == "FAILED" for x in job_states[2:]])
+        if len(job_states) > 2
+        else False
+    )
+
+
 @timeit
 def setoff_slurm_job_and_wait(direc: str, config: DictConfig) -> int:
     """
@@ -42,19 +61,17 @@ def setoff_slurm_job_and_wait(direc: str, config: DictConfig) -> int:
         int: Slurm Job ID.
     """
     # time_limit_str = "HH:mm:ss".format(time_limit)
-    resolution = config.adcirc.resolution
+    resolution = config.adcirc.resolution.value
 
-    time_limit = config.slurm.options[config.adcirc.resolution].walltime
+    time_limit = config.slurm.options[resolution].walltime
     s = Slurm(  # jobname,
-        config.slurm.slurm_job_name,
+        config.name,
         {
             "nodes": config.slurm.options[resolution].nodes,
-            "account": config.options[resolution].account,
-            "partition": config.partition,
-            "qos": config[resolution].qos,
-            "time": config.options[
-                resolution
-            ].walltime,  # str(timedelta(seconds=time_limit)),
+            "account": config.slurm.account,
+            "partition": config.slurm.partition,
+            "qos": config.slurm.options[resolution].qos,
+            "time": time_limit,  # str(timedelta(seconds=time_limit)),
             "tasks-per-node": config.slurm.tasks_per_node,  # number of cpus on archer2 node.
             "cpus-per-task": 1,
             "output": os.path.join(direc, "slurm.out"),
@@ -118,13 +135,23 @@ echo ""
     tinc = 1
     # wait twice as long as the time limit given to the slurm job
     # to account for queueing.
-    while not is_finished and time_total < time_limit * 2:
+    # convert time_limit to seconds
+    # was in format HH:MM:SS
+    time_limit = sum(
+        [int(x) * 60**i for i, x in enumerate(reversed(time_limit.split(":")))]
+    )
+    while (
+        not is_finished and time_total < time_limit * 2 and not is_slurm_job_failed(jid)
+    ):
         is_finished = is_slurm_job_finished(jid)
         time.sleep(tinc)
         time_total += tinc
 
-    if not is_finished:
+    if is_slurm_job_failed(jid):
+        raise Exception(f"Job {jid} failed")
+    elif not is_finished:
         print(f"Job {jid} did not finish in time")
     else:
         print(f"Job {jid} finished")
-    return jid
+
+    return jid  # sacct -j 7915551 -o state

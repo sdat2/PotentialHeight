@@ -187,7 +187,7 @@ def add_psfc_u10(
             len(ds.dimensions["yi"]),
             len(ds.dimensions["xi"]),
         )
-        interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile"])
+        interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
         dist = np.sqrt(dist_lon**2 + dist_lat**2)
         psfc, wsp = interp_func(dist)
         ds["PSFC"][:] = psfc
@@ -327,7 +327,11 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
         tc_config (dict): Idealized TC configuration dictionary.
     """
     # Create a new netCDF4 file
-    ds = nc.Dataset(nc_path, "w", format="NETCDF4")
+    ds = nc.Dataset(os.path.join(nc_path, "fort.22.nc"), "w", format="NETCDF4")
+    if "profile_name" in tc_config:
+        tc_config["profile_path"]["value"] = os.path.join(
+            CLE_DATA_PATH, f"{tc_config['profile_name']['value']}.json"
+        )
     # Create the "Main" group (rank 1)
     main_group = ds.createGroup("Main")
     main_group = rectilinear_square(main_group, grid_config["Main"])
@@ -357,8 +361,5 @@ if __name__ == "__main__":
     grid_config = yaml.safe_load(
         open(os.path.join(CONFIG_PATH, "grid", "grid_fort22_config.yaml"))
     )
-    if "profile_name" in tc_config:
-        tc_config["profile"] = os.path.join(
-            CLE_DATA_PATH, f"{tc_config['profile_name']['value']}.json"
-        )
-    create_fort22(os.path.join(DATA_PATH, "default_fort22.nc"), grid_config, tc_config)
+
+    create_fort22(DATA_PATH, grid_config, tc_config)
