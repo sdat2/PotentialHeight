@@ -77,140 +77,6 @@ def rectilinear_square(ds: nc.Dataset, grid_config: dict) -> nc.Dataset:
     return ds
 
 
-def gen_ps_f(
-    profile_path_or_dict: Union[str, dict] = os.path.join(
-        CLE_DATA_PATH, "outputs.json"
-    )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
-) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
-    """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
-
-    Maybe I should also make options for any other azimuthally symetric model automatically.
-
-    This should potentially be changed to allow each timestep to have a different profile.
-
-    That would require some clever way of interpolating each time step.
-
-    Args:
-        profile_path_or_dict (Union[str, dict], optional): path to wind profile file or dictionary containing the wind profile. Defaults to os.path.join(CLE_DATA_PATH, "outputs.json").
-
-    Returns:
-        Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]: interpolation function.
-    """
-    if isinstance(profile_path_or_dict, str):
-        profile = read_profile(profile_path_or_dict)
-    elif isinstance(profile_path_or_dict, dict):
-        profile = profile_path_or_dict
-    else:
-        raise ValueError("profile_path_or_dict must be a string or a dictionary.")
-    radii = profile["radii"].values
-    windspeeds = profile["windspeeds"].values
-    pressures = profile["pressures"].values
-    # print(radii[0:10], windspeeds[0:10], pressures[0:10])
-
-    def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Interpolate the pressure and wind fields from the wind profile file.
-
-        Args:
-            distances (np.ndarray): distances from the center of the storm.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: pressure, wind speed.
-        """
-        pressure_cube = np.interp(distances, radii, pressures)
-        velo_cube = np.interp(distances, radii, windspeeds)
-        return np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(
-            velo_cube, nan=0.0
-        )
-
-    return interp_func
-
-
-@timeit
-def add_psfc_u10(
-    ds: nc.Dataset, tc_config: Optional[dict] = None, background_pressure: float = 1010
-) -> nc.Dataset:
-    """Add pressure and velocity fields to an existing netcdf dataset.
-
-    Args:
-        ds (nc.Dataset): reference to input netcdf4 dataset.
-        tc_config (Optional[dict], optional): A dictionary containing the information necesary to reconstruct the tropical cyclone trajectory. Defaults to None. If None, the fields are left blank (velocity fields are zero and pressure is set to background_pressure).
-        background_pressure: background pressure to assume in mb. Defaults to 1010 mb.
-
-    Returns:
-        ds (nc.Dataset): reference to transformed netcdf4 dataset.
-    """
-    ds.createVariable("PSFC", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-    ds.createVariable("U10", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-    ds.createVariable("V10", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
-    shape = (
-        len(ds.dimensions["time"]),
-        len(ds.dimensions["yi"]),
-        len(ds.dimensions["xi"]),
-    )
-    if tc_config is None:  # blank fields
-        ds["U10"][:] = np.zeros(shape, dtype="float32")
-        ds["V10"][:] = np.zeros(shape, dtype="float32")
-        ds["PSFC"][:] = np.zeros(shape, dtype="float32") + background_pressure
-    else:  # add fields based on tc_config
-        times = ds["time"][:]
-        tlen = len(times)
-        if "clat" in ds.variables and "clon" in ds.variables:
-            # we're dealing with the moving grid.
-            # assume that the right TC config has been given previously.
-            dist_lon = ds["lon"][:] - ds["clon"][:].reshape(tlen, 1, 1)
-            dist_lat = ds["lat"][:] - ds["clat"][:].reshape(tlen, 1, 1)
-        else:
-            # we're dealing with the static grid.
-
-            angle = tc_config["angle"]["value"]
-            speed = tc_config["translation_speed"]["value"]
-            ilon = tc_config["impact_location"]["value"][0]
-            ilat = tc_config["impact_location"]["value"][1]
-            itime = unknown_to_time(
-                tc_config["impact_time"]["value"],
-                ds["time"].units,
-                ds["time"].calendar,
-            )
-            angular_distances = (times - itime) / 60 * speed / 111e3
-            point = np.array([[ilon], [ilat]])
-            slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
-            clon_clat_array = point + slope * angular_distances
-            lons = ds["lon"][:]
-            lats = ds["lat"][:]
-            dist_lon = lons - clon_clat_array[0, :].reshape(tlen, 1, 1)
-            dist_lat = lats - clon_clat_array[1, :].reshape(tlen, 1, 1)
-            del lons, lats
-        assert dist_lat.shape == dist_lat.shape
-        assert dist_lon.shape == (
-            len(ds.dimensions["time"]),
-            len(ds.dimensions["yi"]),
-            len(ds.dimensions["xi"]),
-        )
-        interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
-        dist = np.sqrt(dist_lon**2 + dist_lat**2)
-        psfc, wsp = interp_func(dist)
-        ds["PSFC"][:] = psfc
-        del psfc
-        rad = np.arctan2(np.radians(dist_lon), np.radians(dist_lat)) - np.pi / 2
-        del dist_lon, dist_lat
-        u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
-        ds["U10"][:] = u10
-        ds["V10"][:] = v10
-        del u10, v10
-
-    ds["PSFC"].units = "mb"
-    ds["U10"].units = "m s-1"
-    ds["V10"].units = "m s-1"
-    ds["PSFC"].coordinates = "time lat lon"
-    ds["U10"].coordinates = "time lat lon"
-    ds["V10"].coordinates = "time lat lon"
-    ds["PSFC"].standard_name = "Surface pressure"
-    ds["U10"].standard_name = "10m zonal windspeed"
-    ds["V10"].standard_name = "10m meridional windspeed"
-    return ds
-
-
 @timeit
 def moving_rectilinear_square(
     ds: nc.Dataset,
@@ -313,6 +179,170 @@ def moving_rectilinear_square(
     ds["clon"].long_name = "center longitude of feature"
     # add attribute rank=2 to dataset
     ds.rank = 2
+    return ds
+
+
+def gen_ps_f(
+    profile_path_or_dict: Union[str, dict] = os.path.join(
+        CLE_DATA_PATH, "outputs.json"
+    )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
+) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
+    """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
+
+    Maybe I should also make options for any other azimuthally symetric model automatically.
+
+    This should potentially be changed to allow each timestep to have a different profile.
+
+    That would require some clever way of interpolating each time step.
+
+    Args:
+        profile_path_or_dict (Union[str, dict], optional): path to wind profile file or dictionary containing the wind profile. Defaults to os.path.join(CLE_DATA_PATH, "outputs.json").
+
+    Returns:
+        Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]: interpolation function.
+    """
+    if isinstance(profile_path_or_dict, str):
+        profile = read_profile(profile_path_or_dict)
+    elif isinstance(profile_path_or_dict, dict):
+        profile = profile_path_or_dict
+    else:
+        raise ValueError("profile_path_or_dict must be a string or a dictionary.")
+    radii = profile["radii"].values
+    windspeeds = profile["windspeeds"].values
+    pressures = profile["pressures"].values
+    print(radii[0:10], windspeeds[0:10], pressures[0:10])
+    from sithom.io import write_json
+
+    write_json(profile, os.path.join(DATA_PATH, "profile.json"))
+
+    def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Interpolate the pressure and wind fields from the wind profile file.
+
+        Args:
+            distances (np.ndarray): distances from the center of the storm.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: pressure, wind speed.
+        """
+        pressure_cube = np.interp(distances, radii, pressures)
+        velo_cube = np.interp(distances, radii, windspeeds)
+        return np.nan_to_num(pressure_cube, nan=pressures[-1]), np.nan_to_num(
+            velo_cube, nan=0.0
+        )
+
+    return interp_func
+
+
+@timeit
+def add_psfc_u10(
+    ds: nc.Dataset, tc_config: Optional[dict] = None, background_pressure: float = 1010
+) -> nc.Dataset:
+    """Add pressure and velocity fields to an existing netcdf dataset.
+
+    Args:
+        ds (nc.Dataset): reference to input netcdf4 dataset.
+        tc_config (Optional[dict], optional): A dictionary containing the information necesary to reconstruct the tropical cyclone trajectory. Defaults to None. If None, the fields are left blank (velocity fields are zero and pressure is set to background_pressure).
+        background_pressure: background pressure to assume in mb. Defaults to 1010 mb.
+
+    Returns:
+        ds (nc.Dataset): reference to transformed netcdf4 dataset.
+    """
+    ds.createVariable("PSFC", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+    ds.createVariable("U10", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+    ds.createVariable("V10", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+    shape = (
+        len(ds.dimensions["time"]),
+        len(ds.dimensions["yi"]),
+        len(ds.dimensions["xi"]),
+    )
+    if tc_config is None:  # blank fields
+        ds["U10"][:] = np.zeros(shape, dtype="float32")
+        ds["V10"][:] = np.zeros(shape, dtype="float32")
+        ds["PSFC"][:] = np.zeros(shape, dtype="float32") + background_pressure
+    else:  # add fields based on tc_config
+        times = ds["time"][:]
+        tlen = len(times)
+        if "clat" in ds.variables and "clon" in ds.variables:
+            # we're dealing with the moving grid.
+            # assume that the right TC config has been given previously.
+            # distance from the center of the storm
+            dist_lon = ds["lon"][:] - ds["clon"][:].reshape(tlen, 1, 1)
+            dist_lat = ds["lat"][:] - ds["clat"][:].reshape(tlen, 1, 1)
+        else:
+            # we're dealing with the static grid.
+            angle = tc_config["angle"]["value"]
+            speed = tc_config["translation_speed"]["value"]
+            ilon = tc_config["impact_location"]["value"][0]
+            ilat = tc_config["impact_location"]["value"][1]
+            itime = unknown_to_time(
+                tc_config["impact_time"]["value"],
+                ds["time"].units,
+                ds["time"].calendar,
+            )
+            # rel_time (min)  * 60 (min/second) * speed (m/s) / 111e3 (m/degree)
+            angular_distances = (times - itime) / 60 * speed / 111e3
+            point = np.array([[ilon], [ilat]])
+            slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
+            # work out the center of the storm at each time step
+            clon_clat_array = point + slope * angular_distances
+            lons = ds["lon"][:]
+            lats = ds["lat"][:]
+            # distance from the center of the storm
+            dist_lon = lons - clon_clat_array[0, :].reshape(tlen, 1, 1)
+            dist_lat = lats - clon_clat_array[1, :].reshape(tlen, 1, 1)
+            del lons, lats
+
+            ds.createVariable("clat", "f4", ("time",), fill_value=9.96921e36)
+            ds.createVariable("clon", "f4", ("time",), fill_value=9.96921e36)
+            ds["clat"][:] = clon_clat_array[1, :]
+            ds["clon"][:] = clon_clat_array[0, :]
+
+        ds.createVariable("dist_lat", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+        ds.createVariable("dist_lon", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+        ds["dist_lat"][:] = dist_lat
+        ds["dist_lon"][:] = dist_lon
+
+        assert dist_lat.shape == dist_lat.shape
+        assert dist_lon.shape == (
+            len(ds.dimensions["time"]),
+            len(ds.dimensions["yi"]),
+            len(ds.dimensions["xi"]),
+        )
+        # generate the interpolation function from the wind profile
+        interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
+        # calculate the distance from the center of the storm
+        dist = np.sqrt(np.square(dist_lon) + np.square(dist_lat)) * 111e3
+        # interpolate the pressure and wind fields from the wind profile file
+        ds.createVariable("DIST", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+        psfc, wsp = interp_func(dist)
+        ds.createVariable("WSP", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+        ds["WSP"][:] = wsp
+        # add the pressure field to the dataset
+        ds["PSFC"][:] = psfc
+        del psfc
+        # calculate the u10 and v10 from the windspeed
+        rad = np.arctan2(dist_lon, dist_lat) - np.pi / 2
+
+        ds.createVariable("rad", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
+        ds["rad"][:] = rad
+
+        del dist_lon, dist_lat
+        u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
+        del rad
+        ds["U10"][:] = u10
+        ds["V10"][:] = v10
+        del u10, v10
+
+    ds["PSFC"].units = "mb"
+    ds["U10"].units = "m s-1"
+    ds["V10"].units = "m s-1"
+    ds["PSFC"].coordinates = "time lat lon"
+    ds["U10"].coordinates = "time lat lon"
+    ds["V10"].coordinates = "time lat lon"
+    ds["PSFC"].standard_name = "Surface pressure"
+    ds["U10"].standard_name = "10m zonal windspeed"
+    ds["V10"].standard_name = "10m meridional windspeed"
     return ds
 
 

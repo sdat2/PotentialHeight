@@ -19,7 +19,7 @@ from sithom.misc import in_notebook, get_git_revision_hash
 from sithom.plot import plot_defaults
 from sithom.time import timeit, time_stamp
 from sithom.io import write_json
-from tcpips.constants import (
+from .constants import (
     DATA_PATH,
     FIGURE_PATH,
     CMIP6_PATH,
@@ -27,7 +27,7 @@ from tcpips.constants import (
     REGRIDDED_PATH,
     CONVERSION_NAMES,
 )
-from tcpips.files import locker, get_task_dict
+from .files import locker, get_task_dict
 
 
 def run_regridding_sequentially(

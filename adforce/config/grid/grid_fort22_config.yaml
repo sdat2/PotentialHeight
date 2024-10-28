@@ -14,8 +14,8 @@ Main: # main stationary grid
 TC1: # tropical cylone moves with the center of the grid
   type: moving_rectilinear_square 
   lateral_spacing: 0.0125 # 1/10 of the spacing of the main grid
-  xlen: 161
-  ylen: 161
+  xlen: 250 # 161
+  ylen: 250 # 161
   tlen: 481
   start: 2004-08-09T00:00:00 # 7680900
   timestep: 15 # minutes

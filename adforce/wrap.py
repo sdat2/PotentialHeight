@@ -27,7 +27,11 @@ def observe_max_point(cfg: DictConfig) -> float:
 
 
 def save_config(cfg: DictConfig) -> None:
-    """Save the configuration file."""
+    """Save the configuration file.
+
+    Args:
+        cfg (DictConfig): configuration.
+    """
     with open(os.path.join(cfg.files.run_folder, "config.yaml"), "w") as fp:
         OmegaConf.save(config=cfg, f=fp.name)
 
