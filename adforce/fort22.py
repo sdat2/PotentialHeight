@@ -4,7 +4,8 @@ import os
 from typing import Union, Optional, Callable, Tuple
 import netCDF4 as nc
 import numpy as np
-from sithom.time import timeit, write_json
+from sithom.time import timeit
+from sithom.io import write_json
 from cle.constants import DATA_PATH as CLE_DATA_PATH
 from .time import unknown_to_time
 from .constants import DATA_PATH
@@ -278,14 +279,17 @@ def add_psfc_u10(
                 ds["time"].calendar,
             )
             # ang (degree) = rel_time (min)  * 60 (min/second) * speed (m/s) / 111e3 (m/degree)
-            angular_distances = (times - itime) * 60 * speed / 111e3
-            point = np.array([[ilon], [ilat]])
-            slope = np.array([[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]])
+            angular_distances = ((times - itime) * 60 * speed / 111e3).astype("float32")
+            point = np.array([[ilon], [ilat]], dtype="float32")
+            slope = np.array(
+                [[np.sin(np.radians(angle))], [np.cos(np.radians(angle))]],
+                dtype="float32",
+            )
             # work out the center of the storm at each time step
             clon_clat_array = point + slope * angular_distances
-            lons = ds["lon"][:]
-            lats = ds["lat"][:]
-            # distance from the center of the storm
+            lons = ds["lon"][:].astype("float32")
+            lats = ds["lat"][:].astype("float32")
+            # distance from the center of the storm type float32
             dist_lon = lons - clon_clat_array[0, :].reshape(tlen, 1, 1)
             dist_lat = lats - clon_clat_array[1, :].reshape(tlen, 1, 1)
             del lons, lats
@@ -321,9 +325,9 @@ def add_psfc_u10(
     ds["PSFC"].coordinates = "time lat lon"
     ds["U10"].coordinates = "time lat lon"
     ds["V10"].coordinates = "time lat lon"
-    ds["PSFC"].standard_name = "Surface pressure"
-    ds["U10"].standard_name = "10m zonal windspeed"
-    ds["V10"].standard_name = "10m meridional windspeed"
+    # ds["PSFC"].standard_name = "Surface pressure"
+    # ds["U10"].standard_name = "10m zonal windspeed"
+    # ds["V10"].standard_name = "10m meridional windspeed"
     return ds
 
 

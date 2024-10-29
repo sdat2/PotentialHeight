@@ -99,7 +99,7 @@ export OMP_NUM_THREADS=1
 #    By default, Slurm does not propagate this setting from the sbatch
 #    options to srun commands in the job script. If this is not done,
 #    process/thread pinning may be incorrect leading to poor performance
-export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
+export SRUN_CPUS_PER_TASK=1
 
 #...Run the case
 echo ""
