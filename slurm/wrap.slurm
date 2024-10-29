@@ -31,6 +31,6 @@ which python
 python --version
 
 # Run the job
-python -m adforce.wrap --exp_name notide-mid-2025 --profile_name 2025.json --resolution mid-notide --animate
+python -m adforce.wrap angle=45 profile_name=2025 # --exp_name notide-mid-2025 --profile_name 2025.json --resolution mid-notide --animate
 
-python -m adforce.wrap --exp_name notide-mid-2097 --profile_name 2097.json --resolution mid-notide --animate
+# python -m adforce.wrap --exp_name notide-mid-2097 --profile_name 2097.json --resolution mid-notide --animate
