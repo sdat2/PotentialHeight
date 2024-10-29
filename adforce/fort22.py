@@ -1,13 +1,12 @@
 """fort.22.nc file creation functions."""
 
-from typing import Union, Optional
 import os
+from typing import Union, Optional, Callable, Tuple
 import netCDF4 as nc
 import numpy as np
-from sithom.time import timeit
+from sithom.time import timeit, write_json
 from cle.constants import DATA_PATH as CLE_DATA_PATH
-from typing import Callable, Tuple
-from adforce.time import unknown_to_time
+from .time import unknown_to_time
 from .constants import DATA_PATH
 from .profile import read_profile
 
@@ -211,9 +210,6 @@ def gen_ps_f(
     radii = profile["radii"].values
     windspeeds = profile["windspeeds"].values
     pressures = profile["pressures"].values
-    print(radii[0:10], windspeeds[0:10], pressures[0:10])
-    from sithom.io import write_json
-
     write_json(profile, os.path.join(DATA_PATH, "profile.json"))
 
     def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -303,6 +299,7 @@ def add_psfc_u10(
         # generate the interpolation function from the wind profile
         interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
         # calculate the distance from the center of the storm
+        # dist (m) = ang_dist (degree) * 111e3 (m/degree)
         dist = np.sqrt(np.square(dist_lon) + np.square(dist_lat)) * 111e3
         # interpolate the pressure and wind fields from the wind profile file
         psfc, wsp = interp_func(dist)
@@ -360,7 +357,7 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     ds.conventions = "CF-1.6 OWI-NWS13"
     # conventions: CF-1.6 OWI-NWS13
 
-    print(ds)
+    # print(ds)
     ds.close()
 
 
