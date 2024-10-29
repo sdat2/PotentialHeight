@@ -457,15 +457,25 @@ def save_forcing(
     # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
     enc = {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
     node0.to_netcdf(
-        os.path.join(path, "fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
+        os.path.join(path, "datatree.fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
     )
     print("new", node0)
+
+
+def look_at_diff():
+    f22nc = read_fort22(os.path.join(DATA_PATH, "fort.22.nc"))
+    # print(f22)
+    f22dt = read_fort22(os.path.join(DATA_PATH, "datatree.fort.22.nc"))
+    print("netcdf", f22nc)
+    print("datatree", f22dt)
+    # print(f22_2)
+    # print(f22 - f22_2)
 
 
 if __name__ == "__main__":
     # python -m adforce.fort22
     # blank_fort22()
-    data_free_f22_coords()
+    #  data_free_f22_coords()
     # node0 = return_new_input()
     # # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
     # path = "/work/n02/n02/sdat2/adcirc-swan/NWS13set3"
@@ -473,6 +483,8 @@ if __name__ == "__main__":
     # node0.to_netcdf(
     #     os.path.join(path, "fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
     # )
+    # save_forcing(path=DATA_PATH)
+    look_at_diff()
 
     # print("new", node0)
 

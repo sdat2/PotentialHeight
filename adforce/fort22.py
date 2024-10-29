@@ -359,6 +359,7 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     # institution: Oceanweather Inc. (OWI)
     ds.institution = "Oceanweather Inc. (OWI)"
     ds.conventions = "CF-1.6 OWI-NWS13"
+    ds.group_order = "Main TC1"
     # conventions: CF-1.6 OWI-NWS13
 
     # print(ds)
