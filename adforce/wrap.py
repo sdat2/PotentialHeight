@@ -13,15 +13,25 @@ from .mesh import xr_loader
 def observe_max_point(cfg: DictConfig) -> float:
     """Observe the ADCIRC model."""
     mele_ds = xr_loader(os.path.join(cfg.files.run_folder, "maxele.63.nc"))
+    # print("mele_ds", mele_ds)
     xs = mele_ds.x.values
     ys = mele_ds.y.values
     at_obs_loc = cfg.adcirc.attempted_observation_location.value
 
     distsq = (xs - at_obs_loc[0]) ** 2 + (ys - at_obs_loc[1]) ** 2
     min_p = np.argmin(distsq)
-    maxele = mele_ds.zeta.isel(node=min_p).values
+    maxele = mele_ds.zeta_max.isel(node=min_p).values
     point = (xs[min_p], ys[min_p])
-    cfg.adcirc["actual_observation_location"]["value"] = point
+    cfg.adcirc["actual_observation_location"]["value"][0] = float(point[0])
+    cfg.adcirc["actual_observation_location"]["value"][1] = float(point[1])
+
+    print(
+        "point info:",
+        mele_ds.isel(node=min_p)["depth"],
+        "\n",
+        mele_ds.isel(node=min_p)["depth"].values,
+        " m",
+    )
 
     return maxele
 
@@ -50,6 +60,9 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     cfg.files["run_folder"] = os.path.join(cfg.files.exp_path, cfg.name)
     os.makedirs(cfg.files.run_folder, exist_ok=True)
     # transfer relevant ADCIRC setup files
+    assert cfg.adcirc.tide.value == False
+    assert cfg.adcirc.resolution.value == "mid"
+    # other options not yet implemented
     shutil.copy(
         os.path.join(SETUP_PATH, "fort.15.mid.notide"),
         os.path.join(cfg.files.run_folder, "fort.15"),
@@ -74,6 +87,11 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     maxele = observe_max_point(cfg)
     # save config file
     save_config(cfg)
+    print(maxele, "m")
+
+    # from adforce.ani import plot_heights_and_winds
+
+    # plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
     return maxele  # not yet implemented
 
 
