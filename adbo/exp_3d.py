@@ -50,3 +50,4 @@ if __name__ == "__main__":
     # run_bayesopt_exp(seed=16, exp_name="bo_test16", init_steps=5, daf_steps=50)
     # python -m adbo.exp_3d &> logs/bo_test-2d-3.log
     # run_bayesopt_exp(seed=18, exp_name="bo_test18", init_steps=5, daf_steps=100)
+    # stationid = 0
