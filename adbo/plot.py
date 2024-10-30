@@ -22,8 +22,8 @@ print(exp_names)
 
 @timeit
 def plot_diff(
-    exps: Tuple[str, str] = ("bo-3-2025", "bo-3-2097"),
-    figure_name="2025-vs-2097-sid3.png",
+    exps: Tuple[str, str] = ("new-3d", "new-3d-2097"),
+    figure_name="2025-vs-2097-new-orleans.pdf",
 ) -> None:
     """
     Plot difference between two years.
@@ -75,6 +75,8 @@ def plot_diff(
         axs[1].scatter(calls, displacement, label=label, color=color, s=marker_size)
         axs[2].scatter(calls, angle, label=label, color=color, s=marker_size)
         axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
+        print(f"{label} max_res: {max_res[-1]} m")
+        print(f"{label} max_res25: {max_res[-26]} m")
 
     def vline(sample: float) -> None:
         """vertical line.
@@ -88,18 +90,19 @@ def plot_diff(
         axs[2].axvline(sample, color="black", linestyle="--")
         axs[3].axvline(sample, color="black", linestyle="--")
 
-    axs[0].set_ylabel("Result [m]")
+    axs[0].set_ylabel("Max SSH at Point [m]")
     axs[1].set_ylabel(r"Displacement [$^\circ$]")
     axs[2].set_ylabel(r"Angle [$^\circ$]")
-    axs[3].set_ylabel("Trans Speed [m/s]")
-    axs[3].set_xlabel("Samples")
-    axs[0].legend()
-    plt.legend()
+    axs[3].set_ylabel("Translation Speed [m s$^{-1}$]")
+    axs[3].set_xlabel("Number of Samples")
+    # axs[0].legend()
     label_subplots(axs)
 
     plot_exp(exp1, "2025", "blue")
     plot_exp(exp2, "2097", "red")
-    vline(25.5)
+    axs[0].legend()
+    vline(25.5)  # after 25 samples goes to Bayesian optimization
+    # before that it is doing Latin Hypercube Sampling
     figure_path = os.path.join(FIGURE_PATH, figure_name)
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
@@ -181,7 +184,7 @@ def plot_many() -> None:
     plt.savefig(figure_path)
 
 
-if __name__ == "__main__":
+if False:
     # python -m adbo.plot
     for staionid in range(0, 6):
         plot_diff(
@@ -194,3 +197,8 @@ if __name__ == "__main__":
     # plot_diff()
     # plot_many()
     # pass
+
+
+if __name__ == "__main__":
+    # python -m adbo.plot
+    plot_diff()

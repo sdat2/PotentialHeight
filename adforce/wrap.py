@@ -28,7 +28,7 @@ def observe_max_point(cfg: DictConfig) -> float:
     print(
         "point info:",
         mele_ds.isel(node=min_p)["depth"],
-        "\n",
+        "\n depth at point: ",
         mele_ds.isel(node=min_p)["depth"].values,
         " m",
     )
@@ -87,7 +87,7 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     maxele = observe_max_point(cfg)
     # save config file
     save_config(cfg)
-    print(maxele, "m")
+    print("max height at obs point: ", maxele, "m\n\n")
 
     # from adforce.ani import plot_heights_and_winds
 

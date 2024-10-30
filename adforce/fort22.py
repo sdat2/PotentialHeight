@@ -351,10 +351,12 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     main_group = ds.createGroup("Main")
     main_group = rectilinear_square(main_group, grid_config["Main"])
     main_group = add_psfc_u10(main_group, tc_config)
+    main_group.description = "Main grid"
     # Create the "TC1" group within root (rank 2)
     tc1_group = ds.createGroup("TC1")
     tc1_group = moving_rectilinear_square(tc1_group, grid_config["TC1"], tc_config)
     tc1_group = add_psfc_u10(tc1_group, tc_config=tc_config)
+    tc1_group.description = "TC1 grid"
 
     # institution: Oceanweather Inc. (OWI)
     ds.institution = "Oceanweather Inc. (OWI)"
