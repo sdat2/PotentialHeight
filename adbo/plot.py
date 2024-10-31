@@ -17,6 +17,20 @@ exp_names = [
     for year in [2025, 2097]
 ]
 
+
+stationid = [
+    "8729840",
+    "8735180",
+    "8760922",
+    "8761724",
+    "8762075",
+    "8762482",
+    "8764044",
+]
+
+years = ["2025", "2097"]
+
+
 print(exp_names)
 
 
@@ -43,7 +57,7 @@ def plot_diff(
     # print(exp1.keys())
     # print(exp2.keys())
 
-    _, axs = plt.subplots(4, 1, figsize=(8, 8))
+    _, axs = plt.subplots(4, 1, figsize=(8, 8), sharex=True)
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
         """
@@ -102,6 +116,8 @@ def plot_diff(
     plot_exp(exp2, "2097", "red")
     axs[0].legend()
     vline(25.5)  # after 25 samples goes to Bayesian optimization
+    plt.xlim(1, 50)
+
     # before that it is doing Latin Hypercube Sampling
     figure_path = os.path.join(FIGURE_PATH, figure_name)
     print(f"Saving figure to {figure_path}")
@@ -109,24 +125,21 @@ def plot_diff(
 
 
 @timeit
-def plot_many() -> None:
+def plot_many(year="2025") -> None:
     """
     Plot difference between two years.
     """
     plot_defaults()
 
     exps = {
-        i: read_json(
-            os.path.join(EXP_PATH, "bo-test-2d-midres" + str(i), "experiments.json")
-        )
-        for i in range(0, 5)
-        if i != 3
+        i: read_json(os.path.join(EXP_PATH, i + "-" + year, "experiments.json"))
+        for i in stationid
     }
     print("exps", exps)
 
     # print(exp2.keys())
 
-    _, axs = plt.subplots(3, 1, figsize=(8, 8))
+    _, axs = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
         """
@@ -166,20 +179,23 @@ def plot_many() -> None:
         axs[2].axvline(sample, color="black", linestyle="--")
         # axs[3].axvline(sample, color="black", linestyle="--")
 
-    axs[0].set_ylabel("Result [m]")
-    axs[1].set_ylabel(r"Displacement [$^\circ$]")
-    axs[2].set_ylabel(r"Angle [$^\circ$]")
-    axs[-1].set_xlabel("Samples")
-    axs[0].legend()
-    plt.legend()
+    axs[0].set_ylabel("Max elevation [m]")
+    axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
+    axs[2].set_ylabel(r"Track Angle [$^\circ$]")
+    axs[-1].set_xlabel("Number of Samples")
     label_subplots(axs)
 
-    colors = ["blue", "red", "green", "orange", "purple"]
+    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"]
 
-    for exp_num, exp in exps.items():
-        plot_exp(exp, f"sid{exp_num}", colors[exp_num])
-    vline(5.5)
-    figure_path = os.path.join(FIGURE_PATH, "2015.png")
+    for exp_num, exp_key in enumerate(exps):
+        plot_exp(exps[exp_key], f"sid{exp_key}", colors[exp_num])
+    vline(25.5)
+
+    # axs[0].legend()
+    plt.legend()
+    plt.xlim(1, 50)
+
+    figure_path = os.path.join(FIGURE_PATH, "along-coast-" + year + ".pdf")
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
 
@@ -202,3 +218,5 @@ if False:
 if __name__ == "__main__":
     # python -m adbo.plot
     plot_diff()
+    plot_many("2025")
+    plot_many("2097")
