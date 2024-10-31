@@ -387,7 +387,7 @@ def maxele_observation_func(
 def run_adcirc_idealized_tc(
     out_path: str = "test-run",
     profile_name: str = "2025.json",
-    select_point: str = maxele_observation_func(3, resolution="mid"),
+    select_point: str = maxele_observation_func(NEW_ORLEANS, resolution="mid"),
     angle: float = 0,
     trans_speed: float = 7.71,
     impact_lon: float = -89.4715,

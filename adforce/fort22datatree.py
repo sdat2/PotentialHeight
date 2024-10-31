@@ -457,7 +457,7 @@ def save_forcing(
     # node0.to_netcdf(os.path.join(DATA_PATH, "ex.nc"))
     enc = {"time": {"units": "minutes since 1990-01-01T01:00:00"}}
     node0.to_netcdf(
-        os.path.join(path, "datatree.fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
+        os.path.join(path, "fort.22.nc"), encoding={"/Main": enc, "/TC1": enc}
     )
     print("new", node0)
 
