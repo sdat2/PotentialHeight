@@ -1,21 +1,24 @@
 """Plot results from adcirc bayesian optimization experiments."""
 
-from typing import Tuple
+from typing import Tuple, List, Optional
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
+from sithom.place import BoundingBox
+from adforce.constants import NO_BBOX
 from sithom.plot import plot_defaults, label_subplots
 from tcpips.constants import FIGURE_PATH
 from adbo.constants import EXP_PATH
 
 
-exp_names = [
-    "notide-" + str(stationid) + "-" + str(year) + "-midres"
-    for stationid in range(0, 6)
-    for year in [2025, 2097]
-]
+# exp_names = [
+#     "notide-" + str(stationid) + "-" + str(year) + "-midres"
+#     for stationid in range(0, 6)
+#     for year in [2025, 2097]
+# ]
+# print(exp_names)
 
 
 stationid = [
@@ -29,9 +32,6 @@ stationid = [
 ]
 
 years = ["2025", "2097"]
-
-
-print(exp_names)
 
 
 @timeit
@@ -105,8 +105,8 @@ def plot_diff(
         axs[3].axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
-    axs[1].set_ylabel(r"Displacement [$^\circ$]")
-    axs[2].set_ylabel(r"Angle [$^\circ$]")
+    axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
+    axs[2].set_ylabel(r"Track Angle [$^\circ$]")
     axs[3].set_ylabel("Translation Speed [m s$^{-1}$]")
     axs[3].set_xlabel("Number of Samples")
     # axs[0].legend()
@@ -122,6 +122,7 @@ def plot_diff(
     figure_path = os.path.join(FIGURE_PATH, figure_name)
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
+    plt.close()
 
 
 @timeit
@@ -179,16 +180,16 @@ def plot_many(year="2025") -> None:
         axs[2].axvline(sample, color="black", linestyle="--")
         # axs[3].axvline(sample, color="black", linestyle="--")
 
-    axs[0].set_ylabel("Max elevation [m]")
+    axs[0].set_ylabel("Max SSH at Point [m]")
     axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
     axs[2].set_ylabel(r"Track Angle [$^\circ$]")
     axs[-1].set_xlabel("Number of Samples")
     label_subplots(axs)
 
-    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"]
+    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
 
     for exp_num, exp_key in enumerate(exps):
-        plot_exp(exps[exp_key], f"sid{exp_key}", colors[exp_num])
+        plot_exp(exps[exp_key], f"{exp_key}", colors[exp_num])
     vline(25.5)
 
     # axs[0].legend()
@@ -198,6 +199,7 @@ def plot_many(year="2025") -> None:
     figure_path = os.path.join(FIGURE_PATH, "along-coast-" + year + ".pdf")
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
+    plt.close()
 
 
 if False:
@@ -215,8 +217,96 @@ if False:
     # pass
 
 
+@timeit
+def plot_places(
+    bbox: Optional[BoundingBox] = NO_BBOX.pad(0.5),
+) -> None:
+    """
+    Plot observation places.
+    """
+    lon: List[float] = [
+        30.404389,
+        30.25,
+        28.932222,
+        29.263,
+        29.114167,
+        29.788611,
+        29.6675,
+    ]
+    lat: List[float] = [
+        -87.211194,
+        -88.075,
+        -89.4075,
+        -89.957,
+        -90.199167,
+        -90.420278,
+        -91.237611,
+    ]
+    stationid: List[str] = [
+        "8729840",
+        "8735180",
+        "8760922",
+        "8761724",
+        "8762075",
+        "8762482",
+        "8764044",
+    ]
+    plot_defaults()
+    try:
+        import cartopy
+        import cartopy.crs as ccrs
+
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.add_feature(cartopy.feature.COASTLINE, alpha=0.5)
+        ax.add_feature(cartopy.feature.LAKES, alpha=0.5)
+        # ax.add_feature(cartopy.feature.BORDERS, linestyle=":")
+        ax.add_feature(cartopy.feature.RIVERS)
+        ax.add_feature(cartopy.feature.STATES, linestyle=":")
+        fd = dict(transform=ccrs.PlateCarree())
+    except ImportError:
+        print("Cartopy not installed. Using default plot.")
+        fd = {}
+        ax = plt.axes()
+
+    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
+
+    for i, sid in enumerate(stationid):
+        ax.scatter(
+            lon[i], lat[i], label=sid, color=colors[i], s=100, marker="x", **fd
+        )  # color="blue"
+    ax.legend()
+    figure_name = os.path.join(FIGURE_PATH, "stationid_map.pdf")
+
+    if fd != {}:
+        ax.set_yticks(
+            [
+                x
+                for x in range(
+                    int((bbox.lat[0] // 1) + 1),
+                    int((bbox.lat[1] // 1) + 1),
+                )
+            ],
+            crs=ccrs.PlateCarree(),
+        )
+        ax.set_xticks(
+            [
+                x
+                for x in range(
+                    int((bbox.lon[0] // 1) + 1),
+                    int((bbox.lon[1] // 1) + 1),
+                )
+            ],
+            crs=ccrs.PlateCarree(),
+        )
+
+    plt.savefig(figure_name)
+    plt.close()
+    print(f"Saved figure to {figure_name}")
+
+
 if __name__ == "__main__":
     # python -m adbo.plot
     plot_diff()
     plot_many("2025")
     plot_many("2097")
+    plot_places()
