@@ -20,12 +20,12 @@ def time_to_datetime(time: int, units: str, calendar: str) -> any:
         datetime.datetime: datetime object
 
     Examples::
-        >>> time_to_datetime(7680900, "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == datetime.datetime(2004, 8, 9, 0, 0)
+        >>> time_to_datetime(7680900, "minutes since 1990-01-01T01:00:00", "proleptic_gregorian") == datetime.datetime(2004, 8, 9, 0, 0)
         True
     """
     assert (
         calendar == "proleptic_gregorian"
-        and units == "minutes since 1990-01-01T01:00:00+00:00"
+        and units == "minutes since 1990-01-01T01:00:00"
     )
     return datetime.datetime(1990, 1, 1, 1, 0, 0) + datetime.timedelta(minutes=time)
 
@@ -60,7 +60,7 @@ def str_to_time(time_str: str, units: str, calendar: str) -> int:
         int: time in minutes from 1990-01-01T01:00:00
 
     Examples::
-        >>> str_to_time("2004-08-09T00:00:00",  "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian" ) == 7680900
+        >>> str_to_time("2004-08-09T00:00:00",  "minutes since 1990-01-01T01:00:00", "proleptic_gregorian" ) == 7680900
         True
     """
     return datetime_to_time(str_to_datetime(time_str), units, calendar)
@@ -80,12 +80,12 @@ def datetime_to_time(dt: int, units: str, calendar: str) -> any:
         int: minutes since 1990-01-01T01:00:00
 
     Examples::
-        >>> datetime_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
+        >>> datetime_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00", "proleptic_gregorian") == 7680900
         True
     """
     assert (
         calendar == "proleptic_gregorian"
-        and units == "minutes since 1990-01-01T01:00:00+00:00"
+        and units == "minutes since 1990-01-01T01:00:00"
     )
     return int((dt - datetime.datetime(1990, 1, 1, 1, 0, 0)).total_seconds() / 60)
 
@@ -107,9 +107,9 @@ def unknown_to_time(
         int: time in minutes from 1990-01-01T01:00:00
 
     Examples::
-        >>> unknown_to_time("2004-08-09T00:00:00", "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
+        >>> unknown_to_time("2004-08-09T00:00:00", "minutes since 1990-01-01T01:00:00", "proleptic_gregorian") == 7680900
         True
-        >>> unknown_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00+00:00", "proleptic_gregorian") == 7680900
+        >>> unknown_to_time(datetime.datetime(2004, 8, 9, 0, 0), "minutes since 1990-01-01T01:00:00", "proleptic_gregorian") == 7680900
         True
         >>> unknown_to_time(7680900) == 7680900
         True
