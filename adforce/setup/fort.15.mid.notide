@@ -208,6 +208,6 @@ Model time is relative to UTC.
 RENCI HPC
 CF
 sdat2@cam.ac.uk
-2005-08-27 00:00:00
+2005-08-25 00:00:00
 &metControl WindDragLimit=0.0020 DragLawString='Powell' /
-&owiWindNetcdf NWS13ColdStartString='20050819.000000' NWS13GroupForPowell='2' /
+&owiWindNetcdf NWS13ColdStartString='20050825.000000' NWS13GroupForPowell='2' /
