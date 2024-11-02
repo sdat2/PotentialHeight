@@ -89,12 +89,12 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     save_config(cfg)
     print("max height at obs point: ", maxele, "m\n\n")
 
-    # from adforce.ani import plot_heights_and_winds
+    from adforce.ani import plot_heights_and_winds
 
-    # plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
+    plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
     return maxele  # not yet implemented
 
 
 if __name__ == "__main__":
-    # python -m adforce.wrap
+    # python -m adforce.wrap name=changed_calendar_wrap
     idealized_tc_observe()

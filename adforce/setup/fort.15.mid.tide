@@ -1065,14 +1065,14 @@ Q1                                       ! ALPHANUMERIC DESCRIPTION
 -1 0 1.E-7 25 0      ! ITITER, ISLDIA, CONVCR, ITMAX & ILUMP
 NCFS
 UNC-CH IMS, RENCI, SeahorseCoastal
-RENCI HPC
+Archer2 HPC
 NCFS Nowcast/Forecast
 http://www.renci.org
 Model time is relative to UTC.
-RENCI HPC
+Archer2 HPC
 CF
-jason.fleming@seahorsecoastal.com
-2014-04-29 00:00:00
+sdat2@cam.ac.uk
+2005-08-27 00:00:00
 &SWANOutputControl SWAN_OutputHS=.true., SWAN_OutputDIR=.true., SWAN_OutputTPS=.true. /
 &metControl WindDragLimit=0.0020 DragLawString='Powell' /
-&owiWindNetcdf NWS13ColdStartString='20040809.000000' NWS13GroupForPowell='3' /
+&owiWindNetcdf NWS13ColdStartString='20050819.000000' NWS13GroupForPowell='3' /
