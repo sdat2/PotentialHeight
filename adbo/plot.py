@@ -223,6 +223,10 @@ def plot_places(
 ) -> None:
     """
     Plot observation places.
+
+    Args:
+        bbox (optional, Optional[BoundingBox]): edge of bounding box.
+
     """
     lon: List[float] = [
         30.404389,
@@ -232,7 +236,7 @@ def plot_places(
         29.114167,
         29.788611,
         29.6675,
-    ]
+    ]  # Longitude in degrees North
     lat: List[float] = [
         -87.211194,
         -88.075,
@@ -241,7 +245,7 @@ def plot_places(
         -90.199167,
         -90.420278,
         -91.237611,
-    ]
+    ]  # Latitude in degrees East
     stationid: List[str] = [
         "8729840",
         "8735180",
@@ -275,8 +279,6 @@ def plot_places(
             lon[i], lat[i], label=sid, color=colors[i], s=100, marker="x", **fd
         )  # color="blue"
     ax.legend()
-    figure_name = os.path.join(FIGURE_PATH, "stationid_map.pdf")
-
     if fd != {}:
         ax.set_yticks(
             [
@@ -298,7 +300,8 @@ def plot_places(
             ],
             crs=ccrs.PlateCarree(),
         )
-
+    bbox.ax_lim(ax)
+    figure_name = os.path.join(FIGURE_PATH, "stationid_map.pdf")
     plt.savefig(figure_name)
     plt.close()
     print(f"Saved figure to {figure_name}")
@@ -306,7 +309,7 @@ def plot_places(
 
 if __name__ == "__main__":
     # python -m adbo.plot
-    plot_diff()
-    plot_many("2025")
-    plot_many("2097")
+    # plot_diff()
+    # plot_many("2025")
+    # plot_many("2097")
     plot_places()
