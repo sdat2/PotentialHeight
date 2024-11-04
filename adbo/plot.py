@@ -228,7 +228,7 @@ def plot_places(
         bbox (optional, Optional[BoundingBox]): edge of bounding box.
 
     """
-    lon: List[float] = [
+    lats: List[float] = [
         30.404389,
         30.25,
         28.932222,
@@ -236,8 +236,8 @@ def plot_places(
         29.114167,
         29.788611,
         29.6675,
-    ]  # Longitude in degrees North
-    lat: List[float] = [
+    ]  # Latitude in degrees North
+    lons: List[float] = [
         -87.211194,
         -88.075,
         -89.4075,
@@ -245,7 +245,7 @@ def plot_places(
         -90.199167,
         -90.420278,
         -91.237611,
-    ]  # Latitude in degrees East
+    ]  # Longitude in degrees East
     stationid: List[str] = [
         "8729840",
         "8735180",
@@ -275,9 +275,11 @@ def plot_places(
     colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
 
     for i, sid in enumerate(stationid):
+        print(lons[i], lats[i], sid)
         ax.scatter(
-            lon[i], lat[i], label=sid, color=colors[i], s=100, marker="x", **fd
+            lons[i], lats[i], label=sid, color=colors[i], s=100, marker="x", **fd
         )  # color="blue"
+        # print("fd", fd)
     ax.legend()
     if fd != {}:
         ax.set_yticks(
@@ -301,10 +303,13 @@ def plot_places(
             crs=ccrs.PlateCarree(),
         )
     bbox.ax_lim(ax)
+    plt.xlabel("Longitude $^\circ$E")
+    plt.ylabel("Latitude $^\circ$N")
     figure_name = os.path.join(FIGURE_PATH, "stationid_map.pdf")
     plt.savefig(figure_name)
     plt.close()
     print(f"Saved figure to {figure_name}")
+    # CESM, GFDL, GISS, MIROC, UKESM
 
 
 if __name__ == "__main__":
