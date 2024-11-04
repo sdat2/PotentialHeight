@@ -11,7 +11,7 @@ from adforce.constants import NO_BBOX
 from sithom.plot import plot_defaults, label_subplots
 from tcpips.constants import FIGURE_PATH
 from adbo.constants import EXP_PATH
-
+from adforce.mesh import xr_loader
 
 # exp_names = [
 #     "notide-" + str(stationid) + "-" + str(year) + "-midres"
@@ -220,12 +220,16 @@ if False:
 @timeit
 def plot_places(
     bbox: Optional[BoundingBox] = NO_BBOX.pad(0.5),
+    path_to_maxele: str = os.path.join(
+        EXP_PATH, "8729840-2025", "exp_0001", "maxele.63.nc"
+    ),
 ) -> None:
     """
     Plot observation places.
 
     Args:
         bbox (optional, Optional[BoundingBox]): edge of bounding box.
+        path_to_maxele (str, optional): path to maxele file. Defaults to os.path.join(EXP_PATH, "8729840-2025", "exp_0001", "maxele.63.nc").
 
     """
     lats: List[float] = [
@@ -255,6 +259,17 @@ def plot_places(
         "8762482",
         "8764044",
     ]
+
+    mele_ds = xr_loader(path_to_maxele)
+    xs = mele_ds.x.values
+    ys = mele_ds.y.values
+    for i, sid in enumerate(stationid):
+        print(lons[i], lats[i], sid)
+        distsq = (xs - lons[i]) ** 2 + (ys - lats[i]) ** 2
+        min_p = np.argmin(distsq)
+        lons[i] = xs[min_p]
+        lats[i] = ys[min_p]
+
     plot_defaults()
     try:
         import cartopy
