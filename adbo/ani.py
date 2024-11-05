@@ -3,13 +3,12 @@
 import os
 import xarray as xr
 import matplotlib.pyplot as plt
+import matplotlib
 import imageio
 from tqdm import tqdm
 from sithom.io import read_json
-from sithom.plot import plot_defaults, feature_grid
+from sithom.plot import plot_defaults, feature_grid, label_subplots
 from sithom.time import timeit
-
-import matplotlib
 
 matplotlib.use("Agg")
 
@@ -21,6 +20,7 @@ def plot_gps(
     plot_acq: bool = False,
     add_name: str = "",
     verbose: bool = False,
+    save_pdf: set = set(),
 ) -> None:
     """
     Plot GPs.
@@ -153,8 +153,12 @@ def plot_gps(
                 marker="+",
                 color="green",
             )
+        label_subplots(axs, override="outside")
+        if call_i in save_pdf:
+            figure_name = os.path.join(img_folder, f"gp_{call_i}.pdf")
+            plt.savefig(figure_name)
         plt.suptitle(
-            "Additional sample " + str(call_i),
+            "Additional sample " + str(call_i + 1),
         )
         figure_name = os.path.join(img_folder, f"gp_{call_i}.png")
         figure_names.append(figure_name)
@@ -178,7 +182,13 @@ def plot_gps(
 if __name__ == "__main__":
     # python -m adbo.ani
     plot_gps(
-        path_in="/work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2",
+        path_in="/work/n02/n02/sdat2/adcirc-swan/exp/2d-ani-new-redo-4",
         add_name="",
         plot_acq=True,
+        save_pdf={
+            0,
+            1,
+            2,
+            3,
+        },
     )

@@ -13,15 +13,8 @@ from tcpips.constants import FIGURE_PATH
 from adbo.constants import EXP_PATH
 from adforce.mesh import xr_loader
 
-# exp_names = [
-#     "notide-" + str(stationid) + "-" + str(year) + "-midres"
-#     for stationid in range(0, 6)
-#     for year in [2025, 2097]
-# ]
-# print(exp_names)
 
-
-stationid = [
+stationid: List[str] = [
     "8729840",
     "8735180",
     "8760922",
@@ -31,7 +24,7 @@ stationid = [
     "8764044",
 ]
 
-years = ["2025", "2097"]
+years: List[str] = ["2025", "2097"]
 
 
 @timeit
@@ -43,8 +36,6 @@ def plot_diff(
     Plot difference between two years.
     """
     plot_defaults()
-    # exp1_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2025")
-    # exp2_dir = os.path.join(EXP_PATH, "bo-test-2d-midres-agg-3-2097")
     exp1_dir = os.path.join(EXP_PATH, exps[0])
     exp2_dir = os.path.join(EXP_PATH, exps[1])
     paths = [os.path.join(direc, "experiments.json") for direc in [exp1_dir, exp2_dir]]
@@ -54,9 +45,6 @@ def plot_diff(
 
     exp1 = read_json(os.path.join(exp1_dir, "experiments.json"))
     exp2 = read_json(os.path.join(exp2_dir, "experiments.json"))
-    # print(exp1.keys())
-    # print(exp2.keys())
-
     _, axs = plt.subplots(4, 1, figsize=(8, 8), sharex=True)
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
@@ -99,10 +87,8 @@ def plot_diff(
             sample (float): sample number.
         """
         nonlocal axs
-        axs[0].axvline(sample, color="black", linestyle="--")
-        axs[1].axvline(sample, color="black", linestyle="--")
-        axs[2].axvline(sample, color="black", linestyle="--")
-        axs[3].axvline(sample, color="black", linestyle="--")
+        for ax in axs:
+            ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
     axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
@@ -125,6 +111,52 @@ def plot_diff(
     plt.close()
 
 
+def find_max(exp: dict) -> float:
+    """
+    Find max value in experiment.
+
+    Args:
+        exp (dict): Experiment dictionary.
+
+    Returns:
+        float: Maximum value.
+    """
+    res = [float(exp[call]["res"]) for call in exp.keys()]
+    return max(res)
+
+
+def find_difference(stationid: str) -> Tuple[float, float, float]:
+    """
+    Find difference in max value between two years.
+
+    Args:
+        stationid (int): Station ID.
+
+    Returns:
+        float: Difference in max value.
+    """
+    exp1 = read_json(os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json"))
+    exp2 = read_json(os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json"))
+    max1 = find_max(exp1)
+    max2 = find_max(exp2)
+    return max2 - max1, max1, max2
+
+
+def find_differences() -> None:
+    """Find differences in max values."""
+    diff_list = []
+    diff_percent_list = []
+    for sid in stationid:
+        diff, max1, max2 = find_difference(sid)
+        print(
+            f"{sid}, max1: {max1:.3f} m, max2: {max2:.3f} m, diff: {diff:.3f} m, {diff/max1:.3f} %"
+        )
+        diff_list.append(diff)
+        diff_percent_list.append(diff / max1)
+    print(f"Average difference: {np.mean(diff_list):.3f} m")
+    print(f"Average percentage difference: {np.mean(diff_percent_list)*100:.3f} %")
+
+
 @timeit
 def plot_many(year="2025") -> None:
     """
@@ -136,11 +168,28 @@ def plot_many(year="2025") -> None:
         i: read_json(os.path.join(EXP_PATH, i + "-" + year, "experiments.json"))
         for i in stationid
     }
-    print("exps", exps)
+    # print("exps", exps)
 
-    # print(exp2.keys())
+    _, axs = plt.subplots(4, 1, figsize=(8, 8), sharex=True)
 
-    _, axs = plt.subplots(3, 1, figsize=(8, 8), sharex=True)
+    def read_exp(
+        exp: dict, variables=("res", "displacement", "angle", "trans_speed")
+    ) -> Tuple[List[float], List[float], List[float], List[float], List[float]]:
+        """
+        Read experiment.
+
+        Args:
+            exp (dict): Experiment dictionary.
+
+        Returns:
+            Tuple[List[float], List[float], List[float], List[float]]: Calls, res, displacement, angle.
+        """
+        calls = list(exp.keys())
+        output = {}
+        for var in variables:
+            output[var] = [float(exp[call][var]) for call in calls]
+        calls = [float(call) + 1 for call in calls]
+        return calls, *tuple([output[var] for var in variables])
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
         """
@@ -153,12 +202,8 @@ def plot_many(year="2025") -> None:
             marker_size (float, optional): Defaults to 1.
         """
         nonlocal axs
-        calls = list(exp.keys())
-        res = [float(exp[call]["res"]) for call in calls]
-        displacement = [float(exp[call]["displacement"]) for call in calls]
-        angle = [float(exp[call]["angle"]) for call in calls]
-        # trans_speed = [float(exp[call]["trans_speed"]) for call in calls]
-        calls = [float(call) + 1 for call in calls]
+
+        calls, res, displacement, angle, speed = read_exp(exp)
 
         max_res = []
         maxr = -np.inf
@@ -171,18 +216,20 @@ def plot_many(year="2025") -> None:
         axs[0].plot(calls, max_res, color=color, linestyle="-", label=f"{label} max")
         axs[1].scatter(calls, displacement, label=label, color=color, s=marker_size)
         axs[2].scatter(calls, angle, label=label, color=color, s=marker_size)
+        axs[3].scatter(calls, speed, label=label, color=color, s=marker_size)
+        print(f"{label} max_res: {max_res[-1]} m")
+        print(f"{label} max_res25: {max_res[-26]} m")
         # axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
 
     def vline(sample: float) -> None:
         nonlocal axs
-        axs[0].axvline(sample, color="black", linestyle="--")
-        axs[1].axvline(sample, color="black", linestyle="--")
-        axs[2].axvline(sample, color="black", linestyle="--")
-        # axs[3].axvline(sample, color="black", linestyle="--")
+        for ax in axs:
+            ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
     axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
     axs[2].set_ylabel(r"Track Angle [$^\circ$]")
+    axs[3].set_ylabel("Translation Speed [m s$^{-1}$]")
     axs[-1].set_xlabel("Number of Samples")
     label_subplots(axs)
 
@@ -318,8 +365,8 @@ def plot_places(
             crs=ccrs.PlateCarree(),
         )
     bbox.ax_lim(ax)
-    plt.xlabel("Longitude $^\circ$E")
-    plt.ylabel("Latitude $^\circ$N")
+    plt.xlabel("Longitude [$^\circ$E]")
+    plt.ylabel("Latitude [$^\circ$N]")
     figure_name = os.path.join(FIGURE_PATH, "stationid_map.pdf")
     plt.savefig(figure_name)
     plt.close()
@@ -332,4 +379,5 @@ if __name__ == "__main__":
     # plot_diff()
     # plot_many("2025")
     # plot_many("2097")
-    plot_places()
+    # plot_places()
+    find_differences()
