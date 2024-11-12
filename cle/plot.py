@@ -115,9 +115,10 @@ def timeseries_plots_from_ds(
     """
     ds = xr.open_dataset(ds_name).sel(time=slice(2014, 2100))
     os.makedirs(folder, exist_ok=True)
-    print("ds", ds)
+    print("ds variables", [var for var in ds])
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+    ds["time"].attrs = {"long_name": "Year"}
     # ds["p0"].attrs = {"units": "Pa", "long_name": "Mean sea level pressure, $P_0$"}
     ds["sst"].attrs = {
         "units": "$^\circ$C",
@@ -127,7 +128,7 @@ def timeseries_plots_from_ds(
     ds["r0"].attrs = {"units": "m", "long_name": "Potential Size, $r_a$"}
     ds["vmax"].attrs = {
         "units": "m s$^{-1}$",
-        "long_name": "Maximum wind speed, $V_{\mathrm{max}}$",
+        "long_name": "Potential Intensity, $V_{\mathrm{max}}$",
     }
     ds["pm"].attrs = {
         "units": "Pa",
@@ -189,6 +190,10 @@ def timeseries_plots_from_ds(
         "time",
         1 / carnot_factor(ds["sst"].values + TEMP_0K, ds["t0"].values),
     )
+    ds["carnot"].attrs = {
+        "long_name": "Carnot factor, $\eta_c$",
+        "units": "dimensionless",
+    }
     axs[0].plot(ds["time"], ds["carnot"], "k")
     axs[1].plot(ds["time"], ds["vmax"], "k")
     axs[2].plot(ds["time"], ds["r0"] / 1000, "k")
