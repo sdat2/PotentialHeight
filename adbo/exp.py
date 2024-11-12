@@ -441,7 +441,6 @@ def run_bayesopt_exp(
     if run_exists(exp_name, num_runs=init_steps + daf_steps):
         print(f"Experiment {exp_name} already exists")
         return
-        # return
 
     # add existance check here
     os.makedirs(direc, exist_ok=True)

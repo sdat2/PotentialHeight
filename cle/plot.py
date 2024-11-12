@@ -113,9 +113,31 @@ def timeseries_plots_from_ds(
         ds_name (str, optional): Defaults to os.path.join(DATA_PATH, "gom_soln_new.nc").
         folder (str, optional): Output figure folder. Defaults to SUP_PATH.
     """
-    ds = xr.open_dataset(ds_name)
+    ds = xr.open_dataset(ds_name).sel(time=slice(2014, 2100))
     os.makedirs(folder, exist_ok=True)
     print("ds", ds)
+    ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
+    ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+    # ds["p0"].attrs = {"units": "Pa", "long_name": "Mean sea level pressure, $P_0$"}
+    ds["sst"].attrs = {
+        "units": "$^\circ$C",
+        "long_name": "Sea surface temperature, $T_s$",
+    }
+    ds["t0"].attrs = {"units": "K", "long_name": "Outflow temperature, $T_0$"}
+    ds["r0"].attrs = {"units": "m", "long_name": "Potential Size, $r_a$"}
+    ds["vmax"].attrs = {
+        "units": "m s$^{-1}$",
+        "long_name": "Maximum wind speed, $V_{\mathrm{max}}$",
+    }
+    ds["pm"].attrs = {
+        "units": "Pa",
+        "long_name": "Pressure at maximum winds, $p_m$",
+    }
+    ds["msl"].attrs = {
+        "units": "Pa",
+        "long_name": "Mean sea level pressure, $P_0$",
+    }
+
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     axs[0].plot(ds["time"], ds["r0"] / 1000, "k")
     axs[1].plot(ds["time"], ds["vmax"], "k")
@@ -568,6 +590,12 @@ def spatial_plot_gom() -> None:
                 axs[i, j].set_xlabel("")
             if i != 0:
                 axs[i, j].set_ylabel("")
+    ds["pm"].attrs["long_name"] = "Pressure at maximum winds, $P_m$"
+    ds["vmax"].attrs["long_name"] = "Potential intensity, $V_{\mathrm{max}}$"
+    ds["r0"].attrs["long_name"] = "Potential size, $r_a$"
+    ds["t0"].attrs["long_name"] = "Outflow temperature, $T_0$"
+    ds["sst"].attrs["long_name"] = "Sea surface temperature, $T_s$"
+    ds["msl"].attrs["long_name"] = "Mean sea level pressure, $P_0$"
     label_subplots(axs, override="outside")
     # axs[1].plot(ds["lat"], ds["vmax"], "k")
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
@@ -575,9 +603,11 @@ def spatial_plot_gom() -> None:
     print("saving to ", folder + "/spatial_gom_bbox_r0_pm_rmax.pdf")
 
     vars: List[str] = ["t", "q", "vmax", "r0", "pc", "t0"]
-    pairplot(ds.isel(p=0), vars=vars, label=True)
+    fig, axs = pairplot(ds.isel(p=0), vars=vars, label=True)
+    # label_subplots(axs)
     plt.savefig(os.path.join(folder, "spatial_gom_bbox_pairplot2.pdf"))
     plt.clf()
+    plt.close()
 
 
 @timeit
