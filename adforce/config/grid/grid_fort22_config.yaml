@@ -16,7 +16,7 @@ TC1: # tropical cylone moves with the center of the grid
   lateral_spacing: 0.0125 # 1/10 of the spacing of the main grid
   xlen: 161
   ylen: 161
-  tlen: 481
+  tlen: 673 # 7.01 days, was 481 (5.01 days)
   start: 2005-08-25T00:00:00 # 7680900
   timestep: 15 # minutes
   time_unit: minutes since 1990-01-01T01:00:00

@@ -118,7 +118,7 @@ def timeseries_plots_from_ds(
     print("ds variables", [var for var in ds])
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
-    ds["time"].attrs = {"long_name": "Year"}
+    ds["time"].attrs = {"long_name": "Year", "units": "A.D."}
     # ds["p0"].attrs = {"units": "Pa", "long_name": "Mean sea level pressure, $P_0$"}
     ds["sst"].attrs = {
         "units": "$^\circ$C",
@@ -161,6 +161,7 @@ def timeseries_plots_from_ds(
     plt.savefig(os.path.join(FIGURE_PATH, "timeseries_rmax_vmax.pdf"))
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
+    ds["year"].attrs = {"long_name": "Year", "units": "A.D."}
     vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]
     pairplot(ds, vars=vars, label=True)
     # pairplot(ds[vars].to_dataframe()[vars], label=True)
