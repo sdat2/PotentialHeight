@@ -142,14 +142,14 @@ def plot_gps(
                 angle[:num_init_data_points],
                 displacement[:num_init_data_points],
                 marker="x",
-                s=5,
+                s=35,
                 color="blue",
             )
             #
             axs.ravel()[i].scatter(
                 angle[num_init_data_points : num_init_data_points + call_i + 1],
                 displacement[num_init_data_points : num_init_data_points + call_i + 1],
-                s=5,
+                s=50,
                 marker="+",
                 color="green",
             )

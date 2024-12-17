@@ -396,7 +396,7 @@ def run_animation() -> None:
 
 
 def single_wind_and_height_step(
-    path_in: str = "/work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049",
+    path_in: str = "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
     time_i: int = 380,
     coarsen: int = 2,
     bbox: Optional[BoundingBox] = NO_BBOX,
@@ -439,7 +439,7 @@ def single_wind_and_height_step(
     f22_main_ds = f22_main_ds.coarsen(xi=coarsen, yi=coarsen, boundary="trim").mean()
 
     ckwargs = {
-        "label": "Sea Surface Height [m]",
+        "label": "Storm Surge Height [m]",
         "format": axis_formatter(),
         "extend": "neither",
         "extendrect": False,
@@ -482,7 +482,7 @@ def single_wind_and_height_step(
         shrink=0.8,  # 0.5,
         **ckwargs,
     )
-    ax.set_title("Water Height [m]")
+    ax.set_title("Storm Surge Height [m]")
     cbar.set_ticks(cbar_levels)
     cbar.set_ticklabels(["{:.1f}".format(x) for x in cbar_levels.tolist()])
     time = f63_ds.isel(time=time_i).time.values
@@ -557,7 +557,7 @@ def single_wind_and_height_step(
     # plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
     from tcpips.constants import FIGURE_PATH
 
-    figure_name = os.path.join(img_folder, add_name + f"snapshot.pdf")
+    figure_name = os.path.join(img_folder, add_name + "snapshot.pdf")
     plt.savefig(figure_name)
     plt.savefig(os.path.join(FIGURE_PATH, "2025_mid_notide_snapshot.pdf"))
 
@@ -567,7 +567,11 @@ def single_wind_and_height_step(
 if __name__ == "__main__":
     # python -m adforce.ani
     # run_animation()
-    single_wind_and_height_step(path_in=".", bbox=NO_BBOX.pad(1), coarsen=3)
+    single_wind_and_height_step(# path_in=".",
+        bbox=NO_BBOX.pad(1),
+        coarsen=3
+        )
+    # single_wind_and_height_step()
 
 # if __name__ == "__main__":
 #    drive_heights_and_winds()
@@ -588,4 +592,4 @@ if __name__ == "__main__":
 
 # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d --step_size 10 --coarsen 2
 # python -m adforce.ani --path_in . --step_size 10 --coarsen 2
-# python -m adforce.ani --path_in . --step_size 1 --winds
+# python -m adforce.ani --path_in /work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025 --step_size 10 --winds --coarsen 2
