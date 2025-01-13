@@ -239,7 +239,7 @@ def plot_ex(
         color_true (str): Color of original GEV.
         color_max_known (str): Color of known upper bound GEV.
         color_max_unknown (str): Color of unknown upper bound GEV.
-        ax (_type_, optional): Axes. Defaults to None.
+        ax (matplotlib.axes.Axes, optional): Axes. Defaults to None.
         fig_path (str, optional): Figure path to save to. Defaults to os.path.join(FIGURE_PATH, "evt_fit_ex_tens.pdf").
     """
     plot_individually = False

@@ -133,3 +133,30 @@ def plot_sample_points(
     )
     ax.set_ylabel("Return Value (RV) $v$ [m]")
     ax.set_xlabel("Return Period (RP) $p$ [years]")
+
+
+def retry_wrapper(max_retries: int = 10) -> callable:
+    """Retry wrapper. If a function fails flakeily, then wrap with this to retry it a few times.
+
+    Puts the function in a try except block and retries it a `max_retries` times if unsuccesful.
+
+    Args:
+        max_retries (int, optional): Number of retries. Defaults to 10.
+
+    Returns:
+        callable: Wrapper function to recall the function in case of failure.
+    """
+
+    def retry_decorator(func: callable) -> callable:
+        def wrapper(*args, **kwargs) -> any:
+            for i in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    print("Exception: ", e)
+                    print(f"Retrying {func.__name__} {i+1}/{max_retries}")
+            raise Exception(f"Max retries exceeded for function {func.__name__}")
+
+        return wrapper
+
+    return retry_decorator

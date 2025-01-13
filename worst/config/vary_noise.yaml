@@ -1,0 +1,30 @@
+z_star: 7 # m
+z_star_sigma:
+  min: 0 # m
+  max: 3 # m
+  steps: 20
+beta: 1 # m
+gamma: -0.2
+ns: 50 # number of samples
+seed_steps_Nr: 20 #600 # resamples
+quantiles: # 1 in 100 year and 1 in 500 year quantiles
+  - 0.01
+  - 0.002
+color_true: black
+color_max_known: '#1f77b4'
+color_max_unknown: '#d95f02'
+fit: # settings for the fitting
+  # initial values for the parameters for fit
+  alpha_guess: 0.0
+  beta_guess: 1.0
+  gamma_guess: -0.1
+  # adam optimizer settings
+  steps: 1000
+  lr: 0.01
+  # other settings
+  force_weibull: false # for the upper bound not known fit only
+reload: true # whether to just reload the data if it exists
+figure:
+  lp: 0.05 # lower percentile to plot
+  up: 0.95 # upper percentile to plot
+verbose: false # whether to print out the progress of fitting

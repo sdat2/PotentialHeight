@@ -64,7 +64,7 @@ setup(
         "chavas15": "chavas15",  # Calculate the Chavas, Lin and Emanuel (2015) profile
         "cle": "cle",  # Calculate the Chavas, Lin and Emanuel (2015) profile
         "adforce": "adforce",  # All of the interfacing with ADCIRC
-        "adbo": "adbo",  # all of the tensorflow/trieste stuff
+        "adbo": "adbo",  # All of the tensorflow/trieste stuff
         "worst": "worst",  # Extreme value theory using the upper bound limit
     },
 )
