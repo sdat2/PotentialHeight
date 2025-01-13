@@ -73,7 +73,7 @@ def try_fit(
         verbose=config.verbose,
     )
     ubk_q = genextreme.isf(quantiles, c=-bg_gamma, loc=bg_alpha, scale=bg_beta)
-    results = np.array([ubk_q])
+    results = np.array(ubk_q)
     return xr.Dataset(
         data_vars={
             "rv": (
@@ -81,11 +81,12 @@ def try_fit(
                 np.expand_dims(
                     np.expand_dims(
                         np.expand_dims(
-                            np.expand_dims(np.expand_dims(results, 0), -1), -1
+                            np.expand_dims(np.expand_dims(results, 0), -1)  # seed
+                            - 1  # beta,
                         ),
-                        -1,
+                        -1,  # gamma
                     ),
-                    -1,
+                    -1,  # z_star_sigma
                 ),
                 {"units": "m"},
             )
@@ -123,7 +124,7 @@ def _name_base(config: DictConfig) -> str:
     Returns:
         str: Unique name based on the configuration.
     """
-    return f"z_star_{config.z_star:.2f}_ns_{config.ns}_Nr_{config.seed_steps_Nr}_gamma_{config.gamma:.2f}_beta_{config.beta:.2f}_z_star_sigma_{config.z_star_sigma.min:.2f}_{config.z_star_sigma.max:.2f}_{config.z_star_sigma_steps:.2f}"
+    return f"z_star_{config.z_star:.2f}_ns_{config.ns}_Nr_{config.seed_steps_Nr}_gamma_{config.gamma:.2f}_beta_{config.beta:.2f}_z_star_sigma_{config.z_star_sigma.min:.2f}_{config.z_star_sigma.max:.2f}_{config.z_star_sigma.steps}"
 
 
 def get_fit_da(config: DictConfig) -> xr.DataArray:

@@ -1,6 +1,6 @@
 """Plot results from adcirc bayesian optimization experiments."""
 
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,6 +23,34 @@ stationid: List[str] = [
     "8762482",
     "8764044",
 ]
+
+"""
+ds = xr.open_dataset("/work/n02/n02/sdat2/adcirc-swan/adcirc-emulation/data/katrina_tides.nc")
+name_d = {}
+for stationid in ds.stationid.values:
+    dss = ds.sel(stationid=stationid)
+    name_d[stationid] = f"{dss.name.values} ({dss.lon.values:.3f}, {dss.lat.values:.3f})
+"""
+stationid_to_names: Dict[str, str] = {
+    "8729840": "Pensacola (-87.211, 30.404)",
+    "8735180": "Dauphin Island (-88.075, 30.250)",
+    "8760922": "Pilots Station East, S.W. Pass (-89.407, 28.932)",
+    "8761724": "Grand Isle (-89.957, 29.263)",
+    "8762075": "Port Fourchon, Belle Pass (-90.199, 29.114)",
+    "8762482": "West Bank 1, Bayou Gauche (-90.420, 29.789)",
+    "8764044": "Berwick, Atchafalaya River (-91.238, 29.668)",
+}
+stationid_to_names = {}
+import xarray as xr
+
+ds = xr.open_dataset(
+    "/work/n02/n02/sdat2/adcirc-swan/adcirc-emulation/data/katrina_tides.nc"
+)
+name_d = {}
+for sid in ds.stationid.values:
+    dss = ds.sel(stationid=sid)
+    name_d[sid] = f"{dss.name.values}"  # ({dss.lon.values:.3f}, {dss.lat.values:.3f})"
+stationid_to_names = name_d
 
 years: List[str] = ["2025", "2097"]
 
@@ -149,7 +177,7 @@ def find_differences() -> None:
     for sid in stationid:
         diff, max1, max2 = find_difference(sid)
         print(
-            f"{sid}, max1: {max1:.3f} m, max2: {max2:.3f} m, diff: {diff:.3f} m, {diff/max1:.3f} %"
+            f"{stationid_to_names[sid]}, max1: {max1:.3f} m, max2: {max2:.3f} m, diff: {diff:.3f} m, {diff/max1:.3f} %"
         )
         diff_list.append(diff)
         diff_percent_list.append(diff / max1)
@@ -212,11 +240,23 @@ def plot_many(year="2025") -> None:
                 maxr = r
             max_res.append(maxr)
 
-        axs[0].scatter(calls, res, label=label, color=color, s=marker_size)
+        axs[0].scatter(
+            calls, res, label=stationid_to_names[label], color=color, s=marker_size
+        )
         axs[0].plot(calls, max_res, color=color, linestyle="-", label=f"{label} max")
-        axs[1].scatter(calls, displacement, label=label, color=color, s=marker_size)
-        axs[2].scatter(calls, angle, label=label, color=color, s=marker_size)
-        axs[3].scatter(calls, speed, label=label, color=color, s=marker_size)
+        axs[1].scatter(
+            calls,
+            displacement,
+            label=stationid_to_names[label],
+            color=color,
+            s=marker_size,
+        )
+        axs[2].scatter(
+            calls, angle, label=stationid_to_names[label], color=color, s=marker_size
+        )
+        axs[3].scatter(
+            calls, speed, label=stationid_to_names[label], color=color, s=marker_size
+        )
         print(f"{label} max_res: {max_res[-1]} m")
         print(f"{label} max_res25: {max_res[-26]} m")
         # axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
@@ -339,7 +379,13 @@ def plot_places(
     for i, sid in enumerate(stationid):
         print(lons[i], lats[i], sid)
         ax.scatter(
-            lons[i], lats[i], label=sid, color=colors[i], s=100, marker="x", **fd
+            lons[i],
+            lats[i],
+            label=stationid_to_names[sid],
+            color=colors[i],
+            s=100,
+            marker="x",
+            **fd,
         )  # color="blue"
         # print("fd", fd)
     ax.legend()
@@ -377,7 +423,19 @@ def plot_places(
 if __name__ == "__main__":
     # python -m adbo.plot
     # plot_diff()
-    # plot_many("2025")
-    # plot_many("2097")
-    # plot_places()
+    plot_many("2025")
+    plot_many("2097")
+    plot_places()
     find_differences()
+
+"""
+Pensacola (-87.211, 30.404), max1: 4.191 m, max2: 4.772 m, diff: 0.581 m, 0.139 %
+Dauphin Island (-88.075, 30.250), max1: 3.567 m, max2: 3.946 m, diff: 0.379 m, 0.106 %
+Pilots Station East, S.W. Pass (-89.407, 28.932), max1: 1.879 m, max2: 2.420 m, diff: 0.541 m, 0.288 %
+Grand Isle (-89.957, 29.263), max1: 5.886 m, max2: 7.141 m, diff: 1.255 m, 0.213 %
+Port Fourchon, Belle Pass (-90.199, 29.114), max1: 4.903 m, max2: 5.274 m, diff: 0.371 m, 0.076 %
+West Bank 1, Bayou Gauche (-90.420, 29.789), max1: 11.694 m, max2: 12.714 m, diff: 1.020 m, 0.087 %
+Berwick, Atchafalaya River (-91.238, 29.668), max1: 9.911 m, max2: 11.102 m, diff: 1.192 m, 0.120 %
+Average difference: 0.763 m
+Average percentage difference: 14.708 %
+"""
