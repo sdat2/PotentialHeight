@@ -319,20 +319,18 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
         ratio.z_star_sigma,
         ratio.isel(rp=0).values.ravel(),
         color="blue",
-        label="1 in " + int(1 / config.quantiles[0]) + " years",
+        label="1 in " + str(int(1 / config.quantiles[0])) + " years",
     )
     plt.plot(
         ratio.z_star_sigma,
         ratio.isel(rp=1).values.ravel(),
         color="red",
-        label="1 in " + int(1 / config.quantiles[1]) + " years",
+        label="1 in " + str(int(1 / config.quantiles[1])) + " years",
     )
     plt.legend()
-    plt.xlabel(
-        r"Standard deviation of ``measured'' upper bound, $\sigma_{\hat{z}*}$ [m]"
-    )
+    plt.xlabel(r"Standard deviation of 'measured' upper bound, $\sigma_{\hat{z}*}$ [m]")
     plt.ylabel(
-        r"Ratio of 5-95\% envelopes, $\frac{r_{\mathrm{upper bound unknown}}}{\sigma_{\mathrm{upper bound known}}}$ [dimensionless]"
+        r"Ratio of 5-95\% envelopes, $\frac{r_{\mathrm{upper\; bound\; unknown}}}{\sigma_{\mathrm{upper\; bound\; known}}}$"  # [dimensionless]"
     )
     plt.xlim(config.z_star_sigma.min, config.z_star_sigma.max)
     plt.savefig(os.path.join(FIGURE_PATH, "vary_" + _name_base(config) + ".pdf"))

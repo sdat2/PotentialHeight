@@ -1,18 +1,15 @@
 z_star: 7 # m
 z_star_sigma:
   min: 0 # m
-  max: 3 # m
-  steps: 20
+  max: 5 # m
+  steps: 30
 beta: 1 # m
 gamma: -0.2
 ns: 50 # number of samples
-seed_steps_Nr: 20 #600 # resamples
+seed_steps_Nr: 600 # resamples
 quantiles: # 1 in 100 year and 1 in 500 year quantiles
   - 0.01
   - 0.002
-color_true: black
-color_max_known: '#1f77b4'
-color_max_unknown: '#d95f02'
 fit: # settings for the fitting
   # initial values for the parameters for fit
   alpha_guess: 0.0
