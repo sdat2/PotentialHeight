@@ -1,6 +1,10 @@
-"""Vary noise of the upper bound, see how big the noise has to get before its no longer valuable."""
+"""Vary noise of the upper bound, see how big the noise has to get before its no longer valuable.
 
-from typing import List, Tuple, Optional
+We want to see what would happen if our method of determining the potential height is inaccurate, and so there is some random noise. Surely the information about the upper bound becomes less valuable as it becomes less certain. We choose one value of scale (beta), shape (gamma) and assymptote (z_star) for the GEV we are sampling, with a fixed sample size, n_s. Then we follow two ways of fitting the GEV b: one where we directly fit beta, gamma, and z_star by minimizing the negative log likelihood (upper bound unknown). The other by fitting beta and gamma while assuming a value of the upper bound (upper bound known). In this second fitting method we assume that our calculation of the upper bound is the true value with some Gaussian error added on whose standard deviation sigma_{z_star} is varied. For each resample we select a sample of n_s, and we also select a new calculated value of \hat{z_star} to assume for the second fitting method. As before we resample the true GEV distribution N_r=600 times, repeating this for each value of sigma_{z_star}.
+
+"""
+
+from typing import List
 import os
 import numpy as np
 import xarray as xr
