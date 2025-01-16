@@ -15,8 +15,6 @@ from sithom.plot import plot_defaults, label_subplots, get_dim
 from sithom.time import timeit
 from .utils import (
     alpha_from_z_star_beta_gamma,
-    plot_rp,
-    plot_sample_points,
     retry_wrapper,
 )
 from .tens import (
@@ -286,8 +284,8 @@ def process_noise(config: DictConfig, da: xr.DataArray) -> xr.Dataset:
     upper_p = upper_p.drop_vars("quantile")
     range_p = upper_p - lower_p
     da_d = {
-        "mean": da.mean("seed"),
-        "std": da.std("seed"),
+        "mn": da.mean("seed"),
+        "sd": da.std("seed"),
         "lower_p": lower_p,
         "upper_p": upper_p,
         "range_p": range_p,
@@ -299,6 +297,47 @@ def process_noise(config: DictConfig, da: xr.DataArray) -> xr.Dataset:
     return xr.merge(da_l)
 
 
+def true_ds(config: DictConfig) -> xr.Dataset:
+    """True dataset.
+
+    Args:
+        config (DictConfig): includes parameters of GEV.
+
+    Returns:
+        xr.Dataset
+    """
+    return xr.Dataset(
+        data_vars={
+            "true": (
+                ("rp", "beta", "gamma"),
+                np.expand_dims(
+                    np.expand_dims(
+                        genextreme.isf(
+                            list(config.quantiles),
+                            c=-config.gamma,
+                            loc=alpha_from_z_star_beta_gamma(
+                                config.z_star, config.beta, config.gamma
+                            ),
+                            scale=config.beta,
+                        ),
+                        -1,
+                    ),
+                    -1,
+                ),
+            ),
+        },
+        coords={
+            "rp": (
+                ("rp"),
+                [int(1 / q) for q in config.quantiles],
+                {"units": "years", "long_name": "Return period"},
+            ),
+            "gamma": (("gamma"), [config.gamma]),
+            "beta": (("beta"), [config.beta]),
+        },
+    )
+
+
 def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
     """
     Plot fit ds.
@@ -307,6 +346,9 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
         config (DictConfig): Config.
         ds (xr.Dataset): Dataset.
     """
+    # work out true return periods
+    true_rp = true_ds(config)
+
     print(config, ds)
     print("ubu", ds["ubu"])
     ubu = process_noise(config, ds["ubu"])
@@ -315,24 +357,88 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
     print("ubu", ubu, "\n\nubk", ubk)
     ratio = ubu["range_p"] / ubk["range_p"]
     plot_defaults()
-    plt.plot(
+
+    # setup figure
+    _, axs = plt.subplots(
+        3,
+        1,
+        height_ratios=[1, 1, 1],
+        figsize=get_dim(ratio=0.6180339887498949 * 2),
+        sharex=True,
+    )
+
+    # intitial plots
+    for irp in (0, 1):
+        axs[irp].set_ylabel("1 in " + str(int(1 / config.quantiles[irp])) + " years")
+        axs[irp].hlines(
+            true_rp.isel(rp=irp).values,
+            config.z_star_sigma.min,
+            config.z_star_sigma.max,
+            color=config.color.true,
+        )
+        iubu = ubu.isel(rp=irp)
+        iubk = ubk.isel(rp=irp)
+        axs[irp].fill_between(
+            ratio.z_star_sigma,
+            iubu.lower_p.values.ravel(),
+            iubu.upper_p.values.ravel(),
+            alpha=0.2,
+            color=config.color.max_unknown,
+            linestyle="-",
+        )
+        axs[irp].fill_between(
+            ratio.z_star_sigma,
+            iubk.lower_p.values.ravel(),
+            iubk.upper_p.values.ravel(),
+            alpha=0.2,
+            color=config.color.max_known,
+            linestyle="-",
+        )
+        axs[irp].plot(
+            ratio.z_star_sigma,
+            ubk.mn.values,
+            color=config.color.max_known,
+            linewidth=1,
+            label="Max known GEV",
+        )
+        axs[irp].plot(
+            ratio.z_star_sigma,
+            ubu.mn.values,
+            color=config.color.max_known,
+            linewidth=1,
+            label="Unbounded GEV",
+        )
+
+    axs[0].legend()
+
+    axs[2].plot(
         ratio.z_star_sigma,
         ratio.isel(rp=0).values.ravel(),
         color="blue",
         label="1 in " + str(int(1 / config.quantiles[0])) + " years",
     )
-    plt.plot(
+    axs[2].plot(
         ratio.z_star_sigma,
         ratio.isel(rp=1).values.ravel(),
         color="red",
-        label="1 in " + str(int(1 / config.quantiles[1])) + " years",
+        label="1 in " + str(int(1 / config.quantiles[1])) + " year RV",
     )
-    plt.legend()
-    plt.xlabel(r"Standard deviation of 'measured' upper bound, $\sigma_{\hat{z}*}$ [m]")
-    plt.ylabel(
-        r"Ratio of 5-95\% envelopes, $\frac{r_{\mathrm{upper\; bound\; unknown}}}{\sigma_{\mathrm{upper\; bound\; known}}}$"  # [dimensionless]"
+    axs[2].legend()
+    axs[2].set_xlabel(
+        r"Standard deviation of calculated upper bound, $\sigma_{\hat{z}*}$ [m]"
+    )
+    axs[2].set_ylabel(
+        r"Ratio of 5%-95% envelopes, $\frac{r_{\mathrm{upper\; bound\; unknown}}}{r_{\mathrm{upper\; bound\; known}}}$"  # [dimensionless]"
+    )
+    axs[2].hlines(
+        1,
+        config.z_star_sigma.min,
+        config.z_star_sigma.max,
+        color="grey",
+        linestyles="dashed",
     )
     plt.xlim(config.z_star_sigma.min, config.z_star_sigma.max)
+    label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "vary_" + _name_base(config) + ".pdf"))
 
 
