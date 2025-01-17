@@ -2,9 +2,9 @@
 
 We want to see what would happen if our method of determining the potential height is inaccurate, and so there is some random noise. Surely the information about the upper bound becomes less valuable as it becomes less certain. We choose one value of scale (beta), shape (gamma) and assymptote (z_star) for the GEV we are sampling, with a fixed sample size, n_s. Then we follow two ways of fitting the GEV b: one where we directly fit beta, gamma, and z_star by minimizing the negative log likelihood (upper bound unknown). The other by fitting beta and gamma while assuming a value of the upper bound (upper bound known). In this second fitting method we assume that our calculation of the upper bound is the true value with some Gaussian error added on whose standard deviation sigma_{z_star} is varied. For each resample we select a sample of n_s, and we also select a new calculated value of \hat{z_star} to assume for the second fitting method. As before we resample the true GEV distribution N_r=600 times, repeating this for each value of sigma_{z_star}. In the case where \hat{z_star} is smaller than the maximum of the datapoints, we replace \hat{z_star} with max(\vec{z}), as the fit would otherwise be impossible. This is equivalent to calculating the potential height, but then replacing this with the highest observation if an observation has occured.
 
-The first two figure panels show the mean and the 5%-95% envelopes for the ()
+The first two figure panels show the mean and the 5%-95% envelopes for the 1 in 100 and 1 in 500 year return values (RV) for fitting methods (I) and (II), as we change the standard deviation in the calculated upper bound z_star_sigma for method (I). As shown in the two panels, an estimate of the upper bound (I) reduces the bias in the mean estimate, leads to a smaller 5%-95% envelope. As z_star_sigma progresses from 0~m to 5~m (where the scale is 1~m), the range of (I) approaches (II). To show this quantitatively, in panel (c) we can see that the ratio between the 5%-95% confidence envelopees begins larger for the 1 in 500 year events than the 1 in 100 year events, as knowing the upper bound has a larger effect on our estimation of longer return period return values as before. Both converge towards one as the standard deviation in the calculated upper bound increases and the information becomes less informative. This might be surprising because it suggests that knowing the upper bound in this set up, even with a large standard deviation, improves the return value estimate. This could be because if the calculated upper bound is too low, then it is likely to be replaced by the maximum of the samples, and if it is too high, then the shape and scale parameters can change to compensate and achieve good long period RV, but this could be studied further.
 
-
+Overall, this suggests that even with a moderate uncertainty in the potential height of the storm surge, we could expect it to improve relevant risk estimates. Therefore, we argue that we have shown that calculating the potential height could usefully augment observations.
 
 """
 
@@ -44,7 +44,7 @@ def try_fit_upperbound(
     config: DictConfig,
     quantiles: List[float] = [1 / 100, 1 / 500],
 ) -> xr.Dataset:
-    """Try fitting the data for the upperbound known with error.
+    """Try fitting the data for the upperbound known with error (fit type (I)).
 
     Presumably at higher noises its better to not know the upper bound that it is to know it.
 
@@ -131,7 +131,7 @@ def try_fit_no_upperbound(
     quantiles: List[float] = [1 / 100, 1 / 500],
 ) -> xr.Dataset:
     """
-    Try fit no upperbound.
+    Try fit no upperbound (fit type (II)).
 
     Args:
         z_star (float): z_star mean (true value).
