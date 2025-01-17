@@ -26,6 +26,6 @@ figure:
   up: 0.95 # upper percentile to plot
 verbose: false # whether to print out the progress of fitting
 color: 
-  true: black
+  true_gev: black
   max_known: '#1f77b4'
   max_unknown: '#d95f02'

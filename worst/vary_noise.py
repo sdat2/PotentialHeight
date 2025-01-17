@@ -1,6 +1,10 @@
 """Vary noise of the upper bound, see how big the noise has to get before its no longer valuable.
 
-We want to see what would happen if our method of determining the potential height is inaccurate, and so there is some random noise. Surely the information about the upper bound becomes less valuable as it becomes less certain. We choose one value of scale (beta), shape (gamma) and assymptote (z_star) for the GEV we are sampling, with a fixed sample size, n_s. Then we follow two ways of fitting the GEV b: one where we directly fit beta, gamma, and z_star by minimizing the negative log likelihood (upper bound unknown). The other by fitting beta and gamma while assuming a value of the upper bound (upper bound known). In this second fitting method we assume that our calculation of the upper bound is the true value with some Gaussian error added on whose standard deviation sigma_{z_star} is varied. For each resample we select a sample of n_s, and we also select a new calculated value of \hat{z_star} to assume for the second fitting method. As before we resample the true GEV distribution N_r=600 times, repeating this for each value of sigma_{z_star}.
+We want to see what would happen if our method of determining the potential height is inaccurate, and so there is some random noise. Surely the information about the upper bound becomes less valuable as it becomes less certain. We choose one value of scale (beta), shape (gamma) and assymptote (z_star) for the GEV we are sampling, with a fixed sample size, n_s. Then we follow two ways of fitting the GEV b: one where we directly fit beta, gamma, and z_star by minimizing the negative log likelihood (upper bound unknown). The other by fitting beta and gamma while assuming a value of the upper bound (upper bound known). In this second fitting method we assume that our calculation of the upper bound is the true value with some Gaussian error added on whose standard deviation sigma_{z_star} is varied. For each resample we select a sample of n_s, and we also select a new calculated value of \hat{z_star} to assume for the second fitting method. As before we resample the true GEV distribution N_r=600 times, repeating this for each value of sigma_{z_star}. In the case where \hat{z_star} is smaller than the maximum of the datapoints, we replace \hat{z_star} with max(\vec{z}), as the fit would otherwise be impossible. This is equivalent to calculating the potential height, but then replacing this with the highest observation if an observation has occured.
+
+The first two figure panels show the mean and the 5%-95% envelopes for the ()
+
+
 
 """
 
@@ -10,7 +14,6 @@ import numpy as np
 import xarray as xr
 import hydra
 from omegaconf import DictConfig
-import matplotlib
 import matplotlib.pyplot as plt
 from scipy.stats import genextreme
 from tcpips.constants import DATA_PATH, FIGURE_PATH
@@ -280,7 +283,7 @@ def process_noise(config: DictConfig, da: xr.DataArray) -> xr.Dataset:
         da (xr.DataArray): dataarray
 
     Returns:
-        xr.Dataset:
+        xr.Dataset: dataset with mean, standard deviation etc.
     """
     lower_p = da.quantile(config.figure.lp, dim="seed")
     upper_p = da.quantile(config.figure.up, dim="seed")
@@ -366,29 +369,22 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
     _, axs = plt.subplots(
         3,
         1,
-        height_ratios=[1, 1, 1],
+        height_ratios=[0.35, 0.35, 1],
         figsize=get_dim(ratio=0.6180339887498949 * 2),
         sharex=True,
     )
 
     # intitial plots
     for irp in (0, 1):
-        axs[irp].set_ylabel("1 in " + str(int(1 / config.quantiles[irp])) + " years")
-        axs[irp].hlines(
-            true_rp.isel(rp=irp).values,
-            config.z_star_sigma.min,
-            config.z_star_sigma.max,
-            color=config.color.true,
-        )
+        axs[irp].set_ylabel("" + str(int(1 / config.quantiles[irp])) + " year RV [m]")
         iubu = ubu.isel(rp=irp)
         iubk = ubk.isel(rp=irp)
-        axs[irp].fill_between(
+        axs[irp].plot(
             ratio.z_star_sigma,
-            iubu.lower_p.values.ravel(),
-            iubu.upper_p.values.ravel(),
-            alpha=0.2,
-            color=config.color.max_unknown,
-            linestyle="-",
+            iubk.mn.values.ravel(),
+            color=config.color.max_known,
+            linewidth=1,
+            label="Max known GEV (I) mean",
         )
         axs[irp].fill_between(
             ratio.z_star_sigma,
@@ -397,29 +393,44 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
             alpha=0.2,
             color=config.color.max_known,
             linestyle="-",
+            label=r"(I) 5%-95% envelope",
+        )
+        axs[irp].hlines(
+            float(true_rp.isel(rp=irp).true.values.ravel()),
+            config.z_star_sigma.min,
+            config.z_star_sigma.max,
+            color=config.color.true_gev,
+            label="Original GEV",
         )
         axs[irp].plot(
             ratio.z_star_sigma,
-            ubk.mn.values,
-            color=config.color.max_known,
+            iubu.mn.values.ravel().tolist() * len(ratio.z_star_sigma),
+            color=config.color.max_unknown,
             linewidth=1,
-            label="Max known GEV",
+            label="Unbounded GEV (II) mean",
         )
-        axs[irp].plot(
+        axs[irp].fill_between(
             ratio.z_star_sigma,
-            ubu.mn.values,
-            color=config.color.max_known,
-            linewidth=1,
-            label="Unbounded GEV",
+            iubu.lower_p.values.ravel().tolist() * len(ratio.z_star_sigma),
+            iubu.upper_p.values.ravel().tolist() * len(ratio.z_star_sigma),
+            alpha=0.2,
+            color=config.color.max_unknown,
+            label=r"(II) 5%-95% envelope",
+            linestyle="-",
         )
 
-    axs[0].legend()
+    axs[0].legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.05),
+        # fancybox=True,
+        ncol=2,
+    )
 
     axs[2].plot(
         ratio.z_star_sigma,
         ratio.isel(rp=0).values.ravel(),
         color="blue",
-        label="1 in " + str(int(1 / config.quantiles[0])) + " years",
+        label="1 in " + str(int(1 / config.quantiles[0])) + " year RV",
     )
     axs[2].plot(
         ratio.z_star_sigma,
@@ -432,7 +443,7 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
         r"Standard deviation of calculated upper bound, $\sigma_{\hat{z}*}$ [m]"
     )
     axs[2].set_ylabel(
-        r"Ratio of 5%-95% envelopes, $\frac{r_{\mathrm{upper\; bound\; unknown}}}{r_{\mathrm{upper\; bound\; known}}}$"  # [dimensionless]"
+        r"Ratio of 5%-95% envelopes, $\frac{r_{II}}{r_{\mathrm{I}}}$"  # [dimensionless]"
     )
     axs[2].hlines(
         1,
@@ -442,8 +453,8 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
         linestyles="dashed",
     )
     plt.xlim(config.z_star_sigma.min, config.z_star_sigma.max)
-    label_subplots(axs)
-    plt.savefig(os.path.join(FIGURE_PATH, "vary_" + _name_base(config) + ".pdf"))
+    label_subplots(axs, override="outside")
+    plt.savefig(os.path.join(FIGURE_PATH, "vary_z_star_sigma.pdf"))
 
 
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_noise")
