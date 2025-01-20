@@ -574,6 +574,8 @@ if __name__ == "__main__":
     # print(pairs)
     investigate_cmip6_pairs()
 
+    # I think CESM2.r4i1p1f1.ssp585 is looking ok
+
     # print(gom_combined_inout_timestep_cmip6())
 
     # plot_diffs()

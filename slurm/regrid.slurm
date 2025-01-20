@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=data-processing
+#SBATCH --job-name=data-processing-regrid-test
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -31,5 +31,15 @@ micromamba activate t1
 echo "which python"
 which python
 
-python -m tcpips.regrid
+mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
+export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
+# single bit test:
+python -c "from tcpips.regrid import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r4i1p1f1')"
+
+python -c "from tcpips.regrid import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r4i1p1f1')"
+
+
+# python -m tcpips.regrid
+# ls -lash ../data/cmip6/regridded
+# du -h --max-depth=1 ../data/cmip6/regridded

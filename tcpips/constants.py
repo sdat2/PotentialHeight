@@ -50,8 +50,8 @@ QUARTERS: List[str] = [  # 3-letter quarter names Q1, Q2, Q3, Q4
     "OND",
 ]
 
-# Directories for CMIP6 data processing steps
-CMIP6_PATH: str = os.path.join(DATA_PATH, "cmip6")
+# Directories for CMIP6 data processing steps: make them ahead of time.
+CMIP6_PATH: str = os.path.join(DATA_PATH, "cmip6")  # main data folder
 os.makedirs(CMIP6_PATH, exist_ok=True)
 RAW_PATH: str = os.path.join(CMIP6_PATH, "raw")  # download data here
 os.makedirs(RAW_PATH, exist_ok=True)
@@ -61,9 +61,9 @@ BIAS_CORRECTED_PATH = os.path.join(
     CMIP6_PATH, "bias_corrected"
 )  # bias corrected data here
 os.makedirs(BIAS_CORRECTED_PATH, exist_ok=True)
-PI_PATH: str = os.path.join(DATA_PATH, "pi")  # pi no bias correction before
+PI_PATH: str = os.path.join(CMIP6_PATH, "pi")  # pi no bias correction before
 os.makedirs(PI_PATH, exist_ok=True)
-BC_PI_PATH: str = os.path.join(DATA_PATH, "bc_pi")
+BC_PI_PATH: str = os.path.join(CMIP6_PATH, "bc_pi")
 os.makedirs(BC_PI_PATH, exist_ok=True)
 
 # Constants for converting CMIP6 variables to PI input variables

@@ -92,6 +92,7 @@ def regrid_cmip6_part(
         member (str, optional): Member name. Defaults to "r4i1p1f1".
 
     """
+    print(f"exp:{exp} typ:{typ} model:{model} member:{member}")
     plot_defaults()
 
     @timeit
@@ -118,21 +119,21 @@ def regrid_cmip6_part(
                     "member_id",
                 ]
                 if x in ds
-            ]
-        )
-        return ds.chunk(chunks={"time": time_chunk})
+            ]  ## REDUCING time for exp
+        ).isel(time=slice(0, 12))
+        return ds  # .chunk(chunks={"time": time_chunk})
 
     in_ds = open_ds(
         os.path.join(RAW_PATH, exp, typ, model, member) + ".nc"
     )  # .isel(time=slice(0, 10))
-    print("in_ds", in_ds)
+    print("input dataset", in_ds)
     # atmos_ds = open_ds(os.path.join(RAW_PATH, "ssp585", "atmos", "CESM2", 'r4i1p1f1.nc'))
 
     new_coords = xe.util.grid_global(
         output_res, output_res
     )  # make a regular lat/lon grid
 
-    print("new_coords", new_coords)
+    print("new coordinates", new_coords)
 
     @timeit
     def regrid_and_save(input_ds: xr.Dataset, output_name: str) -> xr.Dataset:
