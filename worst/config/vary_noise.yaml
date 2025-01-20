@@ -1,8 +1,8 @@
 z_star: 7 # m
 z_star_sigma:
   min: 0 # m
-  max: 5 # m
-  steps: 30
+  max: 10 # m
+  steps: 60
 beta: 1 # m
 gamma: -0.2
 ns: 50 # number of samples
@@ -25,7 +25,7 @@ figure:
   lp: 0.05 # lower percentile to plot
   up: 0.95 # upper percentile to plot
 verbose: false # whether to print out the progress of fitting
-color: 
+color:
   true_gev: black
   max_known: '#1f77b4'
   max_unknown: '#d95f02'
