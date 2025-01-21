@@ -1,7 +1,13 @@
 import os
 from typing import Dict
+import xarray as xr
+from dask.diagnostics import ProgressBar
 from sithom.misc import human_readable_size
+from sithom.time import timeit
 from tcpips.constants import REGRIDDED_PATH, PI_PATH
+from tcpips.files import locker
+from tcpips.convert import convert
+from tcpips.pi import calculate_pi
 
 
 def find_atmos_ocean_pairs() -> Dict[str, Dict[str, any]]:
@@ -84,5 +90,65 @@ def investigate_cmip6_pairs() -> None:
             )
 
 
+@timeit
+@locker(PI_PATH)
+def pi_cmip6_part(
+    exp: str = "ssp585",
+    model: str = "CESM2",
+    member: str = "r4i1p1f1",
+    time_chunk: int = 1,
+):
+    print(f"exp:{exp} model:{model} member:{member}")
+
+    @timeit
+    def open_ds(path: str) -> xr.Dataset:
+        """
+        Open dataset.
+
+        Args:
+            path (str): path to the dataset.
+
+        Returns:
+            xr.Dataset: xarray dataset.
+        """
+        nonlocal time_chunk
+        # open netcdf4 file using dask backend
+        ds = xr.open_dataset(path, chunks={"time": time_chunk})
+        ds = ds.drop_vars(
+            [
+                x
+                for x in [
+                    "x",
+                    "y",
+                    "dcpp_init_year",
+                    "member_id",
+                ]
+                if x in ds
+            ]  ## REDUCING time for exp
+        ).isel(time=slice(0, 12))
+        return ds
+
+    ocean_ds = open_ds(
+        os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
+    )
+    atmos_ds = open_ds(
+        os.path.join(REGRIDDED_PATH, exp, "atmos", model, member) + ".nc"
+    )
+    ds = convert(xr.merge([ocean_ds, atmos_ds]))
+    pi = calculate_pi(ds, dim="p")
+    ds = xr.merge([ds, pi])
+    folder = os.path.join(PI_PATH, exp, model)
+    os.makedirs(folder, exist_ok=True)
+    delayed_obj = ds.to_netcdf(
+        os.path.join(folder, member + ".nc"),
+        format="NETCDF4",
+        engine="h5netcdf",
+        compute=False,
+    )
+    with ProgressBar():
+        _ = delayed_obj.compute()
+
+
 if __name__ == "__main__":
+    # python -m tcpips.pi_driver
     investigate_cmip6_pairs()

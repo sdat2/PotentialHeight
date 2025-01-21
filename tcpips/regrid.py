@@ -21,7 +21,6 @@ from sithom.time import timeit, time_stamp
 from sithom.io import write_json
 from .constants import (
     DATA_PATH,
-    FIGURE_PATH,
     CMIP6_PATH,
     RAW_PATH,
     REGRIDDED_PATH,
