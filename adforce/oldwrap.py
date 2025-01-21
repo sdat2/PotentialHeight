@@ -357,7 +357,7 @@ def maxele_observation_func(
         if os.path.exists(path):
             mele_og = xr_loader(path)
         else:
-            os.path.join(os.path.join(DATA_PATH, "maxele.63.nc"))
+            mele_og = xr_loader(os.path.join(os.path.join(DATA_PATH, "maxele.63.nc")))
 
         # read zeta_max point closes to the
         # work out closest point to NEW_ORLEANS

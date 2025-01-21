@@ -3,6 +3,7 @@
 from typing import Tuple, List, Optional, Dict
 import os
 import numpy as np
+import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
@@ -34,8 +35,6 @@ stationid_to_names: Dict[str, str] = {
     "8764044": "Berwick, Atchafalaya River (-91.238, 29.668)",
 }
 stationid_to_names = {}
-import xarray as xr
-
 ds = xr.open_dataset(os.path.join(DATA_PATH, "katrina_tides.nc"))
 name_d = {}
 for sid in ds.stationid.values:
