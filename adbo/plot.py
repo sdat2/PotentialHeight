@@ -9,7 +9,7 @@ from sithom.time import timeit
 from sithom.place import BoundingBox
 from adforce.constants import NO_BBOX
 from sithom.plot import plot_defaults, label_subplots
-from tcpips.constants import FIGURE_PATH
+from tcpips.constants import FIGURE_PATH, DATA_PATH
 from adbo.constants import EXP_PATH
 from adforce.mesh import xr_loader
 
@@ -24,13 +24,6 @@ stationid: List[str] = [
     "8764044",
 ]
 
-"""
-ds = xr.open_dataset("/work/n02/n02/sdat2/adcirc-swan/adcirc-emulation/data/katrina_tides.nc")
-name_d = {}
-for stationid in ds.stationid.values:
-    dss = ds.sel(stationid=stationid)
-    name_d[stationid] = f"{dss.name.values} ({dss.lon.values:.3f}, {dss.lat.values:.3f})
-"""
 stationid_to_names: Dict[str, str] = {
     "8729840": "Pensacola (-87.211, 30.404)",
     "8735180": "Dauphin Island (-88.075, 30.250)",
@@ -43,9 +36,7 @@ stationid_to_names: Dict[str, str] = {
 stationid_to_names = {}
 import xarray as xr
 
-ds = xr.open_dataset(
-    "/work/n02/n02/sdat2/adcirc-swan/adcirc-emulation/data/katrina_tides.nc"
-)
+ds = xr.open_dataset(os.path.join(DATA_PATH, "katrina_tides.nc"))
 name_d = {}
 for sid in ds.stationid.values:
     dss = ds.sel(stationid=sid)

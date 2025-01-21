@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
-from tcpips.pi import gom_combined_inout_timestep_cmip6
+from tcpips.pi_old import gom_combined_inout_timestep_cmip6
 from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH, W_COOL_DEFAULT
 from .potential_size import (
     run_cle15,

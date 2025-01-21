@@ -1,3 +1,5 @@
+"""Process and plot example data."""
+
 import os
 import xarray as xr
 import matplotlib.pyplot as plt
@@ -6,9 +8,9 @@ from sithom.plot import plot_defaults, get_dim
 from sithom.misc import in_notebook
 from tcpips.pi import TCPYPI_SAMPLE_DATA, calculate_pi
 from tcpips.pi_old import combined_inout_timestep_cmip6
-from tcpips.convert import convert  # , regrid_2d_1degree
+from tcpips.convert import convert
 from tcpips.plot import plot_features
-from tcpips.constants import FIGURE_PATH, MONTHS, DATA_PATH
+from tcpips.constants import FIGURE_PATH, MONTHS, DATA_PATH, GOM
 import xarray as xr
 
 
@@ -27,7 +29,9 @@ def plot_tcpypi_in_out_ex() -> None:
     plt.suptitle("month=9")
     plt.savefig(os.path.join(FIGURE_PATH, "sample-input.png"))
     plt.clf()
-    ds = xr.open_dataset(TCPYPI_SAMPLE_DATA).isel(month=9)
+    ds = xr.open_dataset(TCPYPI_SAMPLE_DATA).isel(
+        month=9
+    )  # August? Wait isn't that October?
     pi_ds = calculate_pi(ds, dim="p")
     for var in pi_ds:
         if "standard_name" in pi_ds[var].attrs:

@@ -15,7 +15,7 @@ from slurmpy import Slurm
 from sithom.time import timeit
 from sithom.place import Point
 from cle.constants import DATA_PATH as CLE_DATA_PATH
-from .constants import NEW_ORLEANS  # , KATRINA_TIDE_NC
+from .constants import NEW_ORLEANS, DATA_PATH  # , KATRINA_TIDE_NC
 from .fort22datatree import save_forcing
 from .mesh import xr_loader
 from .profile import read_profile
@@ -353,7 +353,12 @@ def maxele_observation_func(
         point = NEW_ORLEANS
 
     if isinstance(point, Point):
-        mele_og = xr_loader(os.path.join(MODEL_PATHS_DICT[resolution], "maxele.63.nc"))
+        path = os.path.join(MODEL_PATHS_DICT[resolution], "maxele.63.nc")
+        if os.path.exists(path):
+            mele_og = xr_loader(path)
+        else:
+            os.path.join(os.path.join(DATA_PATH, "maxele.63.nc"))
+
         # read zeta_max point closes to the
         # work out closest point to NEW_ORLEANS
         xs = mele_og.x.values

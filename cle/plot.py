@@ -13,7 +13,7 @@ from sithom.plot import plot_defaults, pairplot, label_subplots
 from sithom.time import timeit
 from sithom.io import write_json
 from sithom.curve import fit
-from tcpips.pi import gom_bbox_combined_inout_timestep_cmip6
+from tcpips.pi_old import gom_bbox_combined_inout_timestep_cmip6
 from tcpips.constants import GOM
 from .constants import (
     TEMP_0K,
@@ -214,7 +214,7 @@ def timeseries_plots_from_ds(
     plt.clf()
 
 
-def figure2() -> None:
+def figure_two() -> None:
     """Plot the solution for the GOM bbox for potential size and intensity."""
     _, axs = plt.subplots(
         2,
@@ -361,7 +361,7 @@ def figure2() -> None:
     # vertical black line at year_min
     axs[0, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
     axs[1, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
-    plt.savefig(os.path.join(folder, "figure2.pdf"))
+    plt.savefig(os.path.join(folder, "figure_two.pdf"))
     plt.clf()
     print(timeseries_ds)
 
@@ -737,4 +737,4 @@ if __name__ == "__main__":
     # print(ds)
     # print([var for var in ds])
     # print(ds["msl"].values)
-    figure2()
+    figure_two()

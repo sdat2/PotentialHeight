@@ -3,7 +3,6 @@
 from typing import Callable
 import xarray as xr
 from tcpyPI import pi
-from matplotlib import pyplot as plt
 from sithom.time import timeit
 
 
@@ -83,7 +82,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         "hPa",
     )
 
-    return out_ds
+    return standard_name_to_long_name(out_ds)
 
 
 def standard_name_to_long_name(ds: xr.Dataset) -> xr.Dataset:

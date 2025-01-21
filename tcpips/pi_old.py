@@ -1,3 +1,5 @@
+"""Old processing script for CMIP6."""
+
 from typing import Tuple
 import os
 import matplotlib.pyplot as plt
