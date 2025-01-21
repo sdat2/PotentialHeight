@@ -49,7 +49,22 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         ],
         output_core_dims=[[], [], [], [], []],
         vectorize=True,
+        # dask="allowed", # maybe this could work with dask, but at the moment I get an error
     )
+    """
+    numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)
+non-precise type pyobject
+During: typing of argument at /mnt/lustre/a2fs-work2/work/n02/n02/sdat2/micromamba/envs/t1/lib/python3.10/site-packages/tcpyPI/pi.py (361)
+
+File "../micromamba/envs/t1/lib/python3.10/site-packages/tcpyPI/pi.py", line 361:
+def cape(TP,RP,PP,T,R,P,ascent_flag=0,ptop=50,miss_handle=1):
+    <source elided>
+# define the function to calculate PI
+@nb.njit()
+^
+
+This error may have been caused by the following argument(s):
+    """
 
     # store the result in an xarray data structure
     vmax, pmin, ifl, t0, otl = result

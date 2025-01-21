@@ -20,7 +20,6 @@
 
 
 # Load modules
-# module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
 
 
 # try to activate bashrc
@@ -35,8 +34,4 @@ mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
 # single bit test:
-python -c "from tcpips.pi import pi_cmip6_part; regrid_cmip6_part(exp='ssp585', model='CESM2', member='r4i1p1f1')"
-
-# python -m tcpips.regrid
-# ls -lash ../data/cmip6/regridded
-# du -h --max-depth=1 ../data/cmip6/regridded
+python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r4i1p1f1')"

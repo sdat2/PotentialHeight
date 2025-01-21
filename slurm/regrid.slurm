@@ -35,9 +35,9 @@ mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
 # single bit test:
-python -c "from tcpips.regrid import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r4i1p1f1')"
+python -c "from tcpips.regrid import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r10i1p1f1')"
 
-python -c "from tcpips.regrid import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r4i1p1f1')"
+python -c "from tcpips.regrid import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r10i1p1f1')"
 
 
 # python -m tcpips.regrid

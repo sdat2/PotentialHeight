@@ -118,10 +118,9 @@ def pi_cmip6_part(
             [
                 x
                 for x in [
-                    "x",
-                    "y",
-                    "dcpp_init_year",
-                    "member_id",
+                    "time",
+                    "time_bounds",
+                    "nbnd",
                 ]
                 if x in ds
             ]  ## REDUCING time for exp
@@ -131,11 +130,13 @@ def pi_cmip6_part(
     ocean_ds = open_ds(
         os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
     )
+    print("ocean_ds", ocean_ds)
     atmos_ds = open_ds(
         os.path.join(REGRIDDED_PATH, exp, "atmos", model, member) + ".nc"
     )
+    print("atmos_ds", atmos_ds)
     ds = convert(xr.merge([ocean_ds, atmos_ds]))
-    pi = calculate_pi(ds, dim="p")
+    pi = calculate_pi(ds.compute(), dim="p")
     ds = xr.merge([ds, pi])
     folder = os.path.join(PI_PATH, exp, model)
     os.makedirs(folder, exist_ok=True)
