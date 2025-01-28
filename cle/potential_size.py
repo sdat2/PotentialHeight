@@ -3,6 +3,7 @@
 from typing import Callable, Tuple, Optional, Dict
 import os, shutil
 import numpy as np
+import time
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from oct2py import Oct2Py, get_log
@@ -31,7 +32,7 @@ from .solve import bisection
 plot_defaults()
 
 os.environ["OCTAVE_CLI_OPTIONS"] = str(
-    "--no-gui --no-gui-libs"  # disable gui to improve performance
+    "--no-gui --no-gui-libs"  # --jit-compiler"  # disable gui to improve performance
 )
 os.environ["OCTAVE_EXECUTABLE"] = shutil.which("octave")
 try:
@@ -483,8 +484,20 @@ if __name__ == "__main__":
 
     # from timeit import timeit
 
+    tick = time.perf_counter()
+
     for _ in range(10):
         _run_cle15_oct2py()  # oct2py not working on ARCHER2
 
+    tock = time.perf_counter()
+    oct2py_time = tock - tick
+
+    tick = time.perf_counter()
+
     for _ in range(10):
         _run_cle15_octave({}, True)
+    tock = time.perf_counter()
+    octave_time = tock - tick
+
+    print(f"Time taken by oct2py for 10 loops is {oct2py_time:.1} s")  # 21.4 s
+    print(f"Time taken by octave for 10 loops is {octave_time:.1} s")  # 50.9 s
