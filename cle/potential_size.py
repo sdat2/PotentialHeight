@@ -1,7 +1,7 @@
 """Run the CLE15 model with json files or octopy."""
 
 from typing import Callable, Tuple, Optional, Dict
-import os
+import os, shutil
 import numpy as np
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
@@ -33,13 +33,15 @@ plot_defaults()
 os.environ["OCTAVE_CLI_OPTIONS"] = str(
     "--no-gui --no-gui-libs"  # disable gui to improve performance
 )
+os.environ["OCTAVE_EXECUTABLE"] = shutil.which("octave")
 try:
-    oc = Oct2Py(logger=get_log())
-    oc.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
+    OC = Oct2Py(logger=get_log())
+    OC.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
 except Exception as e:
     # allow the code to be tested without octave
-    print(e)
-    oc = None
+    print("Octopy Initializationo Exception", e)
+    # assert False
+    OC = None
 
 
 @timeit
@@ -55,8 +57,8 @@ def _run_cle15_oct2py(
     in_dict = read_json(os.path.join(DATA_PATH, "inputs.json"))
     in_dict.update(kwargs)
     # print(in_dict)
-    # oc.eval("path")
-    rr, VV, rmax, rmerge, Vmerge = oc.feval(
+    # OC.eval("path")
+    rr, VV, rmax, rmerge, Vmerge = OC.feval(
         "ER11E04_nondim_r0input",
         in_dict["Vmax"],
         in_dict["r0"],
@@ -127,7 +129,7 @@ def run_cle15(
         Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
     """
 
-    if oct2py:  # should be faster if graphical element disabled
+    if oct2py and OC is not None:  # should be faster if graphical element disabled
         ou = _run_cle15_oct2py(inputs)
     else:
         ou = _run_cle15_octave(inputs, execute)
@@ -467,7 +469,7 @@ def profile_from_vals(
 
 
 if __name__ == "__main__":
-    # python -m cle.find
+    # python -m cle.potential_size
     # find_solution()
     # find_solution_rmaxv()
     # calc_solns_for_times(num=50)
@@ -482,7 +484,7 @@ if __name__ == "__main__":
     # from timeit import timeit
 
     for _ in range(10):
-        _run_cle15_oct2py()
+        _run_cle15_oct2py()  # oct2py not working on ARCHER2
 
     for _ in range(10):
         _run_cle15_octave({}, True)
