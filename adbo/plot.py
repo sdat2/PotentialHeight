@@ -167,12 +167,12 @@ def find_differences() -> None:
     for sid in stationid:
         diff, max1, max2 = find_difference(sid)
         print(
-            f"{stationid_to_names[sid]}, max1: {max1:.3f} m, max2: {max2:.3f} m, diff: {diff:.3f} m, {diff/max1:.3f} %"
+            f"{stationid_to_names[sid]}, max1: {max1:.1f} m, max2: {max2:.1f} m, diff: {diff:.1f} m, {diff/max1*100:.0f} %"
         )
         diff_list.append(diff)
         diff_percent_list.append(diff / max1)
-    print(f"Average difference: {np.mean(diff_list):.3f} m")
-    print(f"Average percentage difference: {np.mean(diff_percent_list)*100:.3f} %")
+    print(f"Average difference: {np.mean(diff_list):.1f} m")
+    print(f"Average percentage difference: {np.mean(diff_percent_list)*100:.0f} %")
 
 
 @timeit
@@ -270,7 +270,8 @@ def plot_many(year="2025") -> None:
     vline(25.5)
 
     # axs[0].legend()
-    plt.legend()
+    plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.75), ncol=3)
+
     plt.xlim(1, 50)
 
     figure_path = os.path.join(FIGURE_PATH, "along-coast-" + year + ".pdf")
