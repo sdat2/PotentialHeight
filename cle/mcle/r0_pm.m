@@ -1,10 +1,18 @@
 % take r0 as input, get central pressure
 % octave --no-gui --no-gui-libs r0_pm.m
+% octave --no-gui --no-gui-libs r0_pm.m test
 clear
 clc
 % warning("off", "Octave:possible-matlab-short-circuit-operator")
-% warning("off", "all")
-% neither of these warning commands work
+warning("off", "all")
+
+# Check if an argument was provided
+args = argv();
+if numel(args) < 1
+  name = "";
+else
+  name = args{1};
+end
 
 % close all
 % add path to mcle and mfiles
@@ -12,23 +20,30 @@ current_folder = pwd;
 file_path = mfilename('fullpath');
 % take away the file name
 file_path = fileparts(file_path);
+file_path_cle = fileparts(file_path);
+
 addpath(genpath(file_path)); % 'mcle/'));
-data_folder = char([fileparts(file_path), "/", "data"]);
 file_path = char([file_path, "/", "mfiles"]);
 addpath(genpath(char([file_path, "/", "mfiles"])));  % 'mcle/mfiles/'));
 
 % read in JSON file of inputs
-fileName = char([data_folder, '/', 'inputs.json']); % filename in JSON extension
+if isempty(name)
+  data_folder = char([file_path_cle, "/", "data"]);
+  fileName = char([data_folder, '/', 'inputs.json']); % filename in JSON extension
+else
+  data_folder = char([file_path_cle, "/", "data", "/", "tmp"]);
+  fileName = char([data_folder, '/', name, '-inputs.json']);
+  % filename in JSON extension
+end
+
 in_str = fileread(fileName); % dedicated for reading files as text
-in = jsondecode(in_str); % Using the jsondecode function to parse JSON from string
+inputs = jsondecode(in_str); % Using the jsondecode function to parse JSON from string
 
 % print inputs json in matlab
-in.r0;
-
-% in_data("r0")
+inputs.r0;
 
 [rr, VV, rmax, rmerge, Vmerge] = ...
-    ER11E04_nondim_r0input(in.Vmax, in.r0, in.fcor, in.Cdvary, in.Cd, in.w_cool, in.CkCdvary, in.CkCd, in.eye_adj, in.alpha_eye);
+    ER11E04_nondim_r0input(inputs.Vmax, inputs.r0, inputs.fcor, inputs.Cdvary, inputs.Cd, inputs.w_cool, inputs.CkCdvary, inputs.CkCd, inputs.eye_adj, inputs.alpha_eye);
 
 out.rr = rr;
 out.VV = VV;
@@ -38,7 +53,13 @@ out.Vmerge = Vmerge;
 
 % write out JSON file of outputs
 out_str = jsonencode(out);
-fid = fopen(char([data_folder, '/', 'outputs.json']), 'w');
+
+if isempty(name)
+  fid = fopen(char([data_folder, '/', 'outputs.json']), 'w');
+else
+  fid = fopen(char([data_folder, '/' , name, '-outputs.json']), 'w');
+end
+
 if fid == -1, error('Cannot create JSON file'); end
 fwrite(fid, out_str, 'char');
 fclose(fid);
