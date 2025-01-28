@@ -315,7 +315,7 @@ def find_solution_rmaxv(
     near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
     w_cool: float = W_COOL_DEFAULT,  # K m s-1
     outflow_temperature: float = 200,  # K
-    supergradient_factor: float = 1.2,  # dimensionless
+    gamma_supergradient_factor: float = 1.2,  # dimensionless
     plot: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -326,9 +326,9 @@ def find_solution_rmaxv(
         coriolis_parameter (float, optional): Coriolis parameter. Defaults to 5e-5 s-1.
         background_pressure (float, optional): Background pressure. Defaults to 1015 hPa.
         near_surface_air_temperature (float, optional): Near surface air temperature. Defaults to 299 K.
-        w_cool (float, optional): Cooling rate. Defaults to 0.002.
+        w_cool (float, optional): Cooling rate. Defaults to 0.002. 2e-3
         outflow_temperature (float, optional): Outflow temperature. Defaults to 200 K.
-        supergradient_factor (float, optional): Supergradient factor. Defaults to 1.2.
+        gamma_supergradient_factor (float, optional): Supergradient factor. Defaults to 1.2.
         plot (bool, optional): Plot the output. Defaults to False.
 
     Returns:
@@ -355,7 +355,7 @@ def find_solution_rmaxv(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
-                    maximum_wind_speed=vmax * supergradient_factor,
+                    maximum_wind_speed=vmax * gamma_supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=background_pressure
                     - buck_sat_vap_pressure(near_surface_air_temperature),
