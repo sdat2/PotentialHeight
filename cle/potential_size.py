@@ -32,15 +32,16 @@ from .solve import bisection
 plot_defaults()
 
 os.environ["OCTAVE_CLI_OPTIONS"] = str(
-    "--no-gui --no-gui-libs"  # --jit-compiler"  # disable gui to improve performance
+    "--no-gui --no-gui-libs"  # --jit-compiler"  # disable gui to improve performance jit-compiler broke code
 )
-os.environ["OCTAVE_EXECUTABLE"] = shutil.which("octave")
+if shutil.which("octave") is not None:
+    os.environ["OCTAVE_EXECUTABLE"] = shutil.which("octave")
 try:
     OC = Oct2Py(logger=get_log())
     OC.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
 except Exception as e:
     # allow the code to be tested without octave
-    print("Octopy Initializationo Exception", e)
+    print("Octopy Initialization Exception", e)
     # assert False
     OC = None
 
@@ -499,5 +500,5 @@ if __name__ == "__main__":
     tock = time.perf_counter()
     octave_time = tock - tick
 
-    print(f"Time taken by oct2py for 10 loops is {oct2py_time:.1} s")  # 21.4 s
-    print(f"Time taken by octave for 10 loops is {octave_time:.1} s")  # 50.9 s
+    print(f"Time taken by oct2py for 10 loops is {oct2py_time:.1f} s")  # 21.4 s
+    print(f"Time taken by octave for 10 loops is {octave_time:.1f} s")  # 50.9 s
