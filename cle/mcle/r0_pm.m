@@ -3,6 +3,8 @@
 clear
 clc
 % warning("off", "Octave:possible-matlab-short-circuit-operator")
+% warning("off", "all")
+% neither of these warning commands work
 
 % close all
 % add path to mcle and mfiles
