@@ -135,6 +135,7 @@ def pi_cmip6_part(
         os.path.join(REGRIDDED_PATH, exp, "atmos", model, member) + ".nc"
     )
     print("atmos_ds", atmos_ds)
+    # convert units, merge datasets
     ds = convert(xr.merge([ocean_ds, atmos_ds]))
     pi = calculate_pi(ds.compute(), dim="p")
     ds = xr.merge([ds, pi])

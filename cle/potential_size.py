@@ -20,6 +20,7 @@ from .constants import (
     F_COR_DEFAULT,
     W_COOL_DEFAULT,
     RHO_AIR_DEFAULT,
+    SUPERGRADIENT_FACTOR,
 )
 from .utils import (
     pressure_from_wind,
@@ -78,13 +79,21 @@ def _run_cle15_oct2py(
 
 
 def _inputs_to_name(inputs: dict) -> str:
+    """Create a unique naming string based on the input parameters
+    (could be hashed to shorten).
+
+    Args:
+        inputs (dict): input dict
+
+    Returns:
+        str: unique(ish name)
+    """
     name = ""
-    for key in sorted(inputs.keys()):
-        name += key + f"_{inputs[key]:.4e}"
+    for key in sorted(inputs.keys()):  # for consistent order
+        name += key + f"_{inputs[key]:.4e}"  # reasonable precision
     return name
 
 
-@timeit
 def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
     """
     Run the CLE15 model using octave.
@@ -120,12 +129,11 @@ def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
     return read_json(os.path.join(DATA_PATH, "tmp", name + "-outputs.json"))
 
 
-@timeit
 def run_cle15(
     execute: bool = True,
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
-    oct2py: bool = True,
+    oct2py: bool = False,
 ) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
@@ -134,7 +142,7 @@ def run_cle15(
         execute (bool, optional): Execute the model. Defaults to True.
         plot (bool, optional): Plot the output. Defaults to False.
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
-        oct2py (bool, optional): Use oct2py. Defaults to False.
+        oct2py (bool, optional): Use oct2py. Defaults to False, as oct2py seems to be slower than direct octave on ARCHER2 compute nodes.
 
     Returns:
         Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
@@ -144,6 +152,7 @@ def run_cle15(
         ou = _run_cle15_oct2py(inputs)
     else:
         ou = _run_cle15_octave(inputs, execute)
+    # read default values from the inputs.json file
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
 
     if plot:
@@ -188,6 +197,7 @@ def run_cle15(
     rr = np.array(ou["rr"])  # [m]
     vv = np.array(ou["VV"])  # [m/s]
     p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
+    ou["p"] = p.tolist()
 
     if plot:
         plt.plot(rr / 1000, p / 100, "k")
@@ -328,11 +338,11 @@ def find_solution_rmaxv(
     near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
     w_cool: float = W_COOL_DEFAULT,  # K m s-1
     outflow_temperature: float = 200,  # K
-    gamma_supergradient_factor: float = 1.2,  # dimensionless
+    gamma_supergradient_factor: float = SUPERGRADIENT_FACTOR,  # dimensionless
     plot: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Find the solution for rmax and vmax.
+    Find the solution for rmax.
 
     Args:
         vmax_pi (float, optional): Maximum wind speed. Defaults to 86 m/s.
@@ -352,7 +362,7 @@ def find_solution_rmaxv(
     pcw = []
     rmaxs = []
     for r0 in r0s:
-        pm_cle, rmax_cle, vmax, pc = run_cle15(
+        pm_cle15_dyn, rmax_cle, _, _ = run_cle15(
             plot=False,
             inputs={
                 "r0": r0,
@@ -368,7 +378,7 @@ def find_solution_rmaxv(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
-                    maximum_wind_speed=vmax * gamma_supergradient_factor,
+                    maximum_wind_speed=vmax_pi * gamma_supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=background_pressure
                     - buck_sat_vap_pressure(near_surface_air_temperature),
@@ -381,17 +391,24 @@ def find_solution_rmaxv(
             1e-6,
         )
         # convert solution to pressure
-        pm_car = (
+        pm_w22_car = (
             background_pressure - buck_sat_vap_pressure(near_surface_air_temperature)
         ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
 
-        pcs.append(pm_cle)
-        pcw.append(pm_car)
+        pcs.append(pm_cle15_dyn)
+        pcw.append(pm_w22_car)
         rmaxs.append(rmax_cle)
-        print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
+        print(
+            "r0, rmax_cle, pm_cle15_dyn, pm_w22_car",
+            r0,
+            rmax_cle,
+            pm_cle15_dyn,
+            pm_w22_car,
+        )
     pcs = np.array(pcs)
     pcw = np.array(pcw)
     rmaxs = np.array(rmaxs)
+    # find intersection between r0s and pcs and pcw
     intersect = curveintersect(r0s, pcs, r0s, pcw)
 
     if plot:
@@ -399,7 +416,7 @@ def find_solution_rmaxv(
         plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
         print("intersect", intersect)
         # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
-        plt.xlabel("Radius, $r_a$, [km]")
+        plt.xlabel("Radius of outer winds, $r_a$, [km]")
         plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
         if len(intersect) > 0:
             plt.plot(
@@ -414,6 +431,7 @@ def find_solution_rmaxv(
         plt.savefig(os.path.join(FIGURE_PATH, "r0_rmax.pdf"))
         plt.clf()
         run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
+    # why do we put vmax_pi back out? We put it in in the first place.
     return intersect[0][0], vmax_pi, intersect[1][0]  # rmax, vmax, pm
 
 

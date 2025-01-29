@@ -41,12 +41,12 @@ def find_solution_ds(
     pcs = []
     pcw = []
     rmaxs = []
-    near_surface_air_temperature = ds["sst"].values + TEMP_0K - 1
+    near_surface_air_temperature = ds["sst"].values + TEMP_0K - 1  # Kelvin
     outflow_temperature = ds["t0"].values
     coriolis_parameter = coriolis_parameter_from_lat(ds["lat"].values)
 
     for r0 in r0s:
-        pm_cle, rmax_cle, vmax, pc = run_cle15(
+        pm_cle, rmax_cle, _, pc = run_cle15(
             plot=True,
             inputs={
                 "r0": r0,
