@@ -77,6 +77,13 @@ def _run_cle15_oct2py(
     return dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
 
 
+def _inputs_to_name(inputs: dict) -> str:
+    name = ""
+    for key in sorted(inputs.keys()):
+        name += key + f"_{inputs[key]:.4e}"
+    return name
+
+
 @timeit
 def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
     """
@@ -97,18 +104,20 @@ def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
                 ins[key] = inputs[key]
 
     # Storm parameters
-    write_json(ins, os.path.join(DATA_PATH, "inputs.json"))
+    name = _inputs_to_name(ins)
+
+    write_json(ins, os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
 
     # run octave file r0_pm.m
     if execute:
         # disabling gui leads to one order of magnitude speedup
         # also the pop-up window makes me feel sick due to the screen moving about.
         os.system(
-            f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')}"
+            f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
         )
 
     # read in the output from r0_pm.m
-    return read_json(os.path.join(DATA_PATH, "outputs.json"))
+    return read_json(os.path.join(DATA_PATH, "tmp", name + "-outputs.json"))
 
 
 @timeit
