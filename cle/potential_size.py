@@ -90,11 +90,11 @@ def _inputs_to_name(inputs: dict) -> str:
         inputs (dict): input dict
 
     Returns:
-        str: unique(ish name)
+        str: unique(ish) name
     """
     name = ""
     for key in sorted(inputs.keys()):  # for consistent order
-        name += key + f"_{inputs[key]:.4e}"  # reasonable precision
+        name += key + f"_{inputs[key]:.7e}"  # reasonable precision
     return name
 
 

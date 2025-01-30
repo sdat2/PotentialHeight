@@ -60,8 +60,8 @@ def point_solution(
     )  # Celsius Kelvin, subtract 1K for parameterization for near surface
     outflow_temperature = ds["t0"].values
     vmax = ds["vmax"].values
-    coriolis_parameter = coriolis_parameter_from_lat(ds["lat"].values)
-    assert coriolis_parameter > 0
+    coriolis_parameter = abs(coriolis_parameter_from_lat(ds["lat"].values))
+    # assert coriolis_parameter > 0
     print("coriolis_parameter", coriolis_parameter)
     print("ds['lat'].values", ds["lat"].values)
 
@@ -173,8 +173,8 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
 
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
-            assert not np.isnan(ids.vmax.values)
-            assert not np.isnan(ids.sst.values)
+            assert not np.isnan(ids.vmax.values)  # did not converge
+            assert not np.isnan(ids.sst.values)  # is not sea
             return point_solution(ids, include_profile=False)
         except Exception as e:
             print("Exception:", e)
@@ -295,11 +295,13 @@ if __name__ == "__main__":
     in_ds = convert_2d_coords_to_1d(
         xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]]
     ).isel(
-        time=7
+        time=7, y=slice(160, 260), x=slice(120, 360)
     )  # .sel(
     #    lon=slice(-100, -80), lat=slice(25, 35)
     # )  # get necessry inputs, get relevant box
-    # out_ds = loop_through_dimensions(in_ds)
-    # print(out_ds)
-    # out_ds.to_netcdf("example_ps_output.nc")
+    out_ds = loop_through_dimensions(in_ds)
+    print(out_ds)
+    # from tcpips.constants import DATA_PATH
+
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output.nc"))
     print(in_ds)
