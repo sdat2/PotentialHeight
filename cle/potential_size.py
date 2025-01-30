@@ -398,13 +398,13 @@ def find_solution_rmaxv(
         pcs.append(pm_cle15_dyn)
         pcw.append(pm_w22_car)
         rmaxs.append(rmax_cle)
-        print(
-            "r0, rmax_cle, pm_cle15_dyn, pm_w22_car",
-            r0,
-            rmax_cle,
-            pm_cle15_dyn,
-            pm_w22_car,
-        )
+        # print(
+        #    "r0, rmax_cle, pm_cle15_dyn, pm_w22_car",
+        #    r0,
+        #    rmax_cle,
+        #    pm_cle15_dyn,
+        #    pm_w22_car,
+        # )
     pcs = np.array(pcs)
     pcw = np.array(pcw)
     rmaxs = np.array(rmaxs)

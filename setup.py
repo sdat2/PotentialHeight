@@ -2,16 +2,14 @@ from setuptools import setup
 from typing import List
 
 REQUIRED: List[str] = [
-    # "sithom"
     "xarray[complete]",  # to process netCDF4 files (adforce, tcpips).
     "xarray-datatree",  # to process netCDF4 files with groups (adforce).
     "netCDF4",  # to process netCDF4 files (adforce, tcpips).
     "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility for linear error propagation
-    # "sithom>=0.0.5",  # common utilities
     # "sithom @ git+https://github.com/sdat2/sithom",
-    "sithom >= 0.1.1",
+    "sithom >= 0.1.1",  # personal common utilities for timing, plotting, and fitting
     "oct2py",  # oct2py for running MATLAB code (cle)
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
@@ -30,6 +28,7 @@ REQUIRED: List[str] = [
     "slurmpy",  # to run SLURM jobs (adforce)
     "adcircpy",  # to process ADIRC inputs (adforce)
     "tcpypi",  # to calculate potential intensity (tcpips)
+    "joblib",  # to parallize more easily potential size calculation (tcpips/cle)
 ]
 
 

@@ -1,9 +1,11 @@
+"""Functions to calculate potential size from xarray inputs in parallel."""
+
 import os
+from joblib import Parallel, delayed
 import numpy as np
 import xarray as xr
 from sithom.io import read_json
 from sithom.time import timeit
-from chavas15.intersect import curveintersect
 from .constants import (
     TEMP_0K,
     DATA_PATH,
@@ -29,6 +31,11 @@ def point_solution(
     """
     Find the solution for a given point in the grid.
 
+    # TODO: Implement bisection instead
+    # TODO: Speed up?
+    # TODO: Get parallization working well
+    # TODO: Implement into potential intensity step?
+
     Args:
         ds (xr.Dataset): Dataset with the input values.
         supergradient_factor (float, optional): Supergradient. Defaults to 1.2.
@@ -39,33 +46,31 @@ def point_solution(
 
     Example:
         >>> in_ds = xr.Dataset(data_vars={
-        ...     "msl": 1016.7, # hpa
+        ...     "msl": 1016.7, # mbar or hPa
         ...     "vmax": 49.5, # m/s, potential intensity
         ...     "sst": 28, # degC
         ...     "t0": 200, # degK
         ...     },
         ...     coords={"lat":28})
         >>> out_ds = point_solution(in_ds)
+        >>> out_ds
     """
-    r0s = np.linspace(200, 5000, num=30) * 1000  # [m] try different outer radii
-    pcs = []
-    pcw = []
-    rmaxs = []
     near_surface_air_temperature = (
         ds["sst"].values + TEMP_0K - 1
     )  # Celsius Kelvin, subtract 1K for parameterization for near surface
     outflow_temperature = ds["t0"].values
+    vmax = ds["vmax"].values
     coriolis_parameter = coriolis_parameter_from_lat(ds["lat"].values)
 
-    for r0 in r0s:
-        pm_cle, rmax_cle, _, pc = run_cle15(
+    def try_for_r0(r0: float):
+        pm_cle, rmax_cle, _, _ = run_cle15(
             plot=True,
             inputs={
                 "r0": r0,
-                "Vmax": ds["vmax"].values,
+                "Vmax": vmax,
                 "w_cool": W_COOL_DEFAULT,
                 "fcor": coriolis_parameter,
-                "p0": float(ds["msl"].values),
+                "p0": float(ds["msl"].values),  # in hPa / mbar
             },
         )
 
@@ -74,44 +79,49 @@ def point_solution(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
-                    maximum_wind_speed=ds["vmax"].values * supergradient_factor,
+                    maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
-                    pressure_dry_at_inflow=ds["msl"].values * 100
+                    pressure_dry_at_inflow=ds["msl"].values
+                    * 100  # 100 to convert from hPa to Pa
                     - buck_sat_vap_pressure(near_surface_air_temperature),
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=outflow_temperature,
                 )
             ),
-            0.9,
+            0.8,
             1.2,
-            1e-6,
+            1e-6,  # threshold
         )
         # convert solution to pressure
-        pm_car = (
+        pm_car = (  # 100 to convert from hPa to Pa
             ds["msl"].values * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
         ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
 
-        pcs.append(pm_cle)
-        pcw.append(pm_car)
-        rmaxs.append(rmax_cle)
-        print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
-    pcs = np.array(pcs)
-    pcw = np.array(pcw)
-    rmaxs = np.array(rmaxs)
-    intersect = curveintersect(r0s, pcs, r0s, pcw)
+        return pm_car - pm_cle
+        # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
+
+    r0 = bisection(
+        try_for_r0, 200 * 1000, 5000 * 1000, 1e-3
+    )  # find potential size \(r_a\) between 200 and 5000 km
 
     pm_cle, rmax_cle, vmax, pc = run_cle15(
-        inputs={"r0": intersect[0][0], "Vmax": ds["vmax"].values}, plot=False
+        inputs={"r0": r0, "Vmax": ds["vmax"].values}, plot=False
     )
     # read the solution
-    ds["r0"] = intersect[0][0]
-    ds["r0"].attrs = {"units": "m", "long_name": "Outer radius of tropical cyclone"}
-    ds["pm"] = intersect[1][0]
-    ds["pm"].attrs = {"units": "Pa", "long_name": "Pressure at maximum winds"}
+    ds["r0"] = r0
+    ds["r0"].attrs = {
+        "units": "m",
+        "long_name": "Potential size of tropical cyclone, $r_a$",
+    }
+    ds["pm"] = pm_cle
+    ds["pm"].attrs = {"units": "Pa", "long_name": "Pressure at maximum winds, $p_m$"}
     ds["pc"] = pc
     ds["pc"].attrs = {"units": "Pa", "long_name": "Central pressure for CLE15 profile"}
     ds["rmax"] = rmax_cle
-    ds["rmax"].attrs = {"units": "m", "long_name": "Radius of maximum winds"}
+    ds["rmax"].attrs = {
+        "units": "m",
+        "long_name": "Radius of maximum winds, $r_{\mathrm{max}}$",
+    }
     if include_profile:
         # TODO: This optimal profile is reading the wrong data.
         # PV = NRT; Rho = NM/V; N/V = P/RT; assume isothermal -> Rho(P) = PM/RT, Rho1 = Rho2*P1/P2
@@ -127,7 +137,7 @@ def point_solution(
             pressure_from_wind(
                 np.array(out["rr"]),  # [m]
                 np.array(out["VV"]),  # [m/s]
-                ds["msl"].values * 100,  # [Pa]
+                ds["msl"].values * 100,  # [Pa] 100 to convert from hPa to Pa
                 RHO_AIR_DEFAULT,  # [kg m-3]
                 coriolis_parameter,  # [rad s-1]
             )
@@ -135,3 +145,96 @@ def point_solution(
             {"units": "mbar", "long_name": "Surface Pressure"},
         )
     return ds
+
+
+# def loop_through_dimension(ds: xr.Dataset) -> xr.Dataset:
+# I could have a dfs type function for implementing this?
+
+
+@timeit
+def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
+    # the dataset might have a series of dimensions: time, lat, lon, member, etc.
+    # it must have variables msl, vmax, sst, and t0, and coordinate lat for each point
+    # we want to loop through these (in parallel) and apply the point_solution function
+    # to each point, so that we end up with a new dataset with the same dimensions
+    # that now has additional variables r0, pm, pc, rmax
+    # should I use ufunc from xarray
+    # we should call point_solution(ds_part, include_profile=False)
+    # Step 1: Stack all spatial dimensions into a single dimension
+    # ds.dims
+    print("ds.dims", ds.dims, type(ds.dims))
+    ds_stacked = ds.stack(stacked_dim=ds.dims)
+
+    def process_point(index):
+        """Apply point_solution to a single data point."""
+        return point_solution(ds_stacked.isel(stacked_dim=index), include_profile=False)
+
+    print(f"About to conduct {ds_stacked.sizes['stacked_dim']} jobs in parallel")
+    # Step 2: Parallelize computation across all stacked points
+    results = Parallel(n_jobs=-1)(
+        delayed(process_point)(i) for i in range(ds_stacked.sizes["stacked_dim"])
+    )
+
+    # Step 3: Reconstruct the original dataset dimensions
+    return xr.concat(results, dim="stacked_dim").unstack("stacked_dim")
+
+
+def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Converts 2D coordinate variables (lon, lat) into 1D coordinates safely.
+
+    Assumes:
+    - `lon(y, x)` only varies along `x`, so we take the first row to get `lon(x)`.
+    - `lat(y, x)` only varies along `y`, so we take the first column to get `lat(y)`.
+
+    Args:
+        ds (xr.Dataset): Input dataset with 2D coordinates.
+
+    Returns:
+        xr.Dataset: Dataset with 1D `lon(x)` and `lat(y)`, replacing the old ones.
+    """
+    print("2d coords", ds)
+    # Extract 1D latitude and longitude
+    lon_1d = ds["lon"].isel(y=0)  # Take the first row (constant across y)
+    lat_1d = ds["lat"].isel(x=0)  # Take the first column (constant across x)
+
+    # Drop the original 2D coordinates first
+    ds = ds.drop_vars(["lon", "lat"])
+
+    # Assign new 1D coordinates with the same names
+    ds = ds.assign_coords(lon=("x", lon_1d.values), lat=("y", lat_1d.values))
+
+    ds = ds.set_coords(["lon", "lat"])
+
+    print("1d coords", ds)
+
+    return ds
+
+
+if __name__ == "__main__":
+    # python -m cle.ps
+    in_ds = xr.Dataset(
+        data_vars={
+            "msl": 1016.7,  # mbar or hPa
+            "vmax": 49.5,  # m/s, potential intensity
+            "sst": 28,  # degC
+            "t0": 200,  # degK
+        },
+        coords={"lat": 28},  # degNorth
+    )
+    # out_ds = point_solution(in_ds)
+    # print(out_ds)
+
+    # out_ds = loop_through_dimensions(in_ds)
+    # print(out_ds)
+
+    ex_data_path = "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r4i1p1f1.nc"
+    in_ds = convert_2d_coords_to_1d(
+        xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]]
+    ).isel(
+        time=7
+    )  # .sel(
+    #    lon=slice(-100, -80), lat=slice(25, 35)
+    # )  # get necessry inputs, get relevant box
+    out_ds = loop_through_dimensions(in_ds)
+    print(out_ds)
