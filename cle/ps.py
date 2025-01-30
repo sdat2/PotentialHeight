@@ -61,6 +61,9 @@ def point_solution(
     outflow_temperature = ds["t0"].values
     vmax = ds["vmax"].values
     coriolis_parameter = coriolis_parameter_from_lat(ds["lat"].values)
+    assert coriolis_parameter > 0
+    print("coriolis_parameter", coriolis_parameter)
+    print("ds['lat'].values", ds["lat"].values)
 
     def try_for_r0(r0: float):
         pm_cle, rmax_cle, _, _ = run_cle15(
@@ -88,7 +91,7 @@ def point_solution(
                     outflow_temperature=outflow_temperature,
                 )
             ),
-            0.9,
+            0.3,
             1.2,
             1e-6,  # threshold
         )
@@ -257,7 +260,7 @@ if __name__ == "__main__":
         },
         coords={"lat": 28},  # degNorth
     )
-    # out_ds = point_solution(in_ds)
+    out_ds = point_solution(in_ds)
     # print(out_ds)
     # out_ds = loop_through_dimensions(in_ds)
     # print(out_ds)
@@ -278,9 +281,9 @@ if __name__ == "__main__":
             "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
             "vmax": (
                 ("y", "x"),
-                [[49.5, 49.5], [49.5, 49.5]],
+                [[50, 51], [49, 49.5]],
             ),  # m/s, potential intensity
-            "sst": (("y", "x"), [[28, 28], [28, 28]]),  # degC
+            "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
         },
         coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth

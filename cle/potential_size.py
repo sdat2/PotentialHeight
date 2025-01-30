@@ -420,7 +420,7 @@ def find_solution_rmaxv(
         plt.plot(r0s / 1000, pcw / 100, "r", label="W22")
         print("intersect", intersect)
         # plt.plot(intersect[0][0] / 1000, intersect[1][0] / 100, "bx", label="Solution")
-        plt.xlabel("Radius of outer winds, $r_a$, [km]")
+        plt.xlabel("Radius of outer winds, $r_0$, [km]")
         plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
         if len(intersect) > 0:
             plt.plot(
@@ -430,7 +430,7 @@ def find_solution_rmaxv(
         plt.savefig(os.path.join(FIGURE_PATH, "r0_pc_rmaxadj.pdf"))
         plt.clf()
         plt.plot(r0s / 1000, rmaxs / 1000, "k")
-        plt.xlabel("Radius, $r_a$, [km]")
+        plt.xlabel("Outer radius, $r_9$, [km]")
         plt.ylabel("Radius of maximum winds, $r_m$, [km]")
         plt.savefig(os.path.join(FIGURE_PATH, "r0_rmax.pdf"))
         plt.clf()
@@ -516,20 +516,22 @@ if __name__ == "__main__":
 
     # from timeit import timeit
 
+    # tick = time.perf_counter()
+
+    # for _ in range(10):
+    #     _run_cle15_oct2py()  # oct2py not working on ARCHER2
+
+    # tock = time.perf_counter()
+    # oct2py_time = tock - tick
+
     tick = time.perf_counter()
 
-    for _ in range(10):
-        _run_cle15_oct2py()  # oct2py not working on ARCHER2
+    vmaxs = np.linspace(80, 90, num=10)
 
-    tock = time.perf_counter()
-    oct2py_time = tock - tick
-
-    tick = time.perf_counter()
-
-    for _ in range(10):
-        _run_cle15_octave({}, True)
+    for vmax in vmaxs:
+        _run_cle15_octave({"Vmax": vmax}, True)
     tock = time.perf_counter()
     octave_time = tock - tick
 
-    print(f"Time taken by oct2py for 10 loops is {oct2py_time:.1f} s")  # 21.4 s
+    # print(f"Time taken by oct2py for 10 loops is {oct2py_time:.1f} s")  # 21.4 s
     print(f"Time taken by octave for 10 loops is {octave_time:.1f} s")  # 50.9 s

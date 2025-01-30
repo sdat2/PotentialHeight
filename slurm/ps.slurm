@@ -36,7 +36,7 @@ echo "which python"
 which python
 
 # run python job
-# python -m cle.potential_size
+python -m cle.potential_size
 
 # pytest ../cle/ps.py
 python -m cle.ps
