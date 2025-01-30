@@ -15,7 +15,7 @@ def bisection(f: Callable, left: float, right: float, tol: float) -> float:
         f (Callable): Function to find root of.
         left (float): Left boundary.
         right (float): Right boundary.
-        tol (float): tolerance for convergence.
+        tol (float): Tolerance for convergence.
 
     Returns:
         float: x such that |f(x)| < tol.
@@ -27,27 +27,36 @@ def bisection(f: Callable, left: float, right: float, tol: float) -> float:
         >>> f = lambda x: x**2 - 4
         >>> np.isclose(bisection(f, 0, 3, 1e-3), 2, rtol=1e-3, atol=1e-3)
         True
+        >>> f = lambda x: - x**2 + 4
+        >>> np.isclose(bisection(f, 0, 3, 1e-3), 2, rtol=1e-3, atol=1e-3)
+        True
     """
     fleft = f(left)
     fright = f(right)
     # print(fleft, fright)
 
     if fleft * fright > 0:
-        # print("Error: f(left) and f(right) must have opposite signs.")
-        warnings.warn("Warning: f(left) and f(right) must have opposite signs.")
+        warnings.warn(
+            f"Warning: f(left) and f(right) must have opposite signs. Problem while bisection {f.__name__}. f({left})={fleft}, f({right})={fright}."
+        )
         return np.nan
 
-    while fleft * fright < 0 and right - left > tol:
+    if np.isnan(fleft) or np.isnan(fright):
+        return np.nan
+
+    while fleft * fright < 0 and abs(right - left) > tol:
         mid = (left + right) / 2
         fmid = f(mid)
-        if fmid == 0:
+        if np.isnan(fmid):  # if we hit a NaN, return NaN
+            return np.nan
+        if fmid == 0:  # hit the root by chance
             return mid
         # print(left, mid, right)
         # print(fleft, fmid, fright)
-        if fleft * fmid < 0:
+        if fleft * fmid < 0:  # root to the left of middle, move right edge to middle
             right = mid
             fright = fmid
-        else:
+        else:  # root to the right of middle, move left edge to middle
             left = mid
             fleft = fmid
     return (left + right) / 2

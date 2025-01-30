@@ -88,7 +88,7 @@ def point_solution(
                     outflow_temperature=outflow_temperature,
                 )
             ),
-            0.8,
+            0.9,
             1.2,
             1e-6,  # threshold
         )
@@ -97,12 +97,12 @@ def point_solution(
             ds["msl"].values * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
         ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
 
-        return pm_car - pm_cle
+        return pm_cle - pm_car
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
     r0 = bisection(
         try_for_r0, 200 * 1000, 5000 * 1000, 1e-3
-    )  # find potential size \(r_a\) between 200 and 5000 km
+    )  # find potential size \(r_a\) between 200 and 5000 km with 1e-3 m absolute tolerance
 
     pm_cle, rmax_cle, vmax, pc = run_cle15(
         inputs={"r0": r0, "Vmax": ds["vmax"].values}, plot=False
@@ -166,7 +166,6 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
     # we should call point_solution(ds_part, include_profile=False)
     # Step 1: Stack all spatial dimensions into a single dimension
     # ds.dims
-    print("ds.dims", ds.dims, type(ds.dims))
     dims = list(ds.dims)
 
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
@@ -175,6 +174,7 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
             assert not np.isnan(ids.sst.values)
             return point_solution(ids, include_profile=False)
         except Exception as e:
+            print("Exception:", e)
             ids["pm"] = np.nan
             ids["pc"] = np.nan
             ids["r0"] = np.nan
@@ -197,7 +197,6 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
         return xr.concat(results, dim=dims[0])
     else:
         ds_stacked = ds.stack(stacked_dim=dims)
-        print("ds_stacked", ds_stacked)
 
         def process_point(index: int) -> xr.Dataset:
             """Apply point_solution to a single data point."""
@@ -209,19 +208,11 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
         results = Parallel(n_jobs=10)(
             delayed(process_point)(i) for i in range(ds_stacked.sizes["stacked_dim"])
         )
-        print("results", results)
 
         # Step 3: Reconstruct the original dataset dimensions
-        print("concat", xr.concat(results, dim="stacked_dim"))
-
-        # Restore multi-index before unstacking
-        print(
-            "multindex",
-            xr.concat(results, dim="stacked_dim").set_index(stacked_dim=dims),
-        )
         return (
             xr.concat(results, dim="stacked_dim")
-            .set_index(stacked_dim=dims)
+            .set_index(stacked_dim=dims)  # Restore multi-index before unstacking
             .unstack("stacked_dim")
         )
 
@@ -240,7 +231,6 @@ def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
     Returns:
         xr.Dataset: Dataset with 1D `lon(x)` and `lat(y)`, replacing the old ones.
     """
-    print("2d coords", ds)
     # Extract 1D latitude and longitude
     lon_1d = ds["lon"].isel(y=0)  # Take the first row (constant across y)
     lat_1d = ds["lat"].isel(x=0)  # Take the first column (constant across x)
@@ -252,8 +242,6 @@ def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
     ds = ds.assign_coords(lon=("x", lon_1d.values), lat=("y", lat_1d.values))
 
     ds = ds.set_coords(["lon", "lat"])
-
-    print("1d coords", ds)
 
     return ds
 
@@ -295,7 +283,7 @@ if __name__ == "__main__":
             "sst": (("y", "x"), [[28, 28], [28, 28]]),  # degC
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
         },
-        coords={"lat": (("y", "x"), [[28, 28], [29, 29]])},  # degNorth
+        coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth
     )
     print(in_ds)
     out_ds = loop_through_dimensions(in_ds)
