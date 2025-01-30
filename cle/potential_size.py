@@ -22,6 +22,17 @@ from .constants import (
     W_COOL_DEFAULT,
     RHO_AIR_DEFAULT,
     SUPERGRADIENT_FACTOR,
+    LATENT_HEAT_OF_VAPORIZATION,
+    GAS_CONSTANT_FOR_WATER_VAPOR,
+    GAS_CONSTANT,
+    BETA_LIFT_PARAMETERIZATION_DEFAULT,
+    EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT,
+    PRESSURE_DRY_AT_INFLOW_DEFAULT,
+    MAX_WIND_SPEED_DEFAULT,
+    RADIUS_OF_MAX_WIND_DEFAULT,
+    RADIUS_OF_INFLOW_DEFAULT,
+    NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,
+    OUTFLOW_TEMPERATURE_DEFAULT,
 )
 from .utils import (
     pressure_from_wind,
@@ -247,18 +258,18 @@ def wang_diff(
 
 
 def wang_consts(
-    near_surface_air_temperature: float = 299,  # K
-    outflow_temperature: float = 200,  # K
-    latent_heat_of_vaporization: float = 2.27e6,  # J/kg
-    gas_constant_for_water_vapor: float = 461,  # J/kg/K
-    gas_constant: float = 287,  # J/kg/K
-    beta_lift_parameterization: float = 1.25,  # dimensionless
-    efficiency_relative_to_carnot: float = 0.5,  # dimensionless
-    pressure_dry_at_inflow: float = 985 * 100,  # Pa
+    near_surface_air_temperature: float = NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,  # K
+    outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,  # K
+    latent_heat_of_vaporization: float = LATENT_HEAT_OF_VAPORIZATION,  # J/kg
+    gas_constant_for_water_vapor: float = GAS_CONSTANT_FOR_WATER_VAPOR,  # J/kg/K
+    gas_constant: float = GAS_CONSTANT,  # J/kg/K
+    beta_lift_parameterization: float = BETA_LIFT_PARAMETERIZATION_DEFAULT,  # dimensionless
+    efficiency_relative_to_carnot: float = EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT,  # dimensionless
+    pressure_dry_at_inflow: float = PRESSURE_DRY_AT_INFLOW_DEFAULT,  # Pa
     coriolis_parameter: float = F_COR_DEFAULT,  # s-1
-    maximum_wind_speed: float = 83,  # m/s
-    radius_of_inflow: float = 2193 * 1000,  # m
-    radius_of_max_wind: float = 64 * 1000,  # m
+    maximum_wind_speed: float = MAX_WIND_SPEED_DEFAULT,  # m/s
+    radius_of_inflow: float = RADIUS_OF_INFLOW_DEFAULT,  # m
+    radius_of_max_wind: float = RADIUS_OF_MAX_WIND_DEFAULT,  # m
 ) -> Tuple[float, float, float]:  # a, b, c
     """
     Wang carnot engine model parameters.
@@ -341,7 +352,7 @@ def find_solution_rmaxv(
     background_pressure: float = BACKGROUND_PRESSURE,  # Pa
     near_surface_air_temperature: float = DEFAULT_SURF_TEMP,  # K
     w_cool: float = W_COOL_DEFAULT,  # K m s-1
-    outflow_temperature: float = 200,  # K
+    outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,  # K
     gamma_supergradient_factor: float = SUPERGRADIENT_FACTOR,  # dimensionless
     plot: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -475,7 +486,7 @@ def vary_r0_w22(r0s: np.ndarray) -> np.ndarray:
 
 
 def profile_from_vals(
-    rmax: float, vmax: float, r0: float, fcor=F_COR_DEFAULT, p0=1016 * 100
+    rmax: float, vmax: float, r0: float, fcor=F_COR_DEFAULT, p0=BACKGROUND_PRESSURE
 ):
     """
     Profile from values.
@@ -485,7 +496,7 @@ def profile_from_vals(
         vmax (float): vmax [m/s]
         r0 (float): r0 [m]
         fcor (float, optional): fcor. Defaults to 7.836084948051749e-05.
-        p0 (float, optional): p0. Defaults to 1016 * 100.
+        p0 (float, optional): p0. Defaults to 1015_00.
 
     Returns:
         dict: Dictionary of values using pressure wind relationship.
