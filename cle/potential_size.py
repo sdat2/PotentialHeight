@@ -1,16 +1,13 @@
 """Run the CLE15 model with json files or octopy."""
 
 from typing import Callable, Tuple, Optional, Dict
-import os, shutil
+import os
 import numpy as np
 import time
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
-
-# from oct2py import Oct2Py, get_log
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
-from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from .constants import (
     BACKGROUND_PRESSURE,
@@ -43,54 +40,6 @@ from .utils import (
 from .solve import bisection
 
 plot_defaults()
-
-os.environ["OCTAVE_CLI_OPTIONS"] = str(
-    "--no-gui --no-gui-libs"  # --jit-compiler"  # disable gui to improve performance jit-compiler broke code
-)
-if shutil.which("octave") is not None:
-    os.environ["OCTAVE_EXECUTABLE"] = shutil.which("octave")
-"""
-try:
-    OC = Oct2Py(logger=get_log())
-    OC.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
-except Exception as e:
-    # allow the code to be tested without octave
-    print("Octopy Initialization Exception", e)
-    # assert False
-    OC = None
-"""
-OC = None
-
-
-@timeit
-def _run_cle15_oct2py(
-    **kwargs,
-) -> dict:  # Tuple[np.ndarray, np.ndarray, float, float, float]:
-    """
-    Run the CLE15 model using oct2py.
-
-    Returns:
-        dict: dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
-    """
-    in_dict = read_json(os.path.join(DATA_PATH, "inputs.json"))
-    in_dict.update(kwargs)
-    # print(in_dict)
-    # OC.eval("path")
-    rr, VV, rmax, rmerge, Vmerge = OC.feval(
-        "ER11E04_nondim_r0input",
-        in_dict["Vmax"],
-        in_dict["r0"],
-        in_dict["fcor"],
-        in_dict["Cdvary"],
-        in_dict["Cd"],
-        in_dict["w_cool"],
-        in_dict["CkCdvary"],
-        in_dict["CkCd"],
-        in_dict["eye_adj"],
-        in_dict["alpha_eye"],
-        nout=5,
-    )
-    return dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
 
 
 def _inputs_to_name(inputs: dict) -> str:
@@ -148,7 +97,6 @@ def run_cle15(
     execute: bool = True,
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
-    oct2py: bool = False,
 ) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
@@ -157,16 +105,12 @@ def run_cle15(
         execute (bool, optional): Execute the model. Defaults to True.
         plot (bool, optional): Plot the output. Defaults to False.
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
-        oct2py (bool, optional): Use oct2py. Defaults to False, as oct2py seems to be slower than direct octave on ARCHER2 compute nodes.
 
     Returns:
         Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
     """
 
-    if oct2py and OC is not None:  # should be faster if graphical element disabled
-        ou = _run_cle15_oct2py(inputs)
-    else:
-        ou = _run_cle15_octave(inputs, execute)
+    ou = _run_cle15_octave(inputs, execute)
     # read default values from the inputs.json file
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
 
@@ -514,35 +458,10 @@ def profile_from_vals(
 
 if __name__ == "__main__":
     # python -m cle.potential_size
-    # find_solution()
-    # find_solution_rmaxv()
-    # calc_solns_for_times(num=50)
-    # plot_gom_solns()
-    # ds_solns(num=2, verbose=True, ds_name="gom_soln_2.nc")
-    # plot_from_ds()  # ds_name="gom_soln_2.nc")
-    # plot_soln_curves()
-    # plot_gom_bbox()
-    # ds_solns(num=50, verbose=True, ds_name="data/gom_soln_new.nc")
-    # find_solution_rmaxv()
-
-    # from timeit import timeit
-
-    # tick = time.perf_counter()
-
-    # for _ in range(10):
-    #     _run_cle15_oct2py()  # oct2py not working on ARCHER2
-
-    # tock = time.perf_counter()
-    # oct2py_time = tock - tick
-
     tick = time.perf_counter()
-
     vmaxs = np.linspace(80, 90, num=10)
-
     for vmax in vmaxs:
         _run_cle15_octave({"Vmax": vmax}, True)
     tock = time.perf_counter()
     octave_time = tock - tick
-
-    # print(f"Time taken by oct2py for 10 loops is {oct2py_time:.1f} s")  # 21.4 s
     print(f"Time taken by octave for 10 loops is {octave_time:.1f} s")  # 50.9 s
