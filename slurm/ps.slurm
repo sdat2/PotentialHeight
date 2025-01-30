@@ -38,7 +38,8 @@ which python
 # run python job
 # python -m cle.potential_size
 
-pytest ../cle/ps.py
+# pytest ../cle/ps.py
+python -m cle.ps
 
 # Time taken by oct2py for 10 loops is 21.8 s
 # Time taken by octave for 10 loops is 7.9 s

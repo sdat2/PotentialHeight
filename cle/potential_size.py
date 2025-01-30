@@ -6,7 +6,8 @@ import numpy as np
 import time
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
-from oct2py import Oct2Py, get_log
+
+# from oct2py import Oct2Py, get_log
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
 from sithom.time import timeit
@@ -37,6 +38,7 @@ os.environ["OCTAVE_CLI_OPTIONS"] = str(
 )
 if shutil.which("octave") is not None:
     os.environ["OCTAVE_EXECUTABLE"] = shutil.which("octave")
+"""
 try:
     OC = Oct2Py(logger=get_log())
     OC.eval(f"addpath(genpath('{os.path.join(SRC_PATH, 'mcle')}'))")
@@ -45,6 +47,8 @@ except Exception as e:
     print("Octopy Initialization Exception", e)
     # assert False
     OC = None
+"""
+OC = None
 
 
 @timeit

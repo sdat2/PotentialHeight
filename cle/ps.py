@@ -147,36 +147,83 @@ def point_solution(
     return ds
 
 
-# def loop_through_dimension(ds: xr.Dataset) -> xr.Dataset:
-# I could have a dfs type function for implementing this?
-
-
 @timeit
 def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Apply point solution to all of the points in the dataset, using joblib to paralelize.
+
+    Args:
+        ds (xr.Dataset): contains msl, vmax, sst, t0 and lat.
+
+    Returns:
+        xr.Dataset: additionally contains r0, pm, pc, and rmax.
+    """
     # the dataset might have a series of dimensions: time, lat, lon, member, etc.
     # it must have variables msl, vmax, sst, and t0, and coordinate lat for each point
     # we want to loop through these (in parallel) and apply the point_solution function
     # to each point, so that we end up with a new dataset with the same dimensions
     # that now has additional variables r0, pm, pc, rmax
-    # should I use ufunc from xarray
     # we should call point_solution(ds_part, include_profile=False)
     # Step 1: Stack all spatial dimensions into a single dimension
     # ds.dims
     print("ds.dims", ds.dims, type(ds.dims))
-    ds_stacked = ds.stack(stacked_dim=ds.dims)
+    dims = list(ds.dims)
 
-    def process_point(index):
-        """Apply point_solution to a single data point."""
-        return point_solution(ds_stacked.isel(stacked_dim=index), include_profile=False)
+    def ps_skip(ids: xr.Dataset) -> xr.Dataset:
+        try:
+            assert not np.isnan(ids.vmax.values)
+            assert not np.isnan(ids.sst.values)
+            return point_solution(ids, include_profile=False)
+        except Exception as e:
+            ids["pm"] = np.nan
+            ids["pc"] = np.nan
+            ids["r0"] = np.nan
+            ids["rmax"] = np.nan
+            return ids
 
-    print(f"About to conduct {ds_stacked.sizes['stacked_dim']} jobs in parallel")
-    # Step 2: Parallelize computation across all stacked points
-    results = Parallel(n_jobs=-1)(
-        delayed(process_point)(i) for i in range(ds_stacked.sizes["stacked_dim"])
-    )
+    if len(dims) == 0:
+        assert False
+    elif len(dims) == 1:
 
-    # Step 3: Reconstruct the original dataset dimensions
-    return xr.concat(results, dim="stacked_dim").unstack("stacked_dim")
+        def process_point(index: int) -> xr.Dataset:
+            """Apply point_solution to a single data point."""
+            # return point_solution(ds_stacked.isel(stacked_dim=index), include_profile=False)
+            return ps_skip(ds.isel({dims[0]: index}))
+
+        print(f"About to conduct {ds.sizes[dims[0]]} jobs in parallel")
+        results = Parallel(n_jobs=10)(
+            delayed(process_point)(i) for i in range(ds.sizes[dims[0]])
+        )
+        return xr.concat(results, dim=dims[0])
+    else:
+        ds_stacked = ds.stack(stacked_dim=dims)
+        print("ds_stacked", ds_stacked)
+
+        def process_point(index: int) -> xr.Dataset:
+            """Apply point_solution to a single data point."""
+            # return point_solution(ds_stacked.isel(stacked_dim=index), include_profile=False)
+            return ps_skip(ds_stacked.isel(stacked_dim=index))
+
+        print(f"About to conduct {ds_stacked.sizes['stacked_dim']} jobs in parallel")
+        # Step 2: Parallelize computation across all stacked points
+        results = Parallel(n_jobs=10)(
+            delayed(process_point)(i) for i in range(ds_stacked.sizes["stacked_dim"])
+        )
+        print("results", results)
+
+        # Step 3: Reconstruct the original dataset dimensions
+        print("concat", xr.concat(results, dim="stacked_dim"))
+
+        # Restore multi-index before unstacking
+        print(
+            "multindex",
+            xr.concat(results, dim="stacked_dim").set_index(stacked_dim=dims),
+        )
+        return (
+            xr.concat(results, dim="stacked_dim")
+            .set_index(stacked_dim=dims)
+            .unstack("stacked_dim")
+        )
 
 
 def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
@@ -224,10 +271,35 @@ if __name__ == "__main__":
     )
     # out_ds = point_solution(in_ds)
     # print(out_ds)
-
     # out_ds = loop_through_dimensions(in_ds)
     # print(out_ds)
+    in_ds = xr.Dataset(
+        data_vars={
+            "msl": ("y", [1016.7, 1016.7]),  # mbar or hPa
+            "vmax": ("y", [49.5, 49.5]),  # m/s, potential intensity
+            "sst": ("y", [28, 28]),  # degC
+            "t0": ("y", [200, 200]),  # degK
+        },
+        coords={"lat": ("y", [28, 29])},  # degNorth
+    )
+    out_ds = loop_through_dimensions(in_ds)
+    print(out_ds)
 
+    in_ds = xr.Dataset(
+        data_vars={
+            "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
+            "vmax": (
+                ("y", "x"),
+                [[49.5, 49.5], [49.5, 49.5]],
+            ),  # m/s, potential intensity
+            "sst": (("y", "x"), [[28, 28], [28, 28]]),  # degC
+            "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
+        },
+        coords={"lat": (("y", "x"), [[28, 28], [29, 29]])},  # degNorth
+    )
+    print(in_ds)
+    out_ds = loop_through_dimensions(in_ds)
+    print(out_ds)
     ex_data_path = "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r4i1p1f1.nc"
     in_ds = convert_2d_coords_to_1d(
         xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]]
@@ -236,5 +308,7 @@ if __name__ == "__main__":
     )  # .sel(
     #    lon=slice(-100, -80), lat=slice(25, 35)
     # )  # get necessry inputs, get relevant box
-    out_ds = loop_through_dimensions(in_ds)
-    print(out_ds)
+    # out_ds = loop_through_dimensions(in_ds)
+    # print(out_ds)
+    # out_ds.to_netcdf("example_ps_output.nc")
+    print(in_ds)
