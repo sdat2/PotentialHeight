@@ -15,10 +15,8 @@ from .potential_size import (
     run_cle15,
     wang_diff,
     wang_consts,
-    vary_r0_c15,
-    vary_r0_w22,
-    find_solution_rmaxv,
 )
+from .ps_old import vary_r0_c15, vary_r0_w22, find_solution_rmaxv
 from .utils import coriolis_parameter_from_lat, buck_sat_vap_pressure
 from .solve import bisection
 

@@ -4,6 +4,7 @@ import os
 from joblib import Parallel, delayed
 import numpy as np
 import xarray as xr
+from tqdm import tqdm
 from sithom.io import read_json
 from sithom.time import timeit
 from .constants import (
@@ -12,6 +13,12 @@ from .constants import (
     W_COOL_DEFAULT,
     RHO_AIR_DEFAULT,
     SUPERGRADIENT_FACTOR,
+    LOWER_RADIUS_BISECTION,
+    UPPER_RADIUS_BISECTION,
+    PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
+    LOWER_Y_WANG_BISECTION,
+    UPPER_Y_WANG_BISECTION,
+    W22_BISECTION_TOLERANCE,
 )
 from .potential_size import run_cle15, wang_diff, wang_consts
 from .utils import (
@@ -91,9 +98,9 @@ def point_solution(
                     outflow_temperature=outflow_temperature,
                 )
             ),
-            0.3,
-            1.2,
-            1e-6,  # threshold
+            LOWER_Y_WANG_BISECTION,
+            UPPER_Y_WANG_BISECTION,
+            W22_BISECTION_TOLERANCE,  # threshold
         )
         # convert solution to pressure
         pm_car = (  # 100 to convert from hPa to Pa
@@ -104,7 +111,10 @@ def point_solution(
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
     r0 = bisection(
-        try_for_r0, 200 * 1000, 5000 * 1000, 1e-3
+        try_for_r0,
+        LOWER_RADIUS_BISECTION,
+        UPPER_RADIUS_BISECTION,
+        PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
     )  # find potential size \(r_a\) between 200 and 5000 km with 1e-3 m absolute tolerance
 
     pm_cle, rmax_cle, vmax, pc = run_cle15(
@@ -209,7 +219,8 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
         print(f"About to conduct {ds_stacked.sizes['stacked_dim']} jobs in parallel")
         # Step 2: Parallelize computation across all stacked points
         results = Parallel(n_jobs=10)(
-            delayed(process_point)(i) for i in range(ds_stacked.sizes["stacked_dim"])
+            delayed(process_point)(i)
+            for i in tqdm(range(ds_stacked.sizes["stacked_dim"]))
         )
 
         # Step 3: Reconstruct the original dataset dimensions
@@ -249,8 +260,7 @@ def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-if __name__ == "__main__":
-    # python -m cle.ps
+def single_point_example():
     in_ds = xr.Dataset(
         data_vars={
             "msl": 1016.7,  # mbar or hPa
@@ -261,9 +271,10 @@ if __name__ == "__main__":
         coords={"lat": 28},  # degNorth
     )
     out_ds = point_solution(in_ds)
-    # print(out_ds)
-    # out_ds = loop_through_dimensions(in_ds)
-    # print(out_ds)
+    print(out_ds)
+
+
+def multi_point_example_1d() -> None:
     in_ds = xr.Dataset(
         data_vars={
             "msl": ("y", [1016.7, 1016.7]),  # mbar or hPa
@@ -276,6 +287,8 @@ if __name__ == "__main__":
     out_ds = loop_through_dimensions(in_ds)
     print(out_ds)
 
+
+def multi_point_example_2d() -> None:
     in_ds = xr.Dataset(
         data_vars={
             "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
@@ -291,17 +304,20 @@ if __name__ == "__main__":
     print(in_ds)
     out_ds = loop_through_dimensions(in_ds)
     print(out_ds)
+
+
+@timeit
+def trimmed_cmip6_example() -> None:
     ex_data_path = "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r4i1p1f1.nc"
-    in_ds = convert_2d_coords_to_1d(
-        xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]]
-    ).isel(
-        time=7, y=slice(160, 260), x=slice(160, 300)
-    )  # .sel(
-    #    lon=slice(-100, -80), lat=slice(25, 35)
-    # )  # get necessry inputs, get relevant box
+    in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(
+        time=7, y=slice(220, 245), x=slice(165, 205)
+    )
     out_ds = loop_through_dimensions(in_ds)
     print(out_ds)
-    # from tcpips.constants import DATA_PATH
-
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output.nc"))
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output_small.nc"))
     print(in_ds)
+
+
+if __name__ == "__main__":
+    # python -m cle.ps
+    trimmed_cmip6_example()
