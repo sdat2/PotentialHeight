@@ -54,11 +54,11 @@ def _inputs_to_name(inputs: dict) -> str:
     """
     name = ""
     for key in sorted(inputs.keys()):  # for consistent order
-        name += key + f"_{inputs[key]:.7e}"  # reasonable precision
-    return name
+        name += key + f"_{inputs[key]:.15e}"  # v. high precision
+    return str(abs(hash(name)))
 
 
-def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
+def _run_cle15_octave(inputs: dict) -> dict:
     """
     Run the CLE15 model using octave.
 
@@ -82,19 +82,17 @@ def _run_cle15_octave(inputs: dict, execute: bool) -> dict:
     write_json(ins, os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
 
     # run octave file r0_pm.m
-    if execute:
-        # disabling gui leads to one order of magnitude speedup
-        # also the pop-up window makes me feel sick due to the screen moving about.
-        os.system(
-            f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
-        )
+    # disabling gui leads to one order of magnitude speedup
+    # also the pop-up window makes me feel sick due to the screen moving about.
+    os.system(
+        f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
+    )
 
     # read in the output from r0_pm.m
     return read_json(os.path.join(DATA_PATH, "tmp", name + "-outputs.json"))
 
 
 def run_cle15(
-    execute: bool = True,
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
 ) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
@@ -102,7 +100,6 @@ def run_cle15(
     Run the CLE15 model.
 
     Args:
-        execute (bool, optional): Execute the model. Defaults to True.
         plot (bool, optional): Plot the output. Defaults to False.
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
 
@@ -110,7 +107,7 @@ def run_cle15(
         Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
     """
 
-    ou = _run_cle15_octave(inputs, execute)
+    ou = _run_cle15_octave(inputs)
     # read default values from the inputs.json file
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
 
@@ -446,8 +443,8 @@ def profile_from_vals(
         dict: Dictionary of values using pressure wind relationship.
     """
     # rr = np.linspace(0, r0, num=1000)
-    ou = _run_cle15_oct2py(
-        **{"r0": r0, "Vmax": vmax, "rmax": rmax, "fcor": fcor, "p0": p0 / 100}
+    ou = _run_cle15_octave(
+        {"r0": r0, "Vmax": vmax, "rmax": rmax, "fcor": fcor, "p0": p0 / 100}
     )
     for key in ou:
         if isinstance(ou[key], np.ndarray):
@@ -461,7 +458,8 @@ if __name__ == "__main__":
     tick = time.perf_counter()
     vmaxs = np.linspace(80, 90, num=10)
     for vmax in vmaxs:
-        _run_cle15_octave({"Vmax": vmax}, True)
+        ou = _run_cle15_octave({"Vmax": vmax})
+        print(vmax, ou)
     tock = time.perf_counter()
     octave_time = tock - tick
     print(f"Time taken by octave for 10 loops is {octave_time:.1f} s")  # 50.9 s

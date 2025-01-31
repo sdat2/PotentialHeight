@@ -295,7 +295,7 @@ if __name__ == "__main__":
     in_ds = convert_2d_coords_to_1d(
         xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]]
     ).isel(
-        time=7, y=slice(160, 260), x=slice(120, 360)
+        time=7, y=slice(160, 260), x=slice(160, 300)
     )  # .sel(
     #    lon=slice(-100, -80), lat=slice(25, 35)
     # )  # get necessry inputs, get relevant box
