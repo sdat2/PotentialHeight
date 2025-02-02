@@ -84,6 +84,21 @@ def pressure_from_wind_new(
     """
     Pressure from wind new.
 
+    Assume cyclogeostrophic balance
+
+    \frac{dp}{dr}=\rho(r)\left(\frac{v(r)^2}{r} +fv(r)\right)
+
+    If ideal gas following isothermal expansion then rho1/p1 = rho2/p2.
+
+    So rho(r) = rho0/p0*p(r)
+
+    \frac{dp}{dr}=p(r) \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right)
+
+    \frac{dlog(p)}{dr} = \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right)
+
+    p(r) = \int^{\inf}_{r}\frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right) dr
+
+
     Args:
         rr (np.ndarray): radii. Ascending order.
         vv (np.ndarray): velocities. From center to edge.
@@ -96,23 +111,27 @@ def pressure_from_wind_new(
 
     Example:
         >>> r0 = 1_000_000
-        >>> rr = np.linspace(1e-4, r0, 100)
+        >>> rr = np.linspace(0, r0, 100)
         >>> vmax = 50
         >>> rmax = 30_000
         >>> vv = vmax * (rr / rmax) * np.exp(1 - rr / rmax)
         >>> pp1 = pressure_from_wind_new(rr, vv)
         >>> pp2 = pressure_from_wind(rr, vv)
+        >>> assert pp1[0] < pp2[0]
+        >>> rr = np.array([0, 1, 2, 3, 4, 5])
+        >>> vv = np.array([0] * 6)
+        >>> p = pressure_from_wind_new(rr, vv)
+        >>> np.allclose(p, np.array([1015_00] * 6), rtol=1e-3, atol=1e-6)
+        True
     """
     if isinstance(rr, list):
         rr = np.array(rr)
     if isinstance(vv, list):
         vv = np.array(vv)
     assert np.all(rr == np.sort(rr))  # check if rr is sorted
-
-    integrand = (vv**2 / rr + fcor * vv) * rho0 / p0
+    integrand = (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0  # adding small delta
     integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)
-    p = p0 * np.exp(integral[::-1])
-    return p
+    return p0 * np.exp(integral[::-1])
 
 
 def buck_sat_vap_pressure(
