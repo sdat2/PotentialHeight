@@ -3,6 +3,7 @@ Utilities for idealized tropical cyclone calculations.
 """
 
 import numpy as np
+from scipy.integrate import cumulative_trapezoid
 from .constants import TEMP_0K
 
 
@@ -31,9 +32,9 @@ def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
 def pressure_from_wind(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m/s]
-    p0: float = 1015 * 100,  # Pa
-    rho0: float = 1.15,  # kg m-3
-    fcor: float = 5e-5,  # s-2
+    p0: float = 1015 * 100,  # [Pa]
+    rho0: float = 1.15,  # [kg m-3]
+    fcor: float = 5e-5,  # [s-1]
 ) -> np.ndarray:  # [Pa]
     """
     Use coriolis force and pressure gradient force to find physical
@@ -55,7 +56,7 @@ def pressure_from_wind(
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
         >>> vv = np.array([0] * 6)
         >>> p = pressure_from_wind(rr, vv)
-        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6)
+        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
         True
     """
     p = np.zeros(rr.shape)  # [Pa]
@@ -71,6 +72,47 @@ def pressure_from_wind(
         ) * (rr[i + 1] - rr[i])
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
     return p  # pressure profile [Pa]
+
+
+def pressure_from_wind_new(
+    rr: np.ndarray,  # [m]
+    vv: np.ndarray,  # [m s-1]
+    p0: float = 1015 * 100,  # [Pa]
+    rho0: float = 1.15,  # [kg m-3]
+    fcor: float = 5e-5,  # [s-1]
+) -> np.ndarray:  # [Pa]
+    """
+    Pressure from wind new.
+
+    Args:
+        rr (np.ndarray): radii. Ascending order.
+        vv (np.ndarray): velocities. From center to edge.
+        p0 (float): background pressure. Defaults to 1015_00 Pa.
+        rho0 (float): background density. Defaults to 1.15 kg m-3.
+        fcor (float): coriolis force. Defaults to 5e-5 [s-1].
+
+    Returns:
+        np.ndarray: pressure profile [Pa]
+
+    Example:
+        >>> r0 = 1_000_000
+        >>> rr = np.linspace(1e-4, r0, 100)
+        >>> vmax = 50
+        >>> rmax = 30_000
+        >>> vv = vmax * (rr / rmax) * np.exp(1 - rr / rmax)
+        >>> pp1 = pressure_from_wind_new(rr, vv)
+        >>> pp2 = pressure_from_wind(rr, vv)
+    """
+    if isinstance(rr, list):
+        rr = np.array(rr)
+    if isinstance(vv, list):
+        vv = np.array(vv)
+    assert np.all(rr == np.sort(rr))  # check if rr is sorted
+
+    integrand = (vv**2 / rr + fcor * vv) * rho0 / p0
+    integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)
+    p = p0 * np.exp(integral[::-1])
+    return p
 
 
 def buck_sat_vap_pressure(

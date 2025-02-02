@@ -56,6 +56,19 @@ def _inputs_to_name(inputs: dict) -> str:
     return str(abs(hash(name)))
 
 
+def process_inputs(inputs: dict) -> dict:
+    ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
+    ins["w_cool"] = W_COOL_DEFAULT
+    ins["p0"] = BACKGROUND_PRESSURE
+    # ins["CkCd"]
+
+    if inputs is not None:
+        for key in inputs:
+            if key in ins:
+                ins[key] = inputs[key]
+    return ins
+
+
 def _run_cle15_octave(inputs: dict) -> dict:
     """
     Run the CLE15 model using octave.
@@ -68,15 +81,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
         dict: dict(rr=rr, VV=VV, rmax=rmax, rmerge=rmerge, Vmerge=Vmerge)
     """
 
-    ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
-    ins["w_cool"] = W_COOL_DEFAULT
-    ins["p0"] = BACKGROUND_PRESSURE
-    # ins["CkCd"]
-
-    if inputs is not None:
-        for key in inputs:
-            if key in ins:
-                ins[key] = inputs[key]
+    ins = process_inputs(inputs)
 
     # Storm parameters
     name = _inputs_to_name(ins)
@@ -110,8 +115,7 @@ def run_cle15(
     """
 
     ou = _run_cle15_octave(inputs)
-    # read default values from the inputs.json file
-    ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
+    ins = process_inputs(inputs)  # find old data.
 
     if plot:
         # print(ou)
