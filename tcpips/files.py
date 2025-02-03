@@ -8,7 +8,7 @@ import collections
 from sithom.io import write_json
 from sithom.time import time_stamp, timeit
 from sithom.misc import human_readable_size
-from tcpips.constants import CMIP6_PATH, RAW_PATH, DATA_PATH, REGRIDDED_PATH
+from .constants import CMIP6_PATH, RAW_PATH, DATA_PATH, REGRIDDED_PATH
 
 
 def locker(path: str) -> callable:

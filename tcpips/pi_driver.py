@@ -4,10 +4,10 @@ import xarray as xr
 from dask.diagnostics import ProgressBar
 from sithom.misc import human_readable_size, get_git_revision_hash
 from sithom.time import timeit, time_stamp
-from tcpips.constants import REGRIDDED_PATH, PI_PATH
-from tcpips.files import locker
-from tcpips.convert import convert
-from tcpips.pi import calculate_pi
+from .constants import REGRIDDED_PATH, PI_PATH
+from .files import locker
+from .convert import convert
+from .pi import calculate_pi
 
 
 def find_atmos_ocean_pairs() -> Dict[str, Dict[str, any]]:
@@ -99,13 +99,13 @@ def pi_cmip6_part(
     time_chunk: int = 1,
 ) -> None:
     """
-    Potential intensity calculation part.
+    Potential intensity calculation one model ensemble member experiment.
 
     Args:
-        exp (str, optional): _description_. Defaults to "ssp585".
-        model (str, optional): _description_. Defaults to "CESM2".
-        member (str, optional): _description_. Defaults to "r4i1p1f1".
-        time_chunk (int, optional): _description_. Defaults to 1.
+        exp (str, optional): Which experiment. Defaults to "ssp585".
+        model (str, optional): Which model. Defaults to "CESM2".
+        member (str, optional): Which model member. Defaults to "r4i1p1f1".
+        time_chunk (int, optional): How big to chunk time. Defaults to 1.
     """
     print(f"exp:{exp} model:{model} member:{member}")
 
@@ -167,5 +167,5 @@ def pi_cmip6_part(
 
 if __name__ == "__main__":
     # python -m tcpips.pi_driver
-    pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
+    pi_cmip6_part(exp="ssp585", model="CESM2", member="r10i1p1f1")
     investigate_cmip6_pairs()

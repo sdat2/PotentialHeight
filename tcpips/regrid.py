@@ -119,7 +119,7 @@ def regrid_cmip6_part(
                 ]
                 if x in ds
             ]  ## REDUCING time for exp
-        ).isel(time=slice(0, 12))
+        )
         return ds  # .chunk(chunks={"time": time_chunk})
 
     in_ds = open_ds(
