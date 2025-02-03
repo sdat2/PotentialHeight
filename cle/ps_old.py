@@ -1,4 +1,7 @@
+"""Potential size old calculation functions."""
+
 import os
+from typing import Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from chavas15.intersect import curveintersect

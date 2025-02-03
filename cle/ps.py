@@ -30,7 +30,7 @@ from .solve import bisection
 
 
 @timeit
-def point_solution(
+def point_solution_ps(
     ds: xr.Dataset,
     supergradient_factor: float = SUPERGRADIENT_FACTOR,
     include_profile: bool = False,
@@ -59,7 +59,7 @@ def point_solution(
         ...     "t0": 200, # degK
         ...     },
         ...     coords={"lat":28})
-        >>> out_ds = point_solution(in_ds)
+        >>> out_ds = point_solution_ps(in_ds)
         >>> out_ds
     """
     near_surface_air_temperature = (
@@ -161,12 +161,13 @@ def point_solution(
 
 
 @timeit
-def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
+def paralelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
     """
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
 
     Args:
         ds (xr.Dataset): contains msl, vmax, sst, t0 and lat.
+        jobs (int, optional): Number of threads, defaults to 10.
 
     Returns:
         xr.Dataset: additionally contains r0, pm, pc, and rmax.
@@ -185,7 +186,7 @@ def loop_through_dimensions(ds: xr.Dataset) -> xr.Dataset:
         try:
             assert not np.isnan(ids.vmax.values)  # did not converge
             assert not np.isnan(ids.sst.values)  # is not sea
-            return point_solution(ids, include_profile=False)
+            return point_solution_ps(ids, include_profile=False)
         except Exception as e:
             print("Exception:", e)
             ids["pm"] = np.nan
@@ -260,7 +261,7 @@ def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
-def single_point_example():
+def single_point_example() -> None:
     in_ds = xr.Dataset(
         data_vars={
             "msl": 1016.7,  # mbar or hPa
@@ -270,7 +271,7 @@ def single_point_example():
         },
         coords={"lat": 28},  # degNorth
     )
-    out_ds = point_solution(in_ds)
+    out_ds = point_solution_ps(in_ds)
     print(out_ds)
 
 
@@ -284,7 +285,7 @@ def multi_point_example_1d() -> None:
         },
         coords={"lat": ("y", [28, 29])},  # degNorth
     )
-    out_ds = loop_through_dimensions(in_ds)
+    out_ds = paralelized_ps(in_ds)
     print(out_ds)
 
 
@@ -302,19 +303,23 @@ def multi_point_example_2d() -> None:
         coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth
     )
     print(in_ds)
-    out_ds = loop_through_dimensions(in_ds)
+    out_ds = paralelized_ps(in_ds)
     print(out_ds)
 
 
 @timeit
 def trimmed_cmip6_example() -> None:
-    ex_data_path = "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r4i1p1f1.nc"
+    ex_data_path = str(
+        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r4i1p1f1.nc"
+    )
     in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(
         time=7, y=slice(220, 245), x=slice(165, 205)
     )
-    out_ds = loop_through_dimensions(in_ds)
+    out_ds = paralelized_ps(in_ds)
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output_small.nc"))
+    out_ds.to_netcdf(
+        os.path.join(DATA_PATH, "example_potential_size_output_small_isotherm.nc")
+    )
     print(in_ds)
 
 

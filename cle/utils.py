@@ -3,7 +3,7 @@ Utilities for idealized tropical cyclone calculations.
 """
 
 import numpy as np
-from scipy.integrate import cumulative_trapezoid
+from scipy.integrate import cumulative_simpson
 from .constants import TEMP_0K
 
 
@@ -29,7 +29,7 @@ def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
     return 2 * 7.2921e-5 * np.sin(np.deg2rad(lat))
 
 
-def pressure_from_wind(
+def pressure_from_wind_old(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m/s]
     p0: float = 1015 * 100,  # [Pa]
@@ -41,6 +41,8 @@ def pressure_from_wind(
     pressure profile to correspond to the velocity profile.
 
     TODO: decrease air density in response to decreased pressure (will make central pressure lower).
+
+    This assumes cyclogeostrophic balance and constant density.
 
     Args:
         rr (np.ndarray): radii array [m].
@@ -74,7 +76,7 @@ def pressure_from_wind(
     return p  # pressure profile [Pa]
 
 
-def pressure_from_wind_new(
+def pressure_from_wind(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m s-1]
     p0: float = 1015 * 100,  # [Pa]
@@ -82,32 +84,37 @@ def pressure_from_wind_new(
     fcor: float = 5e-5,  # [s-1]
 ) -> np.ndarray:  # [Pa]
     """
-    Pressure from wind new.
+    Pressure from wind, assuming cyclogeostrophic balance and constant temperature.
 
-    Assume cyclogeostrophic balance
+    We assume cyclogeostrophic balance, with pressure gradient balancing the circular acceleration and coriolis force.
 
     \frac{dp}{dr}=\rho(r)\left(\frac{v(r)^2}{r} +fv(r)\right)
 
-    If ideal gas following isothermal expansion then rho1/p1 = rho2/p2.
+    where p is pressure, r is radius, \rho is density, f is coriolis parameter and v is velocity.
+    If ideal gas following isothermal expansion then rho1/p1 = rho2/p2, rho(r) = rho0/p0*p(r)
 
-    So rho(r) = rho0/p0*p(r)
+    Where rho0 and p0 are the background density and pressure respectively.
+    Substituting in we find that,
 
     \frac{dp}{dr}=p(r) \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right)
 
-    \frac{dlog(p)}{dr} = \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right)
+    and then bringing p(r) to the left hand side yields
 
-    p(r) = \int^{\inf}_{r}\frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right) dr
+    \frac{dlog(p)}{dr} = \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right),
 
+    allowing us to express p(r) by integrating from infinity to r:
+
+    p(r) = p0*\exp\left(\frac{rho0}{p0}\int^{\inf}_{r}\left(\frac{v(r)^2}{r} +fv(r)\right)\right) dr
 
     Args:
-        rr (np.ndarray): radii. Ascending order.
-        vv (np.ndarray): velocities. From center to edge.
-        p0 (float): background pressure. Defaults to 1015_00 Pa.
-        rho0 (float): background density. Defaults to 1.15 kg m-3.
+        rr (np.ndarray): radii. Ascending order [m].
+        vv (np.ndarray): velocities. From center to edge [m s-1].
+        p0 (float): background pressure. Defaults to 1015_00 [Pa].
+        rho0 (float): background density. Defaults to 1.15 [kg m-3].
         fcor (float): coriolis force. Defaults to 5e-5 [s-1].
 
     Returns:
-        np.ndarray: pressure profile [Pa]
+        np.ndarray: pressure profile [Pa].
 
     Example:
         >>> r0 = 1_000_000
@@ -115,8 +122,8 @@ def pressure_from_wind_new(
         >>> vmax = 50
         >>> rmax = 30_000
         >>> vv = vmax * (rr / rmax) * np.exp(1 - rr / rmax)
-        >>> pp1 = pressure_from_wind_new(rr, vv)
-        >>> pp2 = pressure_from_wind(rr, vv)
+        >>> pp1 = pressure_from_wind(rr, vv)
+        >>> pp2 = pressure_from_wind_old(rr, vv)
         >>> assert pp1[0] < pp2[0]
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
         >>> vv = np.array([0] * 6)
@@ -129,8 +136,11 @@ def pressure_from_wind_new(
     if isinstance(vv, list):
         vv = np.array(vv)
     assert np.all(rr == np.sort(rr))  # check if rr is sorted
-    integrand = (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0  # adding small delta
-    integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)
+    assert not (np.min(rr) < 0)  # no negative radii
+    integrand = (
+        (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0
+    )  # adding small delta 1e-6 to avoid singularity
+    integral = cumulative_simpson(integrand[::-1], rr[::-1], initial=0)
     return p0 * np.exp(integral[::-1])
 
 

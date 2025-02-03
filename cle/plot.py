@@ -26,11 +26,11 @@ from .constants import (
 
 from .solve import bisection
 from .potential_size import (
-    profile_from_vals,
     run_cle15,
     wang_diff,
     wang_consts,
 )
+from .ps_old import profile_from_vals
 from .utils import buck_sat_vap_pressure, carnot_factor, coriolis_parameter_from_lat
 from .ps_dataset import find_solution_ds, gom_timestep
 
@@ -128,7 +128,7 @@ def timeseries_plots_from_ds(
     ds["r0"].attrs = {"units": "m", "long_name": "Potential Size, $r_a$"}
     ds["vmax"].attrs = {
         "units": "m s$^{-1}$",
-        "long_name": "Potential Intensity, $V_{\mathrm{max}}$",
+        "long_name": "Potential Intensity, $V_{p}$",
     }
     ds["pm"].attrs = {
         "units": "Pa",
@@ -145,8 +145,8 @@ def timeseries_plots_from_ds(
     axs[2].plot(ds["time"], ds["pm"] / 100, "k")
     label_subplots(axs)
     plt.xlabel("Year")
-    axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
-    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[0].set_ylabel("Potential size, $r_a$, [km]")
+    axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     label_subplots(axs)
     plt.savefig(os.path.join(folder, "timeseries_rmax_time_new.pdf"))
@@ -156,8 +156,8 @@ def timeseries_plots_from_ds(
         ds["vmax"].values, ds["r0"].values / 1000, c=ds["time"], marker="x"
     )
     plt.colorbar(im, label="Year", shrink=0.5)
-    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
-    plt.ylabel("Radius of outer winds, $r_a$, [km]")
+    plt.xlabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
+    plt.ylabel("Potential size, $r_a$, [km]")
     plt.savefig(os.path.join(FIGURE_PATH, "timeseries_rmax_vmax.pdf"))
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
@@ -181,8 +181,8 @@ def timeseries_plots_from_ds(
     label_subplots(axs)
     plt.xlabel("Year")
     axs[0].set_ylabel("Sea surface temperature, $T_s$, [$^\circ$C]")
-    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
-    axs[2].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
+    axs[2].set_ylabel("Potential size, $r_a$, [km]")
     plt.savefig(os.path.join(folder, "timeseries_sst_vmax_rmax.pdf"))
 
     # do a line plot of carnot factor, vmax, and r0
@@ -203,8 +203,8 @@ def timeseries_plots_from_ds(
     axs[0].set_ylabel(
         r"Carnot factor, $\eta_c$, $\frac{T_h}{T_h- T_c}$ [dimensionless]"
     )
-    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
-    axs[2].set_ylabel("Radius of outer winds, $r_a$, [km]")
+    axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
+    axs[2].set_ylabel("Potential size, $r_a$, [km]")
     plt.savefig(os.path.join(folder, "timeseries_carnot_vmax_rmax.pdf"))
 
     # pairplot of carnot factor, vmax, and r0
@@ -308,8 +308,8 @@ def figure_two() -> None:
     ds["vmax"].plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
     axs[0, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
     axs[1, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
-    axs[0, 0].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
-    axs[0, 1].set_title("Potential intensity, $V_{\mathrm{max}}$ [m s$^{-1}$]")
+    axs[0, 0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[0, 1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
 
     ## work out correlation between time and vmax between 2000 and 2099
     year_min = 2014
@@ -423,21 +423,21 @@ def plot_soln_curves_timeseries(
 
     im = plt.scatter(ds.vmax, ds.r0 / 1000, c=ds.pm / 100, marker="x", linewidth=0.5)
     plt.colorbar(im, label="Pressure at maximum winds, $p_m$, [hPa]", shrink=0.5)
-    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.xlabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     plt.ylabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
     plt.savefig(os.path.join(folder, "timeseries_r0_vmax_pm.pdf"))
     plt.clf()
 
     im = plt.scatter(ds.vmax, ds.r0 / 1000, c=ds.time, marker="x", linewidth=0.5)
     plt.colorbar(im, label="Year", shrink=0.5)
-    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.xlabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     plt.ylabel("Outer Radius of Tropical Cyclone, $r_a$, [km]")
     plt.savefig(os.path.join(folder, "timeseries_r0_vmax_time.pdf"))
     plt.clf()
 
     im = plt.scatter(ds.vmax, ds.pm / 100, c=ds.r0, marker="x", linewidth=0.5)
     plt.colorbar(im, label="Outer Radius of Tropical Cyclone, $r_a$, [km]", shrink=0.5)
-    plt.xlabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    plt.xlabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     plt.ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     # add in pearson correlation coefficient
 
@@ -585,7 +585,7 @@ def spatial_plot_gom() -> None:
     )
     ds["vmax"].plot(
         ax=axs[1, 1],
-        cbar_kwargs={"label": "Potential intensity, $V_{\mathrm{max}}$, [m s$^{-1}$]"},
+        cbar_kwargs={"label": "Potential intensity, $V_{p}$, [m s$^{-1}$]"},
     )
     (ds["pm"] / 100).plot(
         ax=axs[2, 1], cbar_kwargs={"label": "Pressure at maximum winds, $P_m$, [hPa]"}
@@ -597,7 +597,7 @@ def spatial_plot_gom() -> None:
             if i != 0:
                 axs[i, j].set_ylabel("")
     ds["pm"].attrs["long_name"] = "Pressure at maximum winds, $P_m$"
-    ds["vmax"].attrs["long_name"] = "Potential intensity, $V_{\mathrm{max}}$"
+    ds["vmax"].attrs["long_name"] = "Potential intensity, $V_{p}$"
     ds["r0"].attrs["long_name"] = "Potential size, $r_a$"
     ds["t0"].attrs["long_name"] = "Outflow temperature, $T_0$"
     ds["sst"].attrs["long_name"] = "Sea surface temperature, $T_s$"
@@ -625,8 +625,8 @@ def plot_timeseries_gom_solns() -> None:
     axs[1].plot(ds["year"], ds["vmax"], "k")
     axs[2].plot(ds["year"], ds["pm"] / 100, "k")
     plt.xlabel("Year")
-    axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
-    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[0].set_ylabel("Potential size, $r_a$, [km]")
+    axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "timeseries_diff_rmax_time.pdf"))
@@ -650,8 +650,8 @@ def plot_and_calc_gom_soln_curve() -> None:
     axs[1].plot(times, solns[:, 1], "k")
     axs[2].plot(times, solns[:, 2] / 100, "k")
     plt.xlabel("Year")
-    axs[0].set_ylabel("Radius of outer winds, $r_a$, [km]")
-    axs[1].set_ylabel("Maximum wind speed, $V_{\mathrm{max}}$, [m s$^{-1}$]")
+    axs[0].set_ylabel("Potential size, $r_a$, [km]")
+    axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "soln_curve_rmax_time.pdf"))
