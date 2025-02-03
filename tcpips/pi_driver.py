@@ -2,8 +2,8 @@ import os
 from typing import Dict
 import xarray as xr
 from dask.diagnostics import ProgressBar
-from sithom.misc import human_readable_size
-from sithom.time import timeit
+from sithom.misc import human_readable_size, get_git_revision_hash
+from sithom.time import timeit, time_stamp
 from tcpips.constants import REGRIDDED_PATH, PI_PATH
 from tcpips.files import locker
 from tcpips.convert import convert
@@ -97,7 +97,16 @@ def pi_cmip6_part(
     model: str = "CESM2",
     member: str = "r4i1p1f1",
     time_chunk: int = 1,
-):
+) -> None:
+    """
+    Potential intensity calculation part.
+
+    Args:
+        exp (str, optional): _description_. Defaults to "ssp585".
+        model (str, optional): _description_. Defaults to "CESM2".
+        member (str, optional): _description_. Defaults to "r4i1p1f1".
+        time_chunk (int, optional): _description_. Defaults to 1.
+    """
     print(f"exp:{exp} model:{model} member:{member}")
 
     @timeit
@@ -123,22 +132,25 @@ def pi_cmip6_part(
                     "nbnd",
                 ]
                 if x in ds
-            ]  ## REDUCING time for exp
-        ).isel(time=slice(0, 12))
+            ]  ## REDUCING time for exp - just taking the first year
+        )
         return ds
 
-    ocean_ds = open_ds(
-        os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
-    )
+    ocean_path = os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
+    ocean_ds = open_ds(ocean_path)
     print("ocean_ds", ocean_ds)
     atmos_ds = open_ds(
         os.path.join(REGRIDDED_PATH, exp, "atmos", model, member) + ".nc"
     )
+    ocean_time = xr.open_dataset(ocean_path)["time"].values
     print("atmos_ds", atmos_ds)
     # convert units, merge datasets
     ds = convert(xr.merge([ocean_ds, atmos_ds]))
     pi = calculate_pi(ds.compute(), dim="p")
     ds = xr.merge([ds, pi])
+    ds = ds.assign_coords({"time": ("time", ocean_time)})
+    ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash()
+    ds.attrs["pi_calculated_at_time"] = time_stamp()
     folder = os.path.join(PI_PATH, exp, model)
     os.makedirs(folder, exist_ok=True)
     delayed_obj = ds.to_netcdf(
@@ -150,7 +162,10 @@ def pi_cmip6_part(
     with ProgressBar():
         _ = delayed_obj.compute()
 
+    print(ds)
+
 
 if __name__ == "__main__":
     # python -m tcpips.pi_driver
+    pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
     investigate_cmip6_pairs()

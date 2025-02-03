@@ -3,7 +3,7 @@ Utilities for idealized tropical cyclone calculations.
 """
 
 import numpy as np
-from scipy.integrate import cumulative_simpson
+from scipy.integrate import cumulative_simpson, cumulative_trapezoid
 from .constants import TEMP_0K
 
 
@@ -29,7 +29,7 @@ def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
     return 2 * 7.2921e-5 * np.sin(np.deg2rad(lat))
 
 
-def pressure_from_wind_old(
+def pressure_from_wind(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m/s]
     p0: float = 1015 * 100,  # [Pa]
@@ -76,7 +76,7 @@ def pressure_from_wind_old(
     return p  # pressure profile [Pa]
 
 
-def pressure_from_wind(
+def pressure_from_wind_new(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m s-1]
     p0: float = 1015 * 100,  # [Pa]
@@ -100,18 +100,18 @@ def pressure_from_wind(
 
     and then bringing p(r) to the left hand side yields
 
-    \frac{dlog(p)}{dr} = \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right),
+    \frac{1}{p}\frac{dp}{dr}=\frac{dlog(p)}{dr} = \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right),
 
-    allowing us to express p(r) by integrating from infinity to r:
+    allowing us to express p(r) by integrating from infinity to r,
 
-    p(r) = p0*\exp\left(\frac{rho0}{p0}\int^{\inf}_{r}\left(\frac{v(r)^2}{r} +fv(r)\right)\right) dr
+    p(r) = p0*\exp\left(\frac{rho0}{p0}\int^{\inf}_{r}\left(\frac{v(r)^2}{r} +fv(r)\right)dr\right).
 
     Args:
         rr (np.ndarray): radii. Ascending order [m].
         vv (np.ndarray): velocities. From center to edge [m s-1].
-        p0 (float): background pressure. Defaults to 1015_00 [Pa].
-        rho0 (float): background density. Defaults to 1.15 [kg m-3].
-        fcor (float): coriolis force. Defaults to 5e-5 [s-1].
+        p0 (float, optional): background pressure. Defaults to 1015_00 [Pa].
+        rho0 (float, optional): background density. Defaults to 1.15 [kg m-3].
+        fcor (float, optional): coriolis force. Defaults to 5e-5 [s-1].
 
     Returns:
         np.ndarray: pressure profile [Pa].
@@ -131,6 +131,13 @@ def pressure_from_wind(
         >>> np.allclose(p, np.array([1015_00] * 6), rtol=1e-3, atol=1e-6)
         True
     """
+    # all real inputs
+    assert isinstance(rho0, float) and isinstance(p0, float) and isinstance(fcor, float)
+    assert rho0 < 2 and rho0 > 0.5  # definitely between 0.5 and 2 kg m-3
+    assert p0 > 900_00 and p0 < 1100_00  # definitely between 900 hPa and 1100 hPa
+    assert (
+        fcor > 0
+    )  # assuming cyclonic winds, just take absolute value if you are in southern hemisphere
     if isinstance(rr, list):
         rr = np.array(rr)
     if isinstance(vv, list):
@@ -140,8 +147,11 @@ def pressure_from_wind(
     integrand = (
         (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0
     )  # adding small delta 1e-6 to avoid singularity
-    integral = cumulative_simpson(integrand[::-1], rr[::-1], initial=0)
-    return p0 * np.exp(integral[::-1])
+    integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
+    p = p0 * np.exp(integral)
+    print(p)
+    assert p[0] <= p[-1]
+    return p
 
 
 def buck_sat_vap_pressure(

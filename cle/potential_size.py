@@ -10,14 +10,12 @@ from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
 from .constants import (
     BACKGROUND_PRESSURE,
-    DEFAULT_SURF_TEMP,
     DATA_PATH,
     FIGURE_PATH,
     SRC_PATH,
     F_COR_DEFAULT,
     W_COOL_DEFAULT,
     RHO_AIR_DEFAULT,
-    SUPERGRADIENT_FACTOR,
     LATENT_HEAT_OF_VAPORIZATION,
     GAS_CONSTANT_FOR_WATER_VAPOR,
     GAS_CONSTANT,
@@ -42,7 +40,9 @@ plot_defaults()
 
 def _inputs_to_name(inputs: dict) -> str:
     """Create a unique naming string based on the input parameters
-    (could be hashed to shorten).
+    (now hashed to shorten).
+
+    There is a small probability of a hash collision during runs.
 
     Args:
         inputs (dict): input dict
@@ -83,9 +83,12 @@ def _run_cle15_octave(inputs: dict) -> dict:
 
     ins = process_inputs(inputs)
 
+    print("inputs", inputs)
+
     # Storm parameters
     name = _inputs_to_name(ins)
 
+    # write input file for octave to read
     write_json(ins, os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
 
     # run octave file r0_pm.m
@@ -113,9 +116,8 @@ def run_cle15(
     Returns:
         Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
     """
-
-    ou = _run_cle15_octave(inputs)
     ins = process_inputs(inputs)  # find old data.
+    ou = _run_cle15_octave(inputs)
 
     if plot:
         # print(ou)
@@ -154,10 +156,13 @@ def run_cle15(
 
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
-    p0 = ins["p0"] * 100  # [Pa]
+    p0 = ins["p0"] * 100  # [Pa] [originally in hPa]
     rho0 = RHO_AIR_DEFAULT  # [kg m-3]
     rr = np.array(ou["rr"])  # [m]
     vv = np.array(ou["VV"])  # [m/s]
+    print("rr", rr[:10], rr[-10:])
+    print("vv", vv[:10], vv[-10:])
+    vv[-1] = 0
     p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
     ou["p"] = p.tolist()
 

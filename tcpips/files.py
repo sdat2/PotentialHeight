@@ -53,7 +53,7 @@ def locker(path: str) -> callable:
             callable: wrapper function
         """
 
-        def wrapper(*args, **kwargs) -> callable:
+        def locker_for_cmip6_member(*args, **kwargs) -> callable:
             """Wrapper that runs before and after the function to create and remove lock files.
 
             If the lock file exists, the function will not run and return None.
@@ -77,7 +77,7 @@ def locker(path: str) -> callable:
                 os.remove(lock_file_path)  # remove lock file if function completes
                 return result
 
-        return wrapper
+        return locker_for_cmip6_member
 
     return decorator
 

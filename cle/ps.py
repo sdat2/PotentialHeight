@@ -325,4 +325,5 @@ def trimmed_cmip6_example() -> None:
 
 if __name__ == "__main__":
     # python -m cle.ps
-    trimmed_cmip6_example()
+    single_point_example()
+    # trimmed_cmip6_example()
