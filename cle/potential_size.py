@@ -2,6 +2,7 @@
 
 from typing import Callable, Tuple, Optional, Dict
 import os
+import subprocess
 import numpy as np
 import time
 from scipy.interpolate import interp1d
@@ -12,7 +13,6 @@ from .constants import (
     BACKGROUND_PRESSURE,
     DATA_PATH,
     FIGURE_PATH,
-    SRC_PATH,
     F_COR_DEFAULT,
     W_COOL_DEFAULT,
     RHO_AIR_DEFAULT,
@@ -36,6 +36,22 @@ from .utils import (
 )
 
 plot_defaults()
+
+
+def delete_tmp():
+    """Delete temporary folder."""
+    import os, shutil
+
+    folder = os.path.join(DATA_PATH, "tmp")
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+        except Exception as e:
+            print("Failed to delete %s. Reason: %s" % (file_path, e))
 
 
 def _inputs_to_name(inputs: dict) -> str:
@@ -91,14 +107,42 @@ def _run_cle15_octave(inputs: dict) -> dict:
     # write input file for octave to read
     write_json(ins, os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
 
+    # check file has been written
+    assert os.path.isfile(os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
+
+    time.sleep(0.1)  # wait for filesystem to sync for 0.1 s
+
     # run octave file r0_pm.m
     # disabling gui leads to one order of magnitude speedup
     # also the pop-up window makes me feel sick due to the screen moving about.
-    os.system(
-        f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
-    )
+    # import subprocess
+
+    # os.system(
+    #    f"octave --no-gui --no-gui-libs {os.path.# join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
+    # )
+
+    try:
+        result = subprocess.run(
+            ["octave", "--no-gui", "--no-gui-libs", "r0_pm.m"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/cle/mcle",
+        )
+        print(result.stdout.decode())
+    except subprocess.CalledProcessError as e:
+        print("Octave exited with code", e.returncode)
+        print("Standard error:", e.stderr.decode())
+
+    # subprocess.call(
+    #     (
+    #         "micromamba activate t1",
+    #         f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}",
+    #     )
+    # )
 
     # read in the output from r0_pm.m
+    time.sleep(0.5)  # sleep another 0.5s for file system to catch up with itself
     return read_json(os.path.join(DATA_PATH, "tmp", name + "-outputs.json"))
 
 
@@ -158,11 +202,12 @@ def run_cle15(
     # assume wind-pressure gradient balance
     p0 = ins["p0"] * 100  # [Pa] [originally in hPa]
     rho0 = RHO_AIR_DEFAULT  # [kg m-3]
-    rr = np.array(ou["rr"])  # [m]
-    vv = np.array(ou["VV"])  # [m/s]
+    ou["VV"][-1] = 0  # get rid of None at end of output.
+    assert None not in ou["VV"]
+    rr = np.array(ou["rr"], dtype="float32")  # [m]
+    vv = np.array(ou["VV"], dtype="float32")  # [m/s]
     print("rr", rr[:10], rr[-10:])
     print("vv", vv[:10], vv[-10:])
-    vv[-1] = 0
     p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
     ou["p"] = p.tolist()
 
@@ -177,7 +222,6 @@ def run_cle15(
         plt.clf()
 
     # plot the pressure profile
-
     return (
         interp1d(rr, p)(
             ou["rmax"]
@@ -300,6 +344,7 @@ def wang_consts(
 
 if __name__ == "__main__":
     # python -m cle.potential_size
+    delete_tmp()
     tick = time.perf_counter()
     vmaxs = np.linspace(80, 90, num=10)
     for vmax in vmaxs:

@@ -20,7 +20,7 @@ from .constants import (
     UPPER_Y_WANG_BISECTION,
     W22_BISECTION_TOLERANCE,
 )
-from .potential_size import run_cle15, wang_diff, wang_consts
+from .potential_size import run_cle15, wang_diff, wang_consts, delete_tmp
 from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
@@ -38,10 +38,7 @@ def point_solution_ps(
     """
     Find the solution for a given point in the grid.
 
-    # TODO: Implement bisection instead
     # TODO: Speed up?
-    # TODO: Get parallization working well
-    # TODO: Implement into potential intensity step?
 
     Args:
         ds (xr.Dataset): Dataset with the input values.
@@ -115,7 +112,7 @@ def point_solution_ps(
         LOWER_RADIUS_BISECTION,
         UPPER_RADIUS_BISECTION,
         PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
-    )  # find potential size \(r_a\) between 200 and 5000 km with 1e-3 m absolute tolerance
+    )  # find potential size \(r_a\) between 200 and 5000 km with 1 mbar absolute tolerance
 
     pm_cle, rmax_cle, vmax, pc = run_cle15(
         inputs={"r0": r0, "Vmax": ds["vmax"].values}, plot=False
@@ -205,7 +202,7 @@ def paralelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
             return ps_skip(ds.isel({dims[0]: index}))
 
         print(f"About to conduct {ds.sizes[dims[0]]} jobs in parallel")
-        results = Parallel(n_jobs=10)(
+        results = Parallel(n_jobs=jobs)(
             delayed(process_point)(i) for i in range(ds.sizes[dims[0]])
         )
         return xr.concat(results, dim=dims[0])
@@ -219,7 +216,7 @@ def paralelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
 
         print(f"About to conduct {ds_stacked.sizes['stacked_dim']} jobs in parallel")
         # Step 2: Parallelize computation across all stacked points
-        results = Parallel(n_jobs=10)(
+        results = Parallel(n_jobs=jobs)(
             delayed(process_point)(i)
             for i in tqdm(range(ds_stacked.sizes["stacked_dim"]))
         )
@@ -310,20 +307,23 @@ def multi_point_example_2d() -> None:
 @timeit
 def trimmed_cmip6_example() -> None:
     ex_data_path = str(
-        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r4i1p1f1.nc"
+        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
     )
     in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(
-        time=7, y=slice(220, 245), x=slice(165, 205)
+        time=7, y=slice(220, 245), x=slice(160, 205)
     )
     out_ds = paralelized_ps(in_ds)
     print(out_ds)
     out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_small_isotherm.nc")
+        os.path.join(DATA_PATH, "example_potential_size_output_small_2.nc")
     )
     print(in_ds)
 
 
 if __name__ == "__main__":
     # python -m cle.ps
+    delete_tmp()
     single_point_example()
+    delete_tmp()
+    multi_point_example_2d()
     # trimmed_cmip6_example()

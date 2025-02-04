@@ -37,6 +37,12 @@ else
 end
 
 fprintf('Attempting to read file: %s\n', fileName);
+if exist(fileName, 'file')
+  fprintf('File %s exists\n', fileName);
+else
+  warningMessage = sprintf('Warning: file does not exist:\n%s', FileName);
+  uiwait(msgbox(warningMessage));
+end
 
 in_str = fileread(fileName); % dedicated for reading files as text
 inputs = jsondecode(in_str); % Using the jsondecode function to parse JSON from string
