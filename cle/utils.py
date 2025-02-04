@@ -2,6 +2,7 @@
 Utilities for idealized tropical cyclone calculations.
 """
 
+from typing import Union
 import numpy as np
 from scipy.integrate import cumulative_simpson, cumulative_trapezoid
 from .constants import TEMP_0K
@@ -79,7 +80,7 @@ def pressure_from_wind(
 def pressure_from_wind_new(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m s-1]
-    p0: float = 1015 * 100,  # [Pa]
+    p0: float = 1015 * 100.0,  # [Pa]
     rho0: float = 1.15,  # [kg m-3]
     fcor: float = 5e-5,  # [s-1]
 ) -> np.ndarray:  # [Pa]
@@ -104,7 +105,15 @@ def pressure_from_wind_new(
 
     allowing us to express p(r) by integrating from infinity to r,
 
-    p(r) = p0*\exp\left(\frac{rho0}{p0}\int^{\inf}_{r}\left(\frac{v(r)^2}{r} +fv(r)\right)dr\right).
+    p(r) = p0*\exp\left(-\frac{rho0}{p0}\int^{\inf}_{r}\left(\frac{v(r)^2}{r} +fv(r)\right)dr\right).
+
+    For an exact solution, let fcor=0, v=a0*exp(-\lambda r)*r**0.5
+
+    Then we look:
+
+    p(r) = p0*\exp\left(-\frac{rho0}{p0}\int^{\inf}_{r}\left(a0**2*exp(-2\lambda r)\right)\right)
+        = p0*\exp\left(\frac{a0**2 * rho0}{2* p0 *\lambda}\left[*exp(-2\lambda r)\right]^{\inf}_{r}\right)
+        = p0*\exp\left(-\frac{a0**2 * rho0}{2 * p0 * \lambda}*a0**2*exp(- 2 \lambda r)\right)
 
     Args:
         rr (np.ndarray): radii. Ascending order [m].
@@ -118,25 +127,37 @@ def pressure_from_wind_new(
 
     Example:
         >>> r0 = 1_000_000
-        >>> rr = np.linspace(0, r0, 100)
+        >>> rr = np.linspace(0, r0, 1_000_000)
         >>> vmax = 50
         >>> rmax = 30_000
         >>> vv = vmax * (rr / rmax) * np.exp(1 - rr / rmax)
-        >>> pp1 = pressure_from_wind(rr, vv)
-        >>> pp2 = pressure_from_wind_old(rr, vv)
-        >>> assert pp1[0] < pp2[0]
+        >>> pp1 = pressure_from_wind_new(rr, vv)
+        >>> pp2 = pressure_from_wind(rr, vv)
+        >>> assert pp1[0] > pp2[0]
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
         >>> vv = np.array([0] * 6)
         >>> p = pressure_from_wind_new(rr, vv)
         >>> np.allclose(p, np.array([1015_00] * 6), rtol=1e-3, atol=1e-6)
         True
+        >>> ds = 1/1_000 # decay scale [m-1]
+        >>> rho0 = 1.0 # [kg m-3]
+        >>> p0 = 1000_00.0 # [Pa]
+        >>> a0 = 40.0 # [m0.5 s-1]
+        >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
+        >>> pest = pressure_from_wind_new(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
+        >>> pcalc = p0 * np.exp(-(a0**2*rho0)/(2*p0*ds) * np.exp(-2*ds*rr))
+        >>> if not np.allclose(pest, pcalc, rtol=1e-2, atol=1e-2):
+        ...    print("pest", pest[:10], pest[-10:])
+        ...    print("pcalc", pcalc[:10], pcalc[-10:])
     """
     # all real inputs
-    assert isinstance(rho0, float) and isinstance(p0, float) and isinstance(fcor, float)
+    assert isinstance(rho0, Union[float, int])
+    assert isinstance(p0, Union[float, int])
+    assert isinstance(fcor, Union[float, int])
     assert rho0 < 2 and rho0 > 0.5  # definitely between 0.5 and 2 kg m-3
     assert p0 > 900_00 and p0 < 1100_00  # definitely between 900 hPa and 1100 hPa
     assert (
-        fcor > 0
+        fcor >= 0
     )  # assuming cyclonic winds, just take absolute value if you are in southern hemisphere
     if isinstance(rr, list):
         rr = np.array(rr)
@@ -148,9 +169,10 @@ def pressure_from_wind_new(
         (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0
     )  # adding small delta 1e-6 to avoid singularity
     integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
+    assert np.all(integral <= 0)
     p = p0 * np.exp(integral)
-    print(p)
     assert p[0] <= p[-1]
+    assert np.all(p >= 0)
     return p
 
 
