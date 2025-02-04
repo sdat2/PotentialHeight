@@ -121,7 +121,7 @@ def timeseries_plots_from_ds(
     ds["time"].attrs = {"long_name": "Year", "units": "A.D."}
     # ds["p0"].attrs = {"units": "Pa", "long_name": "Mean sea level pressure, $P_0$"}
     ds["sst"].attrs = {
-        "units": "$^\circ$C",
+        "units": r"$^\circ$C",
         "long_name": "Sea surface temperature, $T_s$",
     }
     ds["t0"].attrs = {"units": "K", "long_name": "Outflow temperature, $T_0$"}
@@ -148,6 +148,7 @@ def timeseries_plots_from_ds(
     axs[0].set_ylabel("Potential size, $r_a$, [km]")
     axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    axs[2].set_xlim(min(ds["time"].values), max(ds["time"].values))
     label_subplots(axs)
     plt.savefig(os.path.join(folder, "timeseries_rmax_time_new.pdf"))
     plt.clf()
@@ -162,6 +163,7 @@ def timeseries_plots_from_ds(
     plt.clf()
     ds["year"] = ("time", ds["time"].values)
     ds["year"].attrs = {"long_name": "Year", "units": "A.D."}
+    ds["t"].attrs["units"] = r"$^{\circ}C$"
     vars: List[str] = ["r0", "vmax", "pm", "sst", "msl", "t0", "year"]
     pairplot(ds, vars=vars, label=True)
     # pairplot(ds[vars].to_dataframe()[vars], label=True)
@@ -183,6 +185,7 @@ def timeseries_plots_from_ds(
     axs[0].set_ylabel("Sea surface temperature, $T_s$, [$^\circ$C]")
     axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Potential size, $r_a$, [km]")
+    axs[2].set_xlim(min(ds["time"].values), max(ds["time"].values))
     plt.savefig(os.path.join(folder, "timeseries_sst_vmax_rmax.pdf"))
 
     # do a line plot of carnot factor, vmax, and r0
@@ -601,7 +604,11 @@ def spatial_plot_gom() -> None:
     ds["r0"].attrs["long_name"] = "Potential size, $r_a$"
     ds["t0"].attrs["long_name"] = "Outflow temperature, $T_0$"
     ds["sst"].attrs["long_name"] = "Sea surface temperature, $T_s$"
+    ds["pc"].attrs["long_name"] = "Central pressure, $p_c$"
+    ds["sst"].attrs["units"] = r"$^{\circ}$C"
     ds["msl"].attrs["long_name"] = "Mean sea level pressure, $P_0$"
+    ds["t"].attrs["long_name"] = "Surface air temperature, $T_a$"
+    ds["t"].attrs["units"] = r"$^{\circ}C$"
     label_subplots(axs, override="outside")
     # axs[1].plot(ds["lat"], ds["vmax"], "k")
     # axs[2].plot(ds["lat"], ds["pc"] / 100, "k")
@@ -628,6 +635,7 @@ def plot_timeseries_gom_solns() -> None:
     axs[0].set_ylabel("Potential size, $r_a$, [km]")
     axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    axs[2].set_xlim(min(ds["year"].values), max(ds["year"].values))
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "timeseries_diff_rmax_time.pdf"))
 
@@ -653,6 +661,7 @@ def plot_and_calc_gom_soln_curve() -> None:
     axs[0].set_ylabel("Potential size, $r_a$, [km]")
     axs[1].set_ylabel("Potential intensity, $V_{p}$, [m s$^{-1}$]")
     axs[2].set_ylabel("Pressure at maximum winds, $p_m$, [hPa]")
+    axs[2].set_xlim(min(times), max(times))
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "soln_curve_rmax_time.pdf"))
 
