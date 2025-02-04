@@ -26,6 +26,7 @@ from .constants import (
     RADIUS_OF_MAX_WIND_DEFAULT,
     RADIUS_OF_INFLOW_DEFAULT,
     NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,
+    SRC_PATH,
     OUTFLOW_TEMPERATURE_DEFAULT,
 )
 from .utils import (
@@ -118,12 +119,18 @@ def _run_cle15_octave(inputs: dict) -> dict:
     # import subprocess
 
     # os.system(
-    #    f"octave --no-gui --no-gui-libs {os.path.# join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
+    #    f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
     # )
 
     try:
         result = subprocess.run(
-            ["octave", "--no-gui", "--no-gui-libs", "r0_pm.m"],
+            [
+                "octave",
+                "--no-gui",
+                "--no-gui-libs",
+                "r0_pm.m",
+                f"{os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}",
+            ],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
