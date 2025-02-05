@@ -191,6 +191,7 @@ def buck_sat_vap_pressure(
         float: saturation vapour pressure in Pa.
 
     """
+    assert temp > 0 and temp < 50
     # https://en.wikipedia.org/wiki/Arden_buck_sat_vap_pressure_equation
     temp: float = temp - TEMP_0K  # convert from degK to degC
     return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
@@ -207,6 +208,8 @@ def carnot_factor(temp_hot: float, temp_cold: float) -> float:
     Returns:
         float: Carnot factor [dimensionless].
     """
+    assert 250 < temp_hot and 320 > temp_hot
+    assert 150 < temp_cold and 250 > temp_cold
     return (temp_hot - temp_cold) / temp_hot
 
 
@@ -228,4 +231,6 @@ def absolute_angular_momentum(v: float, r: float, f: float) -> float:
         >>> absolute_angular_momentum(1, 1, 1)
         1.5
     """
+    assert v >= 0
+    assert r > 0
     return v * r + 0.5 * f * r**2  # [m2/s]

@@ -121,7 +121,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
     # os.system(
     #    f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}"
     # )
-
+    # os.path.join()
     try:
         result = subprocess.run(
             [
@@ -129,17 +129,20 @@ def _run_cle15_octave(inputs: dict) -> dict:
                 "--no-gui",
                 "--no-gui-libs",
                 "r0_pm.m",
-                f"{os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}",
+                f"{name}",
             ],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            cwd="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/cle/mcle",
+            cwd=os.path.join(SRC_PATH, "mcle"),
+            # "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/cle/mcle",
         )
-        print(result.stdout.decode())
+        # print(result.stderr.decode())
+        # print(result.stdout.decode())
     except subprocess.CalledProcessError as e:
         print("Octave exited with code", e.returncode)
         print("Standard error:", e.stderr.decode())
+        print("Standard output:", e.stdout.decode())
 
     # subprocess.call(
     #     (
