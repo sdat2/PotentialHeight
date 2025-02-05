@@ -310,12 +310,12 @@ def trimmed_cmip6_example() -> None:
         "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
     )
     in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(
-        time=7, y=slice(220, 245), x=slice(160, 205)
+        y=slice(215, 245), x=slice(160, 205)
     )
     out_ds = paralelized_ps(in_ds)
     print(out_ds)
     out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_small_2.nc")
+        os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
     )
     print(in_ds)
 
