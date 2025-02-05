@@ -111,7 +111,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
     # check file has been written
     assert os.path.isfile(os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
 
-    time.sleep(0.1)  # wait for filesystem to sync for 0.1 s
+    # time.sleep(0.1)  # wait for filesystem to sync for 0.1 s
 
     # run octave file r0_pm.m
     # disabling gui leads to one order of magnitude speedup
@@ -152,7 +152,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
     # )
 
     # read in the output from r0_pm.m
-    time.sleep(0.5)  # sleep another 0.5s for file system to catch up with itself
+    # time.sleep(0.5)  # sleep another 0.5s for file system to catch up with itself
     return read_json(os.path.join(DATA_PATH, "tmp", name + "-outputs.json"))
 
 
