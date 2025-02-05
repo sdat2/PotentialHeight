@@ -10,7 +10,16 @@ from sithom.io import read_json
 from sithom.time import timeit
 from chavas15.intersect import curveintersect
 from tcpips.pi_old import gom_combined_inout_timestep_cmip6
-from .constants import TEMP_0K, DATA_PATH, FIGURE_PATH, W_COOL_DEFAULT
+from .constants import (
+    TEMP_0K,
+    DATA_PATH,
+    FIGURE_PATH,
+    W_COOL_DEFAULT,
+    LOWER_Y_WANG_BISECTION,
+    UPPER_Y_WANG_BISECTION,
+    W22_BISECTION_TOLERANCE,
+    SUPERGRADIENT_FACTOR,
+)
 from .potential_size import (
     run_cle15,
     wang_diff,
@@ -22,7 +31,9 @@ from .solve import bisection
 
 
 def find_solution_ds(
-    ds: xr.Dataset, plot: bool = False, supergradient_factor: float = 1.2
+    ds: xr.Dataset,
+    plot: bool = False,
+    supergradient_factor: float = SUPERGRADIENT_FACTOR,
 ) -> xr.Dataset:
     """
     Find the solution for a given dataset.
@@ -68,9 +79,9 @@ def find_solution_ds(
                     outflow_temperature=outflow_temperature,
                 )
             ),
-            0.9,
-            1.2,
-            1e-6,
+            LOWER_Y_WANG_BISECTION,
+            UPPER_Y_WANG_BISECTION,
+            W22_BISECTION_TOLERANCE,
         )
         # convert solution to pressure
         pm_car = (
