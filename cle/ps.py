@@ -39,6 +39,7 @@ def point_solution_ps(
     Find the solution for a given point in the grid.
 
     # TODO: Speed up?
+    # TODO: Let's change this by adding additional arguments for the key things that could be changed e.g. CkCd, wcool, supergradient factor, rho_air
 
     Args:
         ds (xr.Dataset): Dataset with the input values.
@@ -312,6 +313,20 @@ def trimmed_cmip6_example() -> None:
     in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(
         y=slice(215, 245), x=slice(160, 205)
     )
+    out_ds = paralelized_ps(in_ds)
+    print(out_ds)
+    out_ds.to_netcdf(
+        os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
+    )
+    print(in_ds)
+
+
+@timeit
+def trimmed_cmip6_example() -> None:
+    ex_data_path = str(
+        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
+    )
+    in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(time=7)
     out_ds = paralelized_ps(in_ds)
     print(out_ds)
     out_ds.to_netcdf(

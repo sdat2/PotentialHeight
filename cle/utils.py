@@ -61,6 +61,18 @@ def pressure_from_wind(
         >>> p = pressure_from_wind(rr, vv)
         >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
         True
+        >>> r0 = 1_000_000
+        >>> ds = 1/1_000 # decay scale [m-1]
+        >>> rho0 = 1.0 # [kg m-3]
+        >>> p0 = 1000_00.0 # [Pa]
+        >>> rr = np.linspace(0, r0, 1_000_000)
+        >>> a0 = 1.0 # [m0.5 s-1]
+        >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
+        >>> pest = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
+        >>> pcalc = p0 - rho0 * a0**2 / (2*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
+        >>> if not np.allclose(pest, pcalc, rtol=1e-2, atol=1e-2):
+        ...    print("pest", pest[:10], pest[::-1][:10][::-1])
+        ...    print("pcalc", pcalc[:10], pcalc[::-1][:10][::-1])
     """
     p = np.zeros(rr.shape)  # [Pa]
     # rr ascending
@@ -69,7 +81,7 @@ def pressure_from_wind(
     for j in range(len(rr) - 1):
         i = -j - 2
         # Assume Coriolis force and pressure-gradient balance centripetal force.
-        # delta P = - rho * ( v^2/r + fcor * vv[i] ) * delta r
+        # delta P = - rho * ( vv[i]^2/r + fcor * vv[i] ) * delta r
         p[i] = p[i + 1] - rho0 * (
             vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
         ) * (rr[i + 1] - rr[i])
@@ -141,14 +153,17 @@ def pressure_from_wind_new(
         True
         >>> ds = 1/1_000 # decay scale [m-1]
         >>> rho0 = 1.0 # [kg m-3]
+        >>> rr = np.linspace(0, r0, 1_000_000)
         >>> p0 = 1000_00.0 # [Pa]
-        >>> a0 = 40.0 # [m0.5 s-1]
+        >>> a0 = 1.0 # [m0.5 s-1]
         >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
         >>> pest = pressure_from_wind_new(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
-        >>> pcalc = p0 * np.exp(-(a0**2*rho0)/(2*p0*ds) * np.exp(-2*ds*rr))
+        >>> integral = -(a0**2*rho0)/(2*p0*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
+        >>> assert np.all(integral < 0)
+        >>> pcalc = p0 * np.exp(integral)
         >>> if not np.allclose(pest, pcalc, rtol=1e-2, atol=1e-2):
-        ...    print("pest", pest[:10], pest[-10:])
-        ...    print("pcalc", pcalc[:10], pcalc[-10:])
+        ...    print("pest", pest[:10], pest[::-1][:10])
+        ...    print("pcalc", pcalc[:10], pcalc[::-1][:10])
     """
     # all real inputs
     assert isinstance(rho0, Union[float, int])
@@ -232,5 +247,5 @@ def absolute_angular_momentum(v: float, r: float, f: float) -> float:
         1.5
     """
     assert v >= 0
-    assert r > 0
+    assert r >= 0
     return v * r + 0.5 * f * r**2  # [m2/s]
