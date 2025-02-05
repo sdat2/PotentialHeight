@@ -1,7 +1,7 @@
 {
     "Cd": 0.0015,
     "Cdvary": 0,
-    "CkCd": 1,
+    "CkCd": 0.9,
     "CkCdvary": 0,
     "Vmax": 49.458511049768816,
     "alpha_eye": 0.15,
