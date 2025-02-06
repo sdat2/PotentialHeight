@@ -71,7 +71,7 @@ def find_solution_ds(
                 *wang_consts(
                     radius_of_max_wind=rmax_cle,
                     radius_of_inflow=r0,
-                    maximum_wind_speed=vmax * supergradient_factor,
+                    maximum_wind_speed=ds["vmax"].values * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=ds["msl"].values * 100
                     - buck_sat_vap_pressure(near_surface_air_temperature),

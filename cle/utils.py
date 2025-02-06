@@ -2,10 +2,10 @@
 Utilities for idealized tropical cyclone calculations.
 """
 
-from typing import Union
+from typing import Union, Literal
 import numpy as np
-from scipy.integrate import cumulative_simpson, cumulative_trapezoid
-from .constants import TEMP_0K
+from scipy.integrate import cumulative_trapezoid
+from .constants import TEMP_0K, F_COR_DEFAULT, RHO_AIR_DEFAULT, BACKGROUND_PRESSURE
 
 
 def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
@@ -33,79 +33,13 @@ def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
 def pressure_from_wind(
     rr: np.ndarray,  # [m]
     vv: np.ndarray,  # [m/s]
-    p0: float = 1015 * 100,  # [Pa]
-    rho0: float = 1.15,  # [kg m-3]
-    fcor: float = 5e-5,  # [s-1]
+    p0: float = BACKGROUND_PRESSURE,  # [Pa]
+    rho0: float = RHO_AIR_DEFAULT,  # [kg m-3]
+    fcor: float = F_COR_DEFAULT,  # [s-1]
+    assumption: Literal["isopycnal", "isothermal"] = "isothermal",
 ) -> np.ndarray:  # [Pa]
     """
-    Use coriolis force and pressure gradient force to find physical
-    pressure profile to correspond to the velocity profile.
-
-    TODO: decrease air density in response to decreased pressure (will make central pressure lower).
-
-    This assumes cyclogeostrophic balance and constant density.
-
-    Args:
-        rr (np.ndarray): radii array [m].
-        vv (np.ndarray): velocity array [m/s]
-        p0 (float): ambient pressure [Pa].
-        rho0 (float): Air density at ambient pressure [kg/m3].
-        fcor (float): Coriolis force [s-1].
-
-    Returns:
-        np.ndarray: Pressure array [Pa].
-
-    Example::
-        >>> rr = np.array([0, 1, 2, 3, 4, 5])
-        >>> vv = np.array([0] * 6)
-        >>> p = pressure_from_wind(rr, vv)
-        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
-        True
-        >>> r0 = 1_000_000
-        >>> ds = 1/1_000 # decay scale [m-1]
-        >>> rho0 = 1.0 # [kg m-3]
-        >>> p0 = 1000_00.0 # [Pa]
-        >>> rr = np.linspace(0, r0, 1_000_000)
-        >>> a0 = 1.0 # [m0.5 s-1]
-        >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
-        >>> pest = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
-        >>> pcalc = p0 - rho0 * a0**2 / (2*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
-        >>> if not np.allclose(pest, pcalc, rtol=1e-4, atol=1e-6):
-        ...    print("pest", pest[:10], pest[::-1][:10][::-1])
-        ...    print("pcalc", pcalc[:10], pcalc[::-1][:10][::-1])
-    """
-    assert np.all(rr == np.sort(rr))  # check if rr is sorted
-    integrand = (
-        vv**2 / (rr + 1e-6) + fcor * vv
-    ) * rho0  # adding small delta 1e-6 to avoid singularity
-    integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
-    p = p0 + integral
-    """
-    p = np.zeros(rr.shape)  # [Pa]
-    # rr ascending
-
-    p[-1] = p0  # set the last value to the background pressure
-    for j in range(len(rr) - 1):
-        i = -j - 2
-        # Assume Coriolis force and pressure-gradient balance centripetal force.
-        # delta P = - rho * ( vv[i]^2/r + fcor * vv[i] ) * delta r
-        p[i] = p[i + 1] - rho0 * (
-            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
-        ) * (rr[i + 1] - rr[i])
-        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
-    """
-    return p  # pressure profile [Pa]
-
-
-def pressure_from_wind_new(
-    rr: np.ndarray,  # [m]
-    vv: np.ndarray,  # [m s-1]
-    p0: float = 1015 * 100.0,  # [Pa]
-    rho0: float = 1.15,  # [kg m-3]
-    fcor: float = 5e-5,  # [s-1]
-) -> np.ndarray:  # [Pa]
-    """
-    Pressure from wind, assuming cyclogeostrophic balance and constant temperature.
+    Pressure from wind, assuming cyclogeostrophic balance and either constant temperature or pressure.
 
     We assume cyclogeostrophic balance, with pressure gradient balancing the circular acceleration and coriolis force.
 
@@ -129,43 +63,45 @@ def pressure_from_wind_new(
 
     For an exact solution, let fcor=0, v=a0*exp(-\lambda r)*r**0.5
 
-    Then we look:
+    Then we see,
 
     p(r) = p0*\exp\left(-\frac{rho0}{p0}\int^{\inf}_{r}\left(a0**2*exp(-2\lambda r)\right)\right)
         = p0*\exp\left(\frac{a0**2 * rho0}{2* p0 *\lambda}\left[*exp(-2\lambda r)\right]^{\inf}_{r}\right)
-        = p0*\exp\left(-\frac{a0**2 * rho0}{2 * p0 * \lambda}*a0**2*exp(- 2 \lambda r)\right)
+        = p0*\exp\left(-\frac{a0**2 * rho0}{2 * p0 * \lambda}*a0**2*exp(- 2 \lambda r)\right).
 
     Args:
-        rr (np.ndarray): radii. Ascending order [m].
-        vv (np.ndarray): velocities. From center to edge [m s-1].
-        p0 (float, optional): background pressure. Defaults to 1015_00 [Pa].
-        rho0 (float, optional): background density. Defaults to 1.15 [kg m-3].
-        fcor (float, optional): coriolis force. Defaults to 5e-5 [s-1].
+        rr (np.ndarray): radii array [m].
+        vv (np.ndarray): velocity array [m/s]
+        p0 (float): ambient pressure [Pa].
+        rho0 (float, optional): Air density at ambient pressure [kg/m3].
+        fcor (float, optional): Coriolis force [s-1].
+        assumption (Literal["isopycnal", "isothermal"], optional)
 
     Returns:
-        np.ndarray: pressure profile [Pa].
+        np.ndarray: Pressure array [Pa].
 
-    Example:
-        >>> r0 = 1_000_000
-        >>> rr = np.linspace(0, r0, 1_000_000)
-        >>> vmax = 50
-        >>> rmax = 30_000
-        >>> vv = vmax * (rr / rmax) * np.exp(1 - rr / rmax)
-        >>> pp1 = pressure_from_wind_new(rr, vv)
-        >>> pp2 = pressure_from_wind(rr, vv)
-        >>> assert pp1[0] > pp2[0]
+    Example::
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
         >>> vv = np.array([0] * 6)
-        >>> p = pressure_from_wind_new(rr, vv)
-        >>> np.allclose(p, np.array([1015_00] * 6), rtol=1e-3, atol=1e-6)
+        >>> p = pressure_from_wind(rr, vv, assumption="isopycnal")
+        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
         True
+        >>> p = pressure_from_wind(rr, vv, assumption="isothermal")
+        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
+        True
+        >>> r0 = 1_000_000
         >>> ds = 1/1_000 # decay scale [m-1]
         >>> rho0 = 1.0 # [kg m-3]
-        >>> rr = np.linspace(0, r0, 1_000_000)
         >>> p0 = 1000_00.0 # [Pa]
+        >>> rr = np.linspace(0, r0, 1_000_000)
         >>> a0 = 1.0 # [m0.5 s-1]
         >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
-        >>> pest = pressure_from_wind_new(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
+        >>> pest = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=0.0, assumption="isopycnal")
+        >>> pcalc = p0 - rho0 * a0**2 / (2*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
+        >>> if not np.allclose(pest, pcalc, rtol=1e-4, atol=1e-6):
+        ...    print("pest", pest[:10], pest[::-1][:10][::-1])
+        ...    print("pcalc", pcalc[:10], pcalc[::-1][:10][::-1])
+        >>> pest = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=0.0, assumption="isothermal")
         >>> integral = -(a0**2*rho0)/(2*p0*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
         >>> assert np.all(integral <= 0)
         >>> pcalc = p0 * np.exp(integral)
@@ -188,16 +124,25 @@ def pressure_from_wind_new(
         vv = np.array(vv)
     assert np.all(rr == np.sort(rr))  # check if rr is sorted
     assert not (np.min(rr) < 0)  # no negative radii
-    integrand = (
-        (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0
-    )  # adding small delta 1e-6 to avoid singularity
-    integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
-    assert np.all(integral <= 0)
-    p = p0 * np.exp(integral)
+    if assumption == "isopycnal":
+        integrand = (
+            vv**2 / (rr + 1e-6) + fcor * vv
+        ) * rho0  # adding small delta 1e-6 to avoid singularity
+        integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
+        p = p0 + integral
+    elif assumption == "isothermal":
+        integrand = (
+            (vv**2 / (rr + 1e-6) + fcor * vv) * rho0 / p0
+        )  # adding small delta 1e-6 to avoid singularity
+        integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
+        assert np.all(integral <= 0)
+        p = p0 * np.exp(integral)
+    else:
+        assert False
     assert p[0] <= p[-1]
     assert np.all(p <= p0)
     assert np.all(p >= 0)
-    return p
+    return p  # pressure profile [Pa]
 
 
 def buck_sat_vap_pressure(
