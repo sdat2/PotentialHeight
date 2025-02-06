@@ -19,6 +19,8 @@ from .constants import (
     LOWER_Y_WANG_BISECTION,
     UPPER_Y_WANG_BISECTION,
     W22_BISECTION_TOLERANCE,
+    CK_CD_DEFAULT,
+    CD_DEFAULT,
 )
 from .potential_size import run_cle15, wang_diff, wang_consts, delete_tmp
 from .utils import (
@@ -66,6 +68,11 @@ def point_solution_ps(
     outflow_temperature = ds["t0"].values
     vmax = ds["vmax"].values
     coriolis_parameter = abs(coriolis_parameter_from_lat(ds["lat"].values))
+    # optional parameters
+    ck_cd = CK_CD_DEFAULT
+    cd = CD_DEFAULT
+    w_cool = W_COOL_DEFAULT
+
     # assert coriolis_parameter > 0
     print("coriolis_parameter", coriolis_parameter)
     print("ds['lat'].values", ds["lat"].values)
@@ -358,8 +365,8 @@ def global_august_cmip6_example() -> None:
 
 if __name__ == "__main__":
     # python -m cle.ps
-    delete_tmp()
+    # delete_tmp()
     single_point_example()
-    delete_tmp()
+    # delete_tmp()
     multi_point_example_2d()
     # trimmed_cmip6_example()
