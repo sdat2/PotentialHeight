@@ -70,13 +70,20 @@ def pressure_from_wind(
         >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
         >>> pest = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
         >>> pcalc = p0 - rho0 * a0**2 / (2*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
-        >>> if not np.allclose(pest, pcalc, rtol=1e-2, atol=1e-2):
+        >>> if not np.allclose(pest, pcalc, rtol=1e-4, atol=1e-6):
         ...    print("pest", pest[:10], pest[::-1][:10][::-1])
         ...    print("pcalc", pcalc[:10], pcalc[::-1][:10][::-1])
     """
+    assert np.all(rr == np.sort(rr))  # check if rr is sorted
+    integrand = (
+        vv**2 / (rr + 1e-6) + fcor * vv
+    ) * rho0  # adding small delta 1e-6 to avoid singularity
+    integral = cumulative_trapezoid(integrand[::-1], rr[::-1], initial=0)[::-1]
+    p = p0 + integral
+    """
     p = np.zeros(rr.shape)  # [Pa]
     # rr ascending
-    assert np.all(rr == np.sort(rr))  # check if rr is sorted
+
     p[-1] = p0  # set the last value to the background pressure
     for j in range(len(rr) - 1):
         i = -j - 2
@@ -86,6 +93,7 @@ def pressure_from_wind(
             vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
         ) * (rr[i + 1] - rr[i])
         # centripetal pushes out, pressure pushes inward, coriolis pushes inward
+    """
     return p  # pressure profile [Pa]
 
 
@@ -161,9 +169,9 @@ def pressure_from_wind_new(
         >>> integral = -(a0**2*rho0)/(2*p0*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
         >>> assert np.all(integral <= 0)
         >>> pcalc = p0 * np.exp(integral)
-        >>> if not np.allclose(pest, pcalc, rtol=1e-2, atol=1e-2):
-        ...    print("pest", pest[:10], pest[::-1][:10])
-        ...    print("pcalc", pcalc[:10], pcalc[::-1][:10])
+        >>> if not np.allclose(pest, pcalc, rtol=1e-3, atol=1e-6):
+        ...    print("pest", pest[:10], pest[::-1][:10][::-1])
+        ...    print("pcalc", pcalc[:10], pcalc[::-1][:10][::-1])
     """
     # all real inputs
     assert isinstance(rho0, Union[float, int])
