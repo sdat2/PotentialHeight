@@ -12,7 +12,7 @@ def plot_panels() -> None:
 
     # initial calculation with Ck/Cd = 1 for C15, gamma =1.2
     example_ds = xr.open_dataset(
-        os.path.join(DATA_PATH, "example_potential_size_output_small.nc")
+        os.path.join(DATA_PATH, "example_potential_size_output_small_2.nc")
     )
 
     var = [["sst", "vmax"], ["msl", "rmax"], ["t0", "r0"]]
@@ -22,7 +22,11 @@ def plot_panels() -> None:
         ["Sea level pressure, $p_0$", r"Radius max winds, $r_{\mathrm{max}}$"],
         ["Outflow temperature, $T_0$", "Potential size, $r_a$"],
     ]
-    cbar_lims = [[None, None], [None, None], [None, None]]
+    cbar_lims = [
+        [(28, 33, "cmo.thermal"), None],
+        [(1010, 1020, "cmo.dense"), None],
+        [(200, 210, "cmo.thermal"), None],
+    ]
     super_titles = ["Inputs", "Outputs"]
 
     xy = [
