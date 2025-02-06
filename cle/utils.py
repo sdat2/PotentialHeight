@@ -159,7 +159,7 @@ def pressure_from_wind_new(
         >>> vv = a0 * np.exp(-ds * rr) * (rr)**0.5
         >>> pest = pressure_from_wind_new(rr, vv, p0=p0, rho0=rho0, fcor=0.0)
         >>> integral = -(a0**2*rho0)/(2*p0*ds) * (np.exp(-2*ds*rr) - np.exp(-2*ds*r0))
-        >>> assert np.all(integral < 0)
+        >>> assert np.all(integral <= 0)
         >>> pcalc = p0 * np.exp(integral)
         >>> if not np.allclose(pest, pcalc, rtol=1e-2, atol=1e-2):
         ...    print("pest", pest[:10], pest[::-1][:10])
@@ -187,6 +187,7 @@ def pressure_from_wind_new(
     assert np.all(integral <= 0)
     p = p0 * np.exp(integral)
     assert p[0] <= p[-1]
+    assert np.all(p <= p0)
     assert np.all(p >= 0)
     return p
 

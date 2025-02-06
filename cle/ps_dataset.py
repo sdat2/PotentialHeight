@@ -55,7 +55,7 @@ def find_solution_ds(
     coriolis_parameter = coriolis_parameter_from_lat(ds["lat"].values)
 
     for r0 in r0s:
-        pm_cle, rmax_cle, _, pc = run_cle15(
+        pm_cle, rmax_cle, pc = run_cle15(
             plot=True,
             inputs={
                 "r0": r0,
@@ -118,7 +118,7 @@ def find_solution_ds(
         plt.clf()
         # run the model with the solution
 
-    pm_cle, rmax_cle, vmax, pc = run_cle15(
+    pm_cle, rmax_cle, pc = run_cle15(
         inputs={"r0": intersect[0][0], "Vmax": ds["vmax"].values}, plot=True
     )
     # read the solution

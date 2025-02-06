@@ -71,8 +71,8 @@ def point_solution_ps(
     print("ds['lat'].values", ds["lat"].values)
 
     def try_for_r0(r0: float):
-        pm_cle, rmax_cle, _, _ = run_cle15(
-            plot=True,
+        pm_cle, rmax_cle, _ = run_cle15(
+            plot=False,
             inputs={
                 "r0": r0,
                 "Vmax": vmax,
@@ -115,8 +115,15 @@ def point_solution_ps(
         PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
     )  # find potential size \(r_a\) between 200 and 5000 km with 1 mbar absolute tolerance
 
-    pm_cle, rmax_cle, vmax, pc = run_cle15(
-        inputs={"r0": r0, "Vmax": ds["vmax"].values}, plot=False
+    pm_cle, rmax_cle, pc = run_cle15(
+        plot=False,
+        inputs={
+            "r0": r0,
+            "Vmax": vmax,
+            "w_cool": W_COOL_DEFAULT,
+            "fcor": coriolis_parameter,
+            "p0": float(ds["msl"].values),  # in hPa / mbar
+        },
     )
     # read the solution
     ds["r0"] = r0
@@ -331,6 +338,20 @@ def trimmed_cmip6_example() -> None:
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
+    )
+    print(in_ds)
+
+
+@timeit
+def global_august_cmip6_example() -> None:
+    ex_data_path = str(
+        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
+    )
+    in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(time=7)
+    out_ds = paralelized_ps(in_ds, jobs=20)
+    print(out_ds)
+    out_ds.to_netcdf(
+        os.path.join(DATA_PATH, "example_potential_size_output_august_2015.nc")
     )
     print(in_ds)
 

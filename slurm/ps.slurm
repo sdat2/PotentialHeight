@@ -46,5 +46,8 @@ python -m cle.ps
 
 python -c "from cle.ps import trimmed_cmip6_example; trimmed_cmip6_example()"
 
+python -c "from cle.ps import global_august_cmip6_example; global_august_cmip6_example()"
+
+
 # Time taken by oct2py for 10 loops is 21.8 s
 # Time taken by octave for 10 loops is 7.9 s

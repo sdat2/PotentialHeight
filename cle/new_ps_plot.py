@@ -20,7 +20,7 @@ def plot_panels() -> None:
     names = [
         ["Sea surface temp., $T_s$", "Potential intensity, $V_p$"],
         ["Sea level pressure, $p_0$", r"Radius max winds, $r_{\mathrm{max}}$"],
-        ["Output temperature, $T_0$", "Potential size, $r_a$"],
+        ["Outflow temperature, $T_0$", "Potential size, $r_a$"],
     ]
     cbar_lims = [[None, None], [None, None], [None, None]]
     super_titles = ["Inputs", "Outputs"]

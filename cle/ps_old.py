@@ -112,7 +112,7 @@ def find_solution_rmaxv(
     pcw = []
     rmaxs = []
     for r0 in r0s:
-        pm_cle15_dyn, rmax_cle, _, _ = run_cle15(
+        pm_cle15_dyn, rmax_cle, _ = run_cle15(
             plot=False,
             inputs={
                 "r0": r0,
@@ -180,6 +180,9 @@ def find_solution_rmaxv(
         plt.ylabel("Radius of maximum winds, $r_m$, [km]")
         plt.savefig(os.path.join(FIGURE_PATH, "r0_rmax.pdf"))
         plt.clf()
-        run_cle15(inputs={"r0": intersect[0][0], "Vmax": vmax_pi}, plot=True)
+        run_cle15(
+            inputs={"r0": intersect[0][0], "Vmax": vmax_pi, "fcor": coriolis_parameter},
+            plot=True,
+        )
     # why do we put vmax_pi back out? We put it in in the first place.
     return intersect[0][0], vmax_pi, intersect[1][0]  # rmax, vmax, pm

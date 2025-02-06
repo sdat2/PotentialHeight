@@ -159,7 +159,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
 def run_cle15(
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
-) -> Tuple[float, float, float, float]:  # pm, rmax, vmax, pc
+) -> Tuple[float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
 
@@ -168,7 +168,7 @@ def run_cle15(
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
 
     Returns:
-        Tuple[float, float, float, float]: pm [Pa], rmax [m], vmax [m/s], pc [Pa]
+        Tuple[float, float, float, float]: pm [Pa], rmax [m], pc [Pa]
     """
     ins = process_inputs(inputs)  # find old data.
     ou = _run_cle15_octave(inputs)
@@ -237,7 +237,6 @@ def run_cle15(
             ou["rmax"]
         ),  # find the pressure at the maximum wind speed radius [Pa]
         ou["rmax"],  # rmax radius [m]
-        ins["Vmax"],  # maximum wind speed [m/s]
         p[0],
     )  # p[0]  # central pressure [Pa]
 
@@ -354,7 +353,7 @@ def wang_consts(
 
 if __name__ == "__main__":
     # python -m cle.potential_size
-    delete_tmp()
+    # delete_tmp()
     tick = time.perf_counter()
     vmaxs = np.linspace(80, 90, num=10)
     for vmax in vmaxs:
