@@ -14,9 +14,11 @@ def plot_panels() -> None:
     example_ds = xr.open_dataset(
         os.path.join(DATA_PATH, "example_potential_size_output_small_2.nc")
     )
-
+    # to km
+    example_ds["r0"][:] /= 1000
+    example_ds["rmax"][:] /= 1000
     var = [["sst", "vmax"], ["msl", "rmax"], ["t0", "r0"]]
-    units = [[r"$^{\circ}$C", r"m s$^{-1}$"], ["hPa", "m"], ["K", "m"]]
+    units = [[r"$^{\circ}$C", r"m s$^{-1}$"], ["hPa", "km"], ["K", "km"]]
     names = [
         ["Sea surface temp., $T_s$", "Potential intensity, $V_p$"],
         ["Sea level pressure, $p_0$", r"Radius max winds, $r_{\mathrm{max}}$"],

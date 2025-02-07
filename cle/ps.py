@@ -62,20 +62,36 @@ def point_solution_ps(
         >>> out_ds = point_solution_ps(in_ds)
         >>> out_ds
     """
+
+    # read compuslory parameters
+    p_a = float(ds["msl"].values)  # ambient surface pressure in mbars
     near_surface_air_temperature = (
         ds["sst"].values + TEMP_0K - 1
     )  # Celsius Kelvin, subtract 1K for parameterization for near surface
-    outflow_temperature = ds["t0"].values
-    vmax = ds["vmax"].values
+    outflow_temperature = float(ds["t0"].values)
+    vmax = float(ds["vmax"].values)
     coriolis_parameter = abs(coriolis_parameter_from_lat(ds["lat"].values))
-    # optional parameters
-    ck_cd = CK_CD_DEFAULT
-    cd = CD_DEFAULT
-    w_cool = W_COOL_DEFAULT
-
-    # assert coriolis_parameter > 0
-    print("coriolis_parameter", coriolis_parameter)
-    print("ds['lat'].values", ds["lat"].values)
+    # optional parameters, set to default if they are not in the dataset
+    if "ck_cd" not in ds:
+        ck_cd = CK_CD_DEFAULT
+    else:
+        ck_cd = float(ds["ck_cd"].values)
+    if "cd" not in ds:
+        cd = CD_DEFAULT
+    else:
+        cd = float(ds["cd"].values)
+    if "w_cool" not in ds:
+        w_cool = W_COOL_DEFAULT
+    else:
+        w_cool = float(ds["w_cool"].values)
+    if "rho_air" not in ds:
+        rho_air = RHO_AIR_DEFAULT
+    else:
+        rho_air = float(ds["rho_air"].values)
+    if "supergradient_factor" not in ds:
+        supergradient_factor = SUPERGRADIENT_FACTOR
+    else:
+        supergradient_factor = float(ds["supergradient_factor"].values)
 
     def try_for_r0(r0: float):
         pm_cle, rmax_cle, _ = run_cle15(
@@ -83,9 +99,11 @@ def point_solution_ps(
             inputs={
                 "r0": r0,
                 "Vmax": vmax,
-                "w_cool": W_COOL_DEFAULT,
+                "w_cool": w_cool,
                 "fcor": coriolis_parameter,
-                "p0": float(ds["msl"].values),  # in hPa / mbar
+                "p0": p_a,  # in hPa / mbar
+                "CkCd": ck_cd,
+                "Cd": cd,
             },
         )
 
@@ -109,7 +127,7 @@ def point_solution_ps(
         )
         # convert solution to pressure
         pm_car = (  # 100 to convert from hPa to Pa
-            ds["msl"].values * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
+            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
         ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
 
         return pm_cle - pm_car
@@ -127,9 +145,11 @@ def point_solution_ps(
         inputs={
             "r0": r0,
             "Vmax": vmax,
-            "w_cool": W_COOL_DEFAULT,
+            "w_cool": w_cool,
             "fcor": coriolis_parameter,
-            "p0": float(ds["msl"].values),  # in hPa / mbar
+            "p0": p_a,  # in hPa / mbar
+            "CkCd": ck_cd,
+            "Cd": cd,
         },
     )
     # read the solution
@@ -149,7 +169,6 @@ def point_solution_ps(
     }
     if include_profile:
         # TODO: This optimal profile is reading the wrong data.
-        # PV = NRT; Rho = NM/V; N/V = P/RT; assume isothermal -> Rho(P) = PM/RT, Rho1 = Rho2*P1/P2
         out = read_json(os.path.join(DATA_PATH, "outputs.json"))
         ds["radii"] = ("r", out["rr"], {"units": "m", "long_name": "Radius"})
         ds["velocities"] = (
@@ -162,8 +181,8 @@ def point_solution_ps(
             pressure_from_wind(
                 np.array(out["rr"]),  # [m]
                 np.array(out["VV"]),  # [m/s]
-                ds["msl"].values * 100,  # [Pa] 100 to convert from hPa to Pa
-                RHO_AIR_DEFAULT,  # [kg m-3]
+                p_a * 100,  # [Pa] 100 to convert from hPa to Pa
+                rho_air,  # [kg m-3]
                 coriolis_parameter,  # [rad s-1]
             )
             / 100,
@@ -310,6 +329,7 @@ def multi_point_example_2d() -> None:
                 [[50, 51], [49, 49.5]],
             ),  # m/s, potential intensity
             "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
+            "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
         },
         coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth
@@ -366,7 +386,7 @@ def global_august_cmip6_example() -> None:
 if __name__ == "__main__":
     # python -m cle.ps
     # delete_tmp()
-    single_point_example()
+    # single_point_example()
     # delete_tmp()
     multi_point_example_2d()
     # trimmed_cmip6_example()

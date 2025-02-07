@@ -15,6 +15,8 @@ from .constants import (
     FIGURE_PATH,
     F_COR_DEFAULT,
     W_COOL_DEFAULT,
+    CK_CD_DEFAULT,
+    CD_DEFAULT,
     RHO_AIR_DEFAULT,
     LATENT_HEAT_OF_VAPORIZATION,
     GAS_CONSTANT_FOR_WATER_VAPOR,
@@ -77,6 +79,8 @@ def process_inputs(inputs: dict) -> dict:
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
     ins["w_cool"] = W_COOL_DEFAULT
     ins["p0"] = BACKGROUND_PRESSURE
+    ins["CkCd"] = CK_CD_DEFAULT
+    ins["Cd"] = CD_DEFAULT
     # ins["CkCd"]
 
     if inputs is not None:
