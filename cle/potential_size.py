@@ -104,7 +104,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
 
     ins = process_inputs(inputs)
 
-    print("inputs", inputs)
+    # print("inputs", inputs)
 
     # Storm parameters
     name = _inputs_to_name(ins)
@@ -220,8 +220,8 @@ def run_cle15(
     assert None not in ou["VV"]
     rr = np.array(ou["rr"], dtype="float32")  # [m]
     vv = np.array(ou["VV"], dtype="float32")  # [m/s]
-    print("rr", rr[:10], rr[-10:])
-    print("vv", vv[:10], vv[-10:])
+    # print("rr", rr[:10], rr[-10:])
+    # print("vv", vv[:10], vv[-10:])
     p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
     ou["p"] = p.tolist()
 

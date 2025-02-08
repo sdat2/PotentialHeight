@@ -15,6 +15,7 @@ def plot_panels() -> None:
         os.path.join(DATA_PATH, "example_potential_size_output_small_2.nc")
     )
     # to km
+    del example_ds["time"]  # was annoying to have overly precise time
     example_ds["r0"][:] /= 1000
     example_ds["rmax"][:] /= 1000
     var = [["sst", "vmax"], ["msl", "rmax"], ["t0", "r0"]]
