@@ -31,8 +31,10 @@ OUTFLOW_TEMPERATURE_DEFAULT = 200  # [k]
 
 
 # CLE15
-CK_CD_DEFAULT = 0.9  # [dimensionless]
-CD_DEFAULT = 0.0015  #
+CK_CD_DEFAULT = (
+    0.9  # [dimensionless], chosen to match standard potential intensity assumptions
+)
+CD_DEFAULT = 0.0015  # drag coefficient
 W_COOL_DEFAULT = 0.002  # m s-1
 
 # supergradient
