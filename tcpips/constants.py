@@ -57,6 +57,8 @@ RAW_PATH: str = os.path.join(CMIP6_PATH, "raw")  # download data here
 os.makedirs(RAW_PATH, exist_ok=True)
 REGRIDDED_PATH: str = os.path.join(CMIP6_PATH, "regridded")  # regridded data here
 os.makedirs(REGRIDDED_PATH, exist_ok=True)
+CDO_PATH: str = os.path.join(CMIP6_PATH, "regrid")
+os.makedirs(CDO_PATH, exist_ok=True)
 BIAS_CORRECTED_PATH = os.path.join(
     CMIP6_PATH, "bias_corrected"
 )  # bias corrected data here

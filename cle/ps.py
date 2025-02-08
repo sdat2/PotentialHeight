@@ -218,6 +218,8 @@ def paralelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
             assert not np.isnan(ids.vmax.values)  # did not converge
             assert not np.isnan(ids.sst.values)  # is not sea
             return point_solution_ps(ids, include_profile=False)
+        except AssertionError as e:
+            print(e.args[0] if e.args else "error")
         except Exception as e:
             print("Exception:", e)
             ids["pm"] = np.nan
