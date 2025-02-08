@@ -150,14 +150,15 @@ def regrid_cmip6_part(
             input_ds,
             new_coords,
             "bilinear",
+            keep_attrs=True,
             periodic=True,
-            ignore_degenerate=True,
         )
         print(regridder)
         out_ds = regridder(
             input_ds,
             keep_attrs=True,
             skipna=True,
+            output_chunks={"time": time_chunk, "lat": 90, "lon": 90},
             # output_chunks={"time": time_chunk},  # , "lat": 90, "lon": 90},
             # ignore_degenerate=True,
         )  # .chunk(chunks={"time": time_chunk})
