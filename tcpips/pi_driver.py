@@ -97,6 +97,7 @@ def pi_cmip6_part(
     model: str = "CESM2",
     member: str = "r4i1p1f1",
     time_chunk: int = 1,
+    reduce_storage: bool = True,
 ) -> None:
     """
     Potential intensity calculation one model ensemble member experiment.
@@ -145,6 +146,9 @@ def pi_cmip6_part(
     # convert units, merge datasets
     ds = convert(xr.merge([ocean_ds, atmos_ds]))
     pi = calculate_pi(ds.compute(), dim="p")
+    if reduce_storage:
+        del ds["t"]
+        del ds["q"]
     ds = xr.merge([ds, pi])
     ds = ds.assign_coords({"time": ("time", ocean_time)})
     ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash()

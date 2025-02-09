@@ -12,6 +12,7 @@ def download_single_levels(years, months, output_file):
     """
     c = cdsapi.Client()
     c.retrieve(
+        # "reanalysis-era5-single-levels-monthly-means"
         "reanalysis-era5-single-levels-monthly-means",
         {
             "product_type": "monthly_averaged_reanalysis",
@@ -22,7 +23,7 @@ def download_single_levels(years, months, output_file):
             "time": "00:00",
         },
         os.path.join(ERA5_PATH, output_file),
-    )
+    )  # .download()
     print(f"Downloaded single-level data to {output_file}")
 
 
