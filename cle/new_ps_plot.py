@@ -3,7 +3,7 @@
 import os
 import xarray as xr
 import matplotlib.pyplot as plt
-from sithom.plot import feature_grid, label_subplots, plot_defaults
+from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim
 from .constants import DATA_PATH, FIGURE_PATH
 
 
@@ -48,6 +48,46 @@ def plot_panels() -> None:
     plt.savefig(os.path.join(FIGURE_PATH, "new_ps_calculation_output_gom.pdf"))
 
 
+def timeseries_plot():
+    # plot CESM2 ensemble members for ssp585 near New Orleans
+    plot_defaults()
+    members = [4, 10, 11]
+    colors = ["purple", "green", "orange"]
+    file_names = [
+        os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
+        for member in members
+    ]
+    ds_l = [xr.open_dataset(file_name) for file_name in file_names]
+    fig, axs = plt.subplots(4, 1, sharex=True, figsize=get_dim(ratio=1.5))
+    vars = ["sst", "vmax", "rmax", "r0"]
+    var_labels = [
+        "Sea surface temp., $T_s$",
+        "Potential intensity, $V_p$",
+        r"Radius max winds, $r_{\mathrm{max}}$",
+        "Potential size, $r_a$",
+    ]
+    units = ["$^{\circ}$ C", "m s$^{-1}$", "km", "km"]
+
+    for i, var in enumerate(vars):
+        for j, ds in enumerate(ds_l):
+            x = [time.year for time in ds.time.values]
+            y = ds[var].values
+            if var == "rmax" or var == "r0":
+                y /= 1000  # divide by 1000 to go to km
+            axs[i].plot(x, y, color=colors[j], label=f"r{members[j]}i1p1f1")
+        axs[i].set_xlabel("")
+        axs[i].set_ylabel(var_labels[i] + " [" + units[i] + "]")
+        if i == len(vars) - 1:
+            axs[i].legend()
+            axs[i].set_xlabel("Year [A.D.]")
+    axs[2].set_xlim(2015, 2100)
+    label_subplots(axs)
+    axs[0].set_title("CESM2 SSP585")
+    plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=3)
+    plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_timeseries.pdf"))
+
+
 if __name__ == "__main__":
     # python -m cle.new_ps_plot
-    plot_panels()
+    # plot_panels()
+    timeseries_plot()

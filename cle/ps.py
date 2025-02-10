@@ -376,6 +376,7 @@ def global_august_cmip6_example() -> None:
     ex_data_path = str(
         "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
     )
+    # /work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi2/ssp585/CESM2/r10i1p1f1.nc
     in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(time=7)
     out_ds = paralelized_ps(in_ds, jobs=20)
     print(out_ds)
@@ -383,6 +384,25 @@ def global_august_cmip6_example() -> None:
         os.path.join(DATA_PATH, "example_potential_size_output_august_2015.nc")
     )
     print(in_ds)
+
+
+def new_orleans_timeseries(member=10):
+    from tcpips.constants import PI2_PATH
+    from adforce.constants import NEW_ORLEANS
+
+    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2" f"r{member}i1p1f1.nc")
+
+    ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
+    point_timeseries = ds.sel(
+        lon=NEW_ORLEANS.lon, lat=NEW_ORLEANS.lat - 0.5, method="nearest"
+    )
+    point_timeseries_august = point_timeseries.isel(
+        time=[time.month == 8 for time in ds.time.values]
+    )
+    out_ds = paralelized_ps(point_timeseries_august, jobs=25)
+    out_ds.to_netcdf(
+        os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
+    )
 
 
 if __name__ == "__main__":

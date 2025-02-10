@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=cdo-cesm
+#SBATCH --job-name=cdo-pi-historical
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -40,12 +40,16 @@ export MPLCONFIGDIR=$(pwd)'/matplotlib'
 module load cdo
 module load nco
 
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r10i1p1f1')"
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r10i1p1f1')"
+# python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r10i1p1f1')"
+#python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r10i1p1f1')"
 #python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r11i1p1f1')"
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r11i1p1f1')"
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r4i1p1f1')"
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r4i1p1f1')"
+#python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r11i1p1f1')"
+python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='historical', typ='atmos', model='CESM2', member='r11i1p1f1')"
+python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='historical', typ='ocean', model='CESM2', member='r11i1p1f1')"
+python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='historical', model='CESM2', member='r11i1p1f1')"
+
+# new_orleans_timeseries
+
 
 #python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='UKESM1-0-LL', member='r1i1p1f2')"
 # python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='UKESM1-0-LL', member='r2i1p1f2')"
