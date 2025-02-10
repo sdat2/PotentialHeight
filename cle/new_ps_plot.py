@@ -1,9 +1,12 @@
 """Plot the new potential size calculation results for PIPS chapter/paper"""
 
 import os
+import numpy as np
+import numpy.ma as ma
 import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim
+from sithom.curve import fit
 from .constants import DATA_PATH, FIGURE_PATH
 
 
@@ -48,6 +51,69 @@ def plot_panels() -> None:
     plt.savefig(os.path.join(FIGURE_PATH, "new_ps_calculation_output_gom.pdf"))
 
 
+def safe_grad(xt, yt):
+    # get rid of nan values
+    xt, yt = xt[~np.isnan(xt)], yt[~np.isnan(xt)]
+    xt, yt = xt[~np.isnan(yt)], yt[~np.isnan(yt)]
+    # normalize the data between 0 and 10
+    xrange = np.max(xt) - np.min(xt)
+    yrange = np.max(yt) - np.min(yt)
+    xt = (xt - np.min(xt)) / xrange * 10
+    yt = (yt - np.min(yt)) / yrange * 10
+    # fit the data with linear fit using OLS
+    param, _ = fit(xt, yt)  # defaults to y=mx+c fit
+    return param[0] * yrange / xrange
+
+
+def safe_corr(xt, yt):
+    corr = ma.corrcoef(ma.masked_invalid(xt), ma.masked_invalid(yt))
+    return corr[0, 1]
+
+
+def _float_to_latex(x, precision=2):
+    """
+    Convert a float x to a LaTeX-formatted string with the given number of significant figures.
+
+    Args:
+        x (float): The number to format.
+        precision (int): Number of significant figures (default is 2).
+
+    Returns:
+        str: A string like "2.2\\times10^{-6}" or "3.1" (if no exponent is needed).
+    """
+    # Handle the special case of zero.
+    if x == 0:
+        return "0"
+
+    # Format the number using general format which automatically uses scientific notation when needed.
+    s = f"{x:.{precision}g}"
+
+    # If scientific notation is used, s will contain an 'e'
+    if "e" in s:
+        mantissa, exp = s.split("e")
+        # Convert the exponent string to an integer (this removes any extra zeros)
+        exp = int(exp)
+        # Choose the multiplication symbol.
+        mult = "\\times"
+        return f"{mantissa}{mult}10^{{{exp}}}"
+    else:
+        # If no exponent is needed, just return the number inside math mode.
+        return f"{s}"
+
+
+def _m_to_text(m):
+    if m.s in (np.nan, np.inf, -np.inf):
+        if m.s not in (np.nan, np.inf, -np.inf):
+            return "$m={:}$".format(_float_to_latex(m))
+        else:
+            return "NaN"
+    else:
+        if m.n > 1000 or m.n < 0.1:
+            return "$m={:.1eL}$".format(m)
+        else:
+            return "$m={:.2L}$".format(m)
+
+
 def timeseries_plot():
     # plot CESM2 ensemble members for ssp585 near New Orleans
     plot_defaults()
@@ -70,11 +136,23 @@ def timeseries_plot():
 
     for i, var in enumerate(vars):
         for j, ds in enumerate(ds_l):
-            x = [time.year for time in ds.time.values]
+            x = np.array([time.year for time in ds.time.values])
             y = ds[var].values
             if var == "rmax" or var == "r0":
                 y /= 1000  # divide by 1000 to go to km
             axs[i].plot(x, y, color=colors[j], label=f"r{members[j]}i1p1f1")
+            m = safe_grad(x, y)
+            rho = safe_corr(x, y)
+            corr_bit = f"ρ = {rho:.2f}"
+            m_bit = _m_to_text(m) + " " + units[i] + " yr$^{-1}$"
+            print(f"r{members[j]}i1p1f1 " + var + " " + corr_bit + ", " + m_bit)
+            axs[i].annotate(
+                corr_bit + ", " + m_bit,
+                xy=(0.44, 0.21 - j * 0.1),
+                xycoords=axs[i].transAxes,
+                color=colors[j],
+            )
+
         axs[i].set_xlabel("")
         axs[i].set_ylabel(var_labels[i] + " [" + units[i] + "]")
         if i == len(vars) - 1:
@@ -82,7 +160,7 @@ def timeseries_plot():
             axs[i].set_xlabel("Year [A.D.]")
     axs[2].set_xlim(2015, 2100)
     label_subplots(axs)
-    axs[0].set_title("CESM2 SSP585")
+    axs[0].set_title("New Orleans CESM2 SSP585")
     plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=3)
     plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_timeseries.pdf"))
 
