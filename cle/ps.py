@@ -390,7 +390,7 @@ def new_orleans_timeseries(member=10):
     from tcpips.constants import PI2_PATH
     from adforce.constants import NEW_ORLEANS
 
-    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2" f"r{member}i1p1f1.nc")
+    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
 
     ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
     point_timeseries = ds.sel(
@@ -405,6 +405,34 @@ def new_orleans_timeseries(member=10):
     )
 
 
+def miami_timeseries(member=10):
+    from tcpips.constants import PI2_PATH
+    from adforce.constants import MIAMI
+
+    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+    ds = xr.open_dataset(file_name)
+    ds.sel(lon=MIAMI.lon + 0.2, lat=MIAMI.lat, method="nearest").isel(
+        time=[t.month == 8 for t in ds.time.values]
+    )
+    out_ds = paralelized_ps(ds, jobs=10)
+    out_ds.to_netcdf(os.path.join(DATA_PATH, f"miami_august_ssp585_r{member}i1p1f1.nc"))
+
+
+def galverston_timeseries(member: int = 10):
+    from tcpips.constants import PI2_PATH
+    from adforce.constants import GALVERSTON
+
+    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+    ds = xr.open_dataset(file_name)
+    ds.sel(lon=GALVERSTON.lon, lat=GALVERSTON.lat - 0.9, method="nearest").isel(
+        time=[t.month == 8 for t in ds.time.values]
+    )
+    out_ds = paralelized_ps(ds, jobs=10)
+    out_ds.to_netcdf(
+        os.path.join(DATA_PATH, f"galverston_august_ssp585_r{member}i1p1f1.nc")
+    )
+
+
 if __name__ == "__main__":
     # python -m cle.ps
     # delete_tmp()
@@ -412,3 +440,8 @@ if __name__ == "__main__":
     # delete_tmp()
     multi_point_example_2d()
     # trimmed_cmip6_example()
+    # python -c "from cle.ps import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
+    # python -c "from cle.ps import new_orleans_timeseries as no; no(4); no(10); no(11)"
+    # python -c "from cle.ps import miami_timeseries as mm; mm(4); mm(10); mm(11)"
+    # for member in [4, 10, 11]:
+    #    galverston_timeseries(member)

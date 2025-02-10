@@ -44,9 +44,9 @@ module load nco
 #python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r10i1p1f1')"
 #python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='ocean', model='CESM2', member='r11i1p1f1')"
 #python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='ssp585', typ='atmos', model='CESM2', member='r11i1p1f1')"
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='historical', typ='atmos', model='CESM2', member='r11i1p1f1')"
-python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='historical', typ='ocean', model='CESM2', member='r11i1p1f1')"
-python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='historical', model='CESM2', member='r11i1p1f1')"
+python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='historical', typ='atmos', model='CESM2', member='r4i1p1f1')"
+python -c "from tcpips.regrid_cdo import regrid_cmip6_part; regrid_cmip6_part(exp='historical', typ='ocean', model='CESM2', member='r4i1p1f1')"
+python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='historical', model='CESM2', member='r4i1p1f1')"
 
 # new_orleans_timeseries
 

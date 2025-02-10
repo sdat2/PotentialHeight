@@ -5,7 +5,7 @@ import numpy as np
 import numpy.ma as ma
 import xarray as xr
 import matplotlib.pyplot as plt
-from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim
+from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
 from .constants import DATA_PATH, FIGURE_PATH
 
@@ -124,7 +124,7 @@ def timeseries_plot():
         for member in members
     ]
     ds_l = [xr.open_dataset(file_name) for file_name in file_names]
-    fig, axs = plt.subplots(4, 1, sharex=True, figsize=get_dim(ratio=1.5))
+    _, axs = plt.subplots(4, 1, sharex=True, figsize=get_dim(ratio=1.5))
     vars = ["sst", "vmax", "rmax", "r0"]
     var_labels = [
         "Sea surface temp., $T_s$",
@@ -163,6 +163,16 @@ def timeseries_plot():
     axs[0].set_title("New Orleans CESM2 SSP585")
     plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=3)
     plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_timeseries.pdf"))
+    plt.clf()
+    for j, member in enumerate(members):
+        del ds_l[j]["time"]
+        ds_l[j]["r0"].attrs["units"] = "km"
+        ds_l[j]["rmax"].attrs["units"] = "km"
+        _, axs = pairplot(ds_l[j][vars])
+        plt.savefig(
+            os.path.join(FIGURE_PATH, f"new_orleans_pairplot_r{member}i1p1f1.pdf")
+        )
+    plt.clf()
 
 
 if __name__ == "__main__":
