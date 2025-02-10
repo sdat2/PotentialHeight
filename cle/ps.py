@@ -410,8 +410,8 @@ def miami_timeseries(member=10):
     from adforce.constants import MIAMI
 
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
-    ds = xr.open_dataset(file_name)
-    ds.sel(lon=MIAMI.lon + 0.2, lat=MIAMI.lat, method="nearest").isel(
+    ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
+    ds = ds.sel(lon=MIAMI.lon + 0.2, lat=MIAMI.lat, method="nearest").isel(
         time=[t.month == 8 for t in ds.time.values]
     )
     out_ds = paralelized_ps(ds, jobs=10)
@@ -423,8 +423,8 @@ def galverston_timeseries(member: int = 10):
     from adforce.constants import GALVERSTON
 
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
-    ds = xr.open_dataset(file_name)
-    ds.sel(lon=GALVERSTON.lon, lat=GALVERSTON.lat - 0.9, method="nearest").isel(
+    ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
+    ds = ds.sel(lon=GALVERSTON.lon, lat=GALVERSTON.lat - 0.9, method="nearest").isel(
         time=[t.month == 8 for t in ds.time.values]
     )
     out_ds = paralelized_ps(ds, jobs=10)
