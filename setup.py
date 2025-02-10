@@ -10,6 +10,7 @@ REQUIRED: List[str] = [
     "uncertainties",  # common utility for linear error propagation
     # "sithom @ git+https://github.com/sdat2/sithom",
     "sithom >= 0.1.1",  # personal common utilities for timing, plotting, and fitting
+    "cdsapi",  # download ERA5 monthly averages (tcpips)
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
     "intake",  # to read CMIP6 data (tcpips)
