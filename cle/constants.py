@@ -27,12 +27,14 @@ RHO_AIR_DEFAULT = 1.15  # [kg m-3]
 # temperatures
 DEFAULT_SURF_TEMP = 299  # [K]
 NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT = DEFAULT_SURF_TEMP  # [K]
-OUTFLOW_TEMPERATURE_DEFAULT = 200  # [k]
+OUTFLOW_TEMPERATURE_DEFAULT = 200  # [K]
 
 
 # CLE15
-CK_CD_DEFAULT = 0.9  # [dimensionless]
-CD_DEFAULT = 0.0015  #
+CK_CD_DEFAULT = (
+    0.9  # [dimensionless], chosen to match standard potential intensity assumptions
+)
+CD_DEFAULT = 0.0015  # drag coefficient
 W_COOL_DEFAULT = 0.002  # m s-1
 
 # supergradient

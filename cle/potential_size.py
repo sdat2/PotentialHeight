@@ -355,6 +355,13 @@ def wang_consts(
     )
 
 
+def profile_from_stats(vmax: float, fcor: float, r0: float, p0: float) -> dict:
+    ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
+    out = _run_cle15_octave(ins)
+    out["p"] = pressure_from_wind(out["rr"], out["VV"], p0=p0, fcor=fcor)
+    return out
+
+
 if __name__ == "__main__":
     # python -m cle.potential_size
     # delete_tmp()

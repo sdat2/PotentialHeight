@@ -34,4 +34,4 @@ mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
 # single bit test:
-python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r4i1p1f1')"
+python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r11i1p1f1')"

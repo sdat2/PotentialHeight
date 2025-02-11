@@ -5,20 +5,20 @@ from .files import locker
 
 
 def call_cdo(input_path: str, output_path: str) -> None:
-    os.system(f"ncdump {input_path}")
+    os.system(f"ncdump -h {input_path}")
     # delete the misnamed coordinates (xmip's fault?)
     os.system(
-        f"ncks -x -v lon_verticies,lat_bounds,lon_bounds   {input_path} {output_path+'.tmp'}"
+        f"ncks -4 -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies   {input_path} {output_path+'.tmp'}"
     )
     # remap bilinearly using cdo in silent mode
     os.system(
-        f"cdo -s remapbil,{CONFIG_PATH}/halfdeg.txt {output_path+'.tmp'} {output_path} > /dev/null"
+        f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt {output_path+'.tmp'} {output_path} > /dev/null"
     )
     try:
         os.remove(f"{output_path + '.tmp'}")
     except Exception as e:
         print(e)
-    os.system(f"ncdump {output_path}")
+    os.system(f"ncdump -h {output_path}")
 
 
 @timeit
@@ -38,5 +38,5 @@ def regrid_cmip6_part(
 
 
 if __name__ == "__main__":
-    # python -m tcpips.regrid_new
-    regrid_cmip6_part(exp="ssp585", typ="atmos", model="CESM2", member="r4i1p1f1")
+    # python -m tcpips.regrid_cdo
+    regrid_cmip6_part(exp="ssp585", typ="ocean", model="CESM2", member="r4i1p1f1")
