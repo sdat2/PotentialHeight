@@ -4,6 +4,7 @@ daf_steps: 25
 obs_lon: -90.0715
 obs_lat: 29.9511
 seed_offset: 22
-resolution: mid-notide
+resolution: mid
+profile_name: 2025_new_orleans_profile_r4i1p1f1
 exp_name: 3d-emulation
 test: false
