@@ -78,9 +78,12 @@ def _inputs_to_name(inputs: dict) -> str:
 def process_inputs(inputs: dict) -> dict:
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
     ins["w_cool"] = W_COOL_DEFAULT
-    ins["p0"] = BACKGROUND_PRESSURE
+    ins["p0"] = BACKGROUND_PRESSURE / 100  # in hPa instead
     ins["CkCd"] = CK_CD_DEFAULT
     ins["Cd"] = CD_DEFAULT
+
+    if "p0" in inputs:
+        assert inputs["p0"] > 900 and inputs["p0"] < 1100  # between 900 and 1100 hPa
     # ins["CkCd"]
 
     if inputs is not None:
@@ -358,7 +361,8 @@ def wang_consts(
 def profile_from_stats(vmax: float, fcor: float, r0: float, p0: float) -> dict:
     ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
     out = _run_cle15_octave(ins)
-    out["p"] = pressure_from_wind(out["rr"], out["VV"], p0=p0, fcor=fcor)
+    out["VV"][-1] = 0
+    out["p"] = pressure_from_wind(out["rr"], out["VV"], p0=p0 * 100, fcor=fcor) / 100
     return out
 
 

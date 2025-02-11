@@ -46,7 +46,6 @@ def save_config(cfg: DictConfig) -> None:
         OmegaConf.save(config=cfg, f=fp.name)
 
 
-# version_base=None,
 @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="wrap_config")
 def idealized_tc_observe(cfg: DictConfig) -> float:
     """Wrap the adcirc call.

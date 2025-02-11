@@ -446,7 +446,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--exp_name",
         type=str,
-        default="notide-example-2",
+        default="notide-example-new",
         help="Path to ADCIRC run folder.",
     )
     parser.add_argument(
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--profile_name",
         type=str,
-        default="2025.json",
+        default="2025_new_orleans_profile_r4i1p1f1.json",
         help="Path to ADCIRC run folder.",
     )
     parser.add_argument(
@@ -497,4 +497,4 @@ if __name__ == "__main__":
 
         plot_heights_and_winds(os.path.join(EXP_PATH, args.exp_name), step_size=10)
 
-    # python -m adforce.wrap --exp_name notide-mid --profile_name 2025.json --stationid 3 --resolution mid-notide
+    # python -m adforce.oldwrap --exp_name notide-mid

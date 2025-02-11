@@ -3,6 +3,7 @@
 import numpy as np
 import xarray as xr
 from sithom.io import read_json
+from cle.utils import pressure_from_wind
 
 
 def pressures_profile(  # add pressure profile to wind profile
@@ -25,25 +26,7 @@ def pressures_profile(  # add pressure profile to wind profile
     Returns:
         np.ndarray: Pressures [hPa].
     """
-
-    # integrate the wind profile to get the pressure profile
-    # assume wind-pressure gradient balance
-    # could speed up but is very quick anyway
-    p = np.zeros(rr.shape)  # [Pa]
-    # rr ascending
-    assert np.all(rr == np.sort(rr))
-    p[-1] = p0
-    for j in range(len(rr) - 1):
-        i = -j - 2
-        # Assume Coriolis force and pressure-gradient balance centripetal force.
-        p[i] = p[i + 1] - rho0 * (
-            vv[i] ** 2 / (rr[i + 1] / 2 + rr[i] / 2) + fcor * vv[i]
-        ) * (rr[i + 1] - rr[i])
-        # delta p = - rho * (v^2 / <r> + fcor * v) * delta r
-        # decreases as you go in
-        # centripetal pushes out, pressure pushes inward, coriolis pushes inward
-
-    return p / 100  # pressures in hPa
+    pressure_from_wind(rr, vv, p0, rho0, fcor, assumption="isothermal") / 100
 
 
 def read_profile(profile_path: str) -> xr.Dataset:
@@ -78,7 +61,11 @@ def read_profile(profile_path: str) -> xr.Dataset:
 
     radii = np.array(chavas_profile["rr"], dtype="float32")
     windspeeds = np.array(chavas_profile["VV"], dtype="float32")
-    pressures = pressures_profile(radii, windspeeds)
+
+    if "p" not in chavas_profile:
+        pressures = pressures_profile(radii, windspeeds)
+    else:
+        pressures = np.array(chavas_profile["p"], dtype="float32")
 
     return xr.Dataset(
         data_vars={

@@ -5,6 +5,7 @@ import numpy as np
 import numpy.ma as ma
 import xarray as xr
 import matplotlib.pyplot as plt
+from sithom.io import write_json
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
 from .constants import DATA_PATH, FIGURE_PATH
@@ -138,6 +139,11 @@ def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
 
     for i, var in enumerate(vars):
         for j, ds in enumerate(ds_l):
+            ds_l[j][var].attrs["long_name"] = var_labels[i]
+            ds_l[j][var].attrs["units"] = units[i]
+
+    for i, var in enumerate(vars):
+        for j, ds in enumerate(ds_l):
             x = np.array([time.year for time in ds.time.values])
             y = ds[var].values
             if var == "rmax" or var == "r0":
@@ -160,47 +166,58 @@ def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
         if i == len(vars) - 1:
             axs[i].legend()
             axs[i].set_xlabel("Year [A.D.]")
-
-    years = [2025, 2097]
-    colors = ["Green", "Blue"]
-    vars = ["p", "VV"]
-    var_labels = ["Pressure [Pa]", "Velocity [m s$^{-1}$]"]
-    plot_defaults()
-    fig, axs = plt.subplots(2, 1, sharex=True)
-    for k, year in enumerate(years):
-        tp = ds_l[0].isel(time=[t.year == year for t in ds_l[0].time.values])
-        profile = profile_from_stats(
-            tp.vmax.values.ravel(),
-            coriolis_parameter_from_lat(tp.lat.values.ravel()),
-            tp.r0.values.ravel(),
-            tp.r0.values.ravel(),
-        )
-        for i, var in enumerate(vars):
-            axs[i].plot(
-                profile["rr"] / 1000,
-                profile[var],
-                color=colors[k],
-                label=f"August {year}",
-            )
-            if k == 0:
-                axs.set_ylabel(var_labels[i])
-    plt.xlabel("Radius [km]")
-    plt.savefig(FIGURE_PATH, f"{name}_profiles_r{members[0]}i1p1f1.pdf")
-    plt.clf()
-
     axs[2].set_xlim(2015, 2100)
     label_subplots(axs)
     axs[0].set_title(f"{plot_name} CESM2 SSP585")
     plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=3)
     plt.savefig(os.path.join(FIGURE_PATH, f"{name}_timeseries.pdf"))
     plt.clf()
+
+    years = [2025, 2097]
+    colors = ["Green", "Blue"]
+    vars = ["p", "VV"]
+    var_labels = ["Pressure [hPa]", "Velocity [m s$^{-1}$]"]
+    plot_defaults()
+    for j, member in enumerate(members):
+        fig, axs = plt.subplots(2, 1, sharex=True)
+        for k, year in enumerate(years):
+            tp = ds_l[j].isel(time=[t.year == year for t in ds_l[j].time.values])
+            vmax = float(tp.vmax.values.ravel())
+            fcor = float(coriolis_parameter_from_lat(tp.lat.values.ravel()))
+            r0 = float(tp.r0.values.ravel()) * 1000  # back to m
+            p0 = float(tp.msl.values.ravel())  # hPa
+            if not np.isnan(vmax) and not np.isnan(r0):
+                profile = profile_from_stats(
+                    vmax,
+                    fcor,
+                    r0,
+                    p0,
+                )
+                write_json(
+                    profile,
+                    os.path.join(
+                        DATA_PATH, f"{year}_{name}_profile_r{member}i1p1f1.json"
+                    ),
+                )
+                for i, var in enumerate(vars):
+                    axs[i].plot(
+                        np.array(profile["rr"]) / 1000,
+                        profile[var],
+                        color=colors[k],
+                        label=f"August {year}",
+                    )
+                    if k == 0:
+                        axs[i].set_ylabel(var_labels[i])
+        label_subplots(axs)
+        plt.legend(ncols=2)
+        plt.xlabel("Radius [km]")
+        plt.savefig(os.path.join(FIGURE_PATH, f"{name}_profiles_r{member}i1p1f1.pdf"))
+        plt.clf()
+
+    vars = ["sst", "vmax", "rmax", "r0"]
     for j, member in enumerate(members):
         del ds_l[j]["time"]
-        for i, var in enumerate(vars):
-            ds_l[j][var].attrs["long_name"] = var_labels[i]
-            ds_l[j][var].attrs["units"] = units[i]
-
-        _, axs = pairplot(ds_l[j][vars])
+        _, axs = pairplot(ds_l[j][vars], label=True)
         plt.savefig(os.path.join(FIGURE_PATH, f"{name}_pairplot_r{member}i1p1f1.pdf"))
         plt.clf()
 

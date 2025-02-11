@@ -152,6 +152,7 @@ def moving_rectilinear_square(
     ds.createVariable(
         "lon", "f8", ("time", "yi", "xi"), fill_value=9.969209968386869e36
     )
+
     # add data to netcdf dataset
     ds["time"][:] = times
     ds["lat"][:] = lats
@@ -160,6 +161,7 @@ def moving_rectilinear_square(
     ds["clat"][:] = clon_clat_array[1]
     ds["time"].units = grid_config["time_unit"]
     ds["time"].calendar = grid_config["time_calendar"]
+
     # set standard coordinate attributes
     ds["lat"].units = "degrees_north"
     ds["lon"].units = "degrees_east"
@@ -188,9 +190,7 @@ def gen_ps_f(
         CLE_DATA_PATH, "outputs.json"
     )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
 ) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
-    """Generate the interpolation function from the wind profile (from Chavas et al. 2015).
-
-    Maybe I should also make options for any other azimuthally symetric model automatically.
+    """Generate the interpolation function from an azimuthally symetric windprofile.
 
     This should potentially be changed to allow each timestep to have a different profile.
 
@@ -202,12 +202,17 @@ def gen_ps_f(
     Returns:
         Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]: interpolation function.
     """
+    print(
+        "profile_path_or_dict,",
+        profile_path_or_dict,
+    )
     if isinstance(profile_path_or_dict, str):
         profile = read_profile(profile_path_or_dict)
     elif isinstance(profile_path_or_dict, dict):
         profile = profile_path_or_dict
     else:
         raise ValueError("profile_path_or_dict must be a string or a dictionary.")
+
     radii = profile["radii"].values
     windspeeds = profile["windspeeds"].values
     pressures = profile["pressures"].values
@@ -304,6 +309,7 @@ def add_psfc_u10(
         interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
         # calculate the distance from the center of the storm
         # dist (m) = ang_dist (degree) * 111e3 (m/degree)
+        # locally flat approximation, should replace
         dist = np.sqrt(np.square(dist_lon) + np.square(dist_lat)) * 111e3
         # interpolate the pressure and wind fields from the wind profile file
         psfc, wsp = interp_func(dist)
