@@ -478,6 +478,7 @@ def run_bayesopt_exp(
     # add existance check here
     os.makedirs(direc, exist_ok=True)
     write_json(cfg, os.path.join(direc, "bo-config.json"))
+    print("BO config", cfg)
 
     setup_tf(seed=seed, log_name=exp_name)
 

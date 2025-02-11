@@ -36,7 +36,7 @@ def create_2d_ani_run() -> None:
         obs_lat=args.obs_lat,
         profile_name="2097_new_orleans_profile_r4i1p1f1",
         exp_name=args.exp_name,
-        resolution=args.resolution,
+        resolution="mid",
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
         wrap_test=args.test,

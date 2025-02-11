@@ -54,6 +54,9 @@ def read_profile(profile_path: str) -> xr.Dataset:
         >>> assert "pressures" in profile_ds.data_vars
         >>> assert "radii" in profile_ds.coords
     """
+    if not profile_path.endswith(".json"):
+        profile_path += ".json"
+
     chavas_profile = read_json(profile_path)
 
     if "rr" not in chavas_profile or "VV" not in chavas_profile:

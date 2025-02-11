@@ -207,6 +207,8 @@ def gen_ps_f(
         profile_path_or_dict,
     )
     if isinstance(profile_path_or_dict, str):
+        if not profile_path_or_dict.endswith(".json"):
+            profile_path_or_dict += ".json"
         profile = read_profile(profile_path_or_dict)
     elif isinstance(profile_path_or_dict, dict):
         profile = profile_path_or_dict
@@ -353,6 +355,7 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
         tc_config["profile_path"]["value"] = os.path.join(
             CLE_DATA_PATH, f"{tc_config['profile_name']['value']}.json"
         )
+        print("TC profile path", tc_config["profile_path"]["value"])
     # Create the "Main" group (rank 1)
     main_group = ds.createGroup("Main")
     main_group = rectilinear_square(main_group, grid_config["Main"])

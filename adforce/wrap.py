@@ -76,7 +76,8 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
         os.path.join(cfg.files.run_folder, "fort.14"),
     )
 
-    print(cfg)
+    print("ADFORCE cfg:", cfg)
+
     # save config file
     save_config(cfg)
     # create forcing files
@@ -87,7 +88,7 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     maxele = observe_max_point(cfg)
     # save config file
     save_config(cfg)
-    print("max height at obs point: ", maxele, "m\n\n")
+    print("max height at obs point: ", maxele, " m\n\n")
 
     if cfg.ani:
         from adforce.ani import plot_heights_and_winds
