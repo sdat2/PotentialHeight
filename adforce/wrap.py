@@ -3,8 +3,10 @@
 import os, shutil
 import numpy as np
 import hydra
+from hydra import initialize, compose
 from omegaconf import DictConfig, OmegaConf
-from .constants import CONFIG_PATH, DATA_PATH, SETUP_PATH
+from sithom.time import timeit
+from .constants import CONFIG_PATH, SETUP_PATH
 from .fort22 import create_fort22
 from .slurm import setoff_slurm_job_and_wait
 from .mesh import xr_loader
@@ -46,7 +48,7 @@ def save_config(cfg: DictConfig) -> None:
         OmegaConf.save(config=cfg, f=fp.name)
 
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="wrap_config")
+@timeit
 def idealized_tc_observe(cfg: DictConfig) -> float:
     """Wrap the adcirc call.
 
@@ -56,7 +58,6 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     Returns:
         float: max water level at observation point.
     """
-    cfg.files["run_folder"] = os.path.join(cfg.files.exp_path, cfg.name)
     os.makedirs(cfg.files.run_folder, exist_ok=True)
     # transfer relevant ADCIRC setup files
     assert cfg.adcirc.tide.value == False
@@ -88,12 +89,40 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     save_config(cfg)
     print("max height at obs point: ", maxele, "m\n\n")
 
-    from adforce.ani import plot_heights_and_winds
+    if cfg.ani:
+        from adforce.ani import plot_heights_and_winds
 
-    plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
-    return maxele  # not yet implemented
+        plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
+
+    return maxele
+
+
+@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="wrap_config")
+def main(cfg: DictConfig) -> float:
+    """
+    Command line call
+
+    Args:
+        cfg (DictConfig): Full config file.
+
+    Returns:
+        float: float.
+    """
+    cfg["name"] == str(cfg["name"])
+    cfg.files["run_folder"] = os.path.join(str(cfg.files.exp_path), str(cfg.name))
+    return idealized_tc_observe(cfg)
+
+
+def get_default_config() -> OmegaConf:
+    with initialize(
+        config_path=os.path.relpath(CONFIG_PATH, os.path.dirname(__file__))
+    ):
+        # Compose the configuration as if you were running from the command line.
+        cfg = compose(config_name="wrap_config")
+    return cfg
 
 
 if __name__ == "__main__":
     # python -m adforce.wrap name=changed_calendar_wrap
-    idealized_tc_observe()
+    # python -m adforce.wrap name="2097" tc.profile_name.value="2097_new_orleans_profile_r4i1p1f1"
+    main()

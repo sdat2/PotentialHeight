@@ -4,7 +4,7 @@ import os
 import yaml
 from adbo.constants import CONFIG_PATH
 import argparse
-from adbo.exp import run_bayesopt_exp
+from adbo.newexp import run_bayesopt_exp
 from adforce.constants import NEW_ORLEANS
 
 
@@ -25,7 +25,7 @@ def create_2d_ani_run() -> None:
     parser.add_argument("--init_steps", type=int, default=25)
     parser.add_argument("--daf_steps", type=int, default=25)
     parser.add_argument("--resolution", type=str, default="mid-notide")
-    parser.add_argument("--exp_name", type=str, default="ani-2d-3")
+    parser.add_argument("--exp_name", type=str, default="ani-2d-2025")
 
     args = parser.parse_args()
 
@@ -34,7 +34,7 @@ def create_2d_ani_run() -> None:
         seed=10,
         obs_lon=args.obs_lon,
         obs_lat=args.obs_lat,
-        profile_name=str(args.year) + ".json",
+        profile_name="2097_new_orleans_profile_r4i1p1f1",
         exp_name=args.exp_name,
         resolution=args.resolution,
         init_steps=args.init_steps,

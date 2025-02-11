@@ -7,3 +7,4 @@ defaults:
   - _self_
 
 name: test-wrap
+ani: false

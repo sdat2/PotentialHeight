@@ -65,7 +65,7 @@ def setoff_slurm_job_and_wait(direc: str, config: DictConfig) -> int:
 
     time_limit = config.slurm.options[resolution].walltime
     s = Slurm(  # jobname,
-        config.name,
+        str(config.name),
         {
             "nodes": config.slurm.options[resolution].nodes,
             "account": config.slurm.account,
