@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
 from .constants import DATA_PATH, FIGURE_PATH
+from .potential_size import profile_from_stats
+from .utils import coriolis_parameter_from_lat
 
 
 def plot_panels() -> None:
@@ -114,13 +116,13 @@ def _m_to_text(m):
             return "$m={:.2L}$".format(m)
 
 
-def timeseries_plot():
+def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
     # plot CESM2 ensemble members for ssp585 near New Orleans
     plot_defaults()
     members = [4, 10, 11]
     colors = ["purple", "green", "orange"]
     file_names = [
-        os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
+        os.path.join(DATA_PATH, f"{name}_august_ssp585_r{member}i1p1f1.nc")
         for member in members
     ]
     ds_l = [xr.open_dataset(file_name) for file_name in file_names]
@@ -158,24 +160,54 @@ def timeseries_plot():
         if i == len(vars) - 1:
             axs[i].legend()
             axs[i].set_xlabel("Year [A.D.]")
+
+    years = [2025, 2097]
+    colors = ["Green", "Blue"]
+    vars = ["p", "VV"]
+    var_labels = ["Pressure [Pa]", "Velocity [m s$^{-1}$]"]
+    plot_defaults()
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    for k, year in enumerate(years):
+        tp = ds_l[0].isel(time=[t.year == year for t in ds_l[0].time.values])
+        profile = profile_from_stats(
+            tp.vmax.values.ravel(),
+            coriolis_parameter_from_lat(tp.lat.values.ravel()),
+            tp.r0.values.ravel(),
+            tp.r0.values.ravel(),
+        )
+        for i, var in enumerate(vars):
+            axs[i].plot(
+                profile["rr"] / 1000,
+                profile[var],
+                color=colors[k],
+                label=f"August {year}",
+            )
+            if k == 0:
+                axs.set_ylabel(var_labels[i])
+    plt.xlabel("Radius [km]")
+    plt.savefig(FIGURE_PATH, f"{name}_profiles_r{members[0]}i1p1f1.pdf")
+    plt.clf()
+
     axs[2].set_xlim(2015, 2100)
     label_subplots(axs)
-    axs[0].set_title("New Orleans CESM2 SSP585")
+    axs[0].set_title(f"{plot_name} CESM2 SSP585")
     plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=3)
-    plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_timeseries.pdf"))
+    plt.savefig(os.path.join(FIGURE_PATH, f"{name}_timeseries.pdf"))
     plt.clf()
     for j, member in enumerate(members):
         del ds_l[j]["time"]
-        ds_l[j]["r0"].attrs["units"] = "km"
-        ds_l[j]["rmax"].attrs["units"] = "km"
+        for i, var in enumerate(vars):
+            ds_l[j][var].attrs["long_name"] = var_labels[i]
+            ds_l[j][var].attrs["units"] = units[i]
+
         _, axs = pairplot(ds_l[j][vars])
-        plt.savefig(
-            os.path.join(FIGURE_PATH, f"new_orleans_pairplot_r{member}i1p1f1.pdf")
-        )
-    plt.clf()
+        plt.savefig(os.path.join(FIGURE_PATH, f"{name}_pairplot_r{member}i1p1f1.pdf"))
+        plt.clf()
 
 
 if __name__ == "__main__":
     # python -m cle.new_ps_plot
     # plot_panels()
-    timeseries_plot()
+    timeseries_plot(name="new_orleans", plot_name="New Orleans")
+    timeseries_plot(name="miami", plot_name="Miami")
+    timeseries_plot(name="galverston", plot_name="Galverston")
