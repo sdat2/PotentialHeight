@@ -1,19 +1,33 @@
 """adbo.exp_3d.py"""
 
-import hydra
-from omegaconf import DictConfig
-from adbo.constants import CONFIG_PATH
-from adbo.exp import run_bayesopt_exp, DEFAULT_CONSTRAINTS
+import argparse
+from adbo.newexp import run_bayesopt_exp, DEFAULT_CONSTRAINTS
+from adforce.constants import NEW_ORLEANS
 
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="bo_setup")
-def run_3d_exp(args: DictConfig) -> None:
+# @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="bo_setup")
+def run_3d_exp() -> None:
     """
     Run an experiment varying the angle, displacement and speed of the storm for a given tropical cyclone profile.
     """
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test", type=bool, default=False)
+    parser.add_argument(
+        "--profile_name", type=int, default="2025_new_orleans_profile_r4i1p1f1"
+    )
+    parser.add_argument("--obs_lon", type=float, default=NEW_ORLEANS.lon)
+    parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
+    parser.add_argument("--init_steps", type=int, default=25)
+    parser.add_argument("--daf_steps", type=int, default=25)
+    parser.add_argument("--resolution", type=str, default="mid")
+    parser.add_argument("--exp_name", type=str, default="bo")
+
+    args = parser.parse_args()
+
     print(args)
     run_bayesopt_exp(
-        seed=args.seed_offset + args.year,
+        seed=args.seed_offset,
         profile_name=args.profile_name,
         constraints=DEFAULT_CONSTRAINTS,
         obs_lon=args.obs_lon,

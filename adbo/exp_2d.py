@@ -25,7 +25,7 @@ def create_2d_ani_run() -> None:
     parser.add_argument("--init_steps", type=int, default=25)
     parser.add_argument("--daf_steps", type=int, default=25)
     parser.add_argument("--resolution", type=str, default="mid-notide")
-    parser.add_argument("--exp_name", type=str, default="ani-2d-2025")
+    parser.add_argument("--exp_name", type=str, default="ani-2d-2097")
 
     args = parser.parse_args()
 
