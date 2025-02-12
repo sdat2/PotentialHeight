@@ -47,8 +47,8 @@ years: List[str] = ["2025", "2097"]
 
 @timeit
 def plot_diff(
-    exps: Tuple[str, str] = ("new-3d", "new-3d-2097"),
-    figure_name="2025-vs-2097-new-orleans.pdf",
+    exps: Tuple[str, str] = ("miami-2025", "miami-2097"),
+    figure_name="2025-vs-2097-miami.pdf",
 ) -> None:
     """
     Plot difference between two years.
@@ -140,7 +140,10 @@ def find_max(exp: dict) -> float:
         float: Maximum value.
     """
     res = [float(exp[call]["res"]) for call in exp.keys()]
-    return max(res)
+    if len(res) > 0:
+        return max(res)
+    else:
+        return float("nan")
 
 
 def find_difference(stationid: str) -> Tuple[float, float, float]:
@@ -153,10 +156,18 @@ def find_difference(stationid: str) -> Tuple[float, float, float]:
     Returns:
         float: Difference in max value.
     """
-    exp1 = read_json(os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json"))
-    exp2 = read_json(os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json"))
-    max1 = find_max(exp1)
-    max2 = find_max(exp2)
+    fp1 = os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json")
+    if os.path.exists(fp1):
+        exp1 = read_json(fp1)
+        max1 = find_max(exp1)
+    else:
+        max1 = float("nan")
+    fp2 = os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json")
+    if os.path.exists(fp2):
+        exp2 = read_json(fp2)
+        max2 = find_max(exp2)
+    else:
+        max2 = float("nan")
     return max2 - max1, max1, max2
 
 
@@ -182,9 +193,15 @@ def plot_many(year="2025") -> None:
     """
     plot_defaults()
 
+    def _safe_read(fp):
+        if os.path.exists(fp):
+            return read_json(fp)
+        else:
+            return None
+
     exps = {
-        i: read_json(os.path.join(EXP_PATH, i + "-" + year, "experiments.json"))
-        for i in stationid
+        id: _safe_read(os.path.join(EXP_PATH, id + "-" + year, "experiments.json"))
+        for id in stationid
     }
     # print("exps", exps)
 
@@ -266,8 +283,9 @@ def plot_many(year="2025") -> None:
     colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
 
     for exp_num, exp_key in enumerate(exps):
-        plot_exp(exps[exp_key], f"{exp_key}", colors[exp_num])
-    vline(25.5)
+        if exps[exp_key] is not None:
+            plot_exp(exps[exp_key], f"{exp_key}", colors[exp_num])
+    vline(25.5)  # LHS to DAF transition in current set up.
 
     # axs[0].legend()
     plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.75), ncol=3)
@@ -414,9 +432,9 @@ def plot_places(
 if __name__ == "__main__":
     # python -m adbo.plot
     # plot_diff()
-    plot_many("2025")
-    plot_many("2097")
-    plot_places()
+    # plot_many("2025")
+    # plot_many("2097")
+    # plot_places()
     find_differences()
 
 """

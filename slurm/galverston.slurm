@@ -46,5 +46,5 @@ obs_lon=-94.7977
 obs_lat=29.3013
 
 # 1
-python -m adbo.exp_3d --exp_name=galverston-2025 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
+# python -m adbo.exp_3d --exp_name=galverston-2025 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
 python -m adbo.exp_3d --exp_name=galverston-2097 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lat
