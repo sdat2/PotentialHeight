@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=bo1
+#SBATCH --job-name=bo3
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -47,10 +47,10 @@ p25=2025_new_orleans_profile_r4i1p1f1
 p97=2097_new_orleans_profile_r4i1p1f1
 
 # 1
-python -m adbo.exp_3d --exp_name=8729840-2097 --profile_name=$p97 --resolution=mid --obs_lat=30.404389 --obs_lon=-87.211194
-python -m adbo.exp_3d --exp_name=8735180-2097 --profile_name=$p97 --resolution=mid --obs_lat=30.25 --obs_lon=-88.075
-python -m adbo.exp_3d --exp_name=8760922-2097 --profile_name=$p97 --resolution=mid --obs_lat=28.932222 --obs_lon=-89.4075
-python -m adbo.exp_3d --exp_name=8761724-2097 --profile_name=$p97 --resolution=mid --obs_lat=29.263 --obs_lon=-89.957
+# python -m adbo.exp_3d --exp_name=8729840-2097 --profile_name=$p97 --resolution=mid --obs_lat=30.404389 --obs_lon=-87.211194
+# python -m adbo.exp_3d --exp_name=8735180-2097 --profile_name=$p97 --resolution=mid --obs_lat=30.25 --obs_lon=-88.075
+# python -m adbo.exp_3d --exp_name=8760922-2097 --profile_name=$p97 --resolution=mid --obs_lat=28.932222 --obs_lon=-89.4075
+# python -m adbo.exp_3d --exp_name=8761724-2097 --profile_name=$p97 --resolution=mid --obs_lat=29.263 --obs_lon=-89.957
 
 
 # 2
@@ -60,12 +60,12 @@ python -m adbo.exp_3d --exp_name=8761724-2097 --profile_name=$p97 --resolution=m
 # python -m adbo.exp_3d --exp_name=8729840-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=30.404389 --obs_lon=-87.211194
 
 # 3
-# python -m adbo.exp_3d --exp_name=8735180-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=30.25 --obs_lon=-88.075
-# python -m adbo.exp_3d --exp_name=8760922-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=28.932222 --obs_lon=-89.4075
-# python -m adbo.exp_3d --exp_name=8761724-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.263 --obs_lon=-89.957
-# python -m adbo.exp_3d --exp_name=8762075-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.114167 --obs_lon=-90.199167
-# python -m adbo.exp_3d --exp_name=8762482-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.788611 --obs_lon=-90.420278
-# python -m adbo.exp_3d --exp_name=8764044-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.6675 --obs_lon=-91.237611
+python -m adbo.exp_3d --exp_name=8735180-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=30.25 --obs_lon=-88.075
+python -m adbo.exp_3d --exp_name=8760922-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=28.932222 --obs_lon=-89.4075
+python -m adbo.exp_3d --exp_name=8761724-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.263 --obs_lon=-89.957
+python -m adbo.exp_3d --exp_name=8762075-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.114167 --obs_lon=-90.199167
+python -m adbo.exp_3d --exp_name=8762482-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.788611 --obs_lon=-90.420278
+python -m adbo.exp_3d --exp_name=8764044-2025 --profile_name=$p25 --resolution=mid-notide --obs_lat=29.6675 --obs_lon=-91.237611
 
 
 #lon=[30.404389, 30.25, 28.932222, 29.263, 29.114167, 29.788611, 29.6675]
