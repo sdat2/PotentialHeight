@@ -27,7 +27,7 @@ def run_3d_exp() -> None:
 
     print(args)
     run_bayesopt_exp(
-        seed=args.seed_offset,
+        # seed=args.seed_offset,
         profile_name=args.profile_name,
         constraints=DEFAULT_CONSTRAINTS,
         obs_lon=args.obs_lon,
