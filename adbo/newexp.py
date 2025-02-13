@@ -164,6 +164,8 @@ def objective_f(
             # I want to generalize this so it's relative to the observation point not New Orleans
             tmp_dir = temp_dir()
             wrap_cfg.files.run_folder = tmp_dir
+            # delete fort.22.nc after run
+            wrap_cfg.files.low_storage = True
             wrap_cfg.tc.profile_name.value = cfg["profile_name"]
             wrap_cfg.adcirc.attempted_observation_location.value = [
                 cfg["obs_lon"],

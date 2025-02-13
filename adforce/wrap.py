@@ -95,6 +95,8 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
 
         plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
 
+    if cfg.files.low_storage:
+        os.remove(os.path.join(cfg.files.run_folder, "fort.22.nc"))
     return maxele
 
 

@@ -109,9 +109,9 @@ def plot_diff(
             ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
-    axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
-    axs[2].set_ylabel(r"Track Angle [$^\circ$]")
-    axs[3].set_ylabel("Translation Speed [m s$^{-1}$]")
+    axs[1].set_ylabel(r"Track Displacement, $c$ [$^\circ$]")
+    axs[2].set_ylabel(r"Track Angle, $\chi$ [$^\circ$]")
+    axs[3].set_ylabel("Translation Speed, $V_t$ [m s$^{-1}$]")
     axs[3].set_xlabel("Number of Samples")
     # axs[0].legend()
     label_subplots(axs)
@@ -431,7 +431,12 @@ def plot_places(
 
 if __name__ == "__main__":
     # python -m adbo.plot
-    # plot_diff()
+    for point in ["miami", "new-orleans", "galverston"]:
+        plot_diff(
+            exps=(f"{point}-2025", f"{point}-2097"),
+            figure_name=f"2025-vs-2097-{point}.pdf",
+        )
+    plt.clf()
     plot_many("2025")
     plot_many("2097")
     # plot_places()
