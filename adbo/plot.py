@@ -83,7 +83,7 @@ def plot_diff(
         trans_speed = [float(exp[call]["trans_speed"]) for call in calls]
         calls = [float(call) + 1 for call in calls]
 
-        max_res = []
+        max_res: list = []
         maxr = -np.inf
         for r in res:
             if r > maxr:
@@ -96,7 +96,8 @@ def plot_diff(
         axs[2].scatter(calls, angle, label=label, color=color, s=marker_size)
         axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
         print(f"{label} max_res: {max_res[-1]} m")
-        print(f"{label} max_res25: {max_res[-26]} m")
+        if len(max_res) > 25:
+            print(f"{label} max_res25: {max_res[-26]} m")
 
     def vline(sample: float) -> None:
         """vertical line.
@@ -108,8 +109,8 @@ def plot_diff(
         for ax in axs:
             ax.axvline(sample, color="black", linestyle="--")
 
-    axs[0].set_ylabel("Max SSH at Point [m]")
-    axs[1].set_ylabel(r"Track Displacement, $c$ [$^\circ$]")
+    axs[0].set_ylabel("Max SSH at Point, $z$ [m]")
+    axs[1].set_ylabel(r"Track Displacement, $c$ [$^\circ$E]")
     axs[2].set_ylabel(r"Track Angle, $\chi$ [$^\circ$]")
     axs[3].set_ylabel("Translation Speed, $V_t$ [m s$^{-1}$]")
     axs[3].set_xlabel("Number of Samples")
@@ -146,6 +147,23 @@ def find_max(exp: dict) -> float:
         return float("nan")
 
 
+def find_argmax(exp: dict) -> Optional[int]:
+    """
+    Find argmax value in experiment.
+
+    Args:
+        exp (dict): Experiment dictionary.
+
+    Returns:
+        int: Index of maximum value.
+    """
+    res = [float(exp[call]["res"]) for call in exp.keys()]
+    if len(res) > 0:
+        return int(np.argmax(res))
+    else:
+        return None
+
+
 def find_difference(stationid: str) -> Tuple[float, float, float]:
     """
     Find difference in max value between two years.
@@ -156,18 +174,19 @@ def find_difference(stationid: str) -> Tuple[float, float, float]:
     Returns:
         float: Difference in max value.
     """
+
+    def get_max(fp: str) -> float:
+        if os.path.exists(fp):
+            exp = read_json(fp)
+            mx = find_max(exp)
+        else:
+            mx = float("nan")
+        return mx
+
     fp1 = os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json")
-    if os.path.exists(fp1):
-        exp1 = read_json(fp1)
-        max1 = find_max(exp1)
-    else:
-        max1 = float("nan")
+    max1 = get_max(fp1)
     fp2 = os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json")
-    if os.path.exists(fp2):
-        exp2 = read_json(fp2)
-        max2 = find_max(exp2)
-    else:
-        max2 = float("nan")
+    max2 = get_max(fp2)
     return max2 - max1, max1, max2
 
 
@@ -274,7 +293,7 @@ def plot_many(year="2025") -> None:
             ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
-    axs[1].set_ylabel(r"Track Displacement [$^\circ$]")
+    axs[1].set_ylabel(r"Track Displacement [$^\circ$E]")
     axs[2].set_ylabel(r"Track Angle [$^\circ$]")
     axs[3].set_ylabel("Translation Speed [m s$^{-1}$]")
     axs[-1].set_xlabel("Number of Samples")
