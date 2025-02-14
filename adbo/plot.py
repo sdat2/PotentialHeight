@@ -3,6 +3,7 @@
 from typing import Tuple, List, Optional, Dict
 import os
 import numpy as np
+import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.io import read_json
@@ -13,6 +14,7 @@ from sithom.plot import plot_defaults, label_subplots
 from tcpips.constants import FIGURE_PATH, DATA_PATH
 from adbo.constants import EXP_PATH
 from adforce.mesh import xr_loader
+from pandas.plotting import parallel_coordinates
 
 
 stationid: List[str] = [
@@ -26,13 +28,13 @@ stationid: List[str] = [
 ]
 
 stationid_to_names: Dict[str, str] = {
-    "8729840": "Pensacola (-87.211, 30.404)",
-    "8735180": "Dauphin Island (-88.075, 30.250)",
-    "8760922": "Pilots Station East, S.W. Pass (-89.407, 28.932)",
-    "8761724": "Grand Isle (-89.957, 29.263)",
-    "8762075": "Port Fourchon, Belle Pass (-90.199, 29.114)",
-    "8762482": "West Bank 1, Bayou Gauche (-90.420, 29.789)",
-    "8764044": "Berwick, Atchafalaya River (-91.238, 29.668)",
+    "8729840": "Pensacola",  # (-87.211, 30.404)
+    "8735180": "Dauphin Island",  #  (-88.075, 30.250)",
+    "8760922": "Pilots Station East, S.W. Pass",  # (-89.407, 28.932)",
+    "8761724": "Grand Isle",  # (-89.957, 29.263)",
+    "8762075": "Port Fourchon, Belle Pass ",  # (-90.199, 29.114)",
+    "8762482": "West Bank 1, Bayou Gauche",  # (-90.420, 29.789)",
+    "8764044": "Berwick, Atchafalaya River",  # (-91.238, 29.668)",
 }
 stationid_to_names = {}
 ds = xr.open_dataset(os.path.join(DATA_PATH, "katrina_tides.nc"))
@@ -43,6 +45,17 @@ for sid in ds.stationid.values:
 stationid_to_names = name_d
 
 years: List[str] = ["2025", "2097"]
+
+labels = {
+    "res": "Max SSH at Point, $z$ [m]",
+    "displacement": r"Track Displacement, $c$ [$^\circ$E]",
+    "angle": r"Track Angle, $\chi$ [$^\circ$]",
+    "trans_speed": r"Translation Speed, $V_t$ [m s$^{-1}$]",
+}
+
+
+def listify(exp: dict, key: str) -> List[float]:
+    return [float(exp[call][key]) for call in exp.keys()]
 
 
 @timeit
@@ -77,12 +90,14 @@ def plot_diff(
         """
         nonlocal axs
         calls = list(exp.keys())
-        res = [float(exp[call]["res"]) for call in calls]
-        displacement = [float(exp[call]["displacement"]) for call in calls]
-        angle = [float(exp[call]["angle"]) for call in calls]
-        trans_speed = [float(exp[call]["trans_speed"]) for call in calls]
+
+        res = listify(exp, "res")
+        displacement = listify(exp, "displacement")
+        angle = listify(exp, "angle")
+        trans_speed = listify(exp, "trans_speed")
         calls = [float(call) + 1 for call in calls]
 
+        # get current max as list for each step to plot regret line.
         max_res: list = []
         maxr = -np.inf
         for r in res:
@@ -110,9 +125,9 @@ def plot_diff(
             ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point, $z$ [m]")
-    axs[1].set_ylabel(r"Track Displacement, $c$ [$^\circ$E]")
-    axs[2].set_ylabel(r"Track Angle, $\chi$ [$^\circ$]")
-    axs[3].set_ylabel("Translation Speed, $V_t$ [m s$^{-1}$]")
+    axs[1].set_ylabel(labels["displacement"])
+    axs[2].set_ylabel(labels["angle"])
+    axs[3].set_ylabel(labels["trans_speed"])
     axs[3].set_xlabel("Number of Samples")
     # axs[0].legend()
     label_subplots(axs)
@@ -140,7 +155,8 @@ def find_max(exp: dict) -> float:
     Returns:
         float: Maximum value.
     """
-    res = [float(exp[call]["res"]) for call in exp.keys()]
+
+    res = listify(exp, "res")
     if len(res) > 0:
         return max(res)
     else:
@@ -157,7 +173,7 @@ def find_argmax(exp: dict) -> Optional[int]:
     Returns:
         int: Index of maximum value.
     """
-    res = [float(exp[call]["res"]) for call in exp.keys()]
+    res = listify(exp, "res")
     if len(res) > 0:
         return int(np.argmax(res))
     else:
@@ -188,6 +204,47 @@ def find_difference(stationid: str) -> Tuple[float, float, float]:
     fp2 = os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json")
     max2 = get_max(fp2)
     return max2 - max1, max1, max2
+
+
+def find_argdifference(stationid: str) -> Tuple[float, float, float]:
+    """
+    Find difference in max value between two years.
+
+    Args:
+        stationid (int): Station ID.
+
+    Returns:
+        float: Difference in max value.
+    """
+
+    def get_argmax(fp):
+        if os.path.exists(fp):
+            exp = read_json(fp)
+            mix = find_argmax(exp)
+            mx = {
+                key: listify(exp, key)[mix]
+                for key in ("displacement", "angle", "trans_speed", "res")
+            }
+        else:
+            mx = {
+                key: float("nan")
+                for key in ("displacement", "angle", "trans_speed", "res")
+            }
+        return mx
+
+    fp1 = os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json")
+    argmax1 = get_argmax(fp1)
+    fp2 = os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json")
+    argmax2 = get_argmax(fp2)
+    print("2025", argmax1, "2097", argmax2)
+
+    def take_diff(am1: dict, am2: dict) -> dict:
+        out = {}
+        for key in am1:
+            out[key] = am2[key] - am1[key]
+        return out
+
+    return argmax1, argmax2, take_diff(argmax1, argmax2)
 
 
 def find_differences() -> None:
@@ -293,9 +350,9 @@ def plot_many(year="2025") -> None:
             ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
-    axs[1].set_ylabel(r"Track Displacement [$^\circ$E]")
-    axs[2].set_ylabel(r"Track Angle [$^\circ$]")
-    axs[3].set_ylabel("Translation Speed [m s$^{-1}$]")
+    axs[1].set_ylabel(labels["displacement"])
+    axs[2].set_ylabel(labels["angle"])
+    axs[3].set_ylabel(labels["trans_speed"])
     axs[-1].set_xlabel("Number of Samples")
     label_subplots(axs)
 
@@ -448,6 +505,58 @@ def plot_places(
     # CESM, GFDL, GISS, MIROC, UKESM
 
 
+def plot_multi_argmax():
+    def _listify(ld: List[dict[str, float]], key) -> List[float]:
+        return [ld[i][key] for i in range(len(ld))]
+
+    def to_pd(am_l: List[dict]) -> pd.DataFrame:
+        out = {}
+        for key in am_l[0]:
+            out[key] = _listify(am_l, key)
+        return pd.DataFrame(out)
+
+    def mean_std(am_l: List[dict]) -> dict:
+        out = {}
+        for key in am_l[0]:
+            l = _listify(am_l, key)
+            if len(l) == 0:
+                out[key] = (float("nan"), float("nan"))
+            elif len(l) == 1:
+                out[key] = (np.mean(l), float("nan"))
+            else:
+                out[key] = (np.mean(l), np.std(l))
+        return out
+
+    am1_l = []
+    am2_l = []
+    amd_l = []
+    for sid in stationid:
+        am1, am2, amd = find_argdifference(sid)
+        am1_l += [am1]
+        am2_l += [am2]
+        amd_l += [amd]
+    am1_res = mean_std(am1_l)
+    am2_res = mean_std(am2_l)
+    amd_res = mean_std(amd_l)
+    print("\n\n2025\n", am1_res, "\n\n2097\n", am2_res, "\n\nDiff\n", amd_res)
+    for i, aml in enumerate([am1_l, am2_l, amd_l]):
+        df = to_pd(aml)
+        df["stationid"] = [stationid_to_names(sid) for sid in stationid]
+        parallel_coordinates(
+            df,
+            class_column="stationid",
+            cols=["res", "displacement", "angle", "trans_speed"],
+        )
+        plt.title("Parallel Coordinates Plot of Max and Argmax")
+        plt.xlabel("Parameters/Performance")
+        plt.ylabel("Values")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(FIGURE_PATH, f"parallel_coordinates_{i}.pdf"))
+        # splt.show()
+        plt.clf()
+
+
 if __name__ == "__main__":
     # python -m adbo.plot
     for point in ["miami", "new-orleans", "galverston"]:
@@ -460,6 +569,8 @@ if __name__ == "__main__":
     plot_many("2097")
     # plot_places()
     find_differences()
+    plot_multi_argmax()
+
 
 """
 Old (isopycnal approx, profile from centre of GOM).
