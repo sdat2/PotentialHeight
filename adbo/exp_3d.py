@@ -1,8 +1,9 @@
 """adbo.exp_3d.py"""
 
 import argparse
-from adbo.newexp import run_bayesopt_exp, DEFAULT_CONSTRAINTS
 from adforce.constants import NEW_ORLEANS
+from .constants import DEFAULT_CONSTRAINTS
+from .newexp import run_bayesopt_exp
 
 
 # @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="bo_setup")

@@ -12,6 +12,8 @@ Example:
 # import os/pathlib to manipulate file names.
 import os
 import pathlib
+import yaml
+
 
 # Note: constants should be UPPER_CASE
 constants_path = pathlib.Path(os.path.realpath(__file__))
@@ -22,3 +24,7 @@ CONFIG_PATH = os.path.join(SRC_PATH, "config")
 AD_PATH = pathlib.Path(os.path.dirname(PROJECT_PATH))
 EXP_PATH = os.path.join(AD_PATH, "exp")
 # ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path, move to constants
+
+DEFAULT_CONSTRAINTS: dict = yaml.safe_load(
+    open(os.path.join(CONFIG_PATH, "3d_constraints.yaml"))
+)

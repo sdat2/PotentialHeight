@@ -39,7 +39,7 @@ from adforce.oldwrap import run_adcirc_idealized_tc, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
-from .constants import FIGURE_PATH, EXP_PATH, CONFIG_PATH
+from .constants import FIGURE_PATH, EXP_PATH, DEFAULT_CONSTRAINTS
 
 # archer 2:
 matplotlib.use("Agg")
@@ -192,12 +192,6 @@ def objective_f(
         # return the result
 
     return obj
-
-
-# maybe shift this to constants?
-DEFAULT_CONSTRAINTS: dict = yaml.safe_load(
-    open(os.path.join(CONFIG_PATH, "3d_constraints.yaml"))
-)
 
 
 def gp_model_callback_maker(

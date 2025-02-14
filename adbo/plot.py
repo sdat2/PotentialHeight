@@ -12,11 +12,12 @@ from sithom.place import BoundingBox
 from adforce.constants import NO_BBOX
 from sithom.plot import plot_defaults, label_subplots
 from tcpips.constants import FIGURE_PATH, DATA_PATH
-from adbo.constants import EXP_PATH
+from adbo.constants import EXP_PATH, DEFAULT_CONSTRAINTS
 from adforce.mesh import xr_loader
-from pandas.plotting import parallel_coordinates
 
+# from pandas.plotting import parallel_coordinates
 
+COLORS = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
 stationid: List[str] = [
     "8729840",
     "8735180",
@@ -46,7 +47,7 @@ stationid_to_names = name_d
 
 years: List[str] = ["2025", "2097"]
 
-labels = {
+LABELS = {
     "res": "Max SSH at Point, $z$ [m]",
     "displacement": r"Track Displacement, $c$ [$^\circ$E]",
     "angle": r"Track Angle, $\chi$ [$^\circ$]",
@@ -125,9 +126,9 @@ def plot_diff(
             ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point, $z$ [m]")
-    axs[1].set_ylabel(labels["displacement"])
-    axs[2].set_ylabel(labels["angle"])
-    axs[3].set_ylabel(labels["trans_speed"])
+    axs[1].set_ylabel(LABELS["displacement"])
+    axs[2].set_ylabel(LABELS["angle"])
+    axs[3].set_ylabel(LABELS["trans_speed"])
     axs[3].set_xlabel("Number of Samples")
     # axs[0].legend()
     label_subplots(axs)
@@ -350,17 +351,15 @@ def plot_many(year="2025") -> None:
             ax.axvline(sample, color="black", linestyle="--")
 
     axs[0].set_ylabel("Max SSH at Point [m]")
-    axs[1].set_ylabel(labels["displacement"])
-    axs[2].set_ylabel(labels["angle"])
-    axs[3].set_ylabel(labels["trans_speed"])
+    axs[1].set_ylabel(LABELS["displacement"])
+    axs[2].set_ylabel(LABELS["angle"])
+    axs[3].set_ylabel(LABELS["trans_speed"])
     axs[-1].set_xlabel("Number of Samples")
     label_subplots(axs)
 
-    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
-
     for exp_num, exp_key in enumerate(exps):
         if exps[exp_key] is not None:
-            plot_exp(exps[exp_key], f"{exp_key}", colors[exp_num])
+            plot_exp(exps[exp_key], f"{exp_key}", COLORS[exp_num])
     vline(25.5)  # LHS to DAF transition in current set up.
 
     # axs[0].legend()
@@ -459,15 +458,13 @@ def plot_places(
         fd = {}
         ax = plt.axes()
 
-    colors = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
-
     for i, sid in enumerate(stationid):
         print(lons[i], lats[i], sid)
         ax.scatter(
             lons[i],
             lats[i],
             label=stationid_to_names[sid],
-            color=colors[i],
+            color=COLORS[i],
             s=100,
             marker="x",
             **fd,
@@ -505,6 +502,122 @@ def plot_places(
     # CESM, GFDL, GISS, MIROC, UKESM
 
 
+def custom_parallel_coordinates(
+    df: pd.DataFrame,
+    class_column: str = None,
+    cols: list = None,
+    colors: dict = None,
+    constraints: dict = None,
+):
+    """
+    Plots a parallel coordinates chart where each column has its own vertical scale.
+
+    Parameters:
+    -----------
+    df : pd.DataFrame
+        Input DataFrame containing the features (and optionally a class column).
+    cols : list
+        List of columns in df to include as parallel axes (y-axes).
+    class_column : str, optional
+        Column in df to use for grouping/coloring lines (e.g., 'group' or 'class').
+        If None, lines are all the same color.
+    colors : dict, optional
+        A dictionary mapping each class value (from class_column) to a desired color.
+        Example: {'A': 'blue', 'B': 'green', 'C': 'red'}
+    title : str, optional
+        Title of the plot.
+    """
+    # If class_column is given, separate the class labels for coloring
+    if class_column and class_column in df.columns:
+        unique_classes = df[class_column].unique()
+    else:
+        unique_classes = [None]
+
+    # Figure and axis setup
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    # For each column, determine its data min and max (for labeling the axis ticks)
+    mins = df[cols].min()
+    maxs = df[cols].max()
+    if constraints:
+        for col in cols:
+            if col in constraints:
+                mins[col] = constraints[col]["min"]
+                maxs[col] = constraints[col]["max"]
+            if col == "res":
+                mins[col] = 0.0
+
+    y_ticks = np.linspace(0, 1, num=7).tolist()
+    y_tick_lalels = [""] * 7
+    ax.set_yticks(y_ticks, labels=y_tick_lalels)
+    # We'll create an x-position for each column
+    x_positions = np.arange(len(cols))
+
+    # Plot each row in the DataFrame as one line
+    for idx, row in df.iterrows():
+        # If we have a class column, pick a color based on row's class value; else default
+        if class_column and class_column in row and colors:
+            c = colors.get(row[class_column], "gray")
+        elif class_column and class_column in row:
+            # If no custom colors dict is provided, pick from a colormap or just gray
+            label_value = row[class_column]
+            color_idx = np.where(unique_classes == label_value)[0][0]
+            c = plt.cm.tab10(color_idx % 10)
+        else:
+            c = "gray"
+
+        # For each column, normalize its value to 0..1 based on that column's min and max
+        y_vals = []
+        for col in cols:
+            y_norm = (
+                (row[col] - mins[col]) / (maxs[col] - mins[col])
+                if maxs[col] != mins[col]
+                else 0.0
+            )
+            y_vals.append(y_norm)
+
+        # Plot the line across the x_positions
+        ax.plot(x_positions, y_vals, color=c, alpha=0.7, label=row[class_column])
+
+    # Now we label each "vertical axis" with its original scale
+    # We'll add a vertical line at each x-position, and we add min/max tick labels
+    for i, col in enumerate(cols):
+        # Draw a vertical line
+        ax.axvline(x=i, color="black", linestyle="--", linewidth=0.5)
+
+        # Text label for the column name
+        ax.text(
+            i,
+            1.05,
+            LABELS[col],
+            rotation=0,
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            # fontweight="bold",
+        )
+
+        # Min/Max numerical labels. They appear just below/above the data range (0.0 and 1.0 after normalization)
+        ax.text(i - 0.05, 0, f"{mins[col]:.3g}", ha="center", va="top", fontsize=12)
+        ax.text(i - 0.05, 1, f"{maxs[col]:.3g}", ha="center", va="bottom", fontsize=12)
+
+    # Remove default x-axis tick marks and labels since we handle them manually
+    ax.set_xticks([])
+    # Set y-limits to [0,1] because we normalized each column into that range
+    ax.set_ylim([-0.05, 1.05])
+    # ax.set_ylabel("Normalized Values (each axis scaled independently)")
+
+    plt.tight_layout()
+    # plt.show()
+    # plot legend below plot if class_column is given
+    if class_column:
+        ax.legend(
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.1),
+            ncol=3,
+        )
+
+
 def plot_multi_argmax():
     def _listify(ld: List[dict[str, float]], key) -> List[float]:
         return [ld[i][key] for i in range(len(ld))]
@@ -539,20 +652,32 @@ def plot_multi_argmax():
     am2_res = mean_std(am2_l)
     amd_res = mean_std(amd_l)
     print("\n\n2025\n", am1_res, "\n\n2097\n", am2_res, "\n\nDiff\n", amd_res)
-    for i, aml in enumerate([am1_l, am2_l, amd_l]):
+    for i, (aml, name) in enumerate(
+        [(am1_l, "2025"), (am2_l, "2097"), (amd_l, "diff")]
+    ):
         df = to_pd(aml)
-        df["stationid"] = [stationid_to_names(sid) for sid in stationid]
-        parallel_coordinates(
+        df["stationid"] = [stationid_to_names[sid] for sid in stationid]
+        if name == "diff":
+            constraints = None
+        else:
+            constraints = DEFAULT_CONSTRAINTS
+        custom_parallel_coordinates(
             df,
-            class_column="stationid",
             cols=["res", "displacement", "angle", "trans_speed"],
+            class_column="stationid",
+            colors={
+                stationid_to_names[sid]: COLORS[i] for i, sid in enumerate(stationid)
+            },
+            constraints=constraints,
         )
-        plt.title("Parallel Coordinates Plot of Max and Argmax")
-        plt.xlabel("Parameters/Performance")
-        plt.ylabel("Values")
+        # plt.title("Parallel Coordinates Plot of Max and Argmax")
+        plt.xlabel(
+            "Maximum SSH $z^{*}$ at point and corresponding arguments $c$, $\chi$, $V_t$"
+        )
+        # plt.ylabel("Values")
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig(os.path.join(FIGURE_PATH, f"parallel_coordinates_{i}.pdf"))
+        plt.savefig(os.path.join(FIGURE_PATH, f"parallel_coordinates_{name}.pdf"))
         # splt.show()
         plt.clf()
 
