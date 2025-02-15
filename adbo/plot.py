@@ -599,6 +599,14 @@ def custom_parallel_coordinates(
 
         # Min/Max numerical labels. They appear just below/above the data range (0.0 and 1.0 after normalization)
         ax.text(i - 0.05, 0, f"{mins[col]:.3g}", ha="center", va="top", fontsize=12)
+        ax.text(
+            i - 0.05,
+            0.5,
+            f"{(mins[col]+maxs[col])/2:.3g}",
+            ha="center",
+            va="top",
+            fontsize=12,
+        )
         ax.text(i - 0.05, 1, f"{maxs[col]:.3g}", ha="center", va="bottom", fontsize=12)
 
     # Remove default x-axis tick marks and labels since we handle them manually
@@ -680,6 +688,29 @@ def plot_multi_argmax():
         plt.savefig(os.path.join(FIGURE_PATH, f"parallel_coordinates_{name}.pdf"))
         # splt.show()
         plt.clf()
+
+
+def plot_bo_exp():
+    res_list = []
+    b_list = []
+    for i, b in [(1, 9), (5, 5), (9, 1), (10, 0)]:
+        print("LHS points", i, "DAF points", b)
+        exp_name = f"i{i}b{b}"
+        if not os.path.exists(os.path.join(EXP_PATH, exp_name)):
+            print(f"Experiment {exp_name} does not exist.")
+            continue
+
+        exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
+        calls = list(exp.keys())
+        res = listify(exp, "res")
+        res_list.append(max(res))
+        b_list.append(b)
+        print(f"Max res for {exp_name} is {max(res)}")
+    plt.plot(b_list, res_list)
+    plt.xlabel("DAF points")
+    plt.ylabel("Max SSH at Point [m]")
+    plt.title("Max SSH at Point vs DAF points for 10 total calls")
+    plt.savefig(os.path.join(FIGURE_PATH, "bo_exp.pdf"))
 
 
 if __name__ == "__main__":

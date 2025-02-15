@@ -1,24 +1,23 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=2d-ani-new
+# Slurm settings
+#SBATCH --job-name=i10b10
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
 #SBATCH --time=12:00:0
-
-# slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
-
-# Replace [budget code] below with your project code (e.g. t01)
-
 #SBATCH --account=n02-bas
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 
-# emailing for start and end.
-#SBATCH --mail-type=BEGIN
-#SBATCH --mail-type=END
-#SBATCH --mail-user=sdat2@cam.ac.uk
+p25=2025_new_orleans_profile_r4i1p1f1
+p97=2097_new_orleans_profile_r4i1p1f1
+obs_lon=-90.0715
+obs_lat=29.9511
+init_steps=10
+daf_steps=10
+seed=1010
 
 # try to activate micromamba
 source /work/n02/n02/sdat2/.bashrc
@@ -44,4 +43,8 @@ which python
 # run python job
 # srun --distribution=block:block --hint=nomultithread python -m tcpips.pangeo
 
-python -m adbo.exp_2d # --exp_name 2d-ani-new --year 2025 --resolution mid-notide
+# python -m adbo.exp_2d # --exp_name 2d-ani-new --year 2025 --resolution mid-notide
+
+# 1
+# python -m adbo.exp_3d --exp_name=new-orleans-2025 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
+python -m adbo.exp_3d --exp_name=i${init_steps}b${daf_steps} --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --init_steps=$init_steps --daf_steps=$daf_steps --seed=$seed

@@ -1,6 +1,7 @@
 """Plot the new potential size calculation results for PIPS chapter/paper"""
 
 import os
+from typing import List
 import numpy as np
 import numpy.ma as ma
 import xarray as xr
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 from sithom.io import write_json
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
+from uncertainties import ufloat
 from .constants import DATA_PATH, FIGURE_PATH
 from .potential_size import profile_from_stats
 from .utils import coriolis_parameter_from_lat
@@ -54,7 +56,7 @@ def plot_panels() -> None:
     plt.savefig(os.path.join(FIGURE_PATH, "new_ps_calculation_output_gom.pdf"))
 
 
-def safe_grad(xt, yt):
+def safe_grad(xt, yt) -> ufloat:
     # get rid of nan values
     xt, yt = xt[~np.isnan(xt)], yt[~np.isnan(xt)]
     xt, yt = xt[~np.isnan(yt)], yt[~np.isnan(yt)]
@@ -117,7 +119,11 @@ def _m_to_text(m):
             return "$m={:.2L}$".format(m)
 
 
-def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
+def timeseries_plot(
+    name: str = "new_orleans",
+    plot_name: str = "New Orleans",
+    years: List[int] = [2025, 2097],
+) -> None:
     # plot CESM2 ensemble members for ssp585 near New Orleans
     plot_defaults()
     members = [4, 10, 11]
@@ -172,8 +178,6 @@ def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
     plt.legend(loc="lower center", bbox_to_anchor=(0.5, -0.5), ncol=3)
     plt.savefig(os.path.join(FIGURE_PATH, f"{name}_timeseries.pdf"))
     plt.clf()
-
-    years = [2025, 2097]
     colors = ["Green", "Blue"]
     vars = ["p", "VV"]
     var_labels = ["Pressure [hPa]", "Velocity [m s$^{-1}$]"]
@@ -211,7 +215,12 @@ def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
         label_subplots(axs)
         plt.legend(ncols=2)
         plt.xlabel("Radius [km]")
-        plt.savefig(os.path.join(FIGURE_PATH, f"{name}_profiles_r{member}i1p1f1.pdf"))
+        plt.savefig(
+            os.path.join(
+                FIGURE_PATH,
+                f"{name}_profiles_{years[0]}_{years[1]}_r{member}i1p1f1.pdf",
+            )
+        )
         plt.clf()
 
     vars = ["sst", "vmax", "rmax", "r0"]
@@ -225,6 +234,7 @@ def timeseries_plot(name: str = "new_orleans", plot_name: str = "New Orleans"):
 if __name__ == "__main__":
     # python -m cle.new_ps_plot
     # plot_panels()
-    timeseries_plot(name="new_orleans", plot_name="New Orleans")
-    timeseries_plot(name="miami", plot_name="Miami")
-    timeseries_plot(name="galverston", plot_name="Galverston")
+    years = [2015, 2100]
+    timeseries_plot(name="new_orleans", plot_name="New Orleans", years=years)
+    timeseries_plot(name="miami", plot_name="Miami", years=years)
+    timeseries_plot(name="galverston", plot_name="Galverston", years=years)

@@ -17,6 +17,7 @@ def run_3d_exp() -> None:
     parser.add_argument(
         "--profile_name", type=str, default="2025_new_orleans_profile_r4i1p1f1"
     )
+    parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--obs_lon", type=float, default=NEW_ORLEANS.lon)
     parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
     parser.add_argument("--init_steps", type=int, default=25)
@@ -28,7 +29,7 @@ def run_3d_exp() -> None:
 
     print(args)
     run_bayesopt_exp(
-        # seed=args.seed_offset,
+        seed=args.seed,
         profile_name=args.profile_name,
         constraints=DEFAULT_CONSTRAINTS,
         obs_lon=args.obs_lon,
