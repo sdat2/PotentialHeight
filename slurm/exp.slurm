@@ -1,7 +1,7 @@
 #!/bin/bash --login
 
 # Slurm settings
-#SBATCH --job-name=i10b10
+#SBATCH --job-name=i20b0
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -15,9 +15,9 @@ p25=2025_new_orleans_profile_r4i1p1f1
 p97=2097_new_orleans_profile_r4i1p1f1
 obs_lon=-90.0715
 obs_lat=29.9511
-init_steps=10
-daf_steps=10
-seed=1010
+init_steps=20
+daf_steps=0
+seed=200
 
 # try to activate micromamba
 source /work/n02/n02/sdat2/.bashrc

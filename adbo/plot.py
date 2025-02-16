@@ -690,26 +690,37 @@ def plot_multi_argmax():
         plt.clf()
 
 
-def plot_bo_exp():
+def get_max_from_ib_list(iblist: List[Tuple[int, int]]) -> float:
+
     res_list = []
     b_list = []
-    for i, b in [(1, 9), (5, 5), (9, 1), (10, 0)]:
+    for i, b in iblist:
         print("LHS points", i, "DAF points", b)
         exp_name = f"i{i}b{b}"
         if not os.path.exists(os.path.join(EXP_PATH, exp_name)):
             print(f"Experiment {exp_name} does not exist.")
-            continue
+            # continue
+        else:
+            exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
+            # calls = list(exp.keys())
+            res = listify(exp, "res")
+            res_list.append(max(res))
+            b_list.append(b)
+            print(f"Max res for {exp_name} is {max(res)}")
+    return res_list, b_list
 
-        exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
-        calls = list(exp.keys())
-        res = listify(exp, "res")
-        res_list.append(max(res))
-        b_list.append(b)
-        print(f"Max res for {exp_name} is {max(res)}")
-    plt.plot(b_list, res_list)
+
+def plot_bo_exp():
+    res_list, b_list = get_max_from_ib_list([(1, 9), (5, 5), (9, 1), (10, 0)])
+    plt.plot(b_list, res_list, color="orange", label="Total Calls 10")
+    res_list, b_list = get_max_from_ib_list([(20, 0), (19, 1), (10, 10)])
+    plt.plot(b_list, res_list, color="purple", label="Total Calls 20")
+    res_list, b_list = get_max_from_ib_list([(49, 1), (25, 25), (15, 35)])
+    plt.plot(b_list, res_list, color="blue", label="Total Calls 50")
     plt.xlabel("DAF points")
-    plt.ylabel("Max SSH at Point [m]")
-    plt.title("Max SSH at Point vs DAF points for 10 total calls")
+    plt.ylabel("Max SSH at Point, $z$ [m]")
+    plt.title("Max SSH at Point vs. DAF points")
+    plt.legend()
     plt.savefig(os.path.join(FIGURE_PATH, "bo_exp.pdf"))
 
 
@@ -726,6 +737,7 @@ if __name__ == "__main__":
     # plot_places()
     find_differences()
     plot_multi_argmax()
+    plot_bo_exp()
 
 
 """
