@@ -550,7 +550,7 @@ def run_bayesopt_exp(
         ax.set_xlabel(r"$x_1$ [dimensionless]")
         ax.set_ylabel(r"$x_2$ [dimensionless]")
         # change name to allow choice.
-        plt.savefig(os.path.join(FIGURE_PATH, exp_name + "_results.pdf"))
+        plt.savefig(os.path.join(FIGURE_PATH, "bo_exp", exp_name + "_results.pdf"))
         # plt.show()
         plt.clf()
         plt.close()
@@ -568,8 +568,7 @@ def run_bayesopt_exp(
         )
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Regret [-m]")
-        plt.savefig(os.path.join(FIGURE_PATH, exp_name + "_regret.pdf"))
-        # plt.show()
+        plt.savefig(os.path.join(FIGURE_PATH, "bo_exp", exp_name + "_regret.pdf"))
         plt.clf()
         plt.close()
 

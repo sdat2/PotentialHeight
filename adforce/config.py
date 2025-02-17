@@ -2,6 +2,8 @@
 
 We use hydra to manage the configuration files. This file contains the dataclass that will be used to store the configuration parameters.
 
+# TODO: Implement the configuration dataclass for the adforce package.
+
 Attributes:
     ChavasCollision: A dataclass to store the impact location of the Chavas Lin and Emanuel (2015) profile collision on a straight track.
 """

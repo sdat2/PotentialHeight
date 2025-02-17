@@ -16,7 +16,7 @@ from adbo.constants import EXP_PATH, DEFAULT_CONSTRAINTS
 from adforce.mesh import xr_loader
 
 # from pandas.plotting import parallel_coordinates
-
+# This might not be a great way of choosing colors
 COLORS = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
 stationid: List[str] = [
     "8729840",
@@ -46,6 +46,10 @@ for sid in ds.stationid.values:
 stationid_to_names = name_d
 
 years: List[str] = ["2025", "2097"]
+
+subfolder = f"{years[0]}vs{years[1]}"
+if not os.path.exists(os.path.join(FIGURE_PATH, subfolder)):
+    os.makedirs(os.path.join(FIGURE_PATH, subfolder))
 
 LABELS = {
     "res": "Max SSH at Point, $z$ [m]",
@@ -140,7 +144,7 @@ def plot_diff(
     plt.xlim(1, 50)
 
     # before that it is doing Latin Hypercube Sampling
-    figure_path = os.path.join(FIGURE_PATH, figure_name)
+    figure_path = os.path.join(FIGURE_PATH, subfolder, figure_name)
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
     plt.close()
@@ -367,7 +371,7 @@ def plot_many(year="2025") -> None:
 
     plt.xlim(1, 50)
 
-    figure_path = os.path.join(FIGURE_PATH, "along-coast-" + year + ".pdf")
+    figure_path = os.path.join(FIGURE_PATH, subfolder, "along-coast-" + year + ".pdf")
     print(f"Saving figure to {figure_path}")
     plt.savefig(figure_path)
     plt.close()
@@ -495,7 +499,7 @@ def plot_places(
     bbox.ax_lim(ax)
     plt.xlabel("Longitude [$^\circ$E]")
     plt.ylabel("Latitude [$^\circ$N]")
-    figure_name = os.path.join(FIGURE_PATH, "stationid_map.pdf")
+    figure_name = os.path.join(FIGURE_PATH, subfolder, "stationid_map.pdf")
     plt.savefig(figure_name)
     plt.close()
     print(f"Saved figure to {figure_name}")
@@ -685,7 +689,9 @@ def plot_multi_argmax():
         # plt.ylabel("Values")
         plt.grid(True)
         plt.tight_layout()
-        plt.savefig(os.path.join(FIGURE_PATH, f"parallel_coordinates_{name}.pdf"))
+        plt.savefig(
+            os.path.join(FIGURE_PATH, subfolder, f"parallel_coordinates_{name}.pdf")
+        )
         # splt.show()
         plt.clf()
 
@@ -713,15 +719,22 @@ def get_max_from_ib_list(iblist: List[Tuple[int, int]]) -> float:
 def plot_bo_exp():
     res_list, b_list = get_max_from_ib_list([(1, 9), (5, 5), (9, 1), (10, 0)])
     plt.plot(b_list, res_list, color="orange", label="Total Calls 10")
-    res_list, b_list = get_max_from_ib_list([(20, 0), (19, 1), (10, 10)])
+    res_list, b_list = get_max_from_ib_list([(20, 0), (19, 1), (10, 10), (1, 19)])
     plt.plot(b_list, res_list, color="purple", label="Total Calls 20")
-    res_list, b_list = get_max_from_ib_list([(49, 1), (25, 25), (15, 35)])
+    res_list, b_list = get_max_from_ib_list(
+        [(50, 0), (49, 1), (35, 15), (25, 25), (15, 35), (1, 49)]
+    )
     plt.plot(b_list, res_list, color="blue", label="Total Calls 50")
     plt.xlabel("DAF points")
-    plt.ylabel("Max SSH at Point, $z$ [m]")
-    plt.title("Max SSH at Point vs. DAF points")
+    plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
+    plt.title("Max SSH over experiment $z^{*}$ vs. DAF points")
     plt.legend()
-    plt.savefig(os.path.join(FIGURE_PATH, "bo_exp.pdf"))
+    plt.tight_layout()
+    plt.xlim(0, 50)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, subfolder, "bo_vary_init_vary_daf_exp.pdf"),
+        bbox_inches="tight",
+    )
 
 
 if __name__ == "__main__":
