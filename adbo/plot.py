@@ -735,6 +735,8 @@ def plot_bo_exp():
         os.path.join(FIGURE_PATH, subfolder, "bo_vary_init_vary_daf_exp.pdf"),
         bbox_inches="tight",
     )
+    plt.clf()
+    plt.close()
 
 
 def plot_bo_comp():
@@ -743,8 +745,8 @@ def plot_bo_comp():
     # naming now i{i}b{b}t{trial} apart from 0th where its i{i}b{b}
     res_lol = []
     for i, b in [(25, 25), (50, 0)]:
-        res_list += [[]]
-        for t in range(11):
+        res_lol += [[]]
+        for t in [i for i in range(11) if i not in [4, 5, 9, 10]]:
             if t == 0:
                 exp_name = f"i{i}b{b}"
             else:
@@ -755,30 +757,34 @@ def plot_bo_comp():
             exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
             res = listify(exp, "res")
             print(f"Max res for {exp_name} is {max(res)}")
-            res_list[-1].append(res)
-    res_array = np.array(res_list)
+            res_lol[-1].append(res)
+    res_array = np.array(res_lol)
+    global_max = np.max(res_array)
+    # take cumulative maximum over each trial
+    res_array = np.maximum.accumulate(res_array, axis=2)
     # mean over trials
     res_mean = np.mean(res_array, axis=1)
     # std over trials
     res_std = np.std(res_array, axis=1)
     # plot
-    plt.plot_between(
+    plt.fill_between(
+        np.arange(50) + 1,
         res_mean[0] - res_std[0],
         res_mean[0] + res_std[0],
-        res_std[0],
         label="25i 25b 1$\sigma$ envelope",
         color="red",
         alpha=0.4,
     )
-    plt.plot_between(
+    plt.fill_between(
+        np.arange(50) + 1,
         res_mean[1] - res_std[1],
         res_mean[1] + res_std[1],
-        res_std[1],
         label="50i 0b 1$\sigma$ envelope",
         color="blue",
         alpha=0.4,
     )
     plt.plot(
+        np.arange(50) + 1,
         res_mean[0],
         label="25i 25b $\mu$",
         color="red",
@@ -786,18 +792,72 @@ def plot_bo_comp():
     plt.plot(res_mean[1], label="50i 0b", color="blue")
     # plot a vertical line
     plt.axvline(25, color="black", linestyle="--")
-    for i in range(res.shape[1]):
+    for i in range(res_array.shape[1]):
         # plot each trial separately in thin lines
-        plt.plot(res_mean[0][i], color="red", linestyle="--", linewidth=0.5)
-        plt.plot(res_mean[1][i], color="blue", linestyle="--", linewidth=0.5)
+        plt.plot(
+            np.arange(50) + 1,
+            res_array[0][i],
+            color="red",
+            linestyle="--",
+            linewidth=0.5,
+        )
+        plt.plot(
+            np.arange(50) + 1,
+            res_array[1][i],
+            color="blue",
+            linestyle="--",
+            linewidth=0.5,
+        )
     plt.legend()
     plt.xlabel("Samples (LHS + DAF points) [dimensionless]")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
+    plt.xlim(1, 50)
+
     plt.savefig(
         os.path.join(FIGURE_PATH, subfolder, "bo_comp_2525vs50.pdf"),
         bbox_inches="tight",
     )
+    plt.clf()
     plt.close()
+    regret_array = global_max - res_array
+    regret_mean = np.mean(regret_array, axis=1)
+    regret_std = np.std(regret_array, axis=1)
+
+    plt.fill_between(
+        np.arange(50) + 1,
+        regret_mean[0] - regret_std[0],
+        regret_mean[0] + regret_std[0],
+        label="25i 25b 1$\sigma$ envelope",
+        color="red",
+        alpha=0.4,
+    )
+    plt.fill_between(
+        np.arange(50) + 1,
+        regret_mean[1] - regret_std[1],
+        regret_mean[1] + regret_std[1],
+        label="50i 0b 1$\sigma$ envelope",
+        color="blue",
+        alpha=0.4,
+    )
+    plt.plot(
+        np.arange(50) + 1,
+        regret_mean[0],
+        label="25i 25b $\mu$",
+        color="red",
+    )
+    plt.plot(np.arange(50) + 1, regret_mean[1], label="50i 0b", color="blue")
+
+    # set y-axis to be semi-log
+
+    # vertical line at 25 samples
+    plt.axvline(25, color="black", linestyle="--")
+
+    plt.yscale("log")
+    plt.legend()
+    plt.xlabel("Samples (LHS + DAF points) [dimensionless]")
+    plt.ylabel("Regret [m]")
+    plt.xlim(1, 50)
+    plt.savefig(os.path.join(FIGURE_PATH, subfolder, "bo_regret_2525vs50.pdf"))
 
 
 if __name__ == "__main__":
@@ -814,6 +874,7 @@ if __name__ == "__main__":
     find_differences()
     plot_multi_argmax()
     plot_bo_exp()
+    plot_bo_comp()
 
 
 """
