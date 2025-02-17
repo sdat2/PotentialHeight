@@ -737,6 +737,69 @@ def plot_bo_exp():
     )
 
 
+def plot_bo_comp():
+    # try redoing 25i 25b for 2025.
+    # had mulitple trials (11) for each experiment
+    # naming now i{i}b{b}t{trial} apart from 0th where its i{i}b{b}
+    res_lol = []
+    for i, b in [(25, 25), (50, 0)]:
+        res_list += [[]]
+        for t in range(11):
+            if t == 0:
+                exp_name = f"i{i}b{b}"
+            else:
+                exp_name = f"i{i}b{b}t{t}"
+            if not os.path.exists(os.path.join(EXP_PATH, exp_name)):
+                print(f"Experiment {exp_name} does not exist.")
+                continue
+            exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
+            res = listify(exp, "res")
+            print(f"Max res for {exp_name} is {max(res)}")
+            res_list[-1].append(res)
+    res_array = np.array(res_list)
+    # mean over trials
+    res_mean = np.mean(res_array, axis=1)
+    # std over trials
+    res_std = np.std(res_array, axis=1)
+    # plot
+    plt.plot_between(
+        res_mean[0] - res_std[0],
+        res_mean[0] + res_std[0],
+        res_std[0],
+        label="25i 25b 1$\sigma$ envelope",
+        color="red",
+        alpha=0.4,
+    )
+    plt.plot_between(
+        res_mean[1] - res_std[1],
+        res_mean[1] + res_std[1],
+        res_std[1],
+        label="50i 0b 1$\sigma$ envelope",
+        color="blue",
+        alpha=0.4,
+    )
+    plt.plot(
+        res_mean[0],
+        label="25i 25b $\mu$",
+        color="red",
+    )
+    plt.plot(res_mean[1], label="50i 0b", color="blue")
+    # plot a vertical line
+    plt.axvline(25, color="black", linestyle="--")
+    for i in range(res.shape[1]):
+        # plot each trial separately in thin lines
+        plt.plot(res_mean[0][i], color="red", linestyle="--", linewidth=0.5)
+        plt.plot(res_mean[1][i], color="blue", linestyle="--", linewidth=0.5)
+    plt.legend()
+    plt.xlabel("Samples (LHS + DAF points) [dimensionless]")
+    plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
+    plt.savefig(
+        os.path.join(FIGURE_PATH, subfolder, "bo_comp_2525vs50.pdf"),
+        bbox_inches="tight",
+    )
+    plt.close()
+
+
 if __name__ == "__main__":
     # python -m adbo.plot
     for point in ["miami", "new-orleans", "galverston"]:
