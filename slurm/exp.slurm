@@ -1,7 +1,7 @@
 #!/bin/bash --login
 
 # Slurm settings
-#SBATCH --job-name=i50b0t45
+#SBATCH --job-name=i50b0t910
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -28,7 +28,7 @@ micromamba activate t1
 echo "which python"
 which python
 
-for trial in {4..5}; do
+for trial in {9..10}; do
     seed=$(( $init_steps * 10000 + $daf_steps * 100 + $trial ))
     echo "trial = $trial, seed = $seed"
     python -m adbo.exp_3d --exp_name=i${init_steps}b${daf_steps}t${trial} --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --init_steps=$init_steps --daf_steps=$daf_steps --seed=$seed

@@ -725,9 +725,9 @@ def plot_bo_exp():
         [(50, 0), (49, 1), (35, 15), (25, 25), (15, 35), (1, 49)]
     )
     plt.plot(b_list, res_list, color="blue", label="Total Calls 50")
-    plt.xlabel("DAF points")
+    plt.xlabel("BO points")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
-    plt.title("Max SSH over experiment $z^{*}$ vs. DAF points")
+    plt.title("Max SSH over experiment $z^{*}$ vs. BO points")
     plt.legend()
     plt.tight_layout()
     plt.xlim(0, 50)
@@ -743,6 +743,7 @@ def plot_bo_comp():
     # try redoing 25i 25b for 2025.
     # had mulitple trials (11) for each experiment
     # naming now i{i}b{b}t{trial} apart from 0th where its i{i}b{b}
+    plot_defaults()
     res_lol = []
     for i, b in [(25, 25), (50, 0)]:
         res_lol += [[]]
@@ -758,6 +759,7 @@ def plot_bo_comp():
             res = listify(exp, "res")
             print(f"Max res for {exp_name} is {max(res)}")
             res_lol[-1].append(res)
+
     res_array = np.array(res_lol)
     global_max = np.max(res_array)
     # take cumulative maximum over each trial
@@ -765,31 +767,41 @@ def plot_bo_comp():
     # mean over trials
     res_mean = np.mean(res_array, axis=1)
     # std over trials
-    res_std = np.std(res_array, axis=1)
+    # res_std = np.std(res_array, axis=1)
     # plot
-    plt.fill_between(
+    res_5pc = np.percentile(res_array, 5, axis=1)
+    res_95pc = np.percentile(res_array, 95, axis=1)
+
+    plt.plot(
         np.arange(50) + 1,
-        res_mean[0] - res_std[0],
-        res_mean[0] + res_std[0],
-        label="25i 25b 1$\sigma$ envelope",
-        color="red",
-        alpha=0.4,
+        res_mean[1],
+        label="(A) 50 LHS points - mean",
+        color="blue",
+        linewidth=2,
     )
     plt.fill_between(
         np.arange(50) + 1,
-        res_mean[1] - res_std[1],
-        res_mean[1] + res_std[1],
-        label="50i 0b 1$\sigma$ envelope",
+        res_5pc[1],
+        res_95pc[1],
+        label="(A) 5% to 95% envelope",
         color="blue",
         alpha=0.4,
     )
     plt.plot(
         np.arange(50) + 1,
         res_mean[0],
-        label="25i 25b $\mu$",
+        label="(B) 25 LHS, 25 BO points - mean",
         color="red",
+        linewidth=2,
     )
-    plt.plot(res_mean[1], label="50i 0b", color="blue")
+    plt.fill_between(
+        np.arange(50) + 1,
+        res_5pc[0],
+        res_95pc[0],
+        label="(B) 5% to 95% envelope",
+        color="red",
+        alpha=0.4,
+    )
     # plot a vertical line
     plt.axvline(25, color="black", linestyle="--")
     for i in range(res_array.shape[1]):
@@ -809,7 +821,7 @@ def plot_bo_comp():
             linewidth=0.5,
         )
     plt.legend()
-    plt.xlabel("Samples (LHS + DAF points) [dimensionless]")
+    plt.xlabel("Samples (LHS + BO points) [dimensionless]")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
     plt.xlim(1, 50)
 
@@ -821,43 +833,74 @@ def plot_bo_comp():
     plt.close()
     regret_array = global_max - res_array
     regret_mean = np.mean(regret_array, axis=1)
-    regret_std = np.std(regret_array, axis=1)
-
-    plt.fill_between(
+    regret_5pc = np.percentile(regret_array, 5, axis=1)
+    regret_95pc = np.percentile(regret_array, 95, axis=1)
+    # regret_std = np.std(regret_array, axis=1)
+    plt.plot(
         np.arange(50) + 1,
-        regret_mean[0] - regret_std[0],
-        regret_mean[0] + regret_std[0],
-        label="25i 25b 1$\sigma$ envelope",
-        color="red",
-        alpha=0.4,
+        regret_mean[1],
+        label="(A) 50 BO points - mean",
+        color="blue",  # "50i 0b mean",
     )
     plt.fill_between(
         np.arange(50) + 1,
-        regret_mean[1] - regret_std[1],
-        regret_mean[1] + regret_std[1],
-        label="50i 0b 1$\sigma$ envelope",
+        regret_5pc[1],
+        regret_95pc[1],
+        label="(A) 5% to 95% envelope",  # "50i 0b 5% to 95% envelope",
         color="blue",
         alpha=0.4,
     )
+
     plt.plot(
         np.arange(50) + 1,
         regret_mean[0],
-        label="25i 25b $\mu$",
+        label="(B) 25 LHS, 25 BO points - mean",  # "25i 25b mean",
         color="red",
     )
-    plt.plot(np.arange(50) + 1, regret_mean[1], label="50i 0b", color="blue")
+    plt.fill_between(
+        np.arange(50) + 1,
+        regret_5pc[0],
+        regret_95pc[0],
+        label="(B) 5% to 95% envelope",
+        # label="25i 25b 5% to 95% envelope",
+        color="red",
+        alpha=0.4,
+    )
 
     # set y-axis to be semi-log
 
     # vertical line at 25 samples
     plt.axvline(25, color="black", linestyle="--")
 
+    for i in range(res_array.shape[1]):
+
+        plt.plot(
+            np.arange(50) + 1,
+            regret_array[0][i],
+            color="red",
+            linestyle="--",
+            linewidth=0.5,
+        )
+        plt.plot(
+            np.arange(50) + 1,
+            regret_array[1][i],
+            color="blue",
+            linestyle="--",
+            linewidth=0.5,
+        )
+
     plt.yscale("log")
     plt.legend()
-    plt.xlabel("Samples (LHS + DAF points) [dimensionless]")
-    plt.ylabel("Regret [m]")
+    plt.xlabel("Samples (LHS + BO points) [dimensionless]")
+    plt.ylabel("Empirical Regret [m]")
     plt.xlim(1, 50)
-    plt.savefig(os.path.join(FIGURE_PATH, subfolder, "bo_regret_2525vs50.pdf"))
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(FIGURE_PATH, subfolder, "bo_regret_2525vs50.pdf"),
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
