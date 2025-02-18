@@ -10,7 +10,7 @@ from sithom.io import read_json
 from sithom.time import timeit
 from sithom.place import BoundingBox
 from adforce.constants import NO_BBOX
-from sithom.plot import plot_defaults, label_subplots
+from sithom.plot import plot_defaults, label_subplots, get_dim
 from tcpips.constants import FIGURE_PATH, DATA_PATH
 from adbo.constants import EXP_PATH, DEFAULT_CONSTRAINTS
 from adforce.mesh import xr_loader
@@ -763,6 +763,7 @@ def plot_bo_exp() -> None:
     res_list, b_list = get_max_from_ib_list(
         [(50, 0), (49, 1), (35, 15), (25, 25), (15, 35), (1, 49)]
     )
+    fig, ax = plt.subplots(1, 1, figsize=get_dim())
     plt.plot(b_list, res_list, color="blue", label="Total Calls 50")
     plt.xlabel("BO points")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
@@ -782,6 +783,8 @@ def plot_bo_comp():
     # try redoing 25i 25b for 2025.
     # had mulitple trials (11) for each experiment
     # naming now i{i}b{b}t{trial} apart from 0th where its i{i}b{b}
+    plt.clf()
+    plt.close()
     plot_defaults()
     res_lol = []
     for i, b in [(25, 25), (50, 0)]:
@@ -827,6 +830,19 @@ def plot_bo_comp():
         color="blue",
         alpha=0.4,
     )
+    for i in range(res_array.shape[1]):
+        if i == 0:
+            labels = {"label": f"(A) {res_array.shape[1]} trials"}
+        else:
+            labels = {}
+        plt.plot(
+            np.arange(50) + 1,
+            res_array[1][i],
+            color="blue",
+            linestyle="--",
+            linewidth=0.5,
+            **labels,
+        )
     plt.plot(
         np.arange(50) + 1,
         res_mean[0],
@@ -842,26 +858,23 @@ def plot_bo_comp():
         color="red",
         alpha=0.4,
     )
-    # plot a vertical line
-    plt.axvline(25, color="black", linestyle="--")
     for i in range(res_array.shape[1]):
-        # plot each trial separately in thin lines
+        if i == 0:
+            labels = {"label": f"(B) {res_array.shape[1]} trials"}
+        else:
+            labels = {}
         plt.plot(
             np.arange(50) + 1,
             res_array[0][i],
-            color="red",
-            linestyle="--",
-            linewidth=0.5,
-        )
-        plt.plot(
-            np.arange(50) + 1,
-            res_array[1][i],
             color="blue",
             linestyle="--",
             linewidth=0.5,
+            **labels,
         )
+    # plot a vertical line
+    plt.axvline(25, color="black", linestyle="--")
     plt.legend()
-    plt.xlabel("Samples (LHS + BO points) [dimensionless]")
+    plt.xlabel("Samples, $s$ (LHS + BO points) [dimensionless]")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
     plt.xlim(1, 50)
 
@@ -891,17 +904,9 @@ def plot_bo_comp():
         color="blue",
         alpha=0.4,
     )
-
-    plt.plot(
-        np.arange(50) + 1,
-        regret_mean[0],
-        label="(B) 25 LHS, 25 BO points - mean",  # "25i 25b mean",
-        color="red",
-        linewidth=1,
-    )
     for i in range(res_array.shape[1]):
         if i == 0:
-            labels = {"label": "(A) single trial"}
+            labels = {"label": f"(A) {res_array.shape[1]} trials"}
         else:
             labels = {}
         plt.plot(
@@ -912,6 +917,14 @@ def plot_bo_comp():
             linewidth=0.5,
             **labels,
         )
+
+    plt.plot(
+        np.arange(50) + 1,
+        regret_mean[0],
+        label="(B) 25 LHS, 25 BO points - mean",  # "25i 25b mean",
+        color="red",
+        linewidth=1,
+    )
     plt.fill_between(
         np.arange(50) + 1,
         regret_5pc[0],
@@ -923,7 +936,7 @@ def plot_bo_comp():
     )
     for i in range(res_array.shape[1]):
         if i == 0:
-            labels = {"label": "(B) single trial"}
+            labels = {"label": f"(B) {res_array.shape[1]} trials"}
         else:
             labels = {}
         plt.plot(
