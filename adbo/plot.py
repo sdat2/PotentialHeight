@@ -866,7 +866,7 @@ def plot_bo_comp():
         plt.plot(
             np.arange(50) + 1,
             res_array[0][i],
-            color="blue",
+            color="red",
             linestyle="--",
             linewidth=0.5,
             **labels,
