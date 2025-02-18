@@ -78,33 +78,46 @@ python -m adbo.exp &> logs/bo_test3.txt
  - GEV with maxima Scipy distribution fitting for CMIP6.
  - Reformat adforce/adbo to allow:
    - flexible profile forcing.
-   - xarray struct passing.
    - keep time/coordinates of moving cyclones in repo.
-
-### In Progress:
-
  - CMIP6 processing for potential size and intensity.
     - Good folder structure for processing.
     - Make sure regridding is working and efficient.
-    - Paralize potential size calculation as much as possible.
+    - Parallelize potential size calculation as much as possible.
  - BayesOpt for different places along the coast.
  - Fix 430k wrapping.
+ - How to quantify the performance of BO better.
+
+### In progress
+   - Discussion vs Introduction.
+
+ - potential size vs W22
+ - plot seasonal cycle, global picture.
+ - Gulf of Mexico August (maybe additionaly South East Asia (e.g. Hong Kong)):
+   - historical-CESM2
+   - ERA5 PIPS (~observations)
+   - compare to find biases.
+ - Compare ERA5 potential size to IBTrACS.
+   - maybe focus on GOM and Hong Kong.
 
 ### TODO:
 
  - Could we produce uncertainty estimates in the upper bound based on MVES.
- - How to quantify the performance of BO better.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
+
+# Nice to have:
  - How to distribute optimisation points more uniformly along the coast.
  - Better tidal gauge comparisons for different events.
 
-
 ## SurgeNet exploration
 
-### In progress
- - Calculate dual graph as in Benteviglio et al. 2024 SWE-GNN.
-
 ### TODO
+ - Calculate dual graph as in Benteviglio et al. 2024 SWE-GNN.
+ - Run initial training/test of SWE-GGN or GCN or MLP
+
+### (nice to have)
  - Consider NeuralODE to fix the smoothing problem of deep GNN.
  - Would diffusion/GANs also help?
+
+### Probably excluded
  - How to include the dynamic features and tides?
+

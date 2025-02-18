@@ -52,7 +52,7 @@ if not os.path.exists(os.path.join(FIGURE_PATH, subfolder)):
     os.makedirs(os.path.join(FIGURE_PATH, subfolder))
 
 LABELS = {
-    "res": "Max SSH at Point, $z$ [m]",
+    "res": "Max SSH, $z$ [m]",
     "displacement": r"Track Displacement, $c$ [$^\circ$E]",
     "angle": r"Track Angle, $\chi$ [$^\circ$]",
     "trans_speed": r"Translation Speed, $V_t$ [m s$^{-1}$]",
@@ -512,7 +512,10 @@ def custom_parallel_coordinates(
     cols: list = None,
     colors: dict = None,
     constraints: dict = None,
-):
+    balance: bool = False,
+    legend: bool = True,
+    ax: Optional[plt.Axes] = None,
+) -> plt.Axes:
     """
     Plots a parallel coordinates chart where each column has its own vertical scale.
 
@@ -531,6 +534,13 @@ def custom_parallel_coordinates(
     title : str, optional
         Title of the plot.
     """
+    NEW_LABELS = {
+        "res": "Max SSH, $z^*$ [m]",
+        "displacement": r"Track Displacement, $c^*$ [$^\circ$E]",
+        "angle": r"Track Angle, $\chi^*$ [$^\circ$]",
+        "trans_speed": r"Translation Speed, $V_t^*$ [m s$^{-1}$]",
+    }
+
     # If class_column is given, separate the class labels for coloring
     if class_column and class_column in df.columns:
         unique_classes = df[class_column].unique()
@@ -538,7 +548,8 @@ def custom_parallel_coordinates(
         unique_classes = [None]
 
     # Figure and axis setup
-    fig, ax = plt.subplots(figsize=(10, 6))
+    if ax is None:
+        _, ax = plt.subplots(figsize=(10, 6))
 
     # For each column, determine its data min and max (for labeling the axis ticks)
     mins = df[cols].min()
@@ -550,7 +561,12 @@ def custom_parallel_coordinates(
                 maxs[col] = constraints[col]["max"]
             if col == "res":
                 mins[col] = 0.0
-
+    elif balance:
+        for col in cols:
+            if col != "res":
+                mins[col] = min(mins[col], -maxs[col])
+                maxs[col] = max(maxs[col], -mins[col])
+    # an odd number so there is a middle line
     y_ticks = np.linspace(0, 1, num=7).tolist()
     y_tick_lalels = [""] * 7
     ax.set_yticks(y_ticks, labels=y_tick_lalels)
@@ -592,8 +608,8 @@ def custom_parallel_coordinates(
         # Text label for the column name
         ax.text(
             i,
-            1.05,
-            LABELS[col],
+            1.1,
+            NEW_LABELS[col],
             rotation=0,
             ha="center",
             va="bottom",
@@ -616,18 +632,19 @@ def custom_parallel_coordinates(
     # Remove default x-axis tick marks and labels since we handle them manually
     ax.set_xticks([])
     # Set y-limits to [0,1] because we normalized each column into that range
-    ax.set_ylim([-0.05, 1.05])
+    ax.set_ylim([-0.1, 1.1])
     # ax.set_ylabel("Normalized Values (each axis scaled independently)")
 
     plt.tight_layout()
     # plt.show()
     # plot legend below plot if class_column is given
-    if class_column:
+    if class_column and legend:
         ax.legend(
             loc="upper center",
             bbox_to_anchor=(0.5, -0.1),
             ncol=3,
         )
+    return ax
 
 
 def plot_multi_argmax():
@@ -664,15 +681,24 @@ def plot_multi_argmax():
     am2_res = mean_std(am2_l)
     amd_res = mean_std(amd_l)
     print("\n\n2025\n", am1_res, "\n\n2097\n", am2_res, "\n\nDiff\n", amd_res)
+    fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
+
     for i, (aml, name) in enumerate(
         [(am1_l, "2025"), (am2_l, "2097"), (amd_l, "diff")]
     ):
+        ax = axs[i]
         df = to_pd(aml)
         df["stationid"] = [stationid_to_names[sid] for sid in stationid]
         if name == "diff":
             constraints = None
         else:
             constraints = DEFAULT_CONSTRAINTS
+        if name == "diff":
+            legend = True
+            balance = True
+        else:
+            legend = False
+            balance = False
         custom_parallel_coordinates(
             df,
             cols=["res", "displacement", "angle", "trans_speed"],
@@ -681,19 +707,31 @@ def plot_multi_argmax():
                 stationid_to_names[sid]: COLORS[i] for i, sid in enumerate(stationid)
             },
             constraints=constraints,
+            ax=ax,
+            legend=legend,
+            balance=balance,
         )
         # plt.title("Parallel Coordinates Plot of Max and Argmax")
-        plt.xlabel(
-            "Maximum SSH $z^{*}$ at point and corresponding arguments $c$, $\chi$, $V_t$"
-        )
-        # plt.ylabel("Values")
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(
-            os.path.join(FIGURE_PATH, subfolder, f"parallel_coordinates_{name}.pdf")
-        )
-        # splt.show()
-        plt.clf()
+        if name != "diff":
+            ax.set_xlabel(
+                "Maximum SSH $z^{*}$ at point and corresponding arguments $c^{*}$, $\chi^*$, $V_t^{*}$ for "
+                + name
+            )
+        else:
+            ax.set_xlabel(
+                "Difference in SSH $z^{*}$ at point and corresponding arguments $c^{*}$, $\chi^*$, $V_t^{*}$ between "
+                + f" {years[0]} and {years[1]}"
+            )  # plt.ylabel("Values")
+        # plt.grid(True)
+        # ax.set_grid(True)
+        # add grid to axis object
+        ax.grid(True)
+
+    plt.tight_layout()
+    label_subplots(axs, x_pos=-0.03)
+    plt.savefig(os.path.join(FIGURE_PATH, subfolder, f"parallel_coordinates_all.pdf"))
+    # splt.show()
+    plt.clf()
 
 
 def get_max_from_ib_list(iblist: List[Tuple[int, int]]) -> float:
@@ -716,7 +754,8 @@ def get_max_from_ib_list(iblist: List[Tuple[int, int]]) -> float:
     return res_list, b_list
 
 
-def plot_bo_exp():
+def plot_bo_exp() -> None:
+    plot_defaults()
     res_list, b_list = get_max_from_ib_list([(1, 9), (5, 5), (9, 1), (10, 0)])
     plt.plot(b_list, res_list, color="orange", label="Total Calls 10")
     res_list, b_list = get_max_from_ib_list([(20, 0), (19, 1), (10, 10), (1, 19)])
@@ -747,18 +786,19 @@ def plot_bo_comp():
     res_lol = []
     for i, b in [(25, 25), (50, 0)]:
         res_lol += [[]]
-        for t in [i for i in range(11) if i not in [4, 5, 9, 10]]:
+        for t in [i for i in range(11)]:  # if i not in [4, 5, 9, 10]]:
             if t == 0:
                 exp_name = f"i{i}b{b}"
             else:
                 exp_name = f"i{i}b{b}t{t}"
             if not os.path.exists(os.path.join(EXP_PATH, exp_name)):
                 print(f"Experiment {exp_name} does not exist.")
-                continue
-            exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
-            res = listify(exp, "res")
-            print(f"Max res for {exp_name} is {max(res)}")
-            res_lol[-1].append(res)
+                res_lol[-1].append([float("nan")] * 50)
+            else:
+                exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
+                res = listify(exp, "res")
+                print(f"Max res for {exp_name} is {max(res)}")
+                res_lol[-1].append(res)
 
     res_array = np.array(res_lol)
     global_max = np.max(res_array)
@@ -777,7 +817,7 @@ def plot_bo_comp():
         res_mean[1],
         label="(A) 50 LHS points - mean",
         color="blue",
-        linewidth=2,
+        linewidth=1,
     )
     plt.fill_between(
         np.arange(50) + 1,
@@ -792,7 +832,7 @@ def plot_bo_comp():
         res_mean[0],
         label="(B) 25 LHS, 25 BO points - mean",
         color="red",
-        linewidth=2,
+        linewidth=1,
     )
     plt.fill_between(
         np.arange(50) + 1,
@@ -841,6 +881,7 @@ def plot_bo_comp():
         regret_mean[1],
         label="(A) 50 BO points - mean",
         color="blue",  # "50i 0b mean",
+        linewidth=1,
     )
     plt.fill_between(
         np.arange(50) + 1,
@@ -856,7 +897,21 @@ def plot_bo_comp():
         regret_mean[0],
         label="(B) 25 LHS, 25 BO points - mean",  # "25i 25b mean",
         color="red",
+        linewidth=1,
     )
+    for i in range(res_array.shape[1]):
+        if i == 0:
+            labels = {"label": "(A) single trial"}
+        else:
+            labels = {}
+        plt.plot(
+            np.arange(50) + 1,
+            regret_array[1][i],
+            color="blue",
+            linestyle="--",
+            linewidth=0.5,
+            **labels,
+        )
     plt.fill_between(
         np.arange(50) + 1,
         regret_5pc[0],
@@ -866,33 +921,32 @@ def plot_bo_comp():
         color="red",
         alpha=0.4,
     )
-
-    # set y-axis to be semi-log
-
-    # vertical line at 25 samples
-    plt.axvline(25, color="black", linestyle="--")
-
     for i in range(res_array.shape[1]):
-
+        if i == 0:
+            labels = {"label": "(B) single trial"}
+        else:
+            labels = {}
         plt.plot(
             np.arange(50) + 1,
             regret_array[0][i],
             color="red",
             linestyle="--",
             linewidth=0.5,
+            **labels,
         )
-        plt.plot(
-            np.arange(50) + 1,
-            regret_array[1][i],
-            color="blue",
-            linestyle="--",
-            linewidth=0.5,
-        )
+
+    # set y-axis to be semi-log
+
+    # vertical line at 25 samples
+    plt.axvline(25, color="black", linestyle="--")
 
     plt.yscale("log")
     plt.legend()
-    plt.xlabel("Samples (LHS + BO points) [dimensionless]")
-    plt.ylabel("Empirical Regret [m]")
+    plt.xlabel("Samples, $s$ (LHS + BO points) [dimensionless]")
+    plt.ylabel(
+        "Empirical Regret [m]"
+        # r"Empirical Regret for dataset $i$ at step $s$, $\max\left(\max\left(\vec{z}^1\right), \cdots \max\left(\vec{z}^n\right)\right) - \max\left(\vec{z}^i_{1,\cdots,s}\right)$ [m]"
+    )
     plt.xlim(1, 50)
     plt.tight_layout()
     plt.savefig(
