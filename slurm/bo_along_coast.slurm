@@ -67,7 +67,6 @@ p97=2097_new_orleans_profile_r4i1p1f1
 # python -m adbo.exp_3d --exp_name=8762482-2025 --profile_name=$p25 --resolution=mid --obs_lat=29.788611 --obs_lon=-90.420278
 python -m adbo.exp_3d --exp_name=8764044-2025 --profile_name=$p25 --resolution=mid --obs_lat=29.6675 --obs_lon=-91.237611
 
-
 #lon=[30.404389, 30.25, 28.932222, 29.263, 29.114167, 29.788611, 29.6675]
 #lat=[-87.211194, -88.075, -89.4075, -89.957, -90.199167,-90.420278, -91.237611]
 #stationid=['8729840', '8735180', '8760922', '8761724', '8762075', '8762482', '8764044']

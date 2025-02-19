@@ -756,6 +756,7 @@ def get_max_from_ib_list(iblist: List[Tuple[int, int]]) -> float:
 
 def plot_bo_exp() -> None:
     plot_defaults()
+    _, _ = plt.subplots(1, 1, figsize=get_dim())
     res_list, b_list = get_max_from_ib_list([(1, 9), (5, 5), (9, 1), (10, 0)])
     plt.plot(b_list, res_list, color="orange", label="Total Calls 10")
     res_list, b_list = get_max_from_ib_list([(20, 0), (19, 1), (10, 10), (1, 19)])
@@ -763,7 +764,6 @@ def plot_bo_exp() -> None:
     res_list, b_list = get_max_from_ib_list(
         [(50, 0), (49, 1), (35, 15), (25, 25), (15, 35), (1, 49)]
     )
-    fig, ax = plt.subplots(1, 1, figsize=get_dim())
     plt.plot(b_list, res_list, color="blue", label="Total Calls 50")
     plt.xlabel("BO points")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
@@ -787,7 +787,7 @@ def plot_bo_comp():
     plt.close()
     plot_defaults()
     res_lol = []
-    for i, b in [(25, 25), (50, 0)]:
+    for i, b in [(25, 25), (50, 0)]: #  (1, 49)
         res_lol += [[]]
         for t in [i for i in range(11)]:  # if i not in [4, 5, 9, 10]]:
             if t == 0:
@@ -800,10 +800,19 @@ def plot_bo_comp():
             else:
                 exp = read_json(os.path.join(EXP_PATH, exp_name, "experiments.json"))
                 res = listify(exp, "res")
+                if len(res) < 50:
+                    print(f"Experiment {exp_name} does not have 50 samples.")
+                    res += [float("nan")] * (50 - len(res))
                 print(f"Max res for {exp_name} is {max(res)}")
                 res_lol[-1].append(res)
 
     res_array = np.array(res_lol)
+    # replace with nan safe operations that discount nans in averages and maximums etc.
+    # use nanmax, nanmean, nanstd etc.
+    global_max = np.nanmax(res_array)
+    # take cumulative maximum over each trial
+    res_array = np.nanmax.accumulate(res_array, axis=2)
+
     global_max = np.max(res_array)
     # take cumulative maximum over each trial
     res_array = np.maximum.accumulate(res_array, axis=2)
