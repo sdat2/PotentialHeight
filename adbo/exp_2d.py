@@ -4,8 +4,8 @@ import os
 import yaml
 from adbo.constants import CONFIG_PATH
 import argparse
-from adbo.newexp import run_bayesopt_exp
 from adforce.constants import NEW_ORLEANS
+from .exp import run_bayesopt_exp
 
 
 def create_2d_ani_run() -> None:

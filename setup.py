@@ -21,7 +21,7 @@ REQUIRED: List[str] = [
     "xesmf",  # to regrid CMIP6 data (tcpips) # really this needs to be installed by
     "gcsfs",  # to read CMIP6 data (tcpips)
     "xmip",  # to preprocess CMIP6 data (tcpips)
-    "hydra-core",  # to read the config files
+    "hydra-core",  # to read the yaml config files (adforce, worst)
     "trieste",  # to run bayesian optimisation (adbo)
     "trieste[plotting]",  # to run bayesian optimisation (adbo)
     "trieste[qhsri]",  # to run bayesian optimisation (adbo)
@@ -33,8 +33,8 @@ REQUIRED: List[str] = [
 
 
 setup(
-    name="tcpips",
-    description="TC potential intensity and potential size.",
+    name="worstsurge",
+    description="A set of tools to calculate the worst case storm surge",
     version="0.0.0",
     author_email="sdat2@cam.ac.uk",
     author="Simon D.A. Thomas",
@@ -57,7 +57,7 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "chavas15", "cle", "adforce", "adbo"],
+    packages=["tcpips", "chavas15", "cle", "adforce", "adbo", "worst"],
     package_dir={
         "tcpips": "tcpips",  # Calculate potential intensity and potential size from CMIP6 data
         "chavas15": "chavas15",  # Calculate the Chavas, Lin and Emanuel (2015) profile

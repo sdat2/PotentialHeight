@@ -787,7 +787,7 @@ def plot_bo_comp():
     plt.close()
     plot_defaults()
     res_lol = []
-    for i, b in [(25, 25), (50, 0)]: #  (1, 49)
+    for i, b in [(25, 25), (50, 0)]:  #  (1, 49)
         res_lol += [[]]
         for t in [i for i in range(11)]:  # if i not in [4, 5, 9, 10]]:
             if t == 0:
@@ -807,11 +807,11 @@ def plot_bo_comp():
                 res_lol[-1].append(res)
 
     res_array = np.array(res_lol)
-    # replace with nan safe operations that discount nans in averages and maximums etc.
+    # TODO: replace with nan safe operations that discount nans in averages and maximums etc.
     # use nanmax, nanmean, nanstd etc.
     global_max = np.nanmax(res_array)
     # take cumulative maximum over each trial
-    res_array = np.nanmax.accumulate(res_array, axis=2)
+    res_array = np.maximum.accumulate(res_array, axis=2)
 
     global_max = np.max(res_array)
     # take cumulative maximum over each trial
@@ -966,7 +966,7 @@ def plot_bo_comp():
     plt.legend()
     plt.xlabel("Samples, $s$ (LHS + BO points) [dimensionless]")
     plt.ylabel(
-        "Empirical Regret [m]"
+        "Approximate Simple Regret [m]"
         # r"Empirical Regret for dataset $i$ at step $s$, $\max\left(\max\left(\vec{z}^1\right), \cdots \max\left(\vec{z}^n\right)\right) - \max\left(\vec{z}^i_{1,\cdots,s}\right)$ [m]"
     )
     plt.xlim(1, 50)

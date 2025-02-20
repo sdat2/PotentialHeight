@@ -79,7 +79,7 @@ def plot_gps(
     print("num_init_data_points", num_init_data_points)
 
     for call_i in tqdm(range(len_active_points), desc="Plotting GPs"):
-        if plot_acq and "acq" in ds:
+        if plot_acq and "acq" in ds:  # plot three panels
             fig, axs = feature_grid(
                 ds.isel(call=call_i),
                 [["ypred", "ystd", "acq"]],
@@ -88,7 +88,7 @@ def plot_gps(
                     [
                         r"GP prediction, $\hat{y}$",
                         r"GP standard deviation, $\sigma_{\hat{y}}$",
-                        r"Acquisition function, $\alpha$ [dimensionless]",
+                        r"Acquisition function, $\alpha_t$ [dimensionless]",
                     ]
                 ],
                 [
@@ -105,7 +105,7 @@ def plot_gps(
                     ("x2", r"Track Displacement, $c$", r"$^{\circ}$E"),
                 ),
             )
-        else:
+        else:  # plot 2 panels
             fig, axs = feature_grid(
                 ds.isel(call=call_i),
                 [["ypred", "ystd"]],
@@ -120,8 +120,12 @@ def plot_gps(
                 ["", ""],
                 figsize=(4 * 2, 4),
                 xy=(
-                    ("x1", "Track Bearing", r"$^{\circ}$"),
-                    ("x2", "Displacement East of New Orleans", r"$^{\circ}$"),
+                    ("x1", "Track Bearing, $\chi$", r"$^{\circ}$"),
+                    (
+                        "x2",
+                        "Displacement East of New Orleans, $c$",
+                        r"$^{\circ}$E",
+                    ),
                 ),
             )
         # this seems not to work properly
@@ -142,14 +146,14 @@ def plot_gps(
                 angle[:num_init_data_points],
                 displacement[:num_init_data_points],
                 marker="x",
-                s=35,
+                s=55,
                 color="blue",
             )
             #
             axs.ravel()[i].scatter(
                 angle[num_init_data_points : num_init_data_points + call_i + 1],
                 displacement[num_init_data_points : num_init_data_points + call_i + 1],
-                s=50,
+                s=100,
                 marker="+",
                 color="green",
             )
@@ -182,7 +186,7 @@ def plot_gps(
 if __name__ == "__main__":
     # python -m adbo.ani
     plot_gps(
-        path_in="/work/n02/n02/sdat2/adcirc-swan/exp/2d-ani-new-redo-4",
+        path_in="/work/n02/n02/sdat2/adcirc-swan/exp/old/2d-ani-new-redo-4",
         add_name="",
         plot_acq=True,
         save_pdf={
@@ -190,5 +194,6 @@ if __name__ == "__main__":
             1,
             2,
             3,
+            24,
         },
     )

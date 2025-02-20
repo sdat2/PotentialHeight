@@ -21,7 +21,6 @@ from trieste.acquisition import (
     # ExpectedImprovement,
     MinValueEntropySearch,
 )
-from omegaconf import OmegaConf
 from trieste.objectives import SingleObjectiveTestProblem
 from trieste.acquisition.rule import EfficientGlobalOptimization
 from trieste.experimental.plotting.plotting import plot_bo_points, plot_regret
@@ -34,12 +33,13 @@ print(
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from sithom.io import write_json
+from sithom.place import Point
 import matplotlib.pyplot as plt
-from adforce.wrap import idealized_tc_observe, get_default_config
+from adforce.oldwrap import run_adcirc_idealized_tc, maxele_observation_func
 from adforce.constants import NEW_ORLEANS
 from .ani import plot_gps
 from .rescale import rescale_inverse
-from .constants import FIGURE_PATH, EXP_PATH, CONFIG_PATH
+from .constants import FIGURE_PATH, EXP_PATH, DEFAULT_CONSTRAINTS
 
 # archer 2:
 matplotlib.use("Agg")
@@ -74,19 +74,20 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 
 @timeit
 def objective_f(
-    cfg,
-    # constraints: dict,
-    # profile_name: str = "outputs.json",
-    # exp_name: str = "bo_test",
-    # obs_lon: float = NEW_ORLEANS.lon,
-    # obs_lat: float = NEW_ORLEANS.lat,
-    # wrap_test: bool = False,
-    # resolution="mid",
+    constraints: dict,
+    profile_name: str = "outputs.json",
+    exp_name: str = "bo_test",
+    obs_lon: float = NEW_ORLEANS.lon,
+    obs_lat: float = NEW_ORLEANS.lat,
+    wrap_test: bool = False,
+    resolution="mid",
 ) -> Callable[[tf.Tensor], tf.Tensor]:
     """
     Return a wrapper function for the ADCIRC model that is compatible with being used as an observer in trieste after processing.
 
     At each objective function call the model is run and the result is returned and saved.
+
+    TODO: add wandb logging option.
 
     Args:
         constraints (dict): Dictionary with the constraints for the model.
@@ -100,10 +101,15 @@ def objective_f(
     Returns:
         Callable[[tf.Tensor], tf.Tensor]: trieste observer function.
     """
+    # set up folder for all experiments
+    exp_dir = os.path.join(EXP_PATH, exp_name)
+    os.makedirs(exp_dir, exist_ok=True)
     call_number = -1
     output = {}
-    dimension_inputs = len(cfg["constraints"]["order"])
-    exp_dir = cfg["exp_dir"]
+    select_point = maxele_observation_func(
+        Point(obs_lon, obs_lat), resolution=resolution
+    )
+    dimension_inputs = len(constraints["order"])
     print("dimension_inputs", dimension_inputs)
 
     def temp_dir() -> str:
@@ -132,7 +138,7 @@ def objective_f(
             "res": float(real_result),
             **{
                 name: float(real_query[j])
-                for j, name in enumerate(cfg["constraints"]["order"])
+                for j, name in enumerate(constraints["order"])
             },
         }
         write_json(output, os.path.join(exp_dir, "experiments.json"))
@@ -148,58 +154,31 @@ def objective_f(
         Returns:
             tf.Tensor: The negative of the result of the ADCIRC model at the selected point.
         """
-        nonlocal call_number
+        nonlocal call_number, select_point, resolution, wrap_test
         # put in real space
         returned_results = []  # new results, negative height [m]
-        real_queries = rescale_inverse(x, cfg["constraints"])  # convert to real space
+        real_queries = rescale_inverse(x, constraints)  # convert to real space
         for i in range(real_queries.shape[0]):
             call_number += 1
+            tmp_dir = temp_dir()
             inputs = {
                 name: float(real_queries[i][j])
-                for j, name in enumerate(cfg["constraints"]["order"])
+                for j, name in enumerate(constraints["order"])
             }
-            wrap_cfg = get_default_config()
-
-            print("read config", wrap_cfg)
-            # I want to generalize this so it's relative to the observation point not New Orleans
-            tmp_dir = temp_dir()
-            wrap_cfg.files.run_folder = tmp_dir
-            # delete fort.22.nc after run
-            wrap_cfg.files.low_storage = True
-            wrap_cfg.tc.profile_name.value = cfg["profile_name"]
-            wrap_cfg.adcirc.attempted_observation_location.value = [
-                cfg["obs_lon"],
-                cfg["obs_lat"],
-            ]
-            wrap_cfg.adcirc["resolution"].value = cfg["resolution"]
-            for inp in inputs:
-                if inp != "displacement":
-                    if inp == "trans_speed":
-                        wrap_cfg.tc["translation_speed"].value = inputs[inp]
-                    else:
-                        wrap_cfg.tc[inp].value = inputs[inp]
-                if inp == "displacement":
-                    wrap_cfg.tc.impact_location.value = [
-                        cfg["obs_lon"] + inputs["displacement"],
-                        cfg["obs_lat"],
-                    ]
-            # if "displacement" in inputs:
-            #    # assume impact lon relative to New Orleans
-            #    inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
-            #    del inputs["displacement"]
-
-            if cfg["wrap_test"]:
+            if "displacement" in inputs:
+                # assume impact lon relative to New Orleans
+                inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]
+                del inputs["displacement"]
+            if wrap_test:
                 real_result = min(7 + np.random.normal(), 10)
-                yaml_str = OmegaConf.to_yaml(wrap_cfg)
-                with open(os.path.join(tmp_dir, "wrap_cfg.yaml"), "w") as file:
-                    file.write(yaml_str)
             else:
-                # wrap_cfg.tc["displacement"].value = x
-                real_result = idealized_tc_observe(wrap_cfg)
-                # out_path=tmp_dir,
-                # profile_name=profile_name,
-                # resolution=resolution,
-                # **inputs,
+                real_result = run_adcirc_idealized_tc(
+                    out_path=tmp_dir,
+                    profile_name=profile_name,
+                    resolution=resolution,
+                    select_point=select_point,
+                    **inputs,
+                )
 
             add_query_to_output(real_queries[i], real_result)
             # flip sign to make it a minimisation problem
@@ -213,12 +192,6 @@ def objective_f(
         # return the result
 
     return obj
-
-
-# maybe shift this to constants?
-DEFAULT_CONSTRAINTS: dict = yaml.safe_load(
-    open(os.path.join(CONFIG_PATH, "3d_constraints.yaml"))
-)
 
 
 def gp_model_callback_maker(
@@ -434,7 +407,7 @@ def run_exists(exp_name: str, num_runs: int) -> bool:
 def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
-    profile_name: str = "2025_new_orleans_profile_r4i1p1f1",  # 2025.json, 2097.json
+    profile_name: str = "outputs.json",  # 2025.json, 2097.json
     resolution: str = "mid",
     exp_name: str = "bo_test",
     root_exp_direc: str = EXP_PATH,
@@ -450,7 +423,7 @@ def run_bayesopt_exp(
     Args:
         constraints (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
         seed (int, optional): Seed to initialize. Defaults to 10.
-        profile_name (str, optional): Name of the profile. Defaults to "2025_new_orleans_profile_r4i1p1f1".
+        profile_name (str, optional): Name of the profile. Defaults to "outputs.json".
         exp_name (str, optional): Experiment name. Defaults to "bo_test".
         root_exp_direc (str, optional): Root directory for the experiments. Defaults to "/work/n01/n01/sithom/adcirc-swan/exp".
         init_steps (int, optional): How many sobol sambles. Defaults to 10.
@@ -459,29 +432,12 @@ def run_bayesopt_exp(
     """
     direc = os.path.join(root_exp_direc, exp_name)
 
-    cfg = {
-        "constraints": constraints,
-        "seed": seed,
-        "profile_name": profile_name,
-        "exp_name": exp_name,
-        "init_steps": init_steps,
-        "daf_steps": daf_steps,
-        "obs_lon": obs_lon,
-        "obs_lat": obs_lat,
-        "wrap_test": wrap_test,
-        "resolution": resolution,
-        "exp_dir": direc,
-    }
-
     if run_exists(exp_name, num_runs=init_steps + daf_steps):
         print(f"Experiment {exp_name} already exists")
         return
 
     # add existance check here
     os.makedirs(direc, exist_ok=True)
-    write_json(cfg, os.path.join(direc, "bo-config.json"))
-    print("BO config", cfg)
-
     setup_tf(seed=seed, log_name=exp_name)
 
     # set up BayesOpt
@@ -490,7 +446,15 @@ def run_bayesopt_exp(
     search_space = trieste.space.Box([0] * dimensions_input, [1] * dimensions_input)
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
-    init_objective = objective_f(cfg)
+    init_objective = objective_f(
+        constraints,
+        profile_name=profile_name,
+        obs_lon=obs_lon,
+        obs_lat=obs_lat,
+        exp_name=exp_name,
+        wrap_test=wrap_test,
+        resolution=resolution,
+    )
     put_through_sotp = False
 
     if (
@@ -514,11 +478,10 @@ def run_bayesopt_exp(
     initial_data = observer(initial_query_points)
     print("initial_data", initial_data, type(initial_data))
     # set up bayesopt loop
-    gpr = trieste.models.gpflow.build_gpr(  # by default Matern 52
+    gpr = trieste.models.gpflow.build_gpr(
         initial_data, search_space
     )  # should add kernel choice here.
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
-    # choices mves,
     acquisition_func = MinValueEntropySearch(
         search_space
     )  # should add in acquisition function choice here.
@@ -587,7 +550,7 @@ def run_bayesopt_exp(
         ax.set_xlabel(r"$x_1$ [dimensionless]")
         ax.set_ylabel(r"$x_2$ [dimensionless]")
         # change name to allow choice.
-        plt.savefig(os.path.join(FIGURE_PATH, exp_name + "_results.pdf"))
+        plt.savefig(os.path.join(FIGURE_PATH, "bo_exp", exp_name + "_results.pdf"))
         # plt.show()
         plt.clf()
         plt.close()
@@ -605,8 +568,7 @@ def run_bayesopt_exp(
         )
         ax.set_xlabel("Iteration")
         ax.set_ylabel("Regret [-m]")
-        plt.savefig(os.path.join(FIGURE_PATH, exp_name + "_regret.pdf"))
-        # plt.show()
+        plt.savefig(os.path.join(FIGURE_PATH, "bo_exp", exp_name + "_regret.pdf"))
         plt.clf()
         plt.close()
 
@@ -615,8 +577,3 @@ def run_bayesopt_exp(
     # plot the gp model changes for 2d case:
     if len(constraints["order"]) == 2:
         plot_gps(path_in=direc, plot_acq=True)
-
-
-if __name__ == "__main__":
-    # python -m adbo.newexp
-    run_bayesopt_exp(wrap_test=False, exp_name="Test3")

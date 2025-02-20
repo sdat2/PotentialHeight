@@ -1,9 +1,12 @@
-"""adbo.exp_3d.py"""
+"""adbo.exp_3d.py
+
+Run an experiment varying the angle, displacement and speed of the storm for a given tropical cyclone profile.
+"""
 
 import argparse
 from adforce.constants import NEW_ORLEANS
 from .constants import DEFAULT_CONSTRAINTS
-from .newexp import run_bayesopt_exp
+from .exp import run_bayesopt_exp
 
 
 # @hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="bo_setup")
