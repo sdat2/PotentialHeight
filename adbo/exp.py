@@ -74,28 +74,12 @@ def setup_tf(seed: int = 1793, log_name: str = "experiment1") -> None:
 
 @timeit
 def objective_f(
-    cfg,
-    # constraints: dict,
-    # profile_name: str = "outputs.json",
-    # exp_name: str = "bo_test",
-    # obs_lon: float = NEW_ORLEANS.lon,
-    # obs_lat: float = NEW_ORLEANS.lat,
-    # wrap_test: bool = False,
-    # resolution="mid",
+    cfg: dict,
 ) -> Callable[[tf.Tensor], tf.Tensor]:
     """
     Return a wrapper function for the ADCIRC model that is compatible with being used as an observer in trieste after processing.
 
     At each objective function call the model is run and the result is returned and saved.
-
-    Args:
-        constraints (dict): Dictionary with the constraints for the model.
-        profile_name (str, optional): Name of the profile. Defaults to "outputs.json".
-        exp_name (str, optional): Name for folder. Defaults to "bo_test".
-        obs_lon (float, optional): Longitude of the observation point. Defaults to NEW_ORLEANS.lon.
-        obs_lat (float, optional): Latitude of the observation point. Defaults to NEW_ORLEANS.lat.
-        wrap_test (bool, optional): If True, do not run the ADCIRC model. Defaults to False.
-        resolution (str, optional): Resolution of the model. Defaults to "mid".
 
     Returns:
         Callable[[tf.Tensor], tf.Tensor]: trieste observer function.
@@ -206,11 +190,6 @@ def objective_f(
             returned_results.append([-real_result])
 
         return tf.constant(returned_results, dtype=tf.float64)
-        # Dataset(
-        #    query_points=x, observations=tf.constant(returned_results, dtype=tf.float64)
-        # )
-        # run the model
-        # return the result
 
     return obj
 
@@ -230,7 +209,6 @@ def gp_model_callback_maker(
     Return a callback function that saves the GP model at each step.
 
     TODO: problem from the animation: the x1 and x2 are not the right way around. Could be a problem in the scaled results.
-
 
     Args:
         direc (str): Directory to save the models.
