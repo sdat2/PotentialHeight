@@ -114,8 +114,7 @@ def point_solution_ps(
                     radius_of_inflow=r0,
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
-                    pressure_dry_at_inflow=ds["msl"].values
-                    * 100  # 100 to convert from hPa to Pa
+                    pressure_dry_at_inflow=p_a * 100  # 100 to convert from hPa to Pa
                     - buck_sat_vap_pressure(near_surface_air_temperature),
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=outflow_temperature,
