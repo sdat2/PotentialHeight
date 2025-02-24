@@ -12,8 +12,8 @@ SUP_PATH = os.path.join(SRC_PATH, "sup")
 
 # real physical constants
 TEMP_0K = 273.15  # [K]
-LATENT_HEAT_OF_VAPORIZATION = 2.27e6  # [J/kg/K]
-GAS_CONSTANT_FOR_WATER_VAPOR = 461  # [J/kg/K]
+LATENT_HEAT_OF_VAPORIZATION = 2_268_000  # [J/kg/K]
+GAS_CONSTANT_FOR_WATER_VAPOR = 461.5  # [J/kg/K]
 GAS_CONSTANT = 287  # [J/kg/K]
 
 
@@ -22,13 +22,14 @@ GAS_CONSTANT = 287  # [J/kg/K]
 # General defaults
 BACKGROUND_PRESSURE = 1015 * 100  # [Pa]
 F_COR_DEFAULT = 5e-5  # [s-2]
-RHO_AIR_DEFAULT = 1.15  # [kg m-3]
+RHO_AIR_DEFAULT = 1.225  # [kg m-3]
 
 # temperatures
 DEFAULT_SURF_TEMP = 299  # [K]
 NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT = DEFAULT_SURF_TEMP  # [K]
 OUTFLOW_TEMPERATURE_DEFAULT = 200  # [K]
 
+ENVIRONMENTAL_HUMIDITY_DEFAULT = 0.9  # [dimensionless]
 
 # CLE15
 CK_CD_DEFAULT = (
@@ -42,7 +43,7 @@ SUPERGRADIENT_FACTOR = 1.2  # [dimensionless], influences real ps
 
 
 # W22
-BETA_LIFT_PARAMETERIZATION_DEFAULT = 1.25  # [dimensionless], influences real ps
+BETA_LIFT_PARAMETERIZATION_DEFAULT = 1.25  # [dimensionless], influences real ps 5/4
 EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT = 0.5  # [dimensionless], influences real ps
 PRESSURE_DRY_AT_INFLOW_DEFAULT = 985_00  # [Pa]
 # vp * gamma_sg

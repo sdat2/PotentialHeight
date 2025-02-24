@@ -34,7 +34,7 @@ from .constants import (
 from .utils import (
     pressure_from_wind,
     absolute_angular_momentum,
-    carnot_factor,
+    carnot_efficiency,
     buck_sat_vap_pressure,
 )
 
@@ -261,6 +261,11 @@ def wang_diff(
 
     Returns:
         Callable[[float], float]: Function to find root of.
+
+    Example::
+        >>> f = wang_diff(a=0.062, b=0.031, c=0.008)
+        >>> f"{f(1.081):.3f}"
+        '0.000'
     """
 
     def f(y: float) -> float:  # y = exp(a*y + b*log(y)*y + c)
@@ -302,12 +307,20 @@ def wang_consts(
 
     Returns:
         Tuple[float, float, float]: a, b, c
+
+    >>> a, b, c = wang_consts(near_surface_air_temperature=299, outflow_temperature=200, latent_heat_of_vaporization=2_268_000, gas_constant_for_water_vapor=461.5, gas_constant=287, beta_lift_parameterization=1.25, efficiency_relative_to_carnot=0.5, pressure_dry_at_inflow=98500, coriolis_parameter=5e-5, maximum_wind_speed=83, radius_of_inflow=2193_000, radius_of_max_wind=64_000)
+    >>> f"{c:.3f}"
+    '0.008'
+    >>> f"{b:.3f}"
+    '0.031'
+    >>> f"{a:.3f}"
+    '0.062'
     """
     # a, b, c
     absolute_angular_momentum_at_vmax = absolute_angular_momentum(
         maximum_wind_speed, radius_of_max_wind, coriolis_parameter
     )
-    carnot_efficiency = carnot_factor(near_surface_air_temperature, outflow_temperature)
+    carnot_eff = carnot_efficiency(near_surface_air_temperature, outflow_temperature)
     near_surface_saturation_vapour_presure = buck_sat_vap_pressure(
         near_surface_air_temperature
     )
@@ -318,26 +331,23 @@ def wang_consts(
             / pressure_dry_at_inflow
             * (
                 efficiency_relative_to_carnot
-                * carnot_efficiency
+                * carnot_eff
                 * latent_heat_of_vaporization
                 / gas_constant_for_water_vapor
-                / near_surface_air_temperature
-                - 1
+                - near_surface_air_temperature
             )
             / (
                 (
                     beta_lift_parameterization
-                    - efficiency_relative_to_carnot * carnot_efficiency
+                    - efficiency_relative_to_carnot * carnot_eff
                 )
+                * near_surface_air_temperature
             )
         ),
         (
             near_surface_saturation_vapour_presure
             / pressure_dry_at_inflow
-            / (
-                beta_lift_parameterization
-                - efficiency_relative_to_carnot * carnot_efficiency
-            )
+            / (beta_lift_parameterization - efficiency_relative_to_carnot * carnot_eff)
         ),
         (
             beta_lift_parameterization
@@ -349,7 +359,7 @@ def wang_consts(
             / (
                 (
                     beta_lift_parameterization
-                    - efficiency_relative_to_carnot * carnot_efficiency
+                    - efficiency_relative_to_carnot * carnot_eff
                 )
                 * near_surface_air_temperature
                 * gas_constant

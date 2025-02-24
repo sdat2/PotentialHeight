@@ -36,38 +36,40 @@ def pressure_from_wind(
     p0: float = BACKGROUND_PRESSURE,  # [Pa]
     rho0: float = RHO_AIR_DEFAULT,  # [kg m-3]
     fcor: float = F_COR_DEFAULT,  # [s-1]
-    assumption: Literal["isopycnal", "isothermal"] = "isothermal",
+    assumption: Literal[
+        "isopycnal", "isothermal"
+    ] = "isopycnal",  # choose isopycnal or isothermal assumption for density
 ) -> np.ndarray:  # [Pa]
     """
     Pressure from wind, assuming cyclogeostrophic balance and either constant temperature or pressure.
 
     We assume cyclogeostrophic balance, with pressure gradient balancing the circular acceleration and coriolis force.
 
-    \frac{dp}{dr}=\rho(r)\left(\frac{v(r)^2}{r} +fv(r)\right)
+    \\frac{dp}{dr}=\\rho(r)\\left(\\frac{v(r)^2}{r} +fv(r)\\right)
 
-    where p is pressure, r is radius, \rho is density, f is coriolis parameter and v is velocity.
+    where p is pressure, r is radius, \\rho is density, f is coriolis parameter and v is velocity.
     If ideal gas following isothermal expansion then rho1/p1 = rho2/p2, rho(r) = rho0/p0*p(r)
 
     Where rho0 and p0 are the background density and pressure respectively.
     Substituting in we find that,
 
-    \frac{dp}{dr}=p(r) \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right)
+    \\frac{dp}{dr}=p(r) \\frac{rho0}{p0}\\left(\\frac{v(r)^2}{r} +fv(r)\\right)
 
     and then bringing p(r) to the left hand side yields
 
-    \frac{1}{p}\frac{dp}{dr}=\frac{dlog(p)}{dr} = \frac{rho0}{p0}\left(\frac{v(r)^2}{r} +fv(r)\right),
+    \\frac{1}{p}\\frac{dp}{dr}=\\frac{dlog(p)}{dr} = \\frac{rho0}{p0}\\left(\\frac{v(r)^2}{r} +fv(r)\\right),
 
     allowing us to express p(r) by integrating from infinity to r,
 
-    p(r) = p0*\exp\left(-\frac{rho0}{p0}\int^{\inf}_{r}\left(\frac{v(r)^2}{r} +fv(r)\right)dr\right).
+    p(r) = p0*\\exp\\left(-\\frac{rho0}{p0}\\int^{\\inf}_{r}\\left(\\frac{v(r)^2}{r} +fv(r)\\right)dr\\right).
 
-    For an exact solution, let fcor=0, v=a0*exp(-\lambda r)*r**0.5
+    For an exact solution, let fcor=0, v=a0*exp(-\\lambda r)*r**0.5
 
     Then we see,
 
-    p(r) = p0*\exp\left(-\frac{rho0}{p0}\int^{\inf}_{r}\left(a0**2*exp(-2\lambda r)\right)\right)
-        = p0*\exp\left(\frac{a0**2 * rho0}{2* p0 *\lambda}\left[*exp(-2\lambda r)\right]^{\inf}_{r}\right)
-        = p0*\exp\left(-\frac{a0**2 * rho0}{2 * p0 * \lambda}*a0**2*exp(- 2 \lambda r)\right).
+    p(r) = p0*\\exp\\left(-\\frac{rho0}{p0}\\int^{\\inf}_{r}\\left(a0**2*exp(-2\\lambda r)\\right)\\right)
+        = p0*\\exp\\left(\\frac{a0**2 * rho0}{2* p0 *\\lambda}\\left[*exp(-2\\lambda r)\\right]^{\\inf}_{r}\\right)
+        = p0*\\exp\\left(-\\frac{a0**2 * rho0}{2 * p0 * \\lambda}*a0**2*exp(- 2 \\lambda r)\\right).
 
     Args:
         rr (np.ndarray): radii array [m].
@@ -166,16 +168,16 @@ def buck_sat_vap_pressure(
     return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
 
 
-def carnot_factor(temp_hot: float, temp_cold: float) -> float:
+def carnot_efficiency(temp_hot: float, temp_cold: float) -> float:
     """
-    Calculate carnot factor.
+    Calculate Carnot efficiency.
 
     Args:
         temp_hot (float): Temperature of hot reservoir [K].
         temp_cold (float): Temperature of cold reservoir [K].
 
     Returns:
-        float: Carnot factor [dimensionless].
+        float: Carnot efficiency [dimensionless].
     """
     assert 250 < temp_hot and 320 > temp_hot
     assert 150 < temp_cold and 250 > temp_cold

@@ -31,7 +31,7 @@ from .potential_size import (
     wang_consts,
 )
 from .ps_old import profile_from_vals
-from .utils import buck_sat_vap_pressure, carnot_factor, coriolis_parameter_from_lat
+from .utils import buck_sat_vap_pressure, carnot_efficiency, coriolis_parameter_from_lat
 from .ps_dataset import find_solution_ds, gom_timestep
 
 plot_defaults()
@@ -192,7 +192,7 @@ def timeseries_plots_from_ds(
     fig, axs = plt.subplots(3, 1, figsize=(6, 8), sharex=True)
     ds["carnot"] = (
         "time",
-        1 / carnot_factor(ds["sst"].values + TEMP_0K, ds["t0"].values),
+        1 / carnot_efficiency(ds["sst"].values + TEMP_0K, ds["t0"].values),
     )
     ds["carnot"].attrs = {
         "long_name": "Carnot factor, $\eta_c$",

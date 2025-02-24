@@ -11,7 +11,8 @@ from .constants import (
     TEMP_0K,
     DATA_PATH,
     W_COOL_DEFAULT,
-    RHO_AIR_DEFAULT,
+    GAS_CONSTANT,
+    GAS_CONSTANT_FOR_WATER_VAPOR,
     SUPERGRADIENT_FACTOR,
     LOWER_RADIUS_BISECTION,
     UPPER_RADIUS_BISECTION,
@@ -21,8 +22,9 @@ from .constants import (
     W22_BISECTION_TOLERANCE,
     CK_CD_DEFAULT,
     CD_DEFAULT,
+    ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
-from .potential_size import run_cle15, wang_diff, wang_consts, delete_tmp
+from .potential_size import run_cle15, wang_diff, wang_consts
 from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
@@ -36,12 +38,12 @@ def point_solution_ps(
     ds: xr.Dataset,
     supergradient_factor: float = SUPERGRADIENT_FACTOR,
     include_profile: bool = False,
+    match_center=True,
 ) -> xr.Dataset:
     """
     Find the solution for a given point in the grid.
 
     # TODO: Speed up?
-    # TODO: Let's change this by adding additional arguments for the key things that could be changed e.g. CkCd, wcool, supergradient factor, rho_air
 
     Args:
         ds (xr.Dataset): Dataset with the input values.
@@ -60,7 +62,6 @@ def point_solution_ps(
         ...     },
         ...     coords={"lat":28})
         >>> out_ds = point_solution_ps(in_ds)
-        >>> out_ds
     """
 
     # read compuslory parameters
@@ -84,17 +85,28 @@ def point_solution_ps(
         w_cool = W_COOL_DEFAULT
     else:
         w_cool = float(ds["w_cool"].values)
-    if "rho_air" not in ds:
-        rho_air = RHO_AIR_DEFAULT
-    else:
-        rho_air = float(ds["rho_air"].values)
     if "supergradient_factor" not in ds:
         supergradient_factor = SUPERGRADIENT_FACTOR
     else:
         supergradient_factor = float(ds["supergradient_factor"].values)
+    if "env_humidity" not in ds:
+        env_humidity = ENVIRONMENTAL_HUMIDITY_DEFAULT
+    else:
+        env_humidity = float(ds["env_humidity"].values)
+    if "rho_air" not in ds:
+        water_vapour_pressure = env_humidity * buck_sat_vap_pressure(
+            near_surface_air_temperature
+        )
+        rho_air = (p_a * 100 - water_vapour_pressure) / (
+            GAS_CONSTANT * near_surface_air_temperature
+        ) + water_vapour_pressure / (
+            GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
+        )
+    else:
+        rho_air = float(ds["rho_air"].values)
 
     def try_for_r0(r0: float):
-        pm_cle, rmax_cle, _ = run_cle15(
+        pm_cle, rmax_cle, pc_cle = run_cle15(
             plot=False,
             inputs={
                 "r0": r0,
@@ -115,7 +127,10 @@ def point_solution_ps(
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
                     pressure_dry_at_inflow=p_a * 100  # 100 to convert from hPa to Pa
-                    - buck_sat_vap_pressure(near_surface_air_temperature),
+                    - env_humidity
+                    * buck_sat_vap_pressure(
+                        near_surface_air_temperature
+                    ),  # env humidity intially assumed to be 1, now assumed to be 0.9 in default
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=outflow_temperature,
                 )
@@ -128,8 +143,10 @@ def point_solution_ps(
         pm_car = (  # 100 to convert from hPa to Pa
             p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
         ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
-
-        return pm_cle - pm_car
+        if match_center:
+            return pc_cle - pm_car
+        else:
+            return pm_cle - pm_car
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
     r0 = bisection(
