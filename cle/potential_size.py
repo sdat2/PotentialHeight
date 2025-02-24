@@ -308,7 +308,11 @@ def wang_consts(
     Returns:
         Tuple[float, float, float]: a, b, c
 
-    >>> a, b, c = wang_consts(near_surface_air_temperature=299, outflow_temperature=200, latent_heat_of_vaporization=2_268_000, gas_constant_for_water_vapor=461.5, gas_constant=287, beta_lift_parameterization=1.25, efficiency_relative_to_carnot=0.5, pressure_dry_at_inflow=98500, coriolis_parameter=5e-5, maximum_wind_speed=83, radius_of_inflow=2193_000, radius_of_max_wind=64_000)
+    # only works if you use dodgy value for constant of latent heat of vaporization of water (2_500_000 J kg-1)
+    # and not the more standard value (2_268_000 J kg-1)
+    # this is because at a point in the derivation they ignore temperature variations, and so pick to use values at 0C
+    # 2_500_000 J kg-1 is the value at 0C (https://met.nps.edu/~bcreasey/mr3222/files/helpful/UnitsandConstantsUsefulInMeteorology-PSU.html)
+    >>> a, b, c = wang_consts(near_surface_air_temperature=299, outflow_temperature=200, latent_heat_of_vaporization=2_500_000+ 0*2_268_000, gas_constant_for_water_vapor=461, gas_constant=287, beta_lift_parameterization=5/4, efficiency_relative_to_carnot=0.5, pressure_dry_at_inflow=985_00, coriolis_parameter=5e-5, maximum_wind_speed=83, radius_of_inflow=2193_000, radius_of_max_wind=64_000)
     >>> f"{c:.3f}"
     '0.008'
     >>> f"{b:.3f}"
