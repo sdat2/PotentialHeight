@@ -154,7 +154,7 @@ def point_solution_ps(
         LOWER_RADIUS_BISECTION,
         UPPER_RADIUS_BISECTION,
         PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
-    )  # find potential size \(r_a\) between 200 and 5000 km with 1 mbar absolute tolerance
+    )  # find potential size \(r_a\) between 200 and 5000 km with 1 Pa absolute tolerance
 
     pm_cle, rmax_cle, pc = run_cle15(
         plot=False,
