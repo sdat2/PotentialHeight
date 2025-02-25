@@ -117,6 +117,7 @@ def point_solution_ps(
                 "CkCd": ck_cd,
                 "Cd": cd,
             },
+            rho0=rho_air,
         )
 
         ys = bisection(

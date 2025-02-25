@@ -166,6 +166,7 @@ def _run_cle15_octave(inputs: dict) -> dict:
 def run_cle15(
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
+    rho0=RHO_AIR_DEFAULT,  # [kg m-3]
 ) -> Tuple[float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
@@ -218,7 +219,6 @@ def run_cle15(
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
     p0 = ins["p0"] * 100  # [Pa] [originally in hPa]
-    rho0 = RHO_AIR_DEFAULT  # [kg m-3]
     ou["VV"][-1] = 0  # get rid of None at end of output.
     assert None not in ou["VV"]
     rr = np.array(ou["rr"], dtype="float32")  # [m]
@@ -240,8 +240,8 @@ def run_cle15(
 
     # plot the pressure profile
     return (
-        interp1d(rr, p)(
-            ou["rmax"]
+        float(
+            interp1d(rr, p)(ou["rmax"])
         ),  # find the pressure at the maximum wind speed radius [Pa]
         ou["rmax"],  # rmax radius [m]
         p[0],
