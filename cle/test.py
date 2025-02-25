@@ -72,6 +72,7 @@ def test_figure_4():
         GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
     )
     print("rho_air", rho_air, "kg m-3")
+    rho_air = 1.225  # kg m-3 # set back to default
     soln_ds = point_solution_ps(
         xr.Dataset(
             data_vars={
