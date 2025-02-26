@@ -38,7 +38,7 @@ def point_solution_ps(
     ds: xr.Dataset,
     supergradient_factor: float = SUPERGRADIENT_FACTOR,
     include_profile: bool = False,
-    match_center=True,
+    pressure_assumption="isopycnal",
 ) -> xr.Dataset:
     """
     Find the solution for a given point in the grid.
@@ -48,7 +48,8 @@ def point_solution_ps(
     Args:
         ds (xr.Dataset): Dataset with the input values.
         supergradient_factor (float, optional): Supergradient. Defaults to 1.2.
-        include_profile: (bool, optional)
+        include_profile (bool, optional)
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isopycnal".
 
     Returns:
         xr.Dataset: Find the solution dataset.
@@ -118,6 +119,7 @@ def point_solution_ps(
                 "Cd": cd,
             },
             rho0=rho_air,
+            pressure_assumption=pressure_assumption,
         )
 
         ys = bisection(
@@ -144,10 +146,10 @@ def point_solution_ps(
         pm_car = (  # 100 to convert from hPa to Pa
             p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
         ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
-        if match_center:
-            return pc_cle - pm_car
-        else:
-            return pm_cle - pm_car
+        # if match_center:
+        #    return pc_cle - pm_car
+        # else:
+        return pm_cle - pm_car
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
     r0 = bisection(
@@ -168,6 +170,8 @@ def point_solution_ps(
             "CkCd": ck_cd,
             "Cd": cd,
         },
+        rho0=rho_air,
+        pressure_assumption=pressure_assumption,
     )
     # read the solution
     ds["r0"] = r0

@@ -167,6 +167,7 @@ def run_cle15(
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
     rho0=RHO_AIR_DEFAULT,  # [kg m-3]
+    pressure_assumption: str = "isopycnal",
 ) -> Tuple[float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.
@@ -225,7 +226,14 @@ def run_cle15(
     vv = np.array(ou["VV"], dtype="float32")  # [m/s]
     # print("rr", rr[:10], rr[-10:])
     # print("vv", vv[:10], vv[-10:])
-    p = pressure_from_wind(rr, vv, p0=p0, rho0=rho0, fcor=ins["fcor"])  # [Pa]
+    p = pressure_from_wind(
+        rr,
+        vv,
+        p0=p0,
+        rho0=rho0,
+        fcor=ins["fcor"],
+        assumption=pressure_assumption,
+    )  # [Pa]
     ou["p"] = p.tolist()
 
     if plot:
@@ -252,7 +260,7 @@ def wang_diff(
     a: float = 0.062, b: float = 0.031, c: float = 0.008
 ) -> Callable[[float], float]:
     """
-    Wang difference function.
+    Wang et al. 2022 difference function to find roots of.
 
     Args:
         a (float, optional): a. Defaults to 0.062.
@@ -266,9 +274,12 @@ def wang_diff(
         >>> f = wang_diff(a=0.062, b=0.031, c=0.008)
         >>> f"{f(1.081):.3f}"
         '0.000'
+        >>> f"{f(19.1829):.3f}" # root said to be around 18 in paper. Is 19.18 close enough?
+        '0.000'
     """
 
-    def f(y: float) -> float:  # y = exp(a*y + b*log(y)*y + c)
+    def f(y: float) -> float:
+        # y = exp(a*y + b*log(y)*y + c)
         return y - np.exp(a * y + b * np.log(y) * y + c)
 
     return f
@@ -289,7 +300,7 @@ def wang_consts(
     radius_of_max_wind: float = RADIUS_OF_MAX_WIND_DEFAULT,  # m
 ) -> Tuple[float, float, float]:  # a, b, c
     """
-    Wang carnot engine model parameters.
+    Wang 2022 Carnot engine model parameters.
 
     Args:
         near_surface_air_temperature (float, optional): Defaults to 299 [K].

@@ -31,8 +31,10 @@ def test_figure_4():
     # second column of each = y = central pressure [mbar] (equiv to [hPa])
     # plot test data
     # plot_defaults()
-    plt.plot(cle15_test.iloc[:, 0], cle15_test.iloc[:, 1], label="CLE15 from paper")
-    plt.plot(w22_test.iloc[:, 0], w22_test.iloc[:, 1], label="W22 from paper")
+    plt.plot(
+        cle15_test.iloc[:, 0], cle15_test.iloc[:, 1], label="$p_m$ CLE15 from paper"
+    )
+    plt.plot(w22_test.iloc[:, 0], w22_test.iloc[:, 1], label="$p_m$ W22 from paper")
     plt.xlabel(r"Outer Radius, $\tilde{r}_a$ [km]")
     plt.ylabel("Central pressure, $p_m$ [mbar]")
     plt.legend()
@@ -61,8 +63,8 @@ def test_figure_4():
     env_humidity = 0.9
     near_surface_air_temperature = 299  # K
 
-    vsg = 83 / 1.2
-
+    vsg = 83 / 1.2  # vmax = 83 m s-1, supergradient factor = 1.2
+    pressure_assumption = "isothermal"  # "isopycnal"
     water_vapour_pressure = env_humidity * buck_sat_vap_pressure(
         near_surface_air_temperature
     )
@@ -72,7 +74,7 @@ def test_figure_4():
         GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
     )
     print("rho_air", rho_air, "kg m-3")
-    rho_air = 1.225  # kg m-3 # set back to default
+    rho_air = 1.225  # kg m-3 # set back to default to match Wang 2022
     soln_ds = point_solution_ps(
         xr.Dataset(
             data_vars={
@@ -89,14 +91,15 @@ def test_figure_4():
             },
             coords={"lat": lat},
         ),
-        match_center=False,
+        pressure_assumption=pressure_assumption,
     )
     print(soln_ds)
-    print("r0, 2193 km", soln_ds.r0.values / 1000, "km")
-    print("rmax, 64 km", soln_ds.rmax.values / 1000, "km")
-    print("pa, 1015 mbar", soln_ds.msl.values, "mbar")
-    print("pc, 944 mbar", soln_ds.pc.values / 100, "mbar")
-    print("pm, 944 mbar", soln_ds.pm.values / 100, "mbar")
+    plt.plot(2193, 944, "+", label="Paper's solution")
+    print("r0, 2193 km vs.", soln_ds.r0.values / 1000, "km")
+    print("rmax, 64 km vs.", soln_ds.rmax.values / 1000, "km")
+    print("pa, 1015 mbar vs.", soln_ds.msl.values, "mbar")
+    print("pc, 944 mbar vs.", soln_ds.pc.values / 100, "mbar")
+    print("pm, 944 mbar vs.", soln_ds.pm.values / 100, "mbar")
 
     plt.plot(
         soln_ds.r0.values / 1000,
@@ -121,6 +124,8 @@ def test_figure_4():
                 "Cd": 0.0015,
                 "CkCd": 1,
             },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
         )
         pm_cle15.append(pm_cle / 100)
         pc_cle15.append(pc_cle / 100)
@@ -155,10 +160,11 @@ def test_figure_4():
                 "CkCd": 1,
             },
             rho0=rho_air,
+            pressure_assumption=pressure_assumption,
         )
-        print(
-            "r0", r0, "rmax", rmax_cle, "pm", pm / 100, "mbar", "pc", pc / 100, "mbar"
-        )
+        # print(
+        #    "r0", r0, "rmax", rmax_cle, "pm", pm / 100, "mbar", "pc", pc / 100, "mbar"
+        # )
         assert rmax_cle > 1000  # should be in meters
         yval = bisection(
             wang_diff(
@@ -181,7 +187,7 @@ def test_figure_4():
         pm_w22_car = (
             1015 * 100 - buck_sat_vap_pressure(299)
         ) / yval + buck_sat_vap_pressure(299)
-        print("rmax", rmax_cle, "pm_w22_car", pm_w22_car / 100, "mbar")
+        print("rmax [m]", rmax_cle, "pm_w22_car [mbar]", pm_w22_car / 100, "mbar")
         pm_w22.append(pm_w22_car / 100)
 
     print("pm_w22", pm_w22)
