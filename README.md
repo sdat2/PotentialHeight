@@ -88,16 +88,22 @@ python -m adbo.exp &> logs/bo_test3.txt
  - How to quantify the performance of BO better.
 
 ### In progress
-   - Discussion vs Introduction.
 
- - potential size vs W22
+This week:
+ - Discussion vs. Introduction for WorstSurge (meet with Talea).
+ - potential size vs W22 (done-ish).
  - plot seasonal cycle, global picture.
+
+Next week:
  - Gulf of Mexico August (maybe additionaly South East Asia (e.g. Hong Kong)):
    - historical-CESM2
    - ERA5 PIPS (~observations)
    - compare to find biases.
+
+The week after:
  - Compare ERA5 potential size to IBTrACS.
-   - maybe focus on GOM and Hong Kong.
+  - maybe focus on GOM and Hong Kong.
+
 
 ### TODO:
 

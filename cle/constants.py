@@ -12,9 +12,9 @@ SUP_PATH = os.path.join(SRC_PATH, "sup")
 
 # real physical constants
 TEMP_0K = 273.15  # [K]
-LATENT_HEAT_OF_VAPORIZATION = 2_500_000  # [J/kg/K] from https://met.nps.edu/~bcreasey/mr3222/files/helpful/UnitsandConstantsUsefulInMeteorology-PSU.html of 0C
+LATENT_HEAT_OF_VAPORIZATION = 2_500_000  # [J/kg] from https://met.nps.edu/~bcreasey/mr3222/files/helpful/UnitsandConstantsUsefulInMeteorology-PSU.html of 0C
 # normally would use 2_257_000 J/kg/K but this is for 0C
-GAS_CONSTANT_FOR_WATER_VAPOR = 461.5  # [J/kg/K]
+GAS_CONSTANT_FOR_WATER_VAPOR = 461.5  # [J/kg]
 GAS_CONSTANT = 287  # [J/kg/K]
 
 

@@ -205,6 +205,7 @@ def point_solution_ps(
                 p_a * 100,  # [Pa] 100 to convert from hPa to Pa
                 rho_air,  # [kg m-3]
                 coriolis_parameter,  # [rad s-1]
+                assumption=pressure_assumption,
             )
             / 100,
             {"units": "mbar", "long_name": "Surface Pressure"},
