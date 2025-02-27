@@ -30,14 +30,25 @@ def w_out(
     outer_radius=2193_000,
     maximum_velocity=83,
     radius_of_maximum_winds=64_000,
+    radius_of_outflow=np.inf,
 ):
     return (
-        1 / 4 * coriolis_parameter**2 * outer_radius**2
+        1 / 4 * (coriolis_parameter**2) * (outer_radius**2)
         - 0.5
         * coriolis_parameter
         * absolute_angular_momentum(
             maximum_velocity, radius_of_maximum_winds, coriolis_parameter
         )
+        - 1
+        / 2
+        * (
+            absolute_angular_momentum(0, outer_radius, coriolis_parameter) ** 2
+            - absolute_angular_momentum(
+                maximum_velocity, radius_of_maximum_winds, coriolis_parameter
+            )
+            ** 2
+        )
+        / (radius_of_outflow**2)
     )
 
 
@@ -101,14 +112,14 @@ def w_p(
 
 
 def q_s(
-    efficiency_relative_to_carnot=0.5,
-    near_surface_air_temperature=299,
-    outflow_temperature=200,
-    dry_pressure_at_inflow=985_00,
-    dry_pressure_at_maximum_winds=944_00,
-    gas_constant=287,
-    latent_heat_of_vaporization=2_500_000,
-    gas_constant_for_water_vapor=461.5,
+    efficiency_relative_to_carnot: float = 0.5,
+    near_surface_air_temperature: float = 299,
+    outflow_temperature: float = 200,
+    dry_pressure_at_inflow: float = 985_00,
+    dry_pressure_at_maximum_winds: float = 944_00,
+    gas_constant: float = 287,
+    latent_heat_of_vaporization: float = 2_500_000,
+    gas_constant_for_water_vapor: float = 461.5,
 ):
     # Q_s = W_p / (1 - efficiency)
     return (
@@ -137,9 +148,17 @@ def test_figure_4():
     # plot test data
     # plot_defaults()
     plt.plot(
-        cle15_test.iloc[:, 0], cle15_test.iloc[:, 1], label="$p_m$ CLE15 from paper"
+        cle15_test.iloc[:, 0],
+        cle15_test.iloc[:, 1],
+        color="red",
+        label="$p_m$ CLE15 from paper",
     )
-    plt.plot(w22_test.iloc[:, 0], w22_test.iloc[:, 1], label="$p_m$ W22 from paper")
+    plt.plot(
+        w22_test.iloc[:, 0],
+        w22_test.iloc[:, 1],
+        color="blue",
+        label="$p_m$ W22 from paper",
+    )
     plt.xlabel(r"Outer Radius, $\tilde{r}_a$ [km]")
     plt.ylabel("Pressure [mbar]")
     plt.legend()
@@ -169,7 +188,7 @@ def test_figure_4():
     near_surface_air_temperature = 299  # K
 
     vsg = 83 / 1.2  # vmax = 83 m s-1, supergradient factor = 1.2
-    pressure_assumption = "isopycnal"  # "isopycnal"
+    pressure_assumption = "isothermal"  # "isopycnal"
     print("pressure_assumption", pressure_assumption)
     water_vapour_pressure = env_humidity * buck_sat_vap_pressure(
         near_surface_air_temperature
@@ -186,7 +205,7 @@ def test_figure_4():
             data_vars={
                 "sst": 300 - TEMP_0K,  # deg C
                 "supergradient_factor": 1.2,  # dimensionless
-                "t0": 200,  # K
+                "t0": 200,  #  K
                 "w_cool": 0.002,  # m s-1
                 "vmax": vsg,  # m s-1
                 "msl": 1015,  # mbar
@@ -210,7 +229,8 @@ def test_figure_4():
     plt.plot(
         soln_ds.r0.values / 1000,
         soln_ds.pm.values / 100,
-        marker="x",
+        "x",
+        color="green",
         label="Our bisection point solution",
     )
 
@@ -248,8 +268,12 @@ def test_figure_4():
     print("pc_cle15 [mbar]", pc_cle15)
     print("rmax_cle15 [km]", rmax_cle15)
 
-    plt.plot(r0s / 1000, pm_cle15, label="Our CLE15 $p_m$")
-    plt.plot(r0s / 1000, pc_cle15, label="Our CLE15 $p_c$")
+    plt.plot(
+        r0s / 1000, pm_cle15, "--", color="red", alpha=0.5, label="Our CLE15 $p_m$"
+    )
+    plt.plot(
+        r0s / 1000, pc_cle15, "--", color="orange", alpha=0.5, label="Our CLE15 $p_c$"
+    )
 
     r0s = w22_test.iloc[:, 0] * 1000  # convert to meters
     pm_w22 = []
@@ -343,11 +367,11 @@ def test_figure_4():
         w_out_l.append(w_out_val)
 
         print("rmax [m]", rmax_cle, "pm_w22_car [mbar]", pm_w22_car / 100, "mbar")
-        pm_w22.append(pm_w22_car / 100)
+        pm_w22.append(pm_w22_car / 100)  # in hPa
 
     print("pm_w22", pm_w22)
 
-    plt.plot(r0s / 1000, pm_w22, label="Our W22 $p_m$")
+    plt.plot(r0s / 1000, pm_w22, "--", alpha=0.5, color="blue", label="Our W22 $p_m$")
     # write a csv with the results
     os.makedirs(os.path.join(DATA_PATH, "w22"), exist_ok=True)
     pd.DataFrame(
@@ -388,8 +412,8 @@ def test_figure_4():
         "w_pbl": "$W_{PBL}$",
         "q_s": "$Q_S$",
         "w_p": "$W_P$",
-        "q_gibbs": "$-Q_{Gibbs}$",
-        "w_out": "$W_{out}$",
+        "q_gibbs": "$-Q_{\mathrm{Gibbs}}$",
+        "w_out": "$W_{\mathrm{out}}$",
         "w_pbl_surplus": "$W_{PBL}$ surplus",
     }
     colors = {
@@ -400,8 +424,6 @@ def test_figure_4():
         "w_out": "blue",
         "w_pbl_surplus": "grey",
     }
-    plt.xlabel("Outer Radius, $r_a$ [km]")
-    plt.ylabel("W [J kg$^{-1}$]")
 
     for key, val in file_names.items():
         if val is not None:
@@ -422,21 +444,11 @@ def test_figure_4():
                 color=colors[key],
                 alpha=0.5,
             )
-        plt.legend()
-        plt.xlim(200, 5000)
-        plt.legend(ncol=2, loc="lower center", bbox_to_anchor=(0.5, 1.05))
-
-    # plt.plot(df["r0"], df["w_pbl"], label="Our $Q_{PBL}$")
-    # plt.plot(df["r0"], df["q_s"], label="Our $Q_S$")
-    # plt.plot(df["r0"], df["w_p"], label="Our $W_P$")
-    # plt.plot(df["r0"], df["q_gibbs"], label="Our $-Q_{Gibbs}$")
-    # plt.plot(df["r0"], df["w_out"], label="Our $W_{out}$")
-
-    plt.legend()
-    plt.xlabel("Outer Radius, $r_0$ [km]")
-    plt.ylabel("Energy [J]")
     plt.xlim(200, 5000)
-    plt.legend(ncol=2, loc="lower center", bbox_to_anchor=(0.5, 1.05))
+    plt.xlabel("Outer Radius, $\tilde{r}_a$ [km]")
+    plt.ylabel("W [J kg$^{-1}$]")
+    plt.xlim(200, 5000)
+    plt.legend(ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.05))
     plt.savefig(os.path.join(FIGURE_PATH, "w22", "figure_4b.pdf"))
     # df["r0"]
     plt.clf()
