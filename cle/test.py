@@ -138,6 +138,31 @@ def q_s(
     )
 
 
+def v_carnot(
+    efficiency_relative_to_carnot: float = 0.5,
+    near_surface_air_temperature: float = 299,
+    outflow_temperature: float = 200,
+    latent_heat_of_vaporization: float = 2_500_000,
+    gas_constant: float = 287,
+    gas_constant_for_water_vapor: float = 461.5,
+    pressure_dry_at_inflow: float = 985_00,
+):
+    return np.sqrt(
+        (
+            (
+                efficiency_relative_to_carnot
+                * carnot_efficiency(near_surface_air_temperature, outflow_temperature)
+                * latent_heat_of_vaporization
+                - gas_constant_for_water_vapor * near_surface_air_temperature
+            )
+            * gas_constant
+            / gas_constant_for_water_vapor
+            * buck_sat_vap_pressure(near_surface_air_temperature)
+            / pressure_dry_at_inflow
+        )
+    )
+
+
 def test_figure_4():
     plot_defaults()
     # read csv test data
@@ -445,7 +470,7 @@ def test_figure_4():
                 alpha=0.5,
             )
     plt.xlim(200, 5000)
-    plt.xlabel("Outer Radius, $\tilde{r}_a$ [km]")
+    plt.xlabel(r"Outer Radius, $\tilde{r}_a$ [km]")
     plt.ylabel("W [J kg$^{-1}$]")
     plt.xlim(200, 5000)
     plt.legend(ncol=3, loc="lower center", bbox_to_anchor=(0.5, 1.05))
@@ -455,6 +480,56 @@ def test_figure_4():
     plt.close()
 
 
+def test_figure_5():
+    vp = 83 / 1.2  # m s-1
+    v_car = v_carnot(
+        efficiency_relative_to_carnot=0.5,
+        near_surface_air_temperature=299,
+        outflow_temperature=200,
+        latent_heat_of_vaporization=2_500_000,
+        gas_constant=287,
+        gas_constant_for_water_vapor=461.5,
+        pressure_dry_at_inflow=985_00,
+    )
+    print("v_car", v_car)
+    print("vp", vp)
+    # column 1 = 1/f, column 2 = r0
+    vpdiv_df = pd.read_csv(os.path.join(DATA_PATH, "w22", "5a-vp-div-f.csv"))
+    plt.plot(
+        vpdiv_df.iloc[:, 0], vpdiv_df.iloc[:, 1], color="grey", label=r"$\frac{v_p}{f}$"
+    )
+    plt.plot(
+        vpdiv_df.iloc[:, 0],
+        vp * vpdiv_df.iloc[:, 0] / 1000,
+        ":",
+        color="grey",
+        alpha=0.5,
+        label=r"Our $\frac{V_p}{f}$",
+    )
+    vcarnot_div_df = pd.read_csv(os.path.join(DATA_PATH, "w22", "5a-vcarnot-div-f.csv"))
+    plt.plot(
+        vcarnot_div_df.iloc[:, 0],
+        vcarnot_div_df.iloc[:, 1],
+        color="black",
+        label=r"$\frac{v_{\mathrm{carnot}}}{f}$",
+    )
+    plt.plot(
+        vcarnot_div_df.iloc[:, 0],
+        v_car * vcarnot_div_df.iloc[:, 0] / 1000,
+        ":",
+        color="black",
+        alpha=0.5,
+        label=r"Our $\frac{V_{\mathrm{carnot}}}{f}$",
+    )
+    plt.xlabel(r"$\frac{1}{f}$, larger at lower latitudes [s]")
+    plt.ylabel(r"Potential Size, $r_a$ [km]")
+    plt.legend(ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.05))
+    plt.savefig(os.path.join(FIGURE_PATH, "w22", "figure_5a.pdf"))
+    plt.clf()
+    plt.close()
+
+
 if __name__ == "__main__":
     # python -m cle.test
-    test_figure_4()
+    # test_figure_4()
+    test_figure_5()
