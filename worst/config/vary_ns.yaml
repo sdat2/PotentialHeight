@@ -8,5 +8,5 @@ max_samp: 1000
 samp_steps: 26
 seed_steps: 600
 color_true: black
-color_max_known: '#1f77b4'
+color_max_known: '#18520c'
 color_max_unknown: '#d95f02'

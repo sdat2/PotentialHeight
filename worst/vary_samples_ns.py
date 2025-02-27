@@ -9,7 +9,6 @@ from omegaconf import DictConfig
 import matplotlib
 import matplotlib.pyplot as plt
 from scipy.stats import genextreme
-from tcpips.constants import DATA_PATH, FIGURE_PATH
 from tqdm import tqdm
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from sithom.time import timeit
@@ -21,7 +20,7 @@ from .tens import (
     fit_gev_upper_bound_known,
     tfd,
 )
-from .constants import CONFIG_PATH
+from .constants import CONFIG_PATH, DATA_PATH, FIGURE_PATH
 
 
 def try_fit(
@@ -460,4 +459,5 @@ def vary_samples_ns(config: DictConfig) -> None:
 
 
 if __name__ == "__main__":
+    # python -m worst.vary_samples_ns
     vary_samples_ns()

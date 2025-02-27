@@ -18,7 +18,6 @@ import hydra
 from omegaconf import DictConfig
 import matplotlib.pyplot as plt
 from scipy.stats import genextreme
-from tcpips.constants import DATA_PATH, FIGURE_PATH
 from tqdm import tqdm
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from sithom.time import timeit
@@ -32,7 +31,7 @@ from .tens import (
     fit_gev_upper_bound_not_known,
     fit_gev_upper_bound_known,
 )
-from .constants import CONFIG_PATH
+from .constants import CONFIG_PATH, DATA_PATH, FIGURE_PATH
 
 
 @retry_wrapper(max_retries=10)
@@ -226,6 +225,7 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
     """
     data_name = os.path.join(DATA_PATH, f"vary_{_name_base(config)}.nc")
     if not os.path.exists(data_name) or not config.reload:
+        print("Remaking data file", data_name)
         quantiles = list(config.quantiles)
         seed_offsets = np.linspace(
             0, config.seed_steps_Nr, config.seed_steps_Nr, dtype=int
@@ -273,6 +273,7 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
         ds = xr.merge([ds_ubu, ds_ubk])
         ds.to_netcdf(data_name)
     else:
+        print("Reloading data file", data_name)
         ds = xr.open_dataset(data_name)
     return ds
 
@@ -378,7 +379,9 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
 
     # intitial plots
     for irp in (0, 1):
-        axs[irp].set_ylabel("" + str(int(1 / config.quantiles[irp])) + " year RV [m]")
+        axs[irp].set_ylabel(
+            "1 in " + str(int(1 / config.quantiles[irp])) + " year RV [m]"
+        )
         iubu = ubu.isel(rp=irp)
         iubk = ubk.isel(rp=irp)
         axs[irp].plot(
@@ -386,7 +389,7 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
             iubk.mn.values.ravel(),
             color=config.color.max_known,
             linewidth=1,
-            label="Max known GEV (I) mean",
+            label="I: Known upper bound GEV fit, mean",
         )
         axs[irp].fill_between(
             ratio.z_star_sigma,
@@ -395,7 +398,7 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
             alpha=0.2,
             color=config.color.max_known,
             linestyle="-",
-            label=r"(I) 5%-95% envelope",
+            label=r"I: 5%-95% envelope",
         )
         axs[irp].hlines(
             float(true_rp.isel(rp=irp).true.values.ravel()),
@@ -409,7 +412,7 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
             iubu.mn.values.ravel().tolist() * len(ratio.z_star_sigma),
             color=config.color.max_unknown,
             linewidth=1,
-            label="Unbounded GEV (II) mean",
+            label="II: Unbounded GEV fit, mean",
         )
         axs[irp].fill_between(
             ratio.z_star_sigma,
@@ -417,7 +420,7 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
             iubu.upper_p.values.ravel().tolist() * len(ratio.z_star_sigma),
             alpha=0.2,
             color=config.color.max_unknown,
-            label=r"(II) 5%-95% envelope",
+            label=r"II: 5%-95% envelope",
             linestyle="-",
         )
 
@@ -442,7 +445,7 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
     )
     axs[2].legend()
     axs[2].set_xlabel(
-        r"Standard deviation of calculated upper bound, $\sigma_{\hat{z}*}$ [m]"
+        r"Standard deviation of calculated upper bound, $\sigma_{\hat{z}^*}$ [m]"
     )
     axs[2].set_ylabel(
         r"Ratio of 5%-95% envelopes, $\frac{r_{II}}{r_{\mathrm{I}}}$"  # [dimensionless]"
@@ -469,6 +472,7 @@ def run_vary_noise(config: DictConfig) -> None:
     Args:
         config (DictConfig): Hydra config object.
     """
+    print("config", config)
     ds = get_fit_ds(config)
     print(ds)
     plot_fit_ds(config, ds)
