@@ -4,6 +4,7 @@ Utilities for idealized tropical cyclone calculations.
 
 from typing import Union, Literal
 import numpy as np
+import xarray as xr
 from scipy.integrate import cumulative_trapezoid
 from .constants import TEMP_0K, F_COR_DEFAULT, RHO_AIR_DEFAULT, BACKGROUND_PRESSURE
 
@@ -205,3 +206,38 @@ def absolute_angular_momentum(v: float, r: float, f: float) -> float:
     assert v >= 0
     assert r >= 0
     return v * r + 0.5 * f * r**2  # [m2/s]
+
+
+def qair2rh(
+    qair: Union[xr.DataArray, float],
+    temp: Union[xr.DataArray, float],
+    press: Union[xr.DataArray, float] = BACKGROUND_PRESSURE,
+) -> Union[xr.DataArray, float]:
+    """
+    Convert specific humidity to relative humidity.
+
+    Inspired by: https://earthscience.stackexchange.com/a/2385
+
+    Args:
+        qair (Union[xr.DataArray, float]): Specific humidity [dimensionless].
+        temp (Union[xr.DataArray, float]): Temperature [K].
+        press (Union[xr.DataArray, float]): Pressure [hPa].
+
+    Returns:
+        Union[xr.DataArray, float]: Relative humidity [dimensionless].
+
+    Example::
+        >>> print(f'{qair2rh(0.01, 300, 1013.25):.3f}')
+        0.458
+    """
+    temp_c = temp - TEMP_0K
+    es = 6.112 * np.exp(17.67 * temp_c / (temp_c + 243.5))
+    e = qair * press / (0.378 * qair + 0.622)
+    rh = e / es
+    rh = np.clip(rh, 0, 1)
+    if isinstance(rh, xr.DataArray):
+        rh.rename("rh")
+        rh.attrs["long_name"] = "Relative Humdity"
+        rh.attrs["short_name"] = "Relative Humdity"
+        rh.attrs["units"] = "dimensionless"
+    return rh
