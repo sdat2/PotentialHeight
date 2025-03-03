@@ -161,7 +161,6 @@ def buck_sat_vap_pressure(
 
     Returns:
         float: saturation vapour pressure in Pa.
-
     """
     assert temp > 150 and temp < 350
     # https://en.wikipedia.org/wiki/Arden_buck_sat_vap_pressure_equation
@@ -230,14 +229,35 @@ def qair2rh(
         >>> print(f'{qair2rh(0.01, 300, 1013.25):.3f}')
         0.458
     """
-    temp_c = temp - TEMP_0K
-    es = 6.112 * np.exp(17.67 * temp_c / (temp_c + 243.5))
+
+    if isinstance(qair, xr.DataArray):
+        if qair.attrs["units"] in ["dimensionless", "kg/kg"]:
+            qair = qair
+        elif qair.attrs["units"] in ["g/kg"]:
+            qair = qair / 1000
+        else:
+            raise ValueError("qair units not recognized")
+    # convert to temperature to degrees
+    if isinstance(temp, xr.DataArray):
+        if temp.attrs["units"] in ["K", "degK"]:
+            temp = temp - TEMP_0K
+        elif temp.attrs["units"] in ["degC", "C", "c", "degres_celsius"]:
+            temp = temp
+        else:
+            raise ValueError("temp units not recognized")
+    # saturation vapour pressure assuming temp in degC
+    # and using buck equation
+    es = 6.112 * np.exp(17.67 * temp / (temp + 243.5))
+    # vapour pressure from specific humidity
     e = qair * press / (0.378 * qair + 0.622)
+    # relative humidity as the ratio of vapour pressure to saturation vapour pressure
     rh = e / es
+    # clip between 0 and 1
     rh = np.clip(rh, 0, 1)
     if isinstance(rh, xr.DataArray):
         rh.rename("rh")
         rh.attrs["long_name"] = "Relative Humdity"
         rh.attrs["short_name"] = "Relative Humdity"
         rh.attrs["units"] = "dimensionless"
+        rh.attrs["description"] = "Relative humidity of air (between 0 and 1)"
     return rh
