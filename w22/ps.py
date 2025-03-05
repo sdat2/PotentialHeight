@@ -60,6 +60,7 @@ def point_solution_ps(
         ...     "vmax": 49.5, # m/s, potential intensity
         ...     "sst": 28, # degC
         ...     "t0": 200, # degK
+        ...     "rh": 0.9, # [dimensionless], relative humidity
         ...     },
         ...     coords={"lat":28})
         >>> out_ds = point_solution_ps(in_ds)
@@ -90,10 +91,10 @@ def point_solution_ps(
         supergradient_factor = SUPERGRADIENT_FACTOR
     else:
         supergradient_factor = float(ds["supergradient_factor"].values)
-    if "env_humidity" not in ds:
+    if "rh" not in ds:
         env_humidity = ENVIRONMENTAL_HUMIDITY_DEFAULT
     else:
-        env_humidity = float(ds["env_humidity"].values)
+        env_humidity = float(ds["rh"].values)
     if "rho_air" not in ds:
         water_vapour_pressure = env_humidity * buck_sat_vap_pressure(
             near_surface_air_temperature
@@ -219,7 +220,7 @@ def paralelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
 
     Args:
-        ds (xr.Dataset): contains msl, vmax, sst, t0 and lat.
+        ds (xr.Dataset): contains msl, vmax, sst, t0, rh, and lat.
         jobs (int, optional): Number of threads, defaults to 10.
 
     Returns:
@@ -352,6 +353,7 @@ def multi_point_example_2d() -> None:
                 ("y", "x"),
                 [[50, 51], [49, 49.5]],
             ),  # m/s, potential intensity
+            "rh": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),
             "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
             "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
@@ -408,18 +410,23 @@ def global_august_cmip6_example() -> None:
     print(in_ds)
 
 
+from .utils import qtp2rh
+
+
 def new_orleans_timeseries(member=10):
     from tcpips.constants import PI2_PATH
     from adforce.constants import NEW_ORLEANS
 
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
 
-    ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
-    point_timeseries = ds.sel(
+    point_ds = xr.open_dataset(file_name).sel(
         lon=NEW_ORLEANS.lon, lat=NEW_ORLEANS.lat - 0.5, method="nearest"
     )
-    point_timeseries_august = point_timeseries.isel(
-        time=[time.month == 8 for time in ds.time.values]
+    rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
+    trimmed_ds = point_ds[["sst", "msl", "vmax", "t0", "rh"]]
+    trimmed_ds["rh"] = rh
+    point_timeseries_august = trimmed_ds.isel(
+        time=[time.month == 8 for time in point_ds.time.values]
     )
     out_ds = paralelized_ps(point_timeseries_august, jobs=25)
     out_ds.to_netcdf(
