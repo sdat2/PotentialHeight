@@ -228,6 +228,12 @@ def qair2rh(
     Example::
         >>> print(f'{qair2rh(0.01, 300, 1013.25):.3f}')
         0.458
+        >>> qair = xr.DataArray([0.001, 0.002, 0.003], dims=["x"], attrs={"units": "dimensionless"})
+        >>> temp = xr.DataArray([300, 300, 300], dims=["x"], attrs={"units": "K"})
+        >>> press = xr.DataArray([1013.25, 1013.25, 1013.25], dims=["x"], attrs={"units": "hPa"})
+        >>> rh = qair2rh(qair, temp, press) #>>> np.allclose(rh, np.array([0.0458*i for i in range(1, 4)]), rtol=1e-3, atol=1e-6)
+        >>> assert rh.attrs["units"] == "dimensionless"
+        >>> assert rh.attrs["long_name"] == "Relative Humdity"
     """
 
     if isinstance(qair, xr.DataArray):
@@ -262,4 +268,34 @@ def qair2rh(
         rh.attrs["short_name"] = "Relative Humdity"
         rh.attrs["units"] = "dimensionless"
         rh.attrs["description"] = "Relative humidity of air (between 0 and 1)"
+    return rh
+
+
+def qtp2rh(qa: xr.DataArray, ta: xr.DataArray, msl: xr.DataArray) -> xr.DataArray:
+    """
+    Generate surface relative humidity from the specific humidity and temperature volumes, and pressure. The pressure level coordinate is "p" in Pa.
+
+    Args:
+        qa (xr.DataArray): Specific humidity [dimensionless] at many pressure levels.
+        ta (xr.DataArray): Air temperature [K] at the same pressure levels.
+        msl (xr.DataArray): The mean sea level pressure [Pa].
+
+    Returns:
+        xr.DataArray: Relative humidity [dimensionless] at the surface.
+
+    Example::
+        >>> pressure_levels = np.array([1000, 900]) * 100
+        >>> qa = xr.DataArray(np.array([0.01, 0.02]), dims=["p"], coords={"p": pressure_levels}, attrs={"units": "dimensionless"})
+        >>> ta = xr.DataArray(np.array([300, 300]), dims=["p"], coords={"p": pressure_levels}, attrs={"units": "K"})
+        >>> msl = xr.DataArray(np.array([1000]), attrs={"units": "hPa"})
+        >>> rh = qtp2rh(qa, ta, msl)
+        >>> assert rh.attrs["units"] == "dimensionless"
+        >>> assert rh.attrs["long_name"] == "Relative Humdity"
+    """
+    # select the closest pressure level to msl pressure from the q and t volumes
+    qa = qa.sel(p=msl, method="nearest")
+    # make layers identical
+    ta = ta.sel(p=qa.p)
+    # convert specific humidity to relative humidity
+    rh = qair2rh(qa, ta, ta.p)
     return rh
