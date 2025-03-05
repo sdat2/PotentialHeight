@@ -77,6 +77,7 @@ def plot_gps(
     num_init_data_points = len(calls) - len_active_points
     print("len_active_points", len_active_points)
     print("num_init_data_points", num_init_data_points)
+    side_length = 3
 
     for call_i in tqdm(range(len_active_points), desc="Plotting GPs"):
         if plot_acq and "acq" in ds:  # plot three panels
@@ -86,9 +87,9 @@ def plot_gps(
                 [["m", "m", None]],
                 [
                     [
-                        r"GP prediction, $\hat{y}$",
-                        r"GP standard deviation, $\sigma_{\hat{y}}$",
-                        r"Acquisition function, $\alpha_t$ [dimensionless]",
+                        r"GP mean, $\hat{f}$",
+                        r"GP std. dev., $\sigma_{\hat{f}}$",
+                        r"Acquisition function, $\alpha_t$",
                     ]
                 ],
                 [
@@ -99,7 +100,7 @@ def plot_gps(
                     ],
                 ],
                 ["", "", ""],
-                figsize=(4 * 3, 4),
+                figsize=(side_length * 3, side_length),
                 xy=(
                     ("x1", r"Track Bearing, $\chi$", r"$^{\circ}$"),
                     ("x2", r"Track Displacement, $c$", r"$^{\circ}$E"),
@@ -112,18 +113,18 @@ def plot_gps(
                 [["m", "m"]],
                 [
                     [
-                        r"GP prediction, $\hat{y}$",
-                        r"GP standard deviation, $\sigma_{\hat{y}}$",
+                        r"GP mean, $\hat{f}$",
+                        r"GP std. dev., $\sigma_{\hat{f}}$",
                     ]
                 ],
                 [[[vminm, vmaxm, "cmo.amp"], [0, vmaxstd, "cmo.amp"]]],
                 ["", ""],
-                figsize=(4 * 2, 4),
+                figsize=(side_length * 2, side_length),
                 xy=(
-                    ("x1", "Track Bearing, $\chi$", r"$^{\circ}$"),
+                    ("x1", r"Track Bearing, $\chi$", r"$^{\circ}$"),
                     (
                         "x2",
-                        "Displacement East of New Orleans, $c$",
+                        r"Track Displacement, $c$",
                         r"$^{\circ}$E",
                     ),
                 ),
