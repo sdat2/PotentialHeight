@@ -89,9 +89,13 @@ python -m adbo.exp &> logs/bo_test3.txt
 
 ### In progress
 
-This week:
+Last week:
  - Discussion vs. Introduction for WorstSurge (meet with Talea).
  - potential size vs W22 (done-ish).
+ - fix potential size for variable surface relative humidity.
+
+This week:
+ - Discussion vs. Introduction for WorstSurge (meet with Talea).
  - plot seasonal cycle, global picture.
 
 Next week:
@@ -102,25 +106,27 @@ Next week:
 
 The week after:
  - Compare ERA5 potential size to IBTrACS.
-  - maybe focus on GOM and Hong Kong.
+ - maybe focus on GOM and Hong Kong.
 
+### TODO
 
-### TODO:
-
- - Could we produce uncertainty estimates in the upper bound based on MVES.
+ - Could we produce uncertainty estimates in the upper bound based on MES.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
 
-# Nice to have:
+### Nice to have
+
  - How to distribute optimisation points more uniformly along the coast.
  - Better tidal gauge comparisons for different events.
 
 ## SurgeNet exploration
 
 ### TODO
+
  - Calculate dual graph as in Benteviglio et al. 2024 SWE-GNN.
  - Run initial training/test of SWE-GGN or GCN or MLP
 
 ### (nice to have)
+
  - Consider NeuralODE to fix the smoothing problem of deep GNN.
  - Would diffusion/GANs also help?
 

@@ -245,6 +245,8 @@ def qair2rh(
             temp = temp
         else:
             raise ValueError("temp units not recognized")
+    else:
+        temp = temp - TEMP_0K
     # saturation vapour pressure assuming temp in degC
     # and using buck equation
     es = 6.112 * np.exp(17.67 * temp / (temp + 243.5))
