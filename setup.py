@@ -18,7 +18,7 @@ REQUIRED: List[str] = [
     "intake-esm",  # to read CMIP6 data (tcpips)
     "intake-xarray",  # to read CMIP6 data (tcpips)
     "dask[complete]",  # to read CMIP6 data (tcpips)
-    "xesmf",  # to regrid CMIP6 data (tcpips) # really this needs to be installed by
+    "xesmf",  # to regrid CMIP6 data (tcpips) # really this needs to be installed by conda
     "gcsfs",  # to read CMIP6 data (tcpips)
     "xmip",  # to preprocess CMIP6 data (tcpips)
     "hydra-core",  # to read the yaml config files (adforce, worst)
@@ -28,7 +28,7 @@ REQUIRED: List[str] = [
     "slurmpy",  # to run SLURM jobs (adforce)
     "adcircpy",  # to process ADIRC inputs (adforce)
     "tcpypi",  # to calculate potential intensity (tcpips)
-    "joblib",  # to parallize more easily potential size calculation (tcpips/cle)
+    "joblib",  # to parallize more easily potential size calculation (tcpips/w22)
 ]
 
 

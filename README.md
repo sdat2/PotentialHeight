@@ -4,12 +4,7 @@ We want to answer the question of what the potential height of a storm surge cou
 
 ## adforce
 
-ADCIRC forcing and processing. Some generic mesh processing.
-
-Animating an adcirc experiment:
-```bash
-python -m adforce.ani --path_in . --step_size 1
-```
+ADCIRC forcing and processing. Some generic mesh processing. Assume gradient wind reduction factor V_reduc=0.8 for 10m wind.
 
 ## adbo
 
@@ -17,10 +12,9 @@ Bayesian optimization using `adforce` to force ADCIRC with a `trieste` Bayesian 
 
 ## w22
 
-Chavas et al. 2015 profile calculation in matlab. (fairly slow coupling, now using `oct2py`)
+Chavas et al. 2015 profile calculation in matlab (using octave instead).
 
-Used to calculate potential size as in Wang et al., (2022)
-
+Used to calculate tropical cyclone potential size as in Wang et al. (2022).
 
 ## tcpips
 
@@ -45,12 +39,6 @@ conda activate tcpips
 # or use micromamba (faster)
 # maybe you need to activate micromamba "$(micromamba shell hook --shell zsh)"
 micromamba create -n tcpips -f env.yml
-micromamba create -n worstsurge -f env.yml
-
-micromamba create -n worst -f env.yml
-pip install -e ../sithom
-
-
 micromamba activate tcpips
 
 # Install repository in editable version
@@ -89,12 +77,12 @@ python -m adbo.exp &> logs/bo_test3.txt
 ### In progress
 
 Last week:
- - Discussion vs. Introduction for WorstSurge (meet with Talea).
+ - Discussion vs. Introduction for WorstSurge
  - potential size vs W22 (done-ish).
  - fix potential size for variable surface relative humidity.
 
 This week:
- - Discussion vs. Introduction for WorstSurge (meet with Talea).
+ - Discussion vs. Introduction for WorstSurge (sent to Talea).
  - plot seasonal cycle, global picture.
  - fix V_reduc to be in ADFORCE not in TCPIPS.
 
