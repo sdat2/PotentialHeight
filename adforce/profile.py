@@ -48,7 +48,7 @@ def read_profile(profile_path: str) -> xr.Dataset:
 
     Examples:
         >>> import os
-        >>> from cle.constants import DATA_PATH
+        >>> from w22.constants import DATA_PATH
         >>> profile_ds = read_profile(os.path.join(DATA_PATH, "2025.json"))
         >>> assert "windspeeds" in profile_ds.data_vars
         >>> assert "pressures" in profile_ds.data_vars
