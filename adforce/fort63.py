@@ -18,7 +18,6 @@ from sithom.place import BoundingBox, Point
 from sithom.xr import plot_units
 from sithom.plot import label_subplots, plot_defaults
 from .mesh import select_nearby, bbox_mesh  # select_coast, filter_mesh,
-from .fort22datatree import read_fort22
 from .constants import NO_BBOX, NEW_ORLEANS
 
 plot_defaults()
