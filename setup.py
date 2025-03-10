@@ -57,11 +57,10 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "chavas15", "cle", "adforce", "adbo", "worst"],
+    packages=["tcpips", "w22", "adforce", "adbo", "worst"],
     package_dir={
-        "tcpips": "tcpips",  # Calculate potential intensity and potential size from CMIP6 data
-        "chavas15": "chavas15",  # Calculate the Chavas, Lin and Emanuel (2015) profile
-        "cle": "cle",  # Calculate the Chavas, Lin and Emanuel (2015) profile
+        "tcpips": "tcpips",  # Calculate potential intensity and prerequisites for potential size
+        "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab, calculate potential size
         "adforce": "adforce",  # All of the interfacing with ADCIRC
         "adbo": "adbo",  # All of the tensorflow/trieste stuff
         "worst": "worst",  # Extreme value theory using the upper bound limit

@@ -8,7 +8,6 @@ import xarray as xr
 from matplotlib import pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
-from chavas15.intersect import curveintersect
 from tcpips.pi_old import gom_combined_inout_timestep_cmip6
 from .constants import (
     TEMP_0K,
@@ -26,7 +25,7 @@ from .potential_size import (
     wang_consts,
 )
 from .ps_old import vary_r0_c15, vary_r0_w22, find_solution_rmaxv
-from .utils import coriolis_parameter_from_lat, buck_sat_vap_pressure
+from .utils import coriolis_parameter_from_lat, buck_sat_vap_pressure, curveintersect
 from .solve import bisection
 
 

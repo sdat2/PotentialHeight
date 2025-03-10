@@ -12,8 +12,9 @@ from sithom.place import BoundingBox
 from adforce.constants import NO_BBOX
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from tcpips.constants import FIGURE_PATH, DATA_PATH
-from adbo.constants import EXP_PATH, DEFAULT_CONSTRAINTS
 from adforce.mesh import xr_loader
+from .constants import EXP_PATH, DEFAULT_CONSTRAINTS
+
 
 # from pandas.plotting import parallel_coordinates
 # This might not be a great way of choosing colors

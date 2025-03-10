@@ -9,10 +9,10 @@ from sithom.plot import (
     plot_defaults,
 )  # , axis_formatter
 from sithom.time import timeit
-from tcpips.convert import convert  # , regrid_2d_1degree
-from tcpips.pi import propagate_attrs, calculate_pi, standard_name_to_long_name
-from tcpips.plot import plot_features
-from tcpips.constants import (
+from .convert import convert  # , regrid_2d_1degree
+from .pi import propagate_attrs, calculate_pi, standard_name_to_long_name
+from .plot import plot_features
+from .constants import (
     FIGURE_PATH,
     GOM,
     DATA_PATH,

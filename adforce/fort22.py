@@ -6,7 +6,7 @@ import netCDF4 as nc
 import numpy as np
 from sithom.time import timeit
 from sithom.io import write_json
-from cle.constants import DATA_PATH as CLE_DATA_PATH
+from w22.constants import DATA_PATH as CLE_DATA_PATH
 from .time import unknown_to_time
 from .constants import DATA_PATH
 from .profile import read_profile

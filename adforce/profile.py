@@ -3,7 +3,7 @@
 import numpy as np
 import xarray as xr
 from sithom.io import read_json
-from cle.utils import pressure_from_wind
+from w22.utils import pressure_from_wind
 
 
 def pressures_profile(  # add pressure profile to wind profile

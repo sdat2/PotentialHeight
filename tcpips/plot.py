@@ -2,8 +2,8 @@
 
 from typing import Optional, List, Tuple
 import xarray as xr
-from sithom.plot import label_subplots, feature_grid
 import matplotlib.pyplot as plt
+from sithom.plot import label_subplots, feature_grid
 
 
 def plot_features(

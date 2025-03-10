@@ -4,10 +4,9 @@ import os
 from typing import Tuple
 import numpy as np
 import matplotlib.pyplot as plt
-from chavas15.intersect import curveintersect
 from .potential_size import run_cle15, _run_cle15_octave, wang_consts, wang_diff
 from .solve import bisection
-from .utils import buck_sat_vap_pressure, pressure_from_wind
+from .utils import buck_sat_vap_pressure, pressure_from_wind, curveintersect
 from .constants import (
     F_COR_DEFAULT,
     BACKGROUND_PRESSURE,

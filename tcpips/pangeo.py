@@ -20,7 +20,7 @@ from dask.diagnostics import ProgressBar
 import xarray as xr
 from xmip.preprocessing import combined_preprocessing
 from sithom.time import timeit, hr_time, time_stamp
-from tcpips.constants import RAW_PATH, CONVERSION_NAMES, PANGEO_CMIP6_URL
+from .constants import RAW_PATH, CONVERSION_NAMES, PANGEO_CMIP6_URL
 
 # from dask.distributed import Client
 

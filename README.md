@@ -15,13 +15,12 @@ python -m adforce.ani --path_in . --step_size 1
 
 Bayesian optimization using `adforce` to force ADCIRC with a `trieste` Bayesian optimization loop.
 
-## cle
+## w22
 
 Chavas et al. 2015 profile calculation in matlab. (fairly slow coupling, now using `oct2py`)
 
-## chavas15
+Used to calculate potential size as in Wang et al., (2022)
 
-Chavas et al. 2015 profile calculation in python. (Currently not working properly)
 
 ## tcpips
 

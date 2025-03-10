@@ -2,7 +2,7 @@
 
 import xarray as xr
 from sithom.time import timeit
-from tcpips.constants import (
+from .constants import (
     CONVERSION_NAMES,
     CONVERSION_MULTIPLES,
     CONVERSION_ADDITIONS,

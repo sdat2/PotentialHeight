@@ -6,12 +6,11 @@ import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.plot import plot_defaults, get_dim
 from sithom.misc import in_notebook
-from tcpips.pi import TCPYPI_SAMPLE_DATA, calculate_pi
-from tcpips.pi_old import combined_inout_timestep_cmip6
-from tcpips.convert import convert
-from tcpips.plot import plot_features
-from tcpips.constants import FIGURE_PATH, MONTHS, DATA_PATH, GOM
-import xarray as xr
+from .pi import TCPYPI_SAMPLE_DATA, calculate_pi
+from .pi_old import combined_inout_timestep_cmip6
+from .convert import convert
+from .plot import plot_features
+from .constants import FIGURE_PATH, MONTHS, DATA_PATH, GOM
 
 
 @timeit

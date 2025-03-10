@@ -14,7 +14,7 @@ import xarray as xr
 from slurmpy import Slurm
 from sithom.time import timeit
 from sithom.place import Point
-from cle.constants import DATA_PATH as CLE_DATA_PATH
+from w22.constants import DATA_PATH as CLE_DATA_PATH
 from .constants import NEW_ORLEANS, DATA_PATH  # , KATRINA_TIDE_NC
 from .fort22datatree import save_forcing
 from .mesh import xr_loader

@@ -17,10 +17,10 @@ import numpy as np
 import xarray as xr
 import datatree as dt
 from netCDF4 import Dataset
-from tcpips.constants import DATA_PATH, FIGURE_PATH
-from cle.constants import DATA_PATH as CLE_DATA_PATH
 from sithom.time import timeit
 from sithom.plot import plot_defaults
+from tcpips.constants import DATA_PATH, FIGURE_PATH
+from w22.constants import DATA_PATH as CLE_DATA_PATH
 from .profile import read_profile
 
 

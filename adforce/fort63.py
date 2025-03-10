@@ -13,14 +13,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import xarray as xr
-from .constants import NO_BBOX, NEW_ORLEANS
 from sithom.time import timeit
 from sithom.place import BoundingBox, Point
 from sithom.xr import plot_units
 from sithom.plot import label_subplots, plot_defaults
 from .mesh import select_nearby, bbox_mesh  # select_coast, filter_mesh,
 from .fort22datatree import read_fort22
-
+from .constants import NO_BBOX, NEW_ORLEANS
 
 plot_defaults()
 
