@@ -33,7 +33,9 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
         ds[dim],
         ds["t"],
         ds["q"],
-        kwargs=dict(CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=PTOP, miss_handle=1),
+        kwargs=dict(
+            CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=PTOP, miss_handle=1, V_reduc=1
+        ),
         input_core_dims=[
             [],
             [],
@@ -142,7 +144,7 @@ def propagate_attrs(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
 
 
 def propogate_wrapper(
-    func: Callable[[xr.Dataset], xr.Dataset]
+    func: Callable[[xr.Dataset], xr.Dataset],
 ) -> Callable[[xr.Dataset], xr.Dataset]:
     """
     Wrapper to propagate the standard_name and units attributes from one dataset to another.

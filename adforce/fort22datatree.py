@@ -198,6 +198,7 @@ def moving_coords_from_tj(
     coords: xr.DataArray,
     tj: xr.DataArray,
     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
+    v_reduc=0.8,
 ) -> xr.Dataset:
     """
     Make a moving grid from the tropical cyclone trajectory.
@@ -233,7 +234,7 @@ def moving_coords_from_tj(
     psfc, wsp = ifunc(distances)
 
     rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
-    u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
+    u10, v10 = np.sin(rad) * wsp * v_reduc, np.cos(rad) * wsp * v_reduc
 
     def transpose(npa: np.ndarray) -> np.ndarray:
         # transpose the first and second axes
@@ -301,6 +302,7 @@ def static_coords_from_tj(
     orig: xr.DataArray,
     tj: xr.DataArray,
     profile_path: str = os.path.join(CLE_DATA_PATH, "outputs.json"),
+    v_reduc=0.8,
 ) -> xr.Dataset:
     """
     Make a static input grid from the tropical cyclone trajectory.
@@ -323,7 +325,7 @@ def static_coords_from_tj(
     psfc, wsp = ifunc(distances)
 
     rad = np.arctan2(np.radians(lons - clon), np.radians(lats - clat)) - np.pi / 2
-    u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
+    u10, v10 = np.sin(rad) * wsp * v_reduc, np.cos(rad) * wsp * v_reduc
 
     # print(lats, lons)
     return xr.Dataset(

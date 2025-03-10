@@ -1,4 +1,10 @@
-"""fort.22.nc file creation functions."""
+"""fort.22.nc file creation functions.
+
+TODO: Add option for Lin and Chavas 2012 Asymmetric wind profile part based on trajectory.
+
+TODO: fix distance calculation to use sphere or better.
+
+"""
 
 import os
 from typing import Union, Optional, Callable, Tuple
@@ -190,7 +196,7 @@ def gen_ps_f(
         CLE_DATA_PATH, "outputs.json"
     )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
 ) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
-    """Generate the interpolation function from an azimuthally symetric windprofile.
+    """Generate the interpolation function from an azimuthally symetric windprofile. (Gradient winds)
 
     This should potentially be changed to allow each timestep to have a different profile.
 
@@ -241,7 +247,10 @@ def gen_ps_f(
 
 @timeit
 def add_psfc_u10(
-    ds: nc.Dataset, tc_config: Optional[dict] = None, background_pressure: float = 1010
+    ds: nc.Dataset,
+    tc_config: Optional[dict] = None,
+    background_pressure: float = 1010,
+    v_reduc=0.8,
 ) -> nc.Dataset:
     """Add pressure and velocity fields to an existing netcdf dataset.
 
@@ -313,7 +322,7 @@ def add_psfc_u10(
         # dist (m) = ang_dist (degree) * 111e3 (m/degree)
         # locally flat approximation, should replace
         dist = np.sqrt(np.square(dist_lon) + np.square(dist_lat)) * 111e3
-        # interpolate the pressure and wind fields from the wind profile file
+        # interpolate the pressure and gradient wind fields from the wind profile file
         psfc, wsp = interp_func(dist)
         # add the pressure field to the dataset
         ds["PSFC"][:] = psfc
@@ -321,7 +330,7 @@ def add_psfc_u10(
         # calculate the u10 and v10 from the windspeed
         rad = np.arctan2(dist_lon, dist_lat) - np.pi / 2
         del dist_lon, dist_lat
-        u10, v10 = np.sin(rad) * wsp, np.cos(rad) * wsp
+        u10, v10 = np.sin(rad) * wsp * v_reduc, np.cos(rad) * wsp * v_reduc
         del rad
         ds["U10"][:] = u10
         ds["V10"][:] = v10
@@ -359,12 +368,16 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     # Create the "Main" group (rank 1)
     main_group = ds.createGroup("Main")
     main_group = rectilinear_square(main_group, grid_config["Main"])
-    main_group = add_psfc_u10(main_group, tc_config)
+    main_group = add_psfc_u10(
+        main_group, tc_config, v_reduc=tc_config["v_reduc"]["value"]
+    )
     main_group.description = "Main grid"
     # Create the "TC1" group within root (rank 2)
     tc1_group = ds.createGroup("TC1")
     tc1_group = moving_rectilinear_square(tc1_group, grid_config["TC1"], tc_config)
-    tc1_group = add_psfc_u10(tc1_group, tc_config=tc_config)
+    tc1_group = add_psfc_u10(
+        tc1_group, tc_config=tc_config, v_reduc=tc_config["v_reduc"]["value"]
+    )
     tc1_group.description = "TC1 grid"
 
     # institution: Oceanweather Inc. (OWI)

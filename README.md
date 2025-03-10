@@ -96,6 +96,7 @@ Last week:
 This week:
  - Discussion vs. Introduction for WorstSurge (meet with Talea).
  - plot seasonal cycle, global picture.
+ - fix V_reduc to be in ADFORCE not in TCPIPS.
 
 Next week:
  - Gulf of Mexico August (maybe additionaly South East Asia (e.g. Hong Kong)):

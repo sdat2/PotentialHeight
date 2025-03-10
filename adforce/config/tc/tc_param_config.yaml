@@ -25,3 +25,7 @@ impact_location:
 impact_time: # roughly the same as Katrina by default
   value: 2005-08-29T06:00:00
   description: Time of landfall
+v_reduc:
+  value: 0.8
+  description: "Reduction factor for the wind speed from gradient wind to 10m height"
+  units: "dimensionless"
