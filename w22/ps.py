@@ -215,7 +215,7 @@ def point_solution_ps(
 
 
 @timeit
-def paralelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
+def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
     """
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
 
@@ -341,7 +341,7 @@ def multi_point_example_1d() -> None:
         },
         coords={"lat": ("y", [28, 29])},  # degNorth
     )
-    out_ds = paralelized_ps(in_ds)
+    out_ds = parallelized_ps(in_ds)
     print(out_ds)
 
 
@@ -361,116 +361,11 @@ def multi_point_example_2d() -> None:
         coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth
     )
     print(in_ds)
-    out_ds = paralelized_ps(in_ds)
+    out_ds = parallelized_ps(in_ds)
     print(out_ds)
-
-
-@timeit
-def trimmed_cmip6_example() -> None:
-    ex_data_path = str(
-        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
-    )
-    in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(
-        y=slice(215, 245), x=slice(160, 205)
-    )
-    out_ds = paralelized_ps(in_ds)
-    print(out_ds)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
-    )
-    print(in_ds)
-
-
-@timeit
-def trimmed_cmip6_example() -> None:
-    ex_data_path = str(
-        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
-    )
-    in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(time=7)
-    out_ds = paralelized_ps(in_ds)
-    print(out_ds)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
-    )
-    print(in_ds)
-
-
-@timeit
-def global_august_cmip6_example() -> None:
-    ex_data_path = str(
-        "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
-    )
-    # /work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi2/ssp585/CESM2/r10i1p1f1.nc
-    in_ds = xr.open_dataset(ex_data_path)[["sst", "msl", "vmax", "t0"]].isel(time=7)
-    out_ds = paralelized_ps(in_ds, jobs=20)
-    print(out_ds)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_august_2015.nc")
-    )
-    print(in_ds)
-
-
-from .utils import qtp2rh
-
-
-def new_orleans_timeseries(member=10):
-    from tcpips.constants import PI2_PATH
-    from adforce.constants import NEW_ORLEANS
-
-    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
-
-    point_ds = xr.open_dataset(file_name).sel(
-        lon=NEW_ORLEANS.lon, lat=NEW_ORLEANS.lat - 0.5, method="nearest"
-    )
-    rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
-    trimmed_ds = point_ds[["sst", "msl", "vmax", "t0", "rh"]]
-    trimmed_ds["rh"] = rh
-    point_timeseries_august = trimmed_ds.isel(
-        time=[time.month == 8 for time in point_ds.time.values]
-    )
-    out_ds = paralelized_ps(point_timeseries_august, jobs=25)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
-    )
-
-
-def miami_timeseries(member=10):
-    from tcpips.constants import PI2_PATH
-    from adforce.constants import MIAMI
-
-    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
-    ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
-    ds = ds.sel(lon=MIAMI.lon + 0.2, lat=MIAMI.lat, method="nearest").isel(
-        time=[t.month == 8 for t in ds.time.values]
-    )
-    out_ds = paralelized_ps(ds, jobs=10)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, f"miami_august_ssp585_r{member}i1p1f1.nc"))
-
-
-def galverston_timeseries(member: int = 10):
-    from tcpips.constants import PI2_PATH
-    from adforce.constants import GALVERSTON
-
-    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
-    ds = xr.open_dataset(file_name)[["sst", "msl", "vmax", "t0"]]
-    ds = ds.sel(lon=GALVERSTON.lon, lat=GALVERSTON.lat - 0.9, method="nearest").isel(
-        time=[t.month == 8 for t in ds.time.values]
-    )
-    out_ds = paralelized_ps(ds, jobs=10)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, f"galverston_august_ssp585_r{member}i1p1f1.nc")
-    )
 
 
 if __name__ == "__main__":
     # python -m cle.ps
-    # delete_tmp()
     # single_point_example()
-    # delete_tmp()
     multi_point_example_2d()
-    # trimmed_cmip6_example()
-    # python -c "from cle.ps import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
-    # python -c "from cle.ps import new_orleans_timeseries as no; no(4); no(10); no(11)"
-    # python -c "from cle.ps import miami_timeseries as mm; mm(4); mm(10); mm(11)"
-    # for member in [4, 10, 11]:
-    #    galverston_timeseries(member)
