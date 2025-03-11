@@ -293,9 +293,9 @@ def qtp2rh(qa: xr.DataArray, ta: xr.DataArray, msl: xr.DataArray) -> xr.DataArra
         xr.DataArray: Relative humidity [dimensionless] at the surface.
 
     Example::
-        >>> pressure_levels = np.array([1000, 900]) * 100
-        >>> qa = xr.DataArray(np.array([0.01, 0.02]), dims=["p"], coords={"p": pressure_levels}, attrs={"units": "dimensionless"})
-        >>> ta = xr.DataArray(np.array([300, 300]), dims=["p"], coords={"p": pressure_levels}, attrs={"units": "K"})
+        >>> pressure_levels = np.array([1000, 900])
+        >>> qa = xr.DataArray(np.array([0.01, 0.02]), dims=["p"], coords={"p": (pressure_levels, {"units": "hPa"})}, attrs={"units": "dimensionless"})
+        >>> ta = xr.DataArray(np.array([300, 300]), dims=["p"], coords={"p": (pressure_levels, {"units": "hPa"})}, attrs={"units": "K"})
         >>> msl = xr.DataArray(np.array([1000]), attrs={"units": "hPa"})
         >>> rh = qtp2rh(qa, ta, msl)
         >>> assert rh.attrs["units"] == "dimensionless"

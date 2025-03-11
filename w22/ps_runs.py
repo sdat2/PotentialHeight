@@ -32,7 +32,7 @@ def trimmed_cmip6_example() -> None:
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
     # get rid of V_reduc accidentally added in for vmax calculation
     in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps(in_ds, jobs=30)
+    out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
@@ -88,7 +88,7 @@ if __name__ == "__main__":
     # python -c "from cle.ps_runs import miami_timeseries as mm; mm(4); mm(10); mm(11)"
     # trimmed_cmip6_example()
     point_timeseries(4, "new_orleans")
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4. "new_orleans"); pt(10, "new_orleans"); pt(11, "new_orleans")"
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, "new_orleans"); pt(10, "new_orleans"); pt(11, "new_orleans")"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'miami'); pt(10, 'miami'); pt(11, 'miami')"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
