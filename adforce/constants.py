@@ -15,6 +15,12 @@ NEW_ORLEANS = Point(-90.0715, 29.9511, desc="New Orleans")  # lon , lat
 MIAMI = Point(-80.1918, 25.7617, desc="Miami")
 GALVERSTON = Point(-94.7977, 29.3013, desc="Galverston")
 
+# Comparable East Asian cities
+HONG_KONG = Point(114.1095, 22.3964, desc="Hong Kong")
+HANOI = Point(105.8019, 21.0285, desc="Hanoi")
+SHANGHAI = Point(121.4737, 31.2304, desc="Shanghai")
+
+
 # Paths
 SRC_PATH = Path(__file__).parent
 SETUP_PATH = os.path.join(SRC_PATH, "setup")

@@ -9,6 +9,8 @@ PROJECT_PATH = pathlib.Path(os.path.dirname(SRC_PATH))
 FIGURE_PATH = pathlib.Path(os.path.join(SRC_PATH, "img"))
 DATA_PATH = os.path.join(SRC_PATH, "data")
 SUP_PATH = os.path.join(SRC_PATH, "sup")
+TMP_PATH = os.path.join(DATA_PATH, "tmp")
+os.makedirs(TMP_PATH, exist_ok=True)
 
 # real physical constants
 TEMP_0K = 273.15  # [K]
@@ -61,8 +63,8 @@ B_DEFAULT: float = 0.031
 C_DEFAULT: float = 0.008
 
 # WANG defaults
-LOWER_Y_WANG_BISECTION = 0.3  # [dimensionless]
-UPPER_Y_WANG_BISECTION = 1.2  # [dimensionless]
+LOWER_Y_WANG_BISECTION = 0.5  # [dimensionless]
+UPPER_Y_WANG_BISECTION = 1.5  # [dimensionless]
 W22_BISECTION_TOLERANCE = 1e-6  # [dimensionless]
 
 

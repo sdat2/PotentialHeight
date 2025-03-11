@@ -254,6 +254,14 @@ def qair2rh(
             raise ValueError("temp units not recognized")
     else:
         temp = temp - TEMP_0K
+
+    if isinstance(press, xr.DataArray):
+        if press.attrs["units"] in ["Pa"]:
+            press = press / 100
+        elif press.attrs["units"] in ["hPa", "mb", "mbar"]:
+            press = press
+        else:
+            raise ValueError("press units not recognized")
     # saturation vapour pressure assuming temp in degC
     # and using buck equation
     es = 6.112 * np.exp(17.67 * temp / (temp + 243.5))

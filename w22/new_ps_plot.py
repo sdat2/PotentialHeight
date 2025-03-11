@@ -123,10 +123,10 @@ def timeseries_plot(
     name: str = "new_orleans",
     plot_name: str = "New Orleans",
     years: List[int] = [2025, 2097],
+    members: List[int] = [4, 10, 11],
 ) -> None:
     # plot CESM2 ensemble members for ssp585 near New Orleans
     plot_defaults()
-    members = [4, 10, 11]
     colors = ["purple", "green", "orange"]
     file_names = [
         os.path.join(DATA_PATH, f"{name}_august_ssp585_r{member}i1p1f1.nc")
@@ -232,9 +232,19 @@ def timeseries_plot(
 
 
 if __name__ == "__main__":
-    # python -m cle.new_ps_plot
+    # python -m w22.new_ps_plot
     # plot_panels()
     years = [2015, 2100]
-    timeseries_plot(name="new_orleans", plot_name="New Orleans", years=years)
-    timeseries_plot(name="miami", plot_name="Miami", years=years)
-    timeseries_plot(name="galverston", plot_name="Galverston", years=years)
+    timeseries_plot(
+        name="new_orleans",
+        plot_name="New Orleans",
+        years=years,
+        members=[4, 10],
+    )
+    # timeseries_plot(name="miami", plot_name="Miami", years=years)
+    timeseries_plot(
+        name="galverston",
+        plot_name="Galverston",
+        years=years,
+        members=[4, 10],
+    )

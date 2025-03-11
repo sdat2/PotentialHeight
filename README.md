@@ -83,11 +83,13 @@ Last week:
 
 This week:
  - Discussion vs. Introduction for WorstSurge (sent to Talea).
- - plot seasonal cycle, global picture.
- - fix V_reduc to be in ADFORCE not in TCPIPS.
+ - fix V_reduc=0.8 to be in ADFORCE not in TCPIPS.
+ - cleaned up repo
+ - recalculating potential size results.
 
 Next week:
- - Gulf of Mexico August (maybe additionaly South East Asia (e.g. Hong Kong)):
+ - plot seasonal cycle, global picture.
+ - Gulf of Mexico August (maybe additionally South East Asia (e.g. Hong Kong)):
    - historical-CESM2
    - ERA5 PIPS (~observations)
    - compare to find biases.
@@ -98,7 +100,6 @@ The week after:
 
 ### TODO
 
- - Could we produce uncertainty estimates in the upper bound based on MES.
  - Get Chavas et al. 2015 profile to work in Python rather than just Matlab (~x100 speed up).
 
 ### Nice to have
