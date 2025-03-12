@@ -75,7 +75,13 @@ BC_PI_PATH: str = os.path.join(CMIP6_PATH, "bc_pi")
 os.makedirs(BC_PI_PATH, exist_ok=True)
 
 # Constants for converting CMIP6 variables to PI input variables
-CONVERSION_NAMES: Dict[str, str] = {"tos": "sst", "hus": "q", "ta": "t", "psl": "msl"}
+CONVERSION_NAMES: Dict[str, str] = {
+    "tos": "sst",
+    "hus": "q",
+    "ta": "t",
+    "psl": "msl",
+    "hurs": "rh",  # relative humidity useful for calulating potential size (but can be derived from q, t, and msl)
+}
 CONVERSION_MULTIPLES: Dict[str, float] = {
     "hus": 1000,
     "psl": 0.01,  # "plev": 0.01
@@ -86,4 +92,5 @@ CONVERSION_UNITS: Dict[str, str] = {
     "psl": "hPa",
     "tos": "degC",
     "ta": "degC",  # "plev": "hPa"
+    "rh": "%",
 }

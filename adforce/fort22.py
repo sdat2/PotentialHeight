@@ -250,7 +250,7 @@ def add_psfc_u10(
     ds: nc.Dataset,
     tc_config: Optional[dict] = None,
     background_pressure: float = 1010,
-    v_reduc=0.8,
+    v_reduc: float = 0.8,
 ) -> nc.Dataset:
     """Add pressure and velocity fields to an existing netcdf dataset.
 
@@ -392,7 +392,7 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
 
 if __name__ == "__main__":
     # python -m adforce.fort22
-    from adforce.constants import CONFIG_PATH
+    from .constants import CONFIG_PATH
     import yaml
 
     tc_config = yaml.safe_load(

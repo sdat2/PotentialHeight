@@ -189,8 +189,13 @@ def point_solution_ps(
         "units": "m",
         "long_name": "Radius of maximum winds, $r_{\mathrm{max}}$",
     }
+    ds["rho_air"] = rho_air
+    ds["rho_air"].attrs = {
+        "units": "kg m-3",
+        "long_name": "Air density at surface",
+    }
     if include_profile:
-        # TODO: This optimal profile is reading the wrong data.
+        # TODO: This is reading the wrong data.
         out = read_json(os.path.join(DATA_PATH, "outputs.json"))
         ds["radii"] = ("r", out["rr"], {"units": "m", "long_name": "Radius"})
         ds["velocities"] = (

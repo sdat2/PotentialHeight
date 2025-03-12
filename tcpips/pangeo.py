@@ -280,7 +280,7 @@ def cmd_download_call() -> None:
 
 
 if __name__ == "__main__":
-    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2-SE
+    # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
     # python -m tcpips.pangeo --institution_id=NCAR --source_id=CESM2 --exp=historical
 
     # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
