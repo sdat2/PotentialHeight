@@ -87,7 +87,7 @@ def plot_gps(
                 [["m", "m", None]],
                 [
                     [
-                        r"GP mean, $\hat{f}$",
+                        r"GP mean, $\mu_{\hat{f}}$",
                         r"GP std. dev., $\sigma_{\hat{f}}$",
                         r"Acquisition function, $\alpha_t$",
                     ]
@@ -113,7 +113,7 @@ def plot_gps(
                 [["m", "m"]],
                 [
                     [
-                        r"GP mean, $\hat{f}$",
+                        r"GP mean, $\mu_{\hat{f}}$",
                         r"GP std. dev., $\sigma_{\hat{f}}$",
                     ]
                 ],
