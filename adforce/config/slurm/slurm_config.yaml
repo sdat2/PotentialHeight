@@ -3,7 +3,7 @@ email: sdat2@cam.ac.uk
 partition: standard
 account: n02-bas
 tasks_per_node: 128
-options:
+options: # default options for each resolution
   high:
     nodes: 8
     qos: standard

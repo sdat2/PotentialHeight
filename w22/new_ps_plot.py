@@ -241,7 +241,7 @@ if __name__ == "__main__":
         years=years,
         members=[4, 10],
     )
-    # timeseries_plot(name="miami", plot_name="Miami", years=years)
+    timeseries_plot(name="miami", plot_name="Miami", years=years, members=[4, 10])
     timeseries_plot(
         name="galverston",
         plot_name="Galverston",

@@ -243,6 +243,11 @@ def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
             return point_solution_ps(ids, include_profile=False)
         except AssertionError as e:
             print(e.args[0] if e.args else "error")
+            ids["pm"] = np.nan
+            ids["pc"] = np.nan
+            ids["r0"] = np.nan
+            ids["rmax"] = np.nan
+            return ids
         except Exception as e:
             print("Exception:", e)
             ids["pm"] = np.nan
@@ -279,6 +284,22 @@ def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
             delayed(process_point)(i)
             for i in tqdm(range(ds_stacked.sizes["stacked_dim"]))
         )
+
+        """Problem:
+        Traceback (most recent call last):
+        File "<string>", line 1, in <module>
+        File "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/sithom/sithom/time.py", line 137, in timed
+            result = method(*args, **kw)
+        File "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/w22/ps_runs.py", line 35, in trimmed_cmip6_example
+            out_ds = parallelized_ps(in_ds, jobs=20)
+        File "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/sithom/sithom/time.py", line 137, in timed
+            result = method(*args, **kw)
+        File "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/w22/ps.py", line 285, in parallelized_ps
+            xr.concat(results, dim="stacked_dim")
+        File "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/micromamba/envs/t1/lib/python3.10/site-packages/xarray/core/concat.py", line 289, in concat
+            raise TypeError(
+        TypeError: can only concatenate xarray Dataset and DataArray objects, got <class 'NoneType'>
+        """
 
         # Step 3: Reconstruct the original dataset dimensions
         return (
