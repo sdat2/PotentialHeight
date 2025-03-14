@@ -21,8 +21,11 @@ SRC_PATH = pathlib.Path(os.path.dirname(constants_path))
 PROJECT_PATH = pathlib.Path(os.path.dirname(SRC_PATH))
 FIGURE_PATH = pathlib.Path(os.path.join(PROJECT_PATH, "img"))
 CONFIG_PATH = os.path.join(SRC_PATH, "config")
-AD_PATH = pathlib.Path(os.path.dirname(PROJECT_PATH))
-EXP_PATH = os.path.join(AD_PATH, "exp")
+AD_PATH = pathlib.Path(
+    os.path.dirname(PROJECT_PATH)
+)  # assume adcirc is in the parent directory of the project
+EXP_PATH = os.path.join(PROJECT_PATH, "exp")
+os.makedirs(EXP_PATH, exist_ok=True)
 # ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path, move to constants
 
 DEFAULT_CONSTRAINTS: dict = yaml.safe_load(

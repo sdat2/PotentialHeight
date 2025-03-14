@@ -1,7 +1,7 @@
 # slurm parameters for my account on archer2
 email: sdat2@cam.ac.uk
 partition: standard
-account: n02-bas
+account: n01-biopole
 tasks_per_node: 128
 options: # default options for each resolution
   high:

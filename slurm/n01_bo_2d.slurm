@@ -12,7 +12,7 @@
 
 # Replace [budget code] below with your project code (e.g. t01)
 
-#SBATCH --account=n02-bas
+#SBATCH --account=n01-biopole
 #SBATCH --partition=standard
 ##########%SBATCH --qos=short
 #SBATCH --qos=standard
@@ -23,10 +23,10 @@
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
 # try to activate micromamba
-source /work/n02/n02/sdat2/.bashrc
-which micromamba
-micromamba --version
-micromamba activate t1
+source /work/n01/n01/sithom/.bashrc
+which conda
+conda --version
+conda activate base
 
 mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
