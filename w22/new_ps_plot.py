@@ -235,7 +235,7 @@ def plot_seasonal_profiles():
     """
     Plot the seasonal profiles for New Orleans.
     """
-    in_path = os.path.join(DATA_PATH, "new_orleans_year.nc")
+    in_path = os.path.join(DATA_PATH, "new_orleans_10year1.nc")
     ds = xr.open_dataset(in_path)
     # plot season for msl, rh,  sst, t0, vmax, rmax, r0
     # shared x -axis = months
@@ -264,18 +264,50 @@ def plot_seasonal_profiles():
     ds["rh"] *= 100
     ds["rmax"] /= 1000
     ds["r0"] /= 1000
+    ds["t0"] -= 273.15
     # units = ["fraction", "K", "m s$^{-1}$", "hPa", "$^{\circ}$C"]
-    units = ["hPa", "%", r"$^{\circ}$C", "K", r"m s$^{-1}$", "km", "km"]
+    units = ["hPa", "%", r"$^{\circ}$C", r"$^{\circ}$C", r"m s$^{-1}$", "km", "km"]
     fig, axs = plt.subplots(len(var), 1, figsize=get_dim(ratio=1.5), sharex=True)
+
+    # 10 dark colors
+    colors = [
+        "black",
+        "red",
+        "green",
+        "blue",
+        "purple",
+        "orange",
+        "brown",
+        "pink",
+        "gray",
+        "cyan",
+    ]
     for i, v in enumerate(var):
-        axs[i].plot(ds[v].values)
+        for j in range(10):
+            axs[i].plot(
+                ds[v].values[j * 12 : (j + 1) * 12], linewidth=0.5, color=colors[j]
+            )
         axs[i].set_ylabel(var_labels[i] + " [" + units[i] + "]")
         # blank x ticks
         axs[i].set_xticks([])
 
     axs[-1].set_xlabel("Month")
     axs[-1].set_xticks(
-        np.arange(0, 12), ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+        np.arange(0, 12),
+        [
+            "Jan",
+            "Feb",
+            "Mar",
+            "Aug",
+            "May",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Oct",
+            "Nov",
+            "Dev",
+        ],
     )
     plt.xlim(0, 11)
     label_subplots(axs)
