@@ -9,6 +9,7 @@ from sithom.time import timeit
 from .constants import CONFIG_PATH, SETUP_PATH
 from .fort22 import create_fort22
 from .slurm import setoff_slurm_job_and_wait
+from .subprocess import setoff_subprocess_job_and_wait
 from .mesh import xr_loader
 
 
@@ -83,7 +84,10 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
     # create forcing files
     create_fort22(cfg.files.run_folder, cfg.grid, cfg.tc)
     # run ADCIRC
-    setoff_slurm_job_and_wait(cfg.files.run_folder, cfg)
+    if cfg.use_slurm:
+        setoff_slurm_job_and_wait(cfg.files.run_folder, cfg)
+    else:
+        setoff_subprocess_job_and_wait(cfg.files.run_folder, cfg)
     # observe ADCIRC
     maxele = observe_max_point(cfg)
     # save config file

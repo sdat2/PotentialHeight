@@ -224,7 +224,7 @@ def gen_ps_f(
     radii = profile["radii"].values
     windspeeds = profile["windspeeds"].values
     pressures = profile["pressures"].values
-    write_json(profile, os.path.join(DATA_PATH, "profile.json"))
+    # write_json(profile, os.path.join(DATA_PATH, "profile.json"))
 
     def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """

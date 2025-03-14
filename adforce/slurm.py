@@ -154,4 +154,4 @@ echo ""
     else:
         print(f"Job {jid} finished")
 
-    return jid  # sacct -j 7915551 -o state
+    return jid
