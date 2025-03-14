@@ -306,7 +306,7 @@ def plot_seasonal_profiles():
             "Sep",
             "Oct",
             "Nov",
-            "Dev",
+            "Dec",
         ],
     )
     plt.xlim(0, 11)
