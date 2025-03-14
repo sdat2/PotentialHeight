@@ -16,9 +16,7 @@ OFFSET_D = {
     "miami": {"point": MIAMI, "lon_offset": 0.2, "lat_offset": 0},
     "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -0.5},
 }
-EX_DATA_PATH = str(
-    "/work/n02/n02/sdat2/adcirc-swan/worstsurge/data/cmip6/pi/ssp585/CESM2/r10i1p1f1.nc"
-)
+EX_DATA_PATH = str(f"{PI2_PATH}/ssp585/CESM2/r4i1p1f1.nc")
 
 
 @timeit
@@ -40,6 +38,30 @@ def trimmed_cmip6_example() -> None:
 
 
 @timeit
+def new_orleans_year() -> None:
+    in_ds = xr.open_dataset(EX_DATA_PATH).isel(time=slice(0, 120))
+    in_ds = in_ds.sel(
+        lon=OFFSET_D["new_orleans"]["point"].lon
+        + OFFSET_D["new_orleans"]["lon_offset"],
+        lat=OFFSET_D["new_orleans"]["point"].lat
+        + OFFSET_D["new_orleans"]["lat_offset"],
+        method="nearest",
+    )
+    print(in_ds)
+    rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
+    in_ds["rh"] = rh
+    qt_ds = in_ds[["q", "t"]]
+    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
+    # get rid of V_reduc accidentally added in for vmax calculation
+    in_ds["vmax"] = in_ds["vmax"] / 0.8
+    out_ds = parallelized_ps(in_ds, jobs=20)
+    out_ds["q"] = qt_ds["q"]
+    out_ds["t"] = qt_ds["t"]
+    print(out_ds)
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "new_orleans_10year1.nc"))
+
+
+@timeit
 def global_august_cmip6_example() -> None:
     in_ds = xr.open_dataset(EX_DATA_PATH).isel(time=7)
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
@@ -55,7 +77,7 @@ def global_august_cmip6_example() -> None:
     )
 
 
-def point_timeseries(member=10, place="new_orleans") -> None:
+def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     point_ds = xr.open_dataset(file_name).sel(
         lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
@@ -94,4 +116,5 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
     # set off global
     # python -c "from w22.ps_runs import global_august_cmip6_example as ga; ga()"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()"
+    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
+    # python -c "from w22.ps_runs import new_orleans_year as no; no()"

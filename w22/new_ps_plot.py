@@ -231,20 +231,73 @@ def timeseries_plot(
         plt.clf()
 
 
+def plot_seasonal_profiles():
+    """
+    Plot the seasonal profiles for New Orleans.
+    """
+    in_path = os.path.join(DATA_PATH, "new_orleans_year.nc")
+    ds = xr.open_dataset(in_path)
+    # plot season for msl, rh,  sst, t0, vmax, rmax, r0
+    # shared x -axis = months
+    # seperate y-axes = values
+    plt.figure(figsize=(6, 6))
+    var = ["msl", "rh", "sst", "t0", "vmax", "rmax", "r0"]
+    var_labels = [
+        "Sea level pressure, $p_a$",
+        r"Relative humidity, $\mathcal{H}_e$",
+        "Sea surface temperature, $T_s$",
+        "Outflow temperature, $T_0$",
+        r"Potential intensity, $V_{p}$",
+        "Radius of maximum winds, $r_{\max}$",
+        "Potential size, $r_a$",
+    ]
+    # only symbols to save space
+    var_labels = [
+        "$p_a$",
+        r"$\mathcal{H}_e$",
+        "$T_s$",
+        "$T_0$",
+        r"$V_{p}$",
+        "$r_{\max}$",
+        "$r_a$",
+    ]
+    ds["rh"] *= 100
+    ds["rmax"] /= 1000
+    ds["r0"] /= 1000
+    # units = ["fraction", "K", "m s$^{-1}$", "hPa", "$^{\circ}$C"]
+    units = ["hPa", "%", r"$^{\circ}$C", "K", r"m s$^{-1}$", "km", "km"]
+    fig, axs = plt.subplots(len(var), 1, figsize=get_dim(ratio=1.5), sharex=True)
+    for i, v in enumerate(var):
+        axs[i].plot(ds[v].values)
+        axs[i].set_ylabel(var_labels[i] + " [" + units[i] + "]")
+        # blank x ticks
+        axs[i].set_xticks([])
+
+    axs[-1].set_xlabel("Month")
+    axs[-1].set_xticks(
+        np.arange(0, 12), ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+    )
+    plt.xlim(0, 11)
+    label_subplots(axs)
+    plt.tight_layout()
+    plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_seasons.pdf"))
+
+
 if __name__ == "__main__":
     # python -m w22.new_ps_plot
     # plot_panels()
-    years = [2015, 2100]
-    timeseries_plot(
-        name="new_orleans",
-        plot_name="New Orleans",
-        years=years,
-        members=[4, 10],
-    )
-    timeseries_plot(name="miami", plot_name="Miami", years=years, members=[4, 10])
-    timeseries_plot(
-        name="galverston",
-        plot_name="Galverston",
-        years=years,
-        members=[4, 10],
-    )
+    plot_seasonal_profiles()
+    # years = [2015, 2100]
+    # timeseries_plot(
+    #     name="new_orleans",
+    #     plot_name="New Orleans",
+    #     years=years,
+    #     members=[4, 10],
+    # )
+    # timeseries_plot(name="miami", plot_name="Miami", years=years, members=[4, 10])
+    # timeseries_plot(
+    #     name="galverston",
+    #     plot_name="Galverston",
+    #     years=years,
+    #     members=[4, 10],
+    # )
