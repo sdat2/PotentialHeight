@@ -50,7 +50,7 @@ def new_orleans_year() -> None:
     print(in_ds)
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
-    qt_ds = in_ds[["q", "t"]]
+    qt_ds = in_ds[["q", "t", "otl"]]
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
     # get rid of V_reduc accidentally added in for vmax calculation
     in_ds["vmax"] = in_ds["vmax"] / 0.8
@@ -58,7 +58,7 @@ def new_orleans_year() -> None:
     out_ds["q"] = qt_ds["q"]
     out_ds["t"] = qt_ds["t"]
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "new_orleans_10year1.nc"))
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "new_orleans_10year2.nc"))
 
 
 @timeit

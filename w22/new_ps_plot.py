@@ -292,9 +292,7 @@ def plot_seasonal_profiles():
         axs[i].set_xticks([])
 
     axs[-1].set_xlabel("Month")
-    axs[-1].set_xticks(
-        np.arange(0, 12),
-        [
+    months =         [
             "Jan",
             "Feb",
             "Mar",
@@ -308,11 +306,38 @@ def plot_seasonal_profiles():
             "Nov",
             "Dec",
         ],
+    axs[-1].set_xticks(
+        np.arange(0, 12),
+        months,
     )
     plt.xlim(0, 11)
     label_subplots(axs)
     plt.tight_layout()
     plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_seasons.pdf"))
+    plt.clf()
+    plt.close()
+    # let's plot the temperature profile and humidity profile
+    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=1.5), sharey=True)
+    # four dark colors
+    colors = ["black", "red", "green", "blue"]
+    ds["t"] -= 273.15
+    for i, j in enumerate(list(range(0, 12, 3))):
+        k = (j - 1) % 12
+        ids = ds.isel(time=k)
+        axs[0].plot(ids["t"].values, ids["p"].values, color=colors[i], linewidth=0.5, label=months[k])
+        axs[1].plot(ids["q"].values, ids["p"].values, color=colors[i], linewidth=0.5)
+    axs[0].set_ylabel("Pressure [hPa]")
+    axs[0].set_xlabel(r"Temperature [$^{\circ}$]")
+    axs[1].set_xlabel("Specific humidity [kg/kg]")
+    label_subplots(axs)
+    axs[0].legend()
+    # reverse the y-axis
+    axs[0].invert_yaxis()
+    axs[0].set_ylim(1000, 0)
+    plt.tight_layout()
+    plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_vertical_profiles.pdf"))
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
