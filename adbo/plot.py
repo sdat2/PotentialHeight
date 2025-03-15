@@ -46,7 +46,7 @@ for sid in ds.stationid.values:
     name_d[sid] = f"{dss.name.values}"  # ({dss.lon.values:.3f}, {dss.lat.values:.3f})"
 stationid_to_names = name_d
 
-years: List[str] = ["2025", "2097"]
+years: List[str] = ["2015", "2100"]
 
 subfolder = f"{years[0]}vs{years[1]}"
 if not os.path.exists(os.path.join(FIGURE_PATH, subfolder)):
@@ -66,8 +66,8 @@ def listify(exp: dict, key: str) -> List[float]:
 
 @timeit
 def plot_diff(
-    exps: Tuple[str, str] = ("miami-2025", "miami-2097"),
-    figure_name="2025-vs-2097-miami.pdf",
+    exps: Tuple[str, str] = ("miami-2015", "miami-2100"),
+    figure_name="2015-vs-2100-miami.pdf",
 ) -> None:
     """
     Plot difference between two years.
@@ -138,8 +138,8 @@ def plot_diff(
     # axs[0].legend()
     label_subplots(axs)
 
-    plot_exp(exp1, "2025", "blue")
-    plot_exp(exp2, "2097", "red")
+    plot_exp(exp1, "2015", "blue")
+    plot_exp(exp2, "2100", "red")
     axs[0].legend()
     vline(25.5)  # after 25 samples goes to Bayesian optimization
     plt.xlim(1, 50)
@@ -164,7 +164,7 @@ def find_max(exp: dict) -> float:
 
     res = listify(exp, "res")
     if len(res) > 0:
-        return max(res)
+        return np.nanmax(res)
     else:
         return float("nan")
 
@@ -181,7 +181,7 @@ def find_argmax(exp: dict) -> Optional[int]:
     """
     res = listify(exp, "res")
     if len(res) > 0:
-        return int(np.argmax(res))
+        return int(np.nanargmax(res))
     else:
         return None
 
@@ -205,9 +205,9 @@ def find_difference(stationid: str) -> Tuple[float, float, float]:
             mx = float("nan")
         return mx
 
-    fp1 = os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json")
+    fp1 = os.path.join(EXP_PATH, f"{stationid}-2015", "experiments.json")
     max1 = get_max(fp1)
-    fp2 = os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json")
+    fp2 = os.path.join(EXP_PATH, f"{stationid}-2100", "experiments.json")
     max2 = get_max(fp2)
     return max2 - max1, max1, max2
 
@@ -238,11 +238,11 @@ def find_argdifference(stationid: str) -> Tuple[float, float, float]:
             }
         return mx
 
-    fp1 = os.path.join(EXP_PATH, f"{stationid}-2025", "experiments.json")
+    fp1 = os.path.join(EXP_PATH, f"{stationid}-2015", "experiments.json")
     argmax1 = get_argmax(fp1)
-    fp2 = os.path.join(EXP_PATH, f"{stationid}-2097", "experiments.json")
+    fp2 = os.path.join(EXP_PATH, f"{stationid}-2100", "experiments.json")
     argmax2 = get_argmax(fp2)
-    print("2025", argmax1, "2097", argmax2)
+    print("2015", argmax1, "2100", argmax2)
 
     def take_diff(am1: dict, am2: dict) -> dict:
         out = {}
@@ -264,12 +264,12 @@ def find_differences() -> None:
         )
         diff_list.append(diff)
         diff_percent_list.append(diff / max1)
-    print(f"Average difference: {np.mean(diff_list):.1f} m")
-    print(f"Average percentage difference: {np.mean(diff_percent_list)*100:.0f} %")
+    print(f"Average difference: {np.nanmean(diff_list):.1f} m")
+    print(f"Average percentage difference: {np.nanmean(diff_percent_list)*100:.0f} %")
 
 
 @timeit
-def plot_many(year="2025") -> None:
+def plot_many(year="2015") -> None:
     """
     Plot difference between two years.
     """
@@ -383,10 +383,10 @@ if False:
     for staionid in range(0, 6):
         plot_diff(
             exps=(
-                f"notide-{staionid}-2025-midres",
-                f"notide-{staionid}-2097-midres",
+                f"notide-{staionid}-2015-midres",
+                f"notide-{staionid}-2100-midres",
             ),
-            figure_name=f"2025-vs-2097-sid{staionid}-midres.png",
+            figure_name=f"2015-vs-2100-sid{staionid}-midres.png",
         )
     # plot_diff()
     # plot_many()
@@ -397,7 +397,7 @@ if False:
 def plot_places(
     bbox: Optional[BoundingBox] = NO_BBOX.pad(0.5),
     path_to_maxele: str = os.path.join(
-        EXP_PATH, "8729840-2025", "exp_0001", "maxele.63.nc"
+        EXP_PATH, "8729840-2015", "exp_0001", "maxele.63.nc"
     ),
 ) -> None:
     """
@@ -405,7 +405,7 @@ def plot_places(
 
     Args:
         bbox (optional, Optional[BoundingBox]): edge of bounding box.
-        path_to_maxele (str, optional): path to maxele file. Defaults to os.path.join(EXP_PATH, "8729840-2025", "exp_0001", "maxele.63.nc").
+        path_to_maxele (str, optional): path to maxele file. Defaults to os.path.join(EXP_PATH, "8729840-2015", "exp_0001", "maxele.63.nc").
 
     """
     lats: List[float] = [
@@ -665,9 +665,9 @@ def plot_multi_argmax():
             if len(l) == 0:
                 out[key] = (float("nan"), float("nan"))
             elif len(l) == 1:
-                out[key] = (np.mean(l), float("nan"))
+                out[key] = (np.nanmean(l), float("nan"))
             else:
-                out[key] = (np.mean(l), np.std(l))
+                out[key] = (np.nanmean(l), np.nanstd(l))
         return out
 
     am1_l = []
@@ -681,11 +681,11 @@ def plot_multi_argmax():
     am1_res = mean_std(am1_l)
     am2_res = mean_std(am2_l)
     amd_res = mean_std(amd_l)
-    print("\n\n2025\n", am1_res, "\n\n2097\n", am2_res, "\n\nDiff\n", amd_res)
+    print("\n\n2015\n", am1_res, "\n\n2100\n", am2_res, "\n\nDiff\n", amd_res)
     fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 
     for i, (aml, name) in enumerate(
-        [(am1_l, "2025"), (am2_l, "2097"), (amd_l, "diff")]
+        [(am1_l, "2015"), (am2_l, "2100"), (amd_l, "diff")]
     ):
         ax = axs[i]
         df = to_pd(aml)
@@ -781,7 +781,7 @@ def plot_bo_exp() -> None:
 
 
 def plot_bo_comp() -> None:
-    # try redoing 25i 25b for 2025.
+    # try redoing 25i 25b for 2015.
     # had mulitple trials (11) for each experiment
     # naming now i{i}b{b}t{trial} apart from 0th where its i{i}b{b}
     plt.clf()
@@ -904,19 +904,19 @@ def plot_bo_comp() -> None:
 
 if __name__ == "__main__":
     # python -m adbo.plot
-    for point in ["miami", "new-orleans", "galverston"]:
+    for point in ["new-orleans"]:  # "miami", "new-orleans", "galverston"]:
         plot_diff(
-            exps=(f"{point}-2025", f"{point}-2097"),
-            figure_name=f"2025-vs-2097-{point}.pdf",
+            exps=(f"{point}-2015", f"{point}-2100"),
+            figure_name=f"2015-vs-2100-{point}.pdf",
         )
     plt.clf()
-    plot_many("2025")
-    plot_many("2097")
+    plot_many("2015")
+    plot_many("2100")
     # plot_places()
     find_differences()
     plot_multi_argmax()
-    plot_bo_exp()
-    plot_bo_comp()
+    # plot_bo_exp()
+    # plot_bo_comp()
 
 
 """
