@@ -25,7 +25,7 @@ from .constants import NO_BBOX, NEW_ORLEANS
 
 
 @timeit
-def plot_heights(
+def ani_heights(
     path_in: str = "mult1",
     step_size: int = 1,
     add_name: str = "",
@@ -120,7 +120,7 @@ def plot_heights(
 
 
 @timeit
-def plot_heights_and_winds(
+def ani_heights_and_winds(
     path_in: str = "mult1",
     step_size: int = 1,
     add_name: str = "",
@@ -376,7 +376,7 @@ def run_animation() -> None:
     args = parser.parse_args()
 
     if args.winds:
-        plot_heights_and_winds(
+        ani_heights_and_winds(
             path_in=args.path_in,
             bbox=NO_BBOX,
             add_name="",
@@ -386,7 +386,7 @@ def run_animation() -> None:
         )
 
     else:
-        plot_heights(
+        ani_heights(
             path_in=args.path_in,
             bbox=NO_BBOX,
             add_name="",
@@ -566,24 +566,21 @@ def single_wind_and_height_step(
 
 if __name__ == "__main__":
     # python -m adforce.ani
-    # run_animation()
-    single_wind_and_height_step(# path_in=".",
-        bbox=NO_BBOX.pad(1),
-        coarsen=3
-        )
+    run_animation()
+    # single_wind_and_height_step(path_in=".", bbox=NO_BBOX.pad(1), coarsen=3)
     # single_wind_and_height_step()
 
 # if __name__ == "__main__":
 #    drive_heights_and_winds()
 # python -m adforce.ani
 # line_up_times()
-# plot_heights(
+# ani_heights(
 #     path_in="/work/n01/n01/sithom/adcirc-swan/NWS13example/",
 #     bbox=NO_BBOX.pad(5),
 #     add_name="zoomed_out_",
 #     step_size=10,
 # )
-# plot_heights_and_winds(
+# ani_heights_and_winds(
 #     path_in="/work/n01/n01/sithom/adcirc-swan/kat.nws13.2004.wrap2/",
 #     bbox=NO_BBOX,
 #     step_size=1,

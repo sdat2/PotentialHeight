@@ -31,8 +31,8 @@ def run_3d_exp() -> None:
     # adding ability to override constraints in the command line
     cs = DEFAULT_CONSTRAINTS
 
-    parser.add_argument("--angle.min", type=float, default=cs["angle"]["min"])
-    parser.add_argument("--angle.max", type=float, default=cs["angle"]["max"])
+    parser.add_argument("--angle_min", type=float, default=cs["angle"]["min"])
+    parser.add_argument("--angle_max", type=float, default=cs["angle"]["max"])
     parser.add_argument(
         "--displacement_min", type=float, default=cs["displacement"]["min"]
     )
@@ -45,6 +45,8 @@ def run_3d_exp() -> None:
     parser.add_argument(
         "--trans_speed_max", type=float, default=cs["trans_speed"]["max"]
     )
+    args = parser.parse_args()
+    print(args)
 
     constraints = {
         "angle": {"min": args.angle_min, "max": args.angle_max},
@@ -53,9 +55,6 @@ def run_3d_exp() -> None:
         "order": cs["order"],
     }
 
-    args = parser.parse_args()
-
-    print(args)
     run_bayesopt_exp(
         seed=args.seed,
         profile_name=args.profile_name,

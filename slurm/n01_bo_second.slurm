@@ -54,8 +54,8 @@ p100=2100_new_orleans_profile_r4i1p1f1
 
 
 # 2
-# python -m adbo.exp_3d --exp_name=8762075-2100 --profile_name=$p100 --resolution=mid --obs_lat=29.114167 --obs_lon=-90.199167
-# python -m adbo.exp_3d --exp_name=8762482-2100 --profile_name=$p100 --resolution=mid --obs_lat=29.788611 --obs_lon=-90.420278
+python -m adbo.exp_3d --exp_name=8762075-2100 --profile_name=$p100 --resolution=mid --obs_lat=29.114167 --obs_lon=-90.199167
+python -m adbo.exp_3d --exp_name=8762482-2100 --profile_name=$p100 --resolution=mid --obs_lat=29.788611 --obs_lon=-90.420278
 python -m adbo.exp_3d --exp_name=8764044-2100 --profile_name=$p100 --resolution=mid --obs_lat=29.6675 --obs_lon=-91.237611
 python -m adbo.exp_3d --exp_name=8729840-2015 --profile_name=$p15 --resolution=mid --obs_lat=30.404389 --obs_lon=-87.211194
 
