@@ -28,13 +28,38 @@ def run_3d_exp() -> None:
     parser.add_argument("--resolution", type=str, default="mid")
     parser.add_argument("--exp_name", type=str, default="bo")
 
+    # adding ability to override constraints in the command line
+    cs = DEFAULT_CONSTRAINTS
+
+    parser.add_argument("--angle.min", type=float, default=cs["angle"]["min"])
+    parser.add_argument("--angle.max", type=float, default=cs["angle"]["max"])
+    parser.add_argument(
+        "--displacement_min", type=float, default=cs["displacement"]["min"]
+    )
+    parser.add_argument(
+        "--displacement_max", type=float, default=cs["displacement"]["max"]
+    )
+    parser.add_argument(
+        "--trans_speed_min", type=float, default=cs["trans_speed"]["min"]
+    )
+    parser.add_argument(
+        "--trans_speed_max", type=float, default=cs["trans_speed"]["max"]
+    )
+
+    constraints = {
+        "angle": {"min": args.angle_min, "max": args.angle_max},
+        "displacement": {"min": args.displacement_min, "max": args.displacement_max},
+        "trans_speed": {"min": args.trans_speed_min, "max": args.trans_speed_max},
+        "order": cs["order"],
+    }
+
     args = parser.parse_args()
 
     print(args)
     run_bayesopt_exp(
         seed=args.seed,
         profile_name=args.profile_name,
-        constraints=DEFAULT_CONSTRAINTS,
+        constraints=constraints,
         obs_lon=args.obs_lon,
         obs_lat=args.obs_lat,
         exp_name=args.exp_name,  # f"{args.setup}-{args.year}-i-{args.init_steps}",

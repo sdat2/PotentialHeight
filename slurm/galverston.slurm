@@ -11,7 +11,7 @@
 
 # Replace [budget code] below with your project code (e.g. t01)
 
-#SBATCH --account=n02-bas
+#SBATCH --account=n01-biopole
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 
@@ -20,11 +20,16 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
-# try to activate micromamba
-source /work/n02/n02/sdat2/.bashrc
-which micromamba
-micromamba --version
-micromamba activate t1
+# # try to activate micromamba
+# source /work/n02/n02/sdat2/.bashrc
+# which micromamba
+# micromamba --version
+# micromamba activate t1
+
+source /work/n01/n01/sithom/.bashrc
+which conda
+conda --version
+conda activate base
 
 # print out the python version
 echo "which python"
@@ -40,11 +45,11 @@ which python
 #    options to srun commands in the job script. If this is not done,
 #    process/thread pinning may be incorrect leading to poor performance
 # export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
-p25=2025_galverston_profile_r4i1p1f1
-p97=2097_galverston_profile_r4i1p1f1
+p15=2015_galverston_profile_r4i1p1f1
+p100=2100_galverston_profile_r4i1p1f1
 obs_lon=-94.7977
 obs_lat=29.3013
 
 # 1
-# python -m adbo.exp_3d --exp_name=galverston-2025 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
-python -m adbo.exp_3d --exp_name=galverston-2097 --profile_name=$p97 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
+python -m adbo.exp_3d --exp_name=galverston-2015 --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
+python -m adbo.exp_3d --exp_name=galverston-2100 --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
