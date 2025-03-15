@@ -1,0 +1,101 @@
+w22 package
+===========
+
+Submodules
+----------
+
+w22.constants module
+--------------------
+
+.. automodule:: w22.constants
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.new\_ps\_plot module
+------------------------
+
+.. automodule:: w22.new_ps_plot
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.plot module
+---------------
+
+.. automodule:: w22.plot
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.potential\_size module
+--------------------------
+
+.. automodule:: w22.potential_size
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.ps module
+-------------
+
+.. automodule:: w22.ps
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.ps\_dataset module
+----------------------
+
+.. automodule:: w22.ps_dataset
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.ps\_old module
+------------------
+
+.. automodule:: w22.ps_old
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.ps\_runs module
+-------------------
+
+.. automodule:: w22.ps_runs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.solve module
+----------------
+
+.. automodule:: w22.solve
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.test module
+---------------
+
+.. automodule:: w22.test
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.utils module
+----------------
+
+.. automodule:: w22.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: w22
+   :members:
+   :undoc-members:
+   :show-inheritance:
