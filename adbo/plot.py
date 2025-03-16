@@ -475,7 +475,11 @@ def plot_places(
             **fd,
         )  # color="blue"
         # print("fd", fd)
-    ax.legend()
+    ax.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.05),
+        ncol=2,
+    )
     if fd != {}:
         ax.set_yticks(
             [
@@ -904,7 +908,7 @@ def plot_bo_comp() -> None:
 
 if __name__ == "__main__":
     # python -m adbo.plot
-    for point in ["new-orleans"]:  # "miami", "new-orleans", "galverston"]:
+    for point in ["new-orleans", "miami", "galverston"]:
         plot_diff(
             exps=(f"{point}-2015", f"{point}-2100"),
             figure_name=f"2015-vs-2100-{point}.pdf",
@@ -912,7 +916,7 @@ if __name__ == "__main__":
     plt.clf()
     plot_many("2015")
     plot_many("2100")
-    # plot_places()
+    plot_places()
     find_differences()
     plot_multi_argmax()
     # plot_bo_exp()
