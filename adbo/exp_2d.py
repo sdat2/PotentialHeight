@@ -24,19 +24,23 @@ def create_2d_ani_run() -> None:
     parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
     parser.add_argument("--init_steps", type=int, default=25)
     parser.add_argument("--daf_steps", type=int, default=25)
-    parser.add_argument("--resolution", type=str, default="mid-notide")
+    parser.add_argument("--resolution", type=str, default="mid")
     parser.add_argument("--exp_name", type=str, default="ani-2d-2097")
+    parser.add_argument("--seed", type=int, default=10)
+    parser.add_argument(
+        "--profile_name", type=str, default="2015_new_orleans_profile_r4i1p1f1"
+    )
 
     args = parser.parse_args()
 
     run_bayesopt_exp(
         constraints=constraints_2d,
-        seed=10,
+        seed=args.seed,
         obs_lon=args.obs_lon,
         obs_lat=args.obs_lat,
-        profile_name="2015_new_orleans_profile_r4i1p1f1",
+        profile_name=args.profile_name,
         exp_name=args.exp_name,
-        resolution="mid",
+        resolution=args.resolution,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
         wrap_test=args.test,

@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=wrap
+#SBATCH --job-name=wrap-2
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -37,6 +37,7 @@ export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
 
 # Run the job
-python -m adforce.wrap name=test-subprocess-from-slurm-np use_slurm=false # tc.angle.value=45 tc.profile_name.value=2025 # --exp_name notide-mid-2025 --profile_name 2025.json --resolution mid-notide --animate
+python -m adforce.wrap --name=test-2 --use_slurm=false --animate # tc.angle.value=45 tc.profile_name.value=2025 # --exp_name notide-mid-2025 --profile_name 2025.json --resolution mid-notide --animate
 
 # python -m adforce.wrap --exp_name notide-mid-2097 --profile_name 2097.json --resolution mid-notide --animate
+

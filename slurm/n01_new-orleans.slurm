@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 
 # slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
@@ -44,7 +44,8 @@ p25=2015_new_orleans_profile_r4i1p1f1
 p97=2100_new_orleans_profile_r4i1p1f1
 obs_lon=-90.0715
 obs_lat=29.9511
+seed=30
 
 # 1
-python -m adbo.exp_3d --exp_name=new-orleans-2015 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
-python -m adbo.exp_3d --exp_name=new-orleans-2100 --profile_name=$p97 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon
+# python -m adbo.exp_3d --exp_name=new-orleans-2015-2 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
+python -m adbo.exp_3d --exp_name=new-orleans-2100-2 --profile_name=$p97 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed

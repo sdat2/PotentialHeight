@@ -49,7 +49,8 @@ p15=2015_miami_profile_r4i1p1f1
 p100=2100_miami_profile_r4i1p1f1
 obs_lon=-80.1918
 obs_lat=25.7617
+seed=20
 
 # 1
-python -m adbo.exp_3d --exp_name=miami-2015 --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --angle_min=-120 --angle_max=-10
-python -m adbo.exp_3d --exp_name=miami-2100 --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --angle_min=-120 --angle_max=-10
+python -m adbo.exp_3d --exp_name=miami-2015-1 --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --angle_min=-120 --angle_max=-10 --seed=$seed
+python -m adbo.exp_3d --exp_name=miami-2100-1 --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --angle_min=-120 --angle_max=-10 --seed=$seed
