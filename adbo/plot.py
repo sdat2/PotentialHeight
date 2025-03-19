@@ -436,6 +436,16 @@ def plot_places(
         "8764044",
     ]
 
+    # put original in pandas dataframe
+    df = pd.DataFrame(
+        {
+            "Name": [stationid_to_names[x] for x in stationid],
+            "StationID": stationid,
+            "Original Latitiude": lats,
+            "Original Longitude": lons,
+        }
+    )
+
     mele_ds = xr_loader(path_to_maxele)
     xs = mele_ds.x.values
     ys = mele_ds.y.values
@@ -445,6 +455,15 @@ def plot_places(
         min_p = np.argmin(distsq)
         lons[i] = xs[min_p]
         lats[i] = ys[min_p]
+
+    df["Node Latitude"] = lats
+    df["Node Longitude"] = lons
+
+    DATA_PATH = os.path.join(DATA_PATH, "stations")
+    os.makedirs(DATA_PATH, exist_ok=True)
+
+    df.to_csv(os.path.join(DATA_PATH, "stationid_lat_lon.csv"), index=False)
+    df.to_latex(os.path.join(DATA_PATH, "stationid_lat_lon.tex"), decimal=3, index=False)
 
     plot_defaults()
     try:
