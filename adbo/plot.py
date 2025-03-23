@@ -18,8 +18,9 @@ from .constants import EXP_PATH, DEFAULT_CONSTRAINTS
 
 # from pandas.plotting import parallel_coordinates
 # This might not be a great way of choosing colors
-COLORS = ["blue", "red", "green", "orange", "purple", "brown", "pink"][::-1]
+COLORS = ["blue", "red", "green", "orange", "purple", "brown", "pink", "black"][::-1]
 stationid: List[str] = [
+    "new-orleans",
     "8729840",
     "8735180",
     "8760922",
@@ -30,6 +31,7 @@ stationid: List[str] = [
 ]
 
 stationid_to_names: Dict[str, str] = {
+    "new-orleans": "New Orleans",  # (-90.070, 29.950)
     "8729840": "Pensacola",  # (-87.211, 30.404)
     "8735180": "Dauphin Island",  #  (-88.075, 30.250)",
     "8760922": "Pilots Station East, S.W. Pass",  # (-89.407, 28.932)",
@@ -38,13 +40,13 @@ stationid_to_names: Dict[str, str] = {
     "8762482": "West Bank 1, Bayou Gauche",  # (-90.420, 29.789)",
     "8764044": "Berwick, Atchafalaya River",  # (-91.238, 29.668)",
 }
-stationid_to_names = {}
-ds = xr.open_dataset(os.path.join(DATA_PATH, "katrina_tides.nc"))
-name_d = {}
-for sid in ds.stationid.values:
-    dss = ds.sel(stationid=sid)
-    name_d[sid] = f"{dss.name.values}"  # ({dss.lon.values:.3f}, {dss.lat.values:.3f})"
-stationid_to_names = name_d
+# stationid_to_names = {}
+# ds = xr.open_dataset(os.path.join(DATA_PATH, "katrina_tides.nc"))
+# name_d = {}
+# for sid in ds.stationid.values:
+#    dss = ds.sel(stationid=sid)
+#    name_d[sid] = f"{dss.name.values}"  # ({dss.lon.values:.3f}, {dss.lat.values:.3f})"
+# stationid_to_names = name_d
 
 years: List[str] = ["2015", "2100"]
 
@@ -459,11 +461,17 @@ def plot_places(
     df["Node Latitude"] = lats
     df["Node Longitude"] = lons
 
-    DATA_PATH = os.path.join(DATA_PATH, "stations")
-    os.makedirs(DATA_PATH, exist_ok=True)
+    # lets get node depth for those points too
+    # df["Node Depth"] = mele_ds
+    print("mele_ds", mele_ds.variables)
 
-    df.to_csv(os.path.join(DATA_PATH, "stationid_lat_lon.csv"), index=False)
-    df.to_latex(os.path.join(DATA_PATH, "stationid_lat_lon.tex"), decimal=3, index=False)
+    data_path = os.path.join(DATA_PATH, "stations")
+    os.makedirs(data_path, exist_ok=True)
+
+    df.to_csv(os.path.join(data_path, "stationid_lat_lon.csv"), index=False)
+    df.to_latex(
+        os.path.join(data_path, "stationid_lat_lon.tex"), index=False  # decimal=3,
+    )
 
     plot_defaults()
     try:
@@ -496,7 +504,7 @@ def plot_places(
         # print("fd", fd)
     ax.legend(
         loc="lower center",
-        bbox_to_anchor=(0.5, 1.05),
+        bbox_to_anchor=(0.5, 1.02),
         ncol=2,
     )
     if fd != {}:
