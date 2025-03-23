@@ -3,7 +3,7 @@
 
 We want to answer the question of what the potential height of a storm surge could be now and in a changing climate. To do this we first calculate the potential intensity and size from CMIP6 (`tcpips` & `w22`), and then use a Bayesian optimization loop (`adbo`) to drive an storm surge model ADCIRC with idealised tropical cyclones (`adforce`). We then show that knowing the upper bound can be useful in the context of an evt fit (`worst`). 
 
-Most/all of the key experiments are carried out as `slurm` jobs, so go to `slurm/` to see these. `data/` contains some of the key data, and `img/` most of the key figures. `docs/` contains the source for the ![readthedocs documentation](https://worstsurge.readthedocs.io/en/latest/MAIN_README.html).
+All of the key experisments are carried out as `slurm` jobs, so go to `slurm/` to see these. `data/` contains some of the key data, and `img/` most of the key figures. `docs/` contains the source for the readthedocs documentation <https://worstsurge.readthedocs.io/en/latest/MAIN_README.html>.
 
 ## tcpips
 
