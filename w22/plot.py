@@ -319,7 +319,7 @@ def plot_seasonal_profiles():
     plt.clf()
     plt.close()
     # let's plot the temperature profile and humidity profile
-    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=1.5), sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=1), sharey=True)
     # four dark colors
     colors = ["black", "red", "green", "blue"]
     # ds["t"] -= 273.15 # OC has already been taken away
