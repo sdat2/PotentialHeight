@@ -26,7 +26,6 @@ REQUIRED: List[str] = [
     "trieste[plotting]",  # to run bayesian optimisation (adbo)
     "trieste[qhsri]",  # to run bayesian optimisation (adbo)
     "slurmpy",  # to run SLURM jobs (adforce)
-    "adcircpy",  # to process ADIRC inputs (adforce)
     "tcpypi",  # to calculate potential intensity (tcpips)
     "joblib",  # to parallize more easily potential size calculation (tcpips/w22)
 ]
