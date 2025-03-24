@@ -21,6 +21,7 @@ EX_DATA_PATH = os.path.join(PI2_PATH, "ssp585", "CESM2", "r4i1p1f1.nc")
 
 @timeit
 def trimmed_cmip6_example() -> None:
+    print("trimmed_cmip6_example", xr.open_dataset(EX_DATA_PATH))
     in_ds = xr.open_dataset(EX_DATA_PATH).isel(
         y=slice(215, 245),
         x=slice(160, 205),
@@ -34,9 +35,7 @@ def trimmed_cmip6_example() -> None:
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
-    )
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output_small.nc"))
 
 
 @timeit

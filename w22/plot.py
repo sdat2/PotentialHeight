@@ -58,7 +58,18 @@ def plot_panels() -> None:
     plt.savefig(os.path.join(FIGURE_PATH, "new_ps_calculation_output_gom.pdf"))
 
 
-def safe_grad(xt, yt) -> ufloat:
+def safe_grad(xt: np.ndarray, yt: np.ndarray) -> ufloat:
+    """
+    Calculate the gradient of the data with error handling.
+
+    Args:
+        xt (np.ndarray): The x data.
+        yt (np.ndarray): The y data.
+
+    Returns:
+        ufloat: The gradient.
+    """
+
     # get rid of nan values
     xt, yt = xt[~np.isnan(xt)], yt[~np.isnan(xt)]
     xt, yt = xt[~np.isnan(yt)], yt[~np.isnan(yt)]
@@ -72,7 +83,17 @@ def safe_grad(xt, yt) -> ufloat:
     return param[0] * yrange / xrange
 
 
-def safe_corr(xt, yt):
+def safe_corr(xt: np.ndarray, yt: np.ndarray) -> float:
+    """
+    Calculate the correlation of the data with error handling.
+
+    Args:
+        xt (np.ndarray): The x data.
+        yt (np.ndarray): The y data.
+
+    Returns:
+        float: The correlation.
+    """
     corr = ma.corrcoef(ma.masked_invalid(xt), ma.masked_invalid(yt))
     return corr[0, 1]
 
@@ -108,7 +129,7 @@ def _float_to_latex(x, precision=2):
         return f"{s}"
 
 
-def _m_to_text(m):
+def _m_to_text(m: ufloat) -> str:
     if m.s in (np.nan, np.inf, -np.inf):
         if m.s not in (np.nan, np.inf, -np.inf):
             return "$m={:}$".format(_float_to_latex(m))
@@ -127,6 +148,15 @@ def timeseries_plot(
     years: List[int] = [2025, 2097],
     members: List[int] = [4, 10, 11],
 ) -> None:
+    """
+    Plot the timeseries for the given location and members.
+
+    Args:
+        name (str): The name of the location (default is "new_orleans").
+        plot_name (str): The name of the location to use in the plot title (default is "New Orleans").
+        years (List[int]): The years to plot (default is [2025, 2097]).
+        members (List[int]): The members to plot (default is [4, 10, 11]).
+    """
     # plot CESM2 ensemble members for ssp585 near New Orleans
     plot_defaults()
     colors = ["purple", "green", "orange"]
@@ -364,7 +394,9 @@ def figure_two() -> None:
 
     # axs[].plot(ds["time"], ds["sst"], "k")
     plot_defaults()
-    ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
+    ds = xr.open_dataset(
+        os.path.join(DATA_PATH, "example_potential_size_output_small.nc")
+    )
     folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     # print("ds", ds)
@@ -393,9 +425,9 @@ def figure_two() -> None:
     vmaxs = vmaxs[~np.isnan(ssts)]
     ssts = ssts[~np.isnan(ssts)]
     rho = safe_corr(lats, ssts)
-    fit_space_sst_lat, _ = fit(lats, ssts)
+    fit_space_sst_lat = safe_grad(lats, ssts)
     print(
-        "space (sst, lat) $m={:.1eL}$ ".format(fit_space_sst_lat[0])
+        "space (sst, lat) $m={:.1eL}$ ".format(fit_space_sst_lat)
         + "$^{\circ}$C  $^{\circ}$N$^{-1}$",
     )
     print("space rho (sst, lat): {:.2f}".format(rho))
@@ -406,7 +438,7 @@ def figure_two() -> None:
     r0s = r0s[~np.isnan(r0s)]
     fit_space_r0s_lats = safe_grad(lats, r0s / 1000)
     print(
-        "space (r0s, lat) $m={:.2eL}$ ".format(fit_space_r0s_lats[0])
+        "space (r0s, lat) $m={:.2eL}$ ".format(fit_space_r0s_lats)
         + "km  $^{\circ}$N$^{-1}$",
     )
     rho = safe_corr(lats, r0s)
@@ -479,13 +511,13 @@ def figure_two() -> None:
     axs[0, 1].text(
         0.66,
         0.05,
-        f"$m=$  " + "${:.1eL}$".format(fit_vmax[0]) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+        f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
         transform=axs[0, 1].transAxes,
     )
     axs[1, 1].text(
         0.66,
         0.1,
-        f"$m=$" + "${:.2L}$".format(fit_r0[0]) + " km yr$^{-1}$",
+        f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
         transform=axs[1, 1].transAxes,
     )
 
