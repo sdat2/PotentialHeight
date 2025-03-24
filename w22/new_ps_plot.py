@@ -53,6 +53,8 @@ def plot_panels() -> None:
 
     label_subplots(axs)
 
+    plt.suptitle("August 2015")
+
     plt.savefig(os.path.join(FIGURE_PATH, "new_ps_calculation_output_gom.pdf"))
 
 
@@ -288,24 +290,24 @@ def plot_seasonal_profiles():
                 ds[v].values[j * 12 : (j + 1) * 12], linewidth=0.5, color=colors[j]
             )
         axs[i].set_ylabel(var_labels[i] + " [" + units[i] + "]")
-        # blank x ticks
-        axs[i].set_xticks([])
+        # blank x ticks axs[i].set_xticks([])
+        # get error message now with new version of matplotlib
 
     axs[-1].set_xlabel("Month")
-    months =         [
-            "Jan",
-            "Feb",
-            "Mar",
-            "Aug",
-            "May",
-            "Jun",
-            "Jul",
-            "Aug",
-            "Sep",
-            "Oct",
-            "Nov",
-            "Dec",
-        ],
+    months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Aug",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    ]
     axs[-1].set_xticks(
         np.arange(0, 12),
         months,
@@ -320,20 +322,28 @@ def plot_seasonal_profiles():
     fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=1.5), sharey=True)
     # four dark colors
     colors = ["black", "red", "green", "blue"]
-    ds["t"] -= 273.15
+    # ds["t"] -= 273.15 # OC has already been taken away
     for i, j in enumerate(list(range(0, 12, 3))):
-        k = (j - 1) % 12
+        k = (j - 2) % 12
         ids = ds.isel(time=k)
-        axs[0].plot(ids["t"].values, ids["p"].values, color=colors[i], linewidth=0.5, label=months[k])
+        axs[0].plot(
+            ids["t"].values,
+            ids["p"].values,
+            color=colors[i],
+            linewidth=0.5,
+            label=months[k],
+        )
         axs[1].plot(ids["q"].values, ids["p"].values, color=colors[i], linewidth=0.5)
-    axs[0].set_ylabel("Pressure [hPa]")
-    axs[0].set_xlabel(r"Temperature [$^{\circ}$]")
-    axs[1].set_xlabel("Specific humidity [kg/kg]")
+    axs[0].set_ylabel("Pressure level [hPa]")
+    axs[0].set_xlabel(r"Temperature [$^{\circ}$C]")
+    axs[1].set_xlabel("Specific humidity [g/kg]")
     label_subplots(axs)
     axs[0].legend()
+    # set a legend above the plot
+    # axs[0].legend(loc="lower center", bbox_to_anchor=(1, 1.1))
     # reverse the y-axis
     axs[0].invert_yaxis()
-    axs[0].set_ylim(1000, 0)
+    axs[0].set_ylim(1000, 0)  # between 0 and 1000 hPa
     plt.tight_layout()
     plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_vertical_profiles.pdf"))
     plt.clf()
