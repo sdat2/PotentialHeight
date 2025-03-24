@@ -16,25 +16,26 @@ OFFSET_D = {
     "miami": {"point": MIAMI, "lon_offset": 0.2, "lat_offset": 0},
     "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -0.5},
 }
-EX_DATA_PATH = str(f"{PI2_PATH}/ssp585/CESM2/r4i1p1f1.nc")
+EX_DATA_PATH = os.path.join(PI2_PATH, "ssp585", "CESM2", "r4i1p1f1.nc")
 
 
 @timeit
 def trimmed_cmip6_example() -> None:
+    print("trimmed_cmip6_example", xr.open_dataset(EX_DATA_PATH))
     in_ds = xr.open_dataset(EX_DATA_PATH).isel(
-        y=slice(215, 245), x=slice(160, 205), time=slice(0, 12)
+        y=slice(215, 245),
+        x=slice(160, 205),
+        time=7,  # slice(0, 12) # just august
     )
     print(in_ds)
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
-    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
+    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
     # get rid of V_reduc accidentally added in for vmax calculation
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_small_year.nc")
-    )
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output_small.nc"))
 
 
 @timeit
@@ -57,8 +58,9 @@ def new_orleans_year() -> None:
     out_ds = parallelized_ps(in_ds, jobs=20)
     out_ds["q"] = qt_ds["q"]
     out_ds["t"] = qt_ds["t"]
+    out_ds["otl"] = qt_ds["otl"]
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "new_orleans_10year2.nc"))
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "new_orleans_10year3.nc"))
 
 
 @timeit
@@ -102,14 +104,15 @@ def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
 
 
 if __name__ == "__main__":
-    # python -m cle.ps_runs
-    # trimmed_cmip6_example()
+    # python -m w22.ps_runs
+    trimmed_cmip6_example()
+    # new_orleans_year()
     # global_august_cmip6_example()
     # python -c "from cle.ps_runs import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
     # python -c "from cle.ps_runs import new_orleans_timeseries as no; no(4); no(10); no(11)"
     # python -c "from cle.ps_runs import miami_timeseries as mm; mm(4); mm(10); mm(11)"
     # trimmed_cmip6_example()
-    point_timeseries(4, "new_orleans")
+    # point_timeseries(4, "new_orleans")
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, "new_orleans"); pt(10, "new_orleans"); pt(11, "new_orleans")"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'miami'); pt(10, 'miami'); pt(11, 'miami')"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
