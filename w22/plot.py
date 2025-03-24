@@ -237,7 +237,7 @@ def plot_seasonal_profiles():
     """
     Plot the seasonal profiles for New Orleans.
     """
-    in_path = os.path.join(DATA_PATH, "new_orleans_10year1.nc")
+    in_path = os.path.join(DATA_PATH, "new_orleans_10year3.nc")
     ds = xr.open_dataset(in_path)
     # plot season for msl, rh,  sst, t0, vmax, rmax, r0
     # shared x -axis = months
@@ -319,7 +319,7 @@ def plot_seasonal_profiles():
     plt.clf()
     plt.close()
     # let's plot the temperature profile and humidity profile
-    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=1), sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=0.7), sharey=True)
     # four dark colors
     colors = ["black", "red", "green", "blue"]
     # ds["t"] -= 273.15 # OC has already been taken away
@@ -333,11 +333,13 @@ def plot_seasonal_profiles():
             linewidth=0.5,
             label=months[k],
         )
+        axs[0].scatter(ids["t0"].values, ids["otl"].values, color=colors[i], marker="x")
         axs[1].plot(ids["q"].values, ids["p"].values, color=colors[i], linewidth=0.5)
+
     axs[0].set_ylabel("Pressure level [hPa]")
     axs[0].set_xlabel(r"Temperature [$^{\circ}$C]")
     axs[1].set_xlabel("Specific humidity [g/kg]")
-    label_subplots(axs)
+    label_subplots(axs, override="outside")
     axs[0].legend()
     # set a legend above the plot
     # axs[0].legend(loc="lower center", bbox_to_anchor=(1, 1.1))
@@ -350,9 +352,162 @@ def plot_seasonal_profiles():
     plt.close()
 
 
+def figure_two() -> None:
+    """Plot the solution for the GOM bbox for potential size and intensity."""
+    _, axs = plt.subplots(
+        2,
+        2,
+        figsize=(9, 6),
+        width_ratios=[1, 1.5],
+        height_ratios=[1, 1],
+    )
+
+    # axs[].plot(ds["time"], ds["sst"], "k")
+    plot_defaults()
+    ds = xr.open_dataset(os.path.join(DATA_PATH, "gom_soln_bbox.nc"))
+    folder = SUP_PATH
+    os.makedirs(folder, exist_ok=True)
+    # print("ds", ds)
+    ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
+    ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+    print(ds)
+    print(ds["sst"])
+    print("two lats", ds["sst"].isel(lat=slice(0, 2)).values.shape)
+    vmaxs = ds["vmax"].values
+    lats = ds["lat"].values
+    ssts = ds["sst"].values
+    r0s = ds["r0"].values
+
+    print("vmaxs", vmaxs.shape)
+    print("lats", lats.shape)
+    print("ssts", ssts.shape)
+    print("r0s", r0s.shape)
+    lats = np.array([lats.tolist() for _ in range(len(ds.lon))]).T
+    assert np.shape(lats) == np.shape(ssts)
+    ssts = ssts.ravel()
+    r0s = r0s.ravel()
+    lats = lats.ravel()
+    vmaxs = vmaxs.ravel()
+    lats = lats[~np.isnan(ssts)]
+    r0s = r0s[~np.isnan(ssts)]
+    vmaxs = vmaxs[~np.isnan(ssts)]
+    ssts = ssts[~np.isnan(ssts)]
+    rho = safe_corr(lats, ssts)
+    fit_space_sst_lat, _ = fit(lats, ssts)
+    print(
+        "space (sst, lat) $m={:.1eL}$ ".format(fit_space_sst_lat[0])
+        + "$^{\circ}$C  $^{\circ}$N$^{-1}$",
+    )
+    print("space rho (sst, lat): {:.2f}".format(rho))
+    lats = lats[~np.isnan(r0s)]
+    ssts = ssts[~np.isnan(r0s)]
+    vmaxs = vmaxs[~np.isnan(r0s)]
+    coriolis_fs = coriolis_parameter_from_lat(lats)
+    r0s = r0s[~np.isnan(r0s)]
+    fit_space_r0s_lats = safe_grad(lats, r0s / 1000)
+    print(
+        "space (r0s, lat) $m={:.2eL}$ ".format(fit_space_r0s_lats[0])
+        + "km  $^{\circ}$N$^{-1}$",
+    )
+    rho = safe_corr(lats, r0s)
+    print("space rho (r0s, lat): {:.2f}".format(rho))
+
+    ssts = ssts[~np.isnan(vmaxs)]
+    coriolis_fs = coriolis_fs[~np.isnan(vmaxs)]
+    vmaxs = vmaxs[~np.isnan(vmaxs)]
+    fit_space_vmaxs_lats = safe_grad(lats, vmaxs)
+    print(
+        "space (vmax, lat) $m={:.1eL}$ ".format(fit_space_vmaxs_lats)
+        + "m s$^{-1}$  $^{\circ}$N$^{-1}$",
+    )
+    fit_space_vmaxs_ssts = safe_grad(ssts, vmaxs)
+    print(
+        "space (vmax, sst) $m={:.1eL}$ ".format(fit_space_vmaxs_ssts)
+        + "m s$^{-1}$  $^{\circ}$C$^{-1}$",
+    )
+    rho = safe_corr(ssts, vmaxs)
+    print("space rho (sst, vmax): {:.2f}".format(rho))
+    vmax_div_coriolis = vmaxs / coriolis_fs
+    rho = safe_grad(vmax_div_coriolis, r0s)
+    print("space rho (vmax/coriolis, r0): {:.2f}".format(rho))
+    fit_space_vmaxs_div_coriolis_r0 = save_grad(vmax_div_coriolis, r0s)
+
+    print(
+        "space (vmax/coriolis, r0) $m={:.2eL}$ ".format(fit_space_vmaxs_div_coriolis_r0)
+        + "km m$^{-1}$ s$^2$$",
+    )
+
+    timeseries_ds = xr.open_dataset(
+        os.path.join(DATA_PATH, "new_orleans_august_ssp585_r4i1p1f1.nc")
+    )
+    (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
+    axs[1, 0].set_title("Potential size, $r_a$ [km]")
+    axs[1, 1].set_title("Potential size, $r_a$ [km]")
+    ds["vmax"].plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
+    axs[0, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    axs[1, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    axs[0, 0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[0, 1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+
+    ## work out correlation between time and vmax between 2000 and 2099
+    year_min = 2014
+    year_max = 2100
+    ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
+    vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
+    r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
+    years = timeseries_ds["time"].sel(time=slice(year_min, year_max)).values
+    rho_vmax = safe_corr(vmaxs, years)
+    rho_r0 = safe_corr(r0s, years)
+    rho_sst = safe_corr(ssts, years)
+    rho_sst_vmax = safe_corr(ssts, vmaxs)
+    rho_sst_r0 = safe_corr(ssts, r0s)
+    print("rho_sst_vmax", rho_sst_vmax)
+    print("rho_sst_r0", rho_sst_r0)
+    print("rho_sst", rho_sst)
+
+    axs[0, 1].text(0.8, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0, 1].transAxes)
+    axs[1, 1].text(0.8, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1, 1].transAxes)
+
+    # work out gradient with error bars for same period
+    fit_vmax = safe_grad(years, vmaxs)
+    fit_r0 = safe_grad(years, r0s / 1000)
+    fit_r0_sst = safe_grad(ssts, r0s / 1000)
+    print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
+    fit_vmax_sst = safe_grad(ssts, vmaxs)
+    print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
+
+    axs[0, 1].text(
+        0.66,
+        0.05,
+        f"$m=$  " + "${:.1eL}$".format(fit_vmax[0]) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+        transform=axs[0, 1].transAxes,
+    )
+    axs[1, 1].text(
+        0.66,
+        0.1,
+        f"$m=$" + "${:.2L}$".format(fit_r0[0]) + " km yr$^{-1}$",
+        transform=axs[1, 1].transAxes,
+    )
+
+    axs[0, 1].plot(timeseries_ds["time"], timeseries_ds["vmax"], "k")
+    axs[1, 1].plot(timeseries_ds["time"], timeseries_ds["r0"] / 1000, "k")
+    label_subplots(axs)
+    axs[0, 0].set_xlabel("")
+    axs[1, 1].set_xlabel("Year")
+    axs[0, 1].set_xlim([1850, 2100])
+    axs[1, 1].set_xlim([1850, 2100])
+    # vertical black line at year_min
+    axs[0, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
+    axs[1, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
+    plt.savefig(os.path.join(folder, "figure_two.pdf"))
+    plt.clf()
+    print(timeseries_ds)
+
+
 if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
+    # figure_two()
     plot_seasonal_profiles()
     # years = [2015, 2100]
     # timeseries_plot(
