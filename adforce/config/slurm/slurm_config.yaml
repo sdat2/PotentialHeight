@@ -3,6 +3,7 @@ email: sdat2@cam.ac.uk
 partition: standard
 account: n01-biopole
 tasks_per_node: 128
+reserve_cpus: 20
 options: # default options for each resolution
   high:
     nodes: 8

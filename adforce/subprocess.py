@@ -62,7 +62,7 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
             # Use tasks_per_node * nodes (assuming one node unless specified otherwise in config).
             resolution_key = config.adcirc.resolution.value  # e.g., "high", "low", etc.
             tasks_per_node = (
-                config.slurm.tasks_per_node - 20
+                config.slurm.tasks_per_node - config.slurm.reserved_cores
             )  # 20 cores reserved for system
             num_nodes = config.slurm.options[resolution_key].nodes
             np = tasks_per_node * num_nodes  # total number of MPI processes for ADCIRC
