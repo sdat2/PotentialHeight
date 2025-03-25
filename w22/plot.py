@@ -457,9 +457,9 @@ def plot_spatial(axs: np.ndarray) -> None:
     (ds["r0"] / 1000).plot(ax=axs[1], cbar_kwargs={"label": ""})
     ds["vmax"].plot(ax=axs[0], cbar_kwargs={"label": ""})
     no = (-90.25, 29.25)
-    axs[0].scatter(*no, color="black", s=30, marker="x")
-    axs[1].scatter(*no, color="black", s=30, marker="x")
-    axs[1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[0].scatter(*no, color="black", s=100, marker="x")
+    axs[1].scatter(*no, color="black", s=100, marker="x")
+    axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
 
 
@@ -488,8 +488,8 @@ def plot_timeseries(axs: np.ndarray) -> None:
     print("rho_sst_r0", rho_sst_r0)
     print("rho_sst", rho_sst)
 
-    axs[0].text(0.8, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
-    axs[1].text(0.8, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1].transAxes)
+    axs[0].text(0.75, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
+    axs[1].text(0.75, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1].transAxes)
 
     # work out gradient with error bars for same period
     fit_vmax = safe_grad(years, vmaxs)
@@ -500,13 +500,13 @@ def plot_timeseries(axs: np.ndarray) -> None:
     print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
 
     axs[0].text(
-        0.66,
+        0.60,
         0.05,
         f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
         transform=axs[0].transAxes,
     )
     axs[1].text(
-        0.66,
+        0.60,
         0.1,
         f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
         transform=axs[1].transAxes,
@@ -532,7 +532,7 @@ def figure_two():
     _, axs = plt.subplots(
         2,
         2,
-        figsize=get_dim(ratio_of_linewidth=1.5),
+        figsize=get_dim(fraction_of_line_width=1.5),
         width_ratios=[1, 1.5],
         height_ratios=[1, 1],
     )
