@@ -393,8 +393,11 @@ def figure_two() -> None:
     )
 
     # axs[].plot(ds["time"], ds["sst"], "k")
+
+
+def plot_spatial(axs):
     plot_defaults()
-    ds = xr.open_dataset(os.path.join(DATA_PATH,"potential_size_gom_august.nc"))
+    ds = xr.open_dataset(os.path.join(DATA_PATH, "potential_size_gom_august.nc"))
     folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     # print("ds", ds)
@@ -471,13 +474,17 @@ def figure_two() -> None:
         os.path.join(DATA_PATH, "new_orleans_august_ssp585_r4i1p1f1.nc")
     )
     (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
-    axs[1, 0].set_title("Potential size, $r_a$ [km]")
-    axs[1, 1].set_title("Potential size, $r_a$ [km]")
+    axs[0].set_title("Potential size, $r_a$ [km]")
+    axs[1].set_title("Potential size, $r_a$ [km]")
     ds["vmax"].plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
-    axs[0, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
-    axs[1, 0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
-    axs[0, 0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
-    axs[0, 1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    axs[0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+
+
+def plot_timeseries(axs):
+    plot_defaults()
 
     ## work out correlation between time and vmax between 2000 and 2099
     year_min = 2014
@@ -537,8 +544,8 @@ def figure_two() -> None:
 if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
-    # figure_two()
-    plot_seasonal_profiles()
+    figure_two()
+    # plot_seasonal_profiles()
     # years = [2015, 2100]
     # timeseries_plot(
     #     name="new_orleans",
