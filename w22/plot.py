@@ -382,24 +382,9 @@ def plot_seasonal_profiles():
     plt.close()
 
 
-def figure_two() -> None:
-    """Plot the solution for the GOM bbox for potential size and intensity."""
-    _, axs = plt.subplots(
-        2,
-        2,
-        figsize=(9, 6),
-        width_ratios=[1, 1.5],
-        height_ratios=[1, 1],
-    )
-
-    # axs[].plot(ds["time"], ds["sst"], "k")
-
-
-def plot_spatial(axs):
+def plot_spatial(axs: np.ndarray) -> None:
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "potential_size_gom_august.nc"))
-    folder = SUP_PATH
-    os.makedirs(folder, exist_ok=True)
     # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
@@ -463,36 +448,37 @@ def plot_spatial(axs):
     vmax_div_coriolis = vmaxs / coriolis_fs
     rho = safe_grad(vmax_div_coriolis, r0s)
     print("space rho (vmax/coriolis, r0): {:.2f}".format(rho))
-    fit_space_vmaxs_div_coriolis_r0 = save_grad(vmax_div_coriolis, r0s)
+    fit_space_vmaxs_div_coriolis_r0 = safe_grad(vmax_div_coriolis, r0s)
 
     print(
         "space (vmax/coriolis, r0) $m={:.2eL}$ ".format(fit_space_vmaxs_div_coriolis_r0)
         + "km m$^{-1}$ s$^2$$",
     )
+    (ds["r0"] / 1000).plot(ax=axs[1], cbar_kwargs={"label": ""})
+    ds["vmax"].plot(ax=axs[0], cbar_kwargs={"label": ""})
+    no = (-90.25, 29.25)
+    axs[0].scatter(*no, color="black", s=30, marker="x")
+    axs[1].scatter(*no, color="black", s=30, marker="x")
+    axs[1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[1].set_title("Potential size, $r_a$ [km]")
 
+
+def plot_timeseries(axs: np.ndarray) -> None:
     timeseries_ds = xr.open_dataset(
         os.path.join(DATA_PATH, "new_orleans_august_ssp585_r4i1p1f1.nc")
     )
-    (ds["r0"] / 1000).plot(ax=axs[1, 0], cbar_kwargs={"label": ""})
-    axs[0].set_title("Potential size, $r_a$ [km]")
-    axs[1].set_title("Potential size, $r_a$ [km]")
-    ds["vmax"].plot(ax=axs[0, 0], cbar_kwargs={"label": ""})
-    axs[0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
-    axs[0].scatter(GOM[1], GOM[0], color="black", s=30, marker="x")
+    print("timeseries_ds", timeseries_ds)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
-    axs[1].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
-
-
-def plot_timeseries(axs):
-    plot_defaults()
-
+    axs[1].set_title("Potential size, $r_a$ [km]")
     ## work out correlation between time and vmax between 2000 and 2099
-    year_min = 2014
-    year_max = 2100
-    ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
-    vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
-    r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
-    years = timeseries_ds["time"].sel(time=slice(year_min, year_max)).values
+    # year_min = 2014
+    # year_max = 2100
+    ssts = timeseries_ds["sst"].values  # .sel(time=slice(year_min, year_max)).values
+    vmaxs = timeseries_ds["vmax"].values  # .sel(time=slice(year_min, year_max)).values
+    r0s = timeseries_ds["r0"].values  # .sel(time=slice(year_min, year_max)).values
+    years = np.array(
+        [time.year for time in timeseries_ds["time"].values]
+    )  # .sel(time=slice(year_min, year_max)).values
     rho_vmax = safe_corr(vmaxs, years)
     rho_r0 = safe_corr(r0s, years)
     rho_sst = safe_corr(ssts, years)
@@ -502,8 +488,8 @@ def plot_timeseries(axs):
     print("rho_sst_r0", rho_sst_r0)
     print("rho_sst", rho_sst)
 
-    axs[0, 1].text(0.8, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0, 1].transAxes)
-    axs[1, 1].text(0.8, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1, 1].transAxes)
+    axs[0].text(0.8, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
+    axs[1].text(0.8, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1].transAxes)
 
     # work out gradient with error bars for same period
     fit_vmax = safe_grad(years, vmaxs)
@@ -513,32 +499,48 @@ def plot_timeseries(axs):
     fit_vmax_sst = safe_grad(ssts, vmaxs)
     print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
 
-    axs[0, 1].text(
+    axs[0].text(
         0.66,
         0.05,
         f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
-        transform=axs[0, 1].transAxes,
+        transform=axs[0].transAxes,
     )
-    axs[1, 1].text(
+    axs[1].text(
         0.66,
         0.1,
         f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
-        transform=axs[1, 1].transAxes,
+        transform=axs[1].transAxes,
     )
 
-    axs[0, 1].plot(timeseries_ds["time"], timeseries_ds["vmax"], "k")
-    axs[1, 1].plot(timeseries_ds["time"], timeseries_ds["r0"] / 1000, "k")
+    axs[0].plot(years, timeseries_ds["vmax"], "k")
+    axs[1].plot(years, timeseries_ds["r0"] / 1000, "k")
     label_subplots(axs)
-    axs[0, 0].set_xlabel("")
-    axs[1, 1].set_xlabel("Year")
-    axs[0, 1].set_xlim([1850, 2100])
-    axs[1, 1].set_xlim([1850, 2100])
+    axs[0].set_xlabel("")
+    axs[1].set_xlabel("Year")
+    axs[0].set_xlim([2015, 2100])
+    axs[1].set_xlim([2015, 2100])
+    # axs[0].set_xlim([1850, 2100])
+    # axs[1].set_xlim([1850, 2100])
     # vertical black line at year_min
-    axs[0, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
-    axs[1, 1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
-    plt.savefig(os.path.join(folder, "figure_two.pdf"))
+    # axs[0].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
+    # axs[1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
+
+
+def figure_two():
+    """Plot the solution for the GOM bbox for potential size and intensity."""
+    plot_defaults()
+    _, axs = plt.subplots(
+        2,
+        2,
+        figsize=get_dim(ratio_of_linewidth=1.5),
+        width_ratios=[1, 1.5],
+        height_ratios=[1, 1],
+    )
+    plot_spatial(axs[:, 0])
+    plot_timeseries(axs[:, 1])
+    plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))
     plt.clf()
-    print(timeseries_ds)
+    plt.close()
 
 
 if __name__ == "__main__":
