@@ -99,6 +99,27 @@ def global_cmip6(part="nw") -> None:
     out_ds.to_netcdf(os.path.join(DATA_PATH, f"potential_size_global_{part}_2015.nc"))
 
 
+def load_global() -> xr.Dataset:
+    """Load all parts of the global data and stitch together.
+
+    Returns:
+        xr.Dataset: stitched together dataset.
+    """
+    return xr.concat(
+        [
+            xr.concat(
+                [
+                    os.path.join(DATA_PATH, f"potential_size_global_{x}_2015.nc")
+                    for x in y
+                ],
+                dim="lon",
+            )
+            for y in [["sw", "se"], ["nw", "ne"]]
+        ],
+        dim="lat",
+    )
+
+
 def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     point_ds = xr.open_dataset(file_name).sel(
