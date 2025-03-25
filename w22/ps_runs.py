@@ -66,19 +66,37 @@ def new_orleans_year() -> None:
 
 
 @timeit
-def global_august_cmip6_example() -> None:
-    in_ds = xr.open_dataset(EX_DATA_PATH).isel(time=7)
+def global_cmip6(part="nw") -> None:
+    # just get North Western Hemisphere August
+    if part == "nw":
+        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+            time=7, lat=slice(180, 300), lon=slice(0, 360)
+        )
+    elif part == "ne":
+        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+            time=7, lat=slice(180, 300), lon=slice(360, 720)
+        )
+    elif part == "sw":  # just February
+        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+            time=1, lat=slice(0, 180), lon=slice(0, 360)
+        )
+    elif part == "se":
+        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+            time=1, lat=slice(0, 180), lon=slice(360, 720)
+        )
+    else:
+        raise ValueError("part must be one of nw, ne, sw, se")
+    print("input cmip6 data", in_ds)
+
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
-    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
+    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
     print(in_ds)
     # get rid of V_reduc accidentally added in for vmax calculation
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=30)
     print(out_ds)
-    out_ds.to_netcdf(
-        os.path.join(DATA_PATH, "example_potential_size_output_august_2015.nc")
-    )
+    out_ds.to_netcdf(os.path.join(DATA_PATH, f"potential_size_global_{part}_2015.nc"))
 
 
 def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
@@ -109,7 +127,7 @@ if __name__ == "__main__":
     # python -m w22.ps_runs
     trimmed_cmip6_example()
     # new_orleans_year()
-    # global_august_cmip6_example()
+    # global_cmip6()
     # python -c "from cle.ps_runs import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
     # python -c "from cle.ps_runs import new_orleans_timeseries as no; no(4); no(10); no(11)"
     # python -c "from cle.ps_runs import miami_timeseries as mm; mm(4); mm(10); mm(11)"
@@ -120,7 +138,10 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
     # set off global
-    # python -c "from w22.ps_runs import global_august_cmip6_example as ga; ga()"
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')"
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('sw')" &> sw.log
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se.log
 
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
     # python -c "from w22.ps_runs import new_orleans_year as no; no()"
