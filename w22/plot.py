@@ -394,9 +394,7 @@ def figure_two() -> None:
 
     # axs[].plot(ds["time"], ds["sst"], "k")
     plot_defaults()
-    ds = xr.open_dataset(
-        os.path.join(DATA_PATH, "example_potential_size_output_small.nc")
-    )
+    ds = xr.open_dataset(os.path.join(DATA_PATH,"potential_size_gom_august.nc"))
     folder = SUP_PATH
     os.makedirs(folder, exist_ok=True)
     # print("ds", ds)

@@ -1,6 +1,6 @@
 """Run the CLE15 model with json files or octopy."""
 
-from typing import Callable, Tuple, Optional, Dict
+from typing import Callable, Tuple, Optional, Dict, Union
 import os
 import subprocess
 import numpy as np
@@ -57,7 +57,7 @@ def delete_tmp():
             print("Failed to delete %s. Reason: %s" % (file_path, e))
 
 
-def _inputs_to_name(inputs: dict) -> str:
+def _inputs_to_name(inputs: dict, hash_name=True) -> str:
     """Create a unique naming string based on the input parameters
     (now hashed to shorten).
 
@@ -65,14 +65,26 @@ def _inputs_to_name(inputs: dict) -> str:
 
     Args:
         inputs (dict): input dict
+        hash_name (bool, optional): whether to hash the name. Defaults to True.
 
     Returns:
         str: unique(ish) name
     """
     name = ""
     for key in sorted(inputs.keys()):  # for consistent order
-        name += key + f"_{inputs[key]:.15e}"  # v. high precision
-    return str(abs(hash(name)))
+        val = inputs[key]
+        if isinstance(val, Union[float, int]):
+            if val < 0:
+                name += key + f"_n{abs(val):.15e}"
+            else:
+                name += key + f"_{val:.15e}"
+        elif isinstance(val, str):
+            name += key + "_" + val
+
+    if hash_name:  # shortens name, but small probability of collision
+        return str(abs(hash(name)))
+    else:
+        return name
 
 
 def process_inputs(inputs: dict) -> dict:
@@ -392,7 +404,7 @@ def profile_from_stats(vmax: float, fcor: float, r0: float, p0: float) -> dict:
 
 
 if __name__ == "__main__":
-    # python -m cle.potential_size
+    # python -m w22.potential_size
     # delete_tmp()
     tick = time.perf_counter()
     vmaxs = np.linspace(80, 90, num=10)

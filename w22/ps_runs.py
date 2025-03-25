@@ -21,13 +21,15 @@ EX_DATA_PATH = os.path.join(PI2_PATH, "ssp585", "CESM2", "r4i1p1f1.nc")
 
 @timeit
 def trimmed_cmip6_example() -> None:
-    print("trimmed_cmip6_example", xr.open_dataset(EX_DATA_PATH))
+    print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
+    # select roughly gulf of mexico
+    # for some reason using the bounding box method doesn't work
     in_ds = xr.open_dataset(EX_DATA_PATH).isel(
-        y=slice(215, 245),
-        x=slice(160, 205),
-        time=7,  # slice(0, 12) # just august
+        lat=slice(215, 245),
+        lon=slice(160, 205),
+        time=7,  # slice(0, 12) # just august 2015
     )
-    print(in_ds)
+    print("trimmed input data", in_ds)
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
@@ -35,7 +37,7 @@ def trimmed_cmip6_example() -> None:
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "example_potential_size_output_small.nc"))
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "potential_size_gom_august.nc"))
 
 
 @timeit
@@ -119,5 +121,6 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
     # set off global
     # python -c "from w22.ps_runs import global_august_cmip6_example as ga; ga()"
+
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
     # python -c "from w22.ps_runs import new_orleans_year as no; no()"

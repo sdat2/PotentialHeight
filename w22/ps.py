@@ -248,6 +248,7 @@ def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
             return point_solution_ps(ids, include_profile=False)
         except AssertionError as e:
             print(e.args[0] if e.args else "error")
+            print(e)
             ids["pm"] = np.nan
             ids["pc"] = np.nan
             ids["r0"] = np.nan
