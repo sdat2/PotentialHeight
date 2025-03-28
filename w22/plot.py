@@ -447,7 +447,7 @@ def plot_spatial(axs: np.ndarray) -> None:
     rho = safe_corr(ssts, vmaxs)
     print("space rho (sst, vmax): {:.2f}".format(rho))
     vmax_div_coriolis = vmaxs / coriolis_fs
-    rho = safe_grad(vmax_div_coriolis, r0s)
+    rho = safe_corr(vmax_div_coriolis, r0s)
     print("space rho (vmax/coriolis, r0): {:.2f}".format(rho))
     fit_space_vmaxs_div_coriolis_r0 = safe_grad(vmax_div_coriolis, r0s)
 
@@ -464,10 +464,10 @@ def plot_spatial(axs: np.ndarray) -> None:
     axs[1].set_title("Potential size, $r_a$ [km]")
 
 
-def plot_timeseries(axs: np.ndarray, text=True, color="black") -> None:
+def plot_timeseries(axs: np.ndarray, text=True, color="black", member: int = 4) -> None:
     assert len(axs) == 2
     timeseries_ds = xr.open_dataset(
-        os.path.join(DATA_PATH, "new_orleans_august_ssp585_r4i1p1f1.nc")
+        os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
     )
     print("timeseries_ds", timeseries_ds)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
@@ -543,7 +543,13 @@ def figure_two():
         height_ratios=[1, 1],
     )
     plot_spatial(axs[:, 0])
-    plot_timeseries(axs[:, 1])
+    plot_timeseries(axs[:, 1], text=False)
+    plot_timeseries(
+        axs[:, 1],
+        text=False,
+        color="purple",
+        member=10,
+    )
     plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))
     plt.clf()
     plt.close()
