@@ -38,18 +38,16 @@ def point_solution_ps(
     ds: xr.Dataset,
     supergradient_factor: float = SUPERGRADIENT_FACTOR,
     include_profile: bool = False,
-    pressure_assumption="isopycnal",
+    pressure_assumption="isothermal",
 ) -> xr.Dataset:
     """
     Find the solution for a given point in the grid.
-
-    # TODO: Speed up?
 
     Args:
         ds (xr.Dataset): Dataset with the input values.
         supergradient_factor (float, optional): Supergradient. Defaults to 1.2.
         include_profile (bool, optional)
-        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isopycnal".
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
 
     Returns:
         xr.Dataset: Find the solution dataset.

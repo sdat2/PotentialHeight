@@ -57,7 +57,7 @@ def delete_tmp():
             print("Failed to delete %s. Reason: %s" % (file_path, e))
 
 
-def _inputs_to_name(inputs: dict, hash_name=True) -> str:
+def _inputs_to_name(inputs: dict, hash_name=False) -> str:
     """Create a unique naming string based on the input parameters
     (now hashed to shorten).
 

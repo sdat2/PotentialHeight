@@ -37,7 +37,7 @@ def trimmed_cmip6_example() -> None:
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "potential_size_gom_august.nc"))
+    out_ds.to_netcdf(os.path.join(DATA_PATH, "potential_size_gom_august_isothermal.nc"))
 
 
 @timeit
@@ -168,7 +168,8 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
     # set off global
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')"
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')" &> ne.log
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('nw')" &> nw.log
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga('sw')" &> sw.log
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se.log
 

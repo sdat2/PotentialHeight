@@ -63,7 +63,7 @@ B_DEFAULT: float = 0.031
 C_DEFAULT: float = 0.008
 
 # WANG defaults
-LOWER_Y_WANG_BISECTION = 0.5  # [dimensionless]
+LOWER_Y_WANG_BISECTION = 0.3  # [dimensionless]
 UPPER_Y_WANG_BISECTION = 1.5  # [dimensionless]
 W22_BISECTION_TOLERANCE = 1e-6  # [dimensionless]
 
