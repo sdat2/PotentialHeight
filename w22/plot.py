@@ -503,6 +503,9 @@ def plot_timeseries(axs: np.ndarray, text=True, color="black", member: int = 4) 
     fit_vmax_sst = safe_grad(ssts, vmaxs)
     print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
 
+    print("fit_vmax_years timeseries", fit_vmax, "m s$^{-1}$ yr$^{-1}$")
+    print("fit_r0_years timeseries", fit_r0, "km yr$^{-1}$")
+
     if text:
         axs[0].text(
             0.60,
