@@ -218,13 +218,16 @@ def point_solution_ps(
 
 
 @timeit
-def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
+def parallelized_ps(
+    ds: xr.Dataset, jobs=10, pressure_assumption="isothermal"
+) -> xr.Dataset:
     """
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
 
     Args:
         ds (xr.Dataset): contains msl, vmax, sst, t0, rh, and lat.
         jobs (int, optional): Number of threads, defaults to 10.
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
 
     Returns:
         xr.Dataset: additionally contains r0, pm, pc, and rmax.
@@ -242,8 +245,10 @@ def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
             assert not np.isnan(ids.vmax.values)  # did not converge
-            assert not np.isnan(ids.sst.values)  # is not sea
-            return point_solution_ps(ids, include_profile=False)
+            assert not np.isnan(ids.sst.values)  # is sea surface
+            return point_solution_ps(
+                ids, include_profile=False, pressure_assumption=pressure_assumption
+            )
         except AssertionError as e:
             print(e.args[0] if e.args else "error")
             print(e)
@@ -295,35 +300,6 @@ def parallelized_ps(ds: xr.Dataset, jobs=10) -> xr.Dataset:
             .set_index(stacked_dim=dims)  # Restore multi-index before unstacking
             .unstack("stacked_dim")
         )
-
-
-def convert_2d_coords_to_1d(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Converts 2D coordinate variables (lon, lat) into 1D coordinates safely.
-
-    Assumes:
-    - `lon(y, x)` only varies along `x`, so we take the first row to get `lon(x)`.
-    - `lat(y, x)` only varies along `y`, so we take the first column to get `lat(y)`.
-
-    Args:
-        ds (xr.Dataset): Input dataset with 2D coordinates.
-
-    Returns:
-        xr.Dataset: Dataset with 1D `lon(x)` and `lat(y)`, replacing the old ones.
-    """
-    # Extract 1D latitude and longitude
-    lon_1d = ds["lon"].isel(y=0)  # Take the first row (constant across y)
-    lat_1d = ds["lat"].isel(x=0)  # Take the first column (constant across x)
-
-    # Drop the original 2D coordinates first
-    ds = ds.drop_vars(["lon", "lat"])
-
-    # Assign new 1D coordinates with the same names
-    ds = ds.assign_coords(lon=("x", lon_1d.values), lat=("y", lat_1d.values))
-
-    ds = ds.set_coords(["lon", "lat"])
-
-    return ds
 
 
 def single_point_example() -> None:
