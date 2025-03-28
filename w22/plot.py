@@ -383,6 +383,7 @@ def plot_seasonal_profiles():
 
 
 def plot_spatial(axs: np.ndarray) -> None:
+    assert len(axs) == 2
     plot_defaults()
     ds = xr.open_dataset(os.path.join(DATA_PATH, "potential_size_gom_august.nc"))
     # print("ds", ds)
@@ -463,7 +464,8 @@ def plot_spatial(axs: np.ndarray) -> None:
     axs[1].set_title("Potential size, $r_a$ [km]")
 
 
-def plot_timeseries(axs: np.ndarray) -> None:
+def plot_timeseries(axs: np.ndarray, text=True, color="black") -> None:
+    assert len(axs) == 2
     timeseries_ds = xr.open_dataset(
         os.path.join(DATA_PATH, "new_orleans_august_ssp585_r4i1p1f1.nc")
     )
@@ -484,12 +486,14 @@ def plot_timeseries(axs: np.ndarray) -> None:
     rho_sst = safe_corr(ssts, years)
     rho_sst_vmax = safe_corr(ssts, vmaxs)
     rho_sst_r0 = safe_corr(ssts, r0s)
+    print("rho_vmax_years", rho_vmax)
+    print("rho_r0_years", rho_r0)
     print("rho_sst_vmax", rho_sst_vmax)
     print("rho_sst_r0", rho_sst_r0)
-    print("rho_sst", rho_sst)
-
-    axs[0].text(0.75, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
-    axs[1].text(0.75, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1].transAxes)
+    print("rho_sst_years", rho_sst)
+    if text:
+        axs[0].text(0.75, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
+        axs[1].text(0.75, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1].transAxes)
 
     # work out gradient with error bars for same period
     fit_vmax = safe_grad(years, vmaxs)
@@ -499,24 +503,26 @@ def plot_timeseries(axs: np.ndarray) -> None:
     fit_vmax_sst = safe_grad(ssts, vmaxs)
     print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
 
-    axs[0].text(
-        0.60,
-        0.05,
-        f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
-        transform=axs[0].transAxes,
-    )
-    axs[1].text(
-        0.60,
-        0.1,
-        f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
-        transform=axs[1].transAxes,
-    )
+    if text:
+        axs[0].text(
+            0.60,
+            0.05,
+            f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+            transform=axs[0].transAxes,
+        )
+        axs[1].text(
+            0.60,
+            0.1,
+            f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
+            transform=axs[1].transAxes,
+        )
 
-    axs[0].plot(years, timeseries_ds["vmax"], "k")
-    axs[1].plot(years, timeseries_ds["r0"] / 1000, "k")
+    axs[0].plot(years, timeseries_ds["vmax"], color=color)
+    axs[1].plot(years, timeseries_ds["r0"] / 1000, color=color)
     label_subplots(axs)
     axs[0].set_xlabel("")
     axs[1].set_xlabel("Year")
+    # just the SSP585 years at the moment
     axs[0].set_xlim([2015, 2100])
     axs[1].set_xlim([2015, 2100])
     # axs[0].set_xlim([1850, 2100])

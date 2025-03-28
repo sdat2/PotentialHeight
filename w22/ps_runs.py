@@ -42,6 +42,7 @@ def trimmed_cmip6_example() -> None:
 
 @timeit
 def new_orleans_year() -> None:
+    # look at some seasonal data for new orleans
     in_ds = xr.open_dataset(EX_DATA_PATH).isel(time=slice(0, 120))
     in_ds = in_ds.sel(
         lon=OFFSET_D["new_orleans"]["point"].lon
@@ -121,6 +122,13 @@ def load_global() -> xr.Dataset:
 
 
 def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
+    """
+    Point timeseries.
+
+    Args:
+        member (int, optional): member number. Defaults to 10.
+        place (str, optional): location. Defaults to "new_orleans".
+    """
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     point_ds = xr.open_dataset(file_name).sel(
         lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
