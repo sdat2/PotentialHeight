@@ -20,7 +20,7 @@ EX_DATA_PATH = os.path.join(PI2_PATH, "ssp585", "CESM2", "r4i1p1f1.nc")
 
 
 @timeit
-def trimmed_cmip6_example(pressure_assumption="isopycnal") -> None:
+def trimmed_cmip6_example(pressure_assumption="isopycnal", trial=1) -> None:
     print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
@@ -33,12 +33,16 @@ def trimmed_cmip6_example(pressure_assumption="isopycnal") -> None:
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
+
     # get rid of V_reduc accidentally added in for vmax calculation
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
     out_ds.to_netcdf(
-        os.path.join(DATA_PATH, f"potential_size_gom_august_{pressure_assumption}.nc")
+        os.path.join(
+            DATA_PATH,
+            f"potential_size_gom_august_{pressure_assumption}_trial_{trial}.nc",
+        )
     )
 
 
@@ -156,7 +160,12 @@ def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
 
 if __name__ == "__main__":
     # python -m w22.ps_runs
-    trimmed_cmip6_example()
+    print("Running as main")
+    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 1)"
+    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 1)"
+    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 2)"
+    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 2)"
+    # trimmed_cmip6_example()
     # new_orleans_year()
     # global_cmip6()
     # python -c "from cle.ps_runs import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
