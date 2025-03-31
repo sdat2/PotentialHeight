@@ -34,7 +34,7 @@ REQUIRED: List[str] = [
 setup(
     name="worstsurge",
     description="A set of tools to calculate the worst case storm surge",
-    version="0.0.0",
+    version="0.0.2",
     author_email="sdat2@cam.ac.uk",
     author="Simon D.A. Thomas",
     install_requires=REQUIRED,
