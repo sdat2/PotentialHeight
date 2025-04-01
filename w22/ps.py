@@ -6,7 +6,8 @@ import numpy as np
 import xarray as xr
 from tqdm import tqdm
 from sithom.io import read_json
-from sithom.time import timeit
+from sithom.time import timeit, time_stamp
+from sithom.misc import get_git_revision_hash
 from .constants import (
     TEMP_0K,
     DATA_PATH,
@@ -245,6 +246,7 @@ def parallelized_ps(
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
             assert not np.isnan(ids.vmax.values)  # did not converge
+            assert ids["vmax"].values > 0.01  # is positive
             assert not np.isnan(ids.sst.values)  # is sea surface
             return point_solution_ps(
                 ids, include_profile=False, pressure_assumption=pressure_assumption
@@ -278,7 +280,7 @@ def parallelized_ps(
         results = Parallel(n_jobs=jobs)(
             delayed(process_point)(i) for i in range(ds.sizes[dims[0]])
         )
-        return xr.concat(results, dim=dims[0])
+        output_ds = xr.concat(results, dim=dims[0])
     else:
         ds_stacked = ds.stack(stacked_dim=dims)
 
@@ -295,11 +297,15 @@ def parallelized_ps(
         )
 
         # Step 3: Reconstruct the original dataset dimensions
-        return (
+        output_ds = (
             xr.concat(results, dim="stacked_dim")
             .set_index(stacked_dim=dims)  # Restore multi-index before unstacking
             .unstack("stacked_dim")
         )
+    output_ds.attrs["potential_size_pressure_assumption"] = pressure_assumption
+    output_ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash()
+    output_ds.attrs["pi_calculated_at_time"] = time_stamp()
+    return output_ds
 
 
 def single_point_example() -> None:
@@ -352,6 +358,6 @@ def multi_point_example_2d() -> None:
 
 
 if __name__ == "__main__":
-    # python -m cle.ps
+    # python -m w22.ps
     # single_point_example()
     multi_point_example_2d()

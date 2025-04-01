@@ -14,9 +14,8 @@ Uses the `tcpypi` pypi package to calculate potential intensity.
 
 ## w22
 
-Chavas et al. 2015 profile calculation in matlab (using octave instead).
+Used to calculate tropical cyclone potential size as in Wang et al. (2022). Uses Chavas et al. 2015 profile calculation in matlab (using octave instead).
 
-Used to calculate tropical cyclone potential size as in Wang et al. (2022).
 
 
 ## adforce

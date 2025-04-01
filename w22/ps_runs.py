@@ -103,7 +103,7 @@ def global_cmip6(part="nw") -> None:
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=30)
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, f"potential_size_global_{part}_2015.nc"))
+    out_ds.to_netcdf(os.path.join(DATA_PATH, f"potential_size_global_{part}_2015_2.nc"))
 
 
 def load_global() -> xr.Dataset:

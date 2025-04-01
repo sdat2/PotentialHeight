@@ -1,18 +1,11 @@
 % take r0 as input, get central pressure
 % octave --no-gui --no-gui-libs r0_pm.m
-% octave --no-gui --no-gui-libs r0_pm.m test
+% octave --no-gui --no-gui-libs r0_pm.m ~/data_folder test
 clear
 clc
 % warning("off", "Octave:possible-matlab-short-circuit-operator")
 warning("off", "all")
 
-# Check if an argument was provided
-args = argv();
-if numel(args) < 1
-  name = "";
-else
-  name = args{1};
-end
 
 % close all
 % add path to mcle and mfiles
@@ -22,16 +15,27 @@ file_path = mfilename('fullpath');
 file_path = fileparts(file_path);
 file_path_cle = fileparts(file_path);
 
-addpath(genpath(file_path)); % 'mcle/'));
+addpath(genpath(file_path));
 file_path = char([file_path, "/", "mfiles"]);
-addpath(genpath(char([file_path, "/", "mfiles"])));  % 'mcle/mfiles/'));
+addpath(genpath(char([file_path, "/", "mfiles"])));
+
+
+# Check if an argument was provided
+args = argv();
+if numel(args) < 2
+  name = "";
+  data_folder = char([file_path_cle, "/", "data"]);
+else
+  data_folder = args{1};
+  name = args{2};
+end
 
 % read in JSON file of inputs
 if isempty(name)
   data_folder = char([file_path_cle, "/", "data"]);
   input_file_name = char([data_folder, '/', 'inputs.json']); % filename in JSON extension
 else
-  data_folder = char([file_path_cle, "/", "data", "/", "tmp"]);
+  % data_folder = char([file_path_cle, "/", "data", "/", "tmp"]);
   input_file_name = char([data_folder, '/', name, '-inputs.json']);
   % filename in JSON extension
 end

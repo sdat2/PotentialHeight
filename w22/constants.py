@@ -11,6 +11,8 @@ DATA_PATH = os.path.join(SRC_PATH, "data")
 SUP_PATH = os.path.join(SRC_PATH, "sup")
 TMP_PATH = os.path.join(DATA_PATH, "tmp")
 os.makedirs(TMP_PATH, exist_ok=True)
+TMPS_PATH = os.path.join(DATA_PATH, "tmps")
+os.makedirs(TMPS_PATH, exist_ok=True)
 
 # real physical constants
 TEMP_0K = 273.15  # [K]

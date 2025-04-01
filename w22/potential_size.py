@@ -2,7 +2,10 @@
 
 from typing import Callable, Tuple, Optional, Dict, Union
 import os
+import shutil
 import subprocess
+import socket
+import uuid
 import numpy as np
 import time
 from scipy.interpolate import interp1d
@@ -10,9 +13,11 @@ from matplotlib import pyplot as plt
 from sithom.io import read_json, write_json
 from sithom.plot import plot_defaults
 from .constants import (
-    BACKGROUND_PRESSURE,
+    SRC_PATH,
     DATA_PATH,
+    TMPS_PATH,
     FIGURE_PATH,
+    BACKGROUND_PRESSURE,
     F_COR_DEFAULT,
     W_COOL_DEFAULT,
     CK_CD_DEFAULT,
@@ -28,7 +33,6 @@ from .constants import (
     RADIUS_OF_MAX_WIND_DEFAULT,
     RADIUS_OF_INFLOW_DEFAULT,
     NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,
-    SRC_PATH,
     OUTFLOW_TEMPERATURE_DEFAULT,
 )
 from .utils import (
@@ -55,6 +59,16 @@ def delete_tmp():
                 shutil.rmtree(file_path)
         except Exception as e:
             print("Failed to delete %s. Reason: %s" % (file_path, e))
+
+
+def get_unique_folder() -> str:
+    # create unique folder for this run.
+    pid = os.getpid()
+    hostname = socket.gethostname()
+    unique_id = uuid.uuid4()
+    temp_dir = os.path.join(TMPS_PATH, f"job_{hostname}_{pid}_{unique_id}")
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
 
 
 def _inputs_to_name(inputs: dict, hash_name=True) -> str:
@@ -88,6 +102,7 @@ def _inputs_to_name(inputs: dict, hash_name=True) -> str:
 
 
 def process_inputs(inputs: dict) -> dict:
+    # load default inputs
     ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
     ins["w_cool"] = W_COOL_DEFAULT
     ins["p0"] = BACKGROUND_PRESSURE / 100  # in hPa instead
@@ -124,11 +139,13 @@ def _run_cle15_octave(inputs: dict) -> dict:
     # Storm parameters
     name = _inputs_to_name(ins)
 
+    data_folder = get_unique_folder()
+
     # write input file for octave to read
-    write_json(ins, os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
+    write_json(ins, os.path.join(data_folder, name + "-inputs.json"))
 
     # check file has been written
-    assert os.path.isfile(os.path.join(DATA_PATH, "tmp", name + "-inputs.json"))
+    assert os.path.isfile(os.path.join(data_folder, name + "-inputs.json"))
 
     # time.sleep(0.1)  # wait for filesystem to sync for 0.1 s
 
@@ -148,31 +165,26 @@ def _run_cle15_octave(inputs: dict) -> dict:
                 "--no-gui",
                 "--no-gui-libs",
                 "r0_pm.m",
+                f"{data_folder}",
                 f"{name}",
             ],
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=os.path.join(SRC_PATH, "mcle"),
-            # "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/cle/mcle",
         )
-        # print(result.stderr.decode())
-        # print(result.stdout.decode())
     except subprocess.CalledProcessError as e:
         print("Octave exited with code", e.returncode)
         print("Standard error:", e.stderr.decode())
         print("Standard output:", e.stdout.decode())
 
-    # subprocess.call(
-    #     (
-    #         "micromamba activate t1",
-    #         f"octave --no-gui --no-gui-libs {os.path.join(SRC_PATH, 'mcle', 'r0_pm.m')} {name}",
-    #     )
-    # )
-
     # read in the output from r0_pm.m
     # time.sleep(0.5)  # sleep another 0.5s for file system to catch up with itself
-    return read_json(os.path.join(DATA_PATH, "tmp", name + "-outputs.json"))
+    output = read_json(os.path.join(data_folder, name + "-outputs.json"))
+
+    # delete the temporary folder 'data_folder'
+    shutil.rmtree(data_folder)
+    return output
 
 
 def run_cle15(
