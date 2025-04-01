@@ -73,23 +73,34 @@ def new_orleans_year() -> None:
 
 
 @timeit
-def global_cmip6(part="nw") -> None:
+def global_cmip6(part="nw", year: int = 2015) -> None:
     # just get North Western Hemisphere August
+    year_offset = (year - 2015) * 12
+    southern_hemisphere_month = 1
+    northern_hemisphere_month = 7
     if part == "nw":
         in_ds = xr.open_dataset(EX_DATA_PATH).isel(
-            time=7, lat=slice(180, 300), lon=slice(0, 360)
+            time=northern_hemisphere_month + year_offset,
+            lat=slice(180, 300),
+            lon=slice(0, 360),
         )
     elif part == "ne":
         in_ds = xr.open_dataset(EX_DATA_PATH).isel(
-            time=7, lat=slice(180, 300), lon=slice(360, 720)
+            time=northern_hemisphere_month + year_offset,
+            lat=slice(180, 300),
+            lon=slice(360, 720),
         )
     elif part == "sw":  # just February
         in_ds = xr.open_dataset(EX_DATA_PATH).isel(
-            time=1, lat=slice(0, 180), lon=slice(0, 360)
+            time=southern_hemisphere_month + year_offset,
+            lat=slice(0, 180),
+            lon=slice(0, 360),
         )
     elif part == "se":
         in_ds = xr.open_dataset(EX_DATA_PATH).isel(
-            time=1, lat=slice(0, 180), lon=slice(360, 720)
+            time=southern_hemisphere_month + year_offset,
+            lat=slice(0, 180),
+            lon=slice(360, 720),
         )
     else:
         raise ValueError("part must be one of nw, ne, sw, se")
@@ -103,10 +114,12 @@ def global_cmip6(part="nw") -> None:
     in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=30)
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, f"potential_size_global_{part}_2015_2.nc"))
+    out_ds.to_netcdf(
+        os.path.join(DATA_PATH, f"potential_size_global_{part}_{year}_2.nc")
+    )
 
 
-def load_global() -> xr.Dataset:
+def load_global(year: int = 2015) -> xr.Dataset:
     """Load all parts of the global data and stitch together.
 
     Returns:
@@ -116,7 +129,7 @@ def load_global() -> xr.Dataset:
         [
             xr.concat(
                 [
-                    os.path.join(DATA_PATH, f"potential_size_global_{x}_2015.nc")
+                    os.path.join(DATA_PATH, f"potential_size_global_{x}_{year}.nc")
                     for x in y
                 ],
                 dim="lon",

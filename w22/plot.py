@@ -542,7 +542,6 @@ def plot_timeseries(axs: np.ndarray, text=True, color="black", member: int = 4) 
 
     axs[0].plot(years, timeseries_ds["vmax"], color=color)
     axs[1].plot(years, timeseries_ds["r0"] / 1000, color=color)
-    label_subplots(axs)
     axs[0].set_xlabel("")
     axs[1].set_xlabel("Year")
     # just the SSP585 years at the moment
@@ -573,6 +572,7 @@ def figure_two():
         color="purple",
         member=10,
     )
+    label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))
     plt.clf()
     plt.close()
