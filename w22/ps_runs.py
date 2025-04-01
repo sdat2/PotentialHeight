@@ -179,10 +179,10 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
     # set off global
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')" &> ne.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('nw')" &> nw.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('sw')" &> sw.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se.log
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')" &> ne2.log
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('nw')" &> nw2.log
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('sw')" &> sw2.log
+    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se2.log
 
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
     # python -c "from w22.ps_runs import new_orleans_year as no; no()"
