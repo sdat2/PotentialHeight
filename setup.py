@@ -10,6 +10,7 @@ REQUIRED: List[str] = [
     "uncertainties",  # common utility for linear error propagation
     # "sithom @ git+https://github.com/sdat2/sithom",
     "sithom >= 0.1.1",  # personal common utilities for timing, plotting, and fitting
+    "osqp==1.0.1", # pip install problem 2nd April 2025 https://github.com/astral-sh/uv/issues/12618
     "cdsapi",  # download ERA5 monthly averages (tcpips)
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
