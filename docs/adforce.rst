@@ -28,14 +28,6 @@ adforce.constants module
    :undoc-members:
    :show-inheritance:
 
-adforce.fort15 module
----------------------
-
-.. automodule:: adforce.fort15
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 adforce.fort22 module
 ---------------------
 

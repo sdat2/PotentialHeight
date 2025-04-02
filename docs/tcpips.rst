@@ -1,14 +1,6 @@
 tcpips package
 ==============
 
-Subpackages
------------
-
-.. toctree::
-   :maxdepth: 4
-
-   tcpips.example
-
 Submodules
 ----------
 

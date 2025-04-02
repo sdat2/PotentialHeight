@@ -12,10 +12,10 @@ w22.constants module
    :undoc-members:
    :show-inheritance:
 
-w22.new\_ps\_plot module
-------------------------
+w22.old\_plot module
+--------------------
 
-.. automodule:: w22.new_ps_plot
+.. automodule:: w22.old_plot
    :members:
    :undoc-members:
    :show-inheritance:
@@ -40,22 +40,6 @@ w22.ps module
 -------------
 
 .. automodule:: w22.ps
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-w22.ps\_dataset module
-----------------------
-
-.. automodule:: w22.ps_dataset
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-w22.ps\_old module
-------------------
-
-.. automodule:: w22.ps_old
    :members:
    :undoc-members:
    :show-inheritance:
