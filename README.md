@@ -1,7 +1,7 @@
 # WorstSurge: Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)[![Python package](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml/badge.svg)](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml)[![Documentation Status](https://readthedocs.org/projects/worstsurge/badge/?version=latest)](https://worstsurge.readthedocs.io/en/latest/?badge=latest)[![Code DOI](https://zenodo.org/badge/718141777.svg)](https://doi.org/10.5281/zenodo.15073504)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)[![Python package](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml/badge.svg)](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml)[![Documentation Status](https://readthedocs.org/projects/worstsurge/badge/?version=latest)](https://worstsurge.readthedocs.io/en/latest/?badge=latest)[![Code DOI](https://zenodo.org/badge/718141777.svg)](https://doi.org/10.5281/zenodo.15073504)[![EarthArXiv Preprint](https://img.shields.io/badge/EarthArXiv-doi:10.31223/X57T5R-blue?style=flat)](https://doi.org/10.31223/X57T5R)
 
-Preprint now available <https://doi.org/10.31223/X57T5R>!
+EarthArxiv preprint now available <https://doi.org/10.31223/X57T5R>!
 
 
 We want to answer the question of what the potential height of a storm surge could be now and in a changing climate. To do this we first calculate the potential intensity and size from CMIP6 (`tcpips` & `w22`), and then use a Bayesian optimization loop (`adbo`) to drive an storm surge model ADCIRC with idealised tropical cyclones (`adforce`). We then show that knowing the upper bound can be useful in the context of an evt fit (`worst`). 
@@ -70,3 +70,41 @@ pip install -e .
 
 ```
 
+## Citations
+
+If you use this code, please cite the following paper:
+```bibtex
+@article{potential_height_paper_2025,
+  title={Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization},
+  author={Thomas, Simon D. A. and Jones, Dani C. and Mayo, Talea and Taylor, John R. and Moss, Henry B. and Haigh, Ivan D. and Gopinathan, Devaraj},
+  journal={EarthArXiv (Submitted to Environmental Data Science)},
+  year={2025},
+  doi={10.31223/X57T5R}
+}
+```
+
+And if you use the code, please cite it as:
+```bibtex
+@software{worstsuge_repo,
+author = {Thomas, Simon D. A.},
+doi = {10.5281/zenodo.15073504},
+month = mar,
+title = {{WorstSurge - Finding the potential height of a tropical cyclone in a changing climate using Bayesian Optimization}},
+url = {https://github.com/sdat2/worstsurge},
+version = {v0.0.2},
+year = {2025}
+}
+```
+
+We also currently use the matlab code from Chavas, Lin, and Emanuel (2015), which should be cited as:
+
+```bibtex
+@misc {cle_2015_code,
+	title = {Code for tropical cyclone wind profile model of Chavas et al (2015, JAS)},
+	month = {Jun},
+	url = {https://purr.purdue.edu/publications/4066/1},
+	year = {2022},
+	doi = {doi:/10.4231/CZ4P-D448},
+	author = {Daniel Robert Chavas}
+}
+```
