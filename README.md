@@ -85,7 +85,7 @@ If you use this code, please cite the following paper:
 
 And if you use the code, please cite it as:
 ```bibtex
-@software{worstsuge_repo,
+@software{worstsuge_code,
 author = {Thomas, Simon D. A.},
 doi = {10.5281/zenodo.15073504},
 month = mar,
@@ -99,7 +99,7 @@ year = {2025}
 We also currently use the matlab code from Chavas, Lin, and Emanuel (2015), which should be cited as:
 
 ```bibtex
-@misc {cle_2015_code,
+@software{cle_2015_code,
 	title = {Code for tropical cyclone wind profile model of Chavas et al (2015, JAS)},
 	month = {Jun},
 	url = {https://purr.purdue.edu/publications/4066/1},

@@ -21,6 +21,12 @@ EX_DATA_PATH = os.path.join(PI2_PATH, "ssp585", "CESM2", "r4i1p1f1.nc")
 
 @timeit
 def trimmed_cmip6_example(pressure_assumption="isopycnal", trial=1) -> None:
+    """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
+
+    Args:
+        pressure_assumption (str, optional): pressure assumption. Defaults to "isopycnal".
+        trial (int, optional): trial number. Defaults to 1.
+    """
     print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
@@ -48,6 +54,7 @@ def trimmed_cmip6_example(pressure_assumption="isopycnal", trial=1) -> None:
 
 @timeit
 def new_orleans_year() -> None:
+    """Run potential size calculations on CMIP6 data to get New Orleans data."""
     # look at some seasonal data for new orleans
     in_ds = xr.open_dataset(EX_DATA_PATH).isel(time=slice(0, 120))
     in_ds = in_ds.sel(
@@ -73,9 +80,16 @@ def new_orleans_year() -> None:
 
 
 @timeit
-def global_cmip6(part="nw", year: int = 2015) -> None:
-    # just get North Western Hemisphere August
-    year_offset = (year - 2015) * 12
+def global_cmip6(part="nw", year: int = 2015, version=2) -> None:
+    """Run potential size calculations on CMIP6 data to make specific subsets.
+    Args:
+        part (str, optional): segment of the world to calculate. Defaults to "nw".
+        year (int, optional): year to calculate. Defaults to 2015.
+        version (int, optional): version of the data. Defaults to 2.
+    """
+    # just get North Hemisphere August
+    # and South Hemisphere February
+    year_offset = (year - 2015) * 12  # number of months since 2015
     southern_hemisphere_month = 1
     northern_hemisphere_month = 7
     if part == "nw":
@@ -115,12 +129,15 @@ def global_cmip6(part="nw", year: int = 2015) -> None:
     out_ds = parallelized_ps(in_ds, jobs=30)
     print(out_ds)
     out_ds.to_netcdf(
-        os.path.join(DATA_PATH, f"potential_size_global_{part}_{year}_2.nc")
+        os.path.join(DATA_PATH, f"potential_size_global_{part}_{year}_{version}.nc")
     )
 
 
 def load_global(year: int = 2015) -> xr.Dataset:
     """Load all parts of the global data and stitch together.
+
+    Args:
+        year (int, optional): year to load. Defaults to 2015.
 
     Returns:
         xr.Dataset: stitched together dataset.
@@ -140,13 +157,16 @@ def load_global(year: int = 2015) -> xr.Dataset:
     )
 
 
-def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
+def point_timeseries(
+    member: int = 10, place: str = "new_orleans", pressure_assumption="isothermal"
+) -> None:
     """
     Point timeseries.
 
     Args:
         member (int, optional): member number. Defaults to 10.
         place (str, optional): location. Defaults to "new_orleans".
+        pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
     """
     file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     point_ds = xr.open_dataset(file_name).sel(
@@ -167,7 +187,9 @@ def point_timeseries(member: int = 10, place: str = "new_orleans") -> None:
     )
     out_ds = parallelized_ps(trimmed_ds, jobs=25)
     out_ds.to_netcdf(
-        os.path.join(DATA_PATH, f"{place}_august_ssp585_r{member}i1p1f1.nc")
+        os.path.join(
+            DATA_PATH, f"{place}_august_ssp585_r{member}i1p1f1_{pressure_assumption}.nc"
+        )
     )
 
 
