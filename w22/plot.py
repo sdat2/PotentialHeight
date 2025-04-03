@@ -382,7 +382,13 @@ def plot_seasonal_profiles():
     plt.close()
 
 
-def plot_spatial(axs: np.ndarray) -> None:
+def plot_two_spatial_new_orleans(axs: np.ndarray) -> None:
+    """
+    Plot the potential intensity and size for the Gulf of Mexico area.
+
+    Args:
+        axs (np.ndarray): axes to plot on. Should be two.
+    """
     assert len(axs) == 2
     plot_defaults()
     ds = xr.open_dataset(
@@ -410,10 +416,6 @@ def plot_spatial(axs: np.ndarray) -> None:
     r0s = r0s.ravel()
     lats = lats.ravel()
     vmaxs = vmaxs.ravel()
-    lats = lats[~np.isnan(ssts)]
-    r0s = r0s[~np.isnan(ssts)]
-    vmaxs = vmaxs[~np.isnan(ssts)]
-    ssts = ssts[~np.isnan(ssts)]
     rho = safe_corr(lats, ssts)
     fit_space_sst_lat = safe_grad(lats, ssts)
     print(
@@ -433,10 +435,6 @@ def plot_spatial(axs: np.ndarray) -> None:
     )
     rho = safe_corr(lats, r0s)
     print("space rho (r0s, lat): {:.2f}".format(rho))
-
-    ssts = ssts[~np.isnan(vmaxs)]
-    coriolis_fs = coriolis_fs[~np.isnan(vmaxs)]
-    vmaxs = vmaxs[~np.isnan(vmaxs)]
     fit_space_vmaxs_lats = safe_grad(lats, vmaxs)
     print(
         "space (vmax, lat) $m={:.1eL}$ ".format(fit_space_vmaxs_lats)
@@ -467,7 +465,19 @@ def plot_spatial(axs: np.ndarray) -> None:
     axs[1].set_title("Potential size, $r_a$ [km]")
 
 
-def plot_timeseries(axs: np.ndarray, text=True, color="black", member: int = 4) -> None:
+def plot_two_timeseries_new_orleans(
+    axs: np.ndarray, text=True, color="black", member: int = 4
+) -> None:
+    """Plot the potential and height timeseries for New Orleans for different ensemble members.
+
+    Args:
+        axs (np.ndarray): The axes to plot on.
+        text (bool): Whether to add text to the plot (default is True).
+        color (str): The color of the line (default is "black").
+        member (int): The ensemble member to plot (default is 4).
+
+    """
+
     assert len(axs) == 2
     timeseries_ds = xr.open_dataset(
         os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
@@ -538,7 +548,10 @@ def plot_timeseries(axs: np.ndarray, text=True, color="black", member: int = 4) 
 
 
 def figure_two():
-    """Plot the solution for the GOM bbox for potential size and intensity."""
+    """Plot the solution for the GOM bbox for potential size and intensity.
+
+    Then plot New Orleans timeseries.
+    """
     plot_defaults()
     _, axs = plt.subplots(
         2,
@@ -547,9 +560,9 @@ def figure_two():
         width_ratios=[1, 1.5],
         height_ratios=[1, 1],
     )
-    plot_spatial(axs[:, 0])
-    plot_timeseries(axs[:, 1], text=False)
-    plot_timeseries(
+    plot_two_spatial_new_orleans(axs[:, 0])
+    plot_two_timeseries_new_orleans(axs[:, 1], text=False)
+    plot_two_timeseries_new_orleans(
         axs[:, 1],
         text=False,
         color="purple",
