@@ -10,7 +10,7 @@ REQUIRED: List[str] = [
     "uncertainties",  # common utility for linear error propagation
     # "sithom @ git+https://github.com/sdat2/sithom",
     "sithom >= 0.1.1",  # personal common utilities for timing, plotting, and fitting
-    "osqp==1.0.1", # pip install problem 2nd April 2025 https://github.com/astral-sh/uv/issues/12618
+    "osqp==1.0.1",  # pip install problem 2nd April 2025 https://github.com/astral-sh/uv/issues/12618
     "cdsapi",  # download ERA5 monthly averages (tcpips)
     "imageio",  # to make animations (adforce, adbo)
     "requests",  # to download data (tcpips)
@@ -34,8 +34,8 @@ REQUIRED: List[str] = [
 
 setup(
     name="worstsurge",
-    description="A set of tools to calculate the worst case storm surge",
-    version="0.0.2",
+    description="A set of tools to calculate the potential height of tropical cyclone storm surges",
+    version="0.0.3",
     author_email="sdat2@cam.ac.uk",
     author="Simon D.A. Thomas",
     install_requires=REQUIRED,
@@ -60,9 +60,9 @@ setup(
     packages=["tcpips", "w22", "adforce", "adbo", "worst"],
     package_dir={
         "tcpips": "tcpips",  # Calculate potential intensity and prerequisites for potential size
-        "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab, calculate potential size
+        "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab (octave), calculate potential size
         "adforce": "adforce",  # All of the interfacing with ADCIRC
-        "adbo": "adbo",  # All of the tensorflow/trieste stuff
-        "worst": "worst",  # Extreme value theory using the upper bound limit
+        "adbo": "adbo",  # All of the tensorflow/trieste Bayesian optimization stuff
+        "worst": "worst",  # Extreme value theory using the upper bound limit using tensorflow for fitting.
     },
 )

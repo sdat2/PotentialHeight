@@ -385,7 +385,9 @@ def plot_seasonal_profiles():
 def plot_spatial(axs: np.ndarray) -> None:
     assert len(axs) == 2
     plot_defaults()
-    ds = xr.open_dataset(os.path.join(DATA_PATH, "potential_size_gom_august.nc"))
+    ds = xr.open_dataset(
+        os.path.join(DATA_PATH, "potential_size_gom_august_isothermal_trial_3.nc")
+    )
     # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
@@ -393,29 +395,10 @@ def plot_spatial(axs: np.ndarray) -> None:
     print(ds["sst"])
     print("two lats", ds["sst"].isel(lat=slice(0, 2)).values.shape)
 
-    # strange missing squares in the data from problems in io
-    # xi yi
-    missing_squares: List[Tuple[int, int]] = [
-        (11, 21),
-        (15, 21),
-        (17, 21),
-        (19, 21),
-        (25, 21),
-        (28, 21),
-    ]
-    # put the square one to the right of the missing squares for r0
-    # for square in missing_squares:
-    #    ds["r0"].values[square[0], square[1]] = ds["r0"].values[
-    #        square[0] + 1, square[1]
-    #     ]
     vmaxs = ds["vmax"].values
     lats = ds["lat"].values
     ssts = ds["sst"].values
     r0s = ds["r0"].values
-
-    for xi, yi in missing_squares:
-        # r0s[xi, yi] = r0s[xi + 1, yi]
-        r0s[yi, xi] = r0s[yi, xi + 1]
 
     print("vmaxs", vmaxs.shape)
     print("lats", lats.shape)
