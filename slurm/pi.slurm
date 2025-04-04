@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
 
 # Replace [budget code] below with your project code (e.g. t01)
@@ -34,4 +34,7 @@ mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
 # single bit test:
-python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r11i1p1f1')"
+#python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r11i1p1f1')"
+#python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r10i1p1f1')"
+# python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='ssp585', model='CESM2', member='r4i1p1f1')"
+python -c "from tcpips.pi_driver import pi_cmip6_part; pi_cmip6_part(exp='historical', model='CESM2', member='r11i1p1f1')"
