@@ -13,8 +13,44 @@ CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimension
 PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
 
 
+def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset:
+    """
+    Fix the temperature profile in the dataset.
+
+    Problem in calculating the potential intensity with incomplete temperature profiles.
+
+    At some places such as the Gulf of Tonkin and the Bay of Bengal, the mean sea level
+    pressure in CESM2 in August is low, leading to NaN values in the temperature profile
+    at the 1000 hPa level.
+
+    To fix this, we could assume an approximation that the temperature at these low levels
+    is equal to sea surface temperature minus one kelvin (a standard parameterization for near surface air temperature).
+
+    Args:
+        ds (xr.Dataset): xarray dataset containing the necessary variables "t" and "sst".
+        offset_temp_param (float, optional): Temperature offset parameter. Defaults to 1.
+
+    Returns:
+        xr.Dataset: xarray dataset with fixed temperature profile.
+
+    Example:
+        >>> import numpy as np
+        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]]),
+        ...                  "t": (["x", "y", "p"], [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]])},
+        ...                  coords={"x": [-80, -85], "y": [20, 25], "p": [1000, 850]})
+        >>> ds_fixed = fix_temp_profile(ds, offset_temp_param=1)
+        >>> np.allclose(ds_fixed.isel(p=0).t.values, [[0, 3], [5, 3]])
+        True
+    """
+    # Fix the temperature profile (doesn't check how )
+    sea_level_temp = ds["sst"] - offset_temp_param
+    # fill in NaN values in the temperature profile with the sea level temperature
+    ds["t"] = ds["t"].where(ds["t"].notnull(), sea_level_temp)
+    return ds
+
+
 @timeit
-def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
+def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
     """Calculate the potential intensity using the tcpyPI package.
 
     Data must have been converted to the tcpyPI units by `tcpips.convert'.
@@ -22,10 +58,14 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p") -> xr.Dataset:
     Args:
         ds (xr.Dataset): xarray dataset containing the necessary variables.
         dim (str, optional): Vertical dimension. Defaults to "p" for pressure level.
+        fix_temp (bool, optional): Whether to fix the temperature profile. Defaults to True.
 
     Returns:
         xr.Dataset: xarray dataset containing the calculated variables.
     """
+    if fix_temp:
+        ds = fix_temp_profile(ds)
+
     result = xr.apply_ufunc(
         pi,
         ds["sst"],
@@ -72,7 +112,7 @@ This error may have been caused by the following argument(s):
     vmax, pmin, ifl, t0, otl = result
     out_ds = xr.Dataset(
         {
-            "vmax": vmax,
+            "vmax": vmax,  # maybe change to vp
             "pmin": pmin,
             "ifl": ifl,
             "t0": t0,

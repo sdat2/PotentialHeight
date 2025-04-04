@@ -71,7 +71,9 @@ PI_PATH: str = os.path.join(CMIP6_PATH, "pi")  # pi no bias correction before
 os.makedirs(PI_PATH, exist_ok=True)
 PI2_PATH: str = os.path.join(CMIP6_PATH, "pi2")  # pi after cdo regridding
 os.makedirs(PI2_PATH, exist_ok=True)
-BC_PI_PATH: str = os.path.join(CMIP6_PATH, "bc_pi")
+PI3_PATH: str = os.path.join(CMIP6_PATH, "pi3")  # pi after temp profile fix
+os.makedirs(PI3_PATH, exist_ok=True)
+BC_PI_PATH: str = os.path.join(CMIP6_PATH, "bc_pi")  # pi after bias correction
 os.makedirs(BC_PI_PATH, exist_ok=True)
 
 # Constants for converting CMIP6 variables to PI input variables

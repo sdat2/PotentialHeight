@@ -47,12 +47,13 @@ def convert(ds: xr.Dataset) -> xr.Dataset:
     for var in CONVERSION_UNITS:
         if var in ds:
             ds[var].attrs["units"] = CONVERSION_UNITS[var]
-    ds = ds.rename(CONVERSION_NAMES)
+    conversion_names = {
+        var: CONVERSION_NAMES[var] for var in CONVERSION_NAMES if var in ds
+    }
+    ds = ds.rename(conversion_names)
     if "plev" in ds:
         ds = ds.set_coords(["plev"])
         ds["plev"] = ds["plev"] / 100
         ds["plev"].attrs["units"] = "hPa"
         ds = ds.rename({"plev": "p"})
     return ds
-
-
