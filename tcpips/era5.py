@@ -1,10 +1,15 @@
-#!/usr/bin/env python3
+"""
+This script downloads ERA5 reanalysis data from the Copernicus Climate Change Service (C3S) Climate Data Store (CDS).
+"""
+
 import os
 import cdsapi
+from typing import List
+import xarray as xr
 from .constants import ERA5_PATH
 
 
-def download_single_levels(years, months, output_file):
+def download_single_levels(years: List[str], months: List[str], output_file: str):
     """
     Downloads monthly-averaged single-level fields:
       - Sea surface temperature
@@ -27,7 +32,9 @@ def download_single_levels(years, months, output_file):
     print(f"Downloaded single-level data to {output_file}")
 
 
-def download_pressure_levels(years, months, output_file):
+def download_pressure_levels(
+    years: List[str], months: List[str], output_file: str
+) -> None:
     """
     Downloads monthly-averaged pressure-level fields:
       - Temperature (atmospheric profile)
@@ -36,7 +43,34 @@ def download_pressure_levels(years, months, output_file):
 
     The pressure levels below are specified in hPa.
     Note: Geopotential is provided in m²/s². Divide by ~9.81 to convert to geopotential height (meters).
+
+    Args:
+        years (List[str]): List of years to download data for.
+        months (List[str]): List of months to download data for.
+        output_file (str): Name of the output file to save the data.
     """
+    if len(years) > 10:
+        # call recursively to avoid problems with timeout
+        # split the years into chunks of 10 years, give each unique name, and then
+        # stitch the temporary files together at the end
+        file_names = []
+        for i in range(0, len(years), 10):
+            j = min(i + 10, len(years) - 1)
+            file_name = f"{output_file}_years{years[i]}_{years[j]}.nc"
+            download_pressure_levels(years[i:j], months, file_name)
+            file_names.append(file_name)
+        # stitch the files together
+        file_names = [os.path.join(ERA5_PATH, file_name) for file_name in file_names]
+        output_file = os.path.join(ERA5_PATH, output_file)
+        xr.open_mfdataset(file_names, combine="by_coords", parallel=True).to_netcdf(
+            output_file
+        )
+        if os.path.exists(output_file):
+            for file_name in file_names:
+                os.remove(file_name)
+        print(f"Downloaded pressure-level data to {output_file}")
+        return
+
     c = cdsapi.Client()
     c.retrieve(
         "reanalysis-era5-pressure-levels-monthly-means",
@@ -81,7 +115,7 @@ if __name__ == "__main__":
     months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 
     # Download the single-level (surface) variables.
-    download_single_levels(years, months, "era5_single_levels.nc")
+    # download_single_levels(years, months, "era5_single_levels.nc")
 
     # Download the pressure-level variables (including geopotential).
     download_pressure_levels(years, months, "era5_pressure_levels.nc")

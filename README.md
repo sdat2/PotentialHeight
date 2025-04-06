@@ -86,13 +86,13 @@ If you use this code, please cite the following paper:
 And if you use the code, please cite it as:
 ```bibtex
 @software{worstsuge_code,
-author = {Thomas, Simon D. A.},
-doi = {10.5281/zenodo.15073504},
-month = mar,
-title = {{WorstSurge - Finding the potential height of a tropical cyclone in a changing climate using Bayesian Optimization}},
-url = {https://github.com/sdat2/worstsurge},
-version = {v0.0.2},
-year = {2025}
+  author = {Thomas, Simon D. A.},
+  doi = {10.5281/zenodo.15073504},
+  month = mar,
+  title = {{WorstSurge - Finding the potential height of a tropical cyclone in a changing climate using Bayesian Optimization}},
+  url = {https://github.com/sdat2/worstsurge},
+  version = {v0.0.2},
+  year = {2025}
 }
 ```
 
@@ -100,11 +100,11 @@ We also currently use the matlab code from Chavas, Lin, and Emanuel (2015), whic
 
 ```bibtex
 @software{cle_2015_code,
-	title = {Code for tropical cyclone wind profile model of Chavas et al (2015, JAS)},
-	month = {Jun},
-	url = {https://purr.purdue.edu/publications/4066/1},
-	year = {2022},
-	doi = {doi:/10.4231/CZ4P-D448},
-	author = {Daniel Robert Chavas}
+  title = {Code for tropical cyclone wind profile model of Chavas et al (2015, JAS)},
+  month = {Jun},
+  url = {https://purr.purdue.edu/publications/4066/1},
+  year = {2022},
+  doi = {doi:/10.4231/CZ4P-D448},
+  author = {Daniel Robert Chavas}
 }
 ```
