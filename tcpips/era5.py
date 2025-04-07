@@ -16,7 +16,7 @@ from .constants import ERA5_PATH
 
 @timeit
 def download_single_levels(
-    years: List[str], months: List[str], output_file: str
+    years: List[str], months: List[str], output_file: str, redo: bool = False
 ) -> None:
     """
     Downloads monthly-averaged single-level fields:
@@ -28,7 +28,11 @@ def download_single_levels(
         years (List[str]): List of years to download data for.
         months (List[str]): List of months to download data for.
         output_file (str): Name of the output file to save the data.
+        redo (bool): If True, download the data again even if the file already exists. Default is False.
     """
+    if os.path.exists(os.path.join(ERA5_PATH, output_file)) and not redo:
+        print(f"File {output_file} already exists. Use redo=True to download again.")
+        return
     c = cdsapi.Client()
     c.retrieve(
         "reanalysis-era5-single-levels-monthly-means",
@@ -52,7 +56,7 @@ def download_single_levels(
 
 @timeit
 def download_pressure_levels(
-    years: List[str], months: List[str], output_file: str
+    years: List[str], months: List[str], output_file: str, redo: bool = False
 ) -> None:
     """
     Downloads monthly-averaged pressure-level fields:
@@ -71,7 +75,11 @@ def download_pressure_levels(
         years (List[str]): List of years to download data for.
         months (List[str]): List of months to download data for.
         output_file (str): Name of the output file to save the data.
+        redo (bool): If True, download the data again even if the file already exists. Default is False.
     """
+    if os.path.exists(os.path.join(ERA5_PATH, output_file)) and not redo:
+        print(f"File {output_file} already exists. Use redo=True to download again.")
+        return
     print(
         f"Downloading pressure-level data for years: {years} and months: {months}, to {output_file}"
     )
@@ -100,7 +108,7 @@ def download_pressure_levels(
         print(f"Stitching files together: {file_paths} to {output_path}")
         ds = xr.open_mfdataset(
             file_paths,
-            combine="by_coords",
+            combine="nested",
             concat_dim="time",
             parallel=True,
         )
@@ -149,16 +157,25 @@ def download_pressure_levels(
     return
 
 
-if __name__ == "__main__":
+def download_era5_data() -> None:
+    """
+    Downloads ERA5 data for the specified years and months.
+    This function is a wrapper around the download_single_levels and download_pressure_levels functions.
+    """
     # Specify the desired years and months.
-    # python -m tcpips.era5
     years = [
         str(year) for year in range(1980, 2025)
     ]  # Modify or extend this list as needed.
     months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 
     # Download the single-level (surface) variables.
-    # download_single_levels(years, months, "era5_single_levels.nc")
+    download_single_levels(years, months, "era5_single_levels.nc", redo=False)
 
     # Download the pressure-level variables (including geopotential).
-    download_pressure_levels(years, months, "era5_pressure_levels.nc")
+    download_pressure_levels(years, months, "era5_pressure_levels.nc", redo=True)
+
+
+if __name__ == "__main__":
+    # Specify the desired years and months.
+    # python -m tcpips.era5
+    download_era5_data()
