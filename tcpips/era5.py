@@ -6,9 +6,11 @@ import os
 import cdsapi
 from typing import List
 import xarray as xr
+from sithom.time import timeit
 from .constants import ERA5_PATH
 
 
+@timeit
 def download_single_levels(years: List[str], months: List[str], output_file: str):
     """
     Downloads monthly-averaged single-level fields:
@@ -32,6 +34,7 @@ def download_single_levels(years: List[str], months: List[str], output_file: str
     print(f"Downloaded single-level data to {output_file}")
 
 
+@timeit
 def download_pressure_levels(
     years: List[str], months: List[str], output_file: str
 ) -> None:
@@ -49,22 +52,32 @@ def download_pressure_levels(
         months (List[str]): List of months to download data for.
         output_file (str): Name of the output file to save the data.
     """
+    print(
+        f"Downloading pressure-level data for years: {years} and months: {months}, to {output_file}"
+    )
     if len(years) > 10:
         # call recursively to avoid problems with timeout
         # split the years into chunks of 10 years, give each unique name, and then
         # stitch the temporary files together at the end
         file_names = []
         for i in range(0, len(years), 10):
-            j = min(i + 10, len(years) - 1)
-            file_name = f"{output_file}_years{years[i]}_{years[j]}.nc"
+            j = min(i + 10, len(years))
+            file_name = f"{output_file}_years{years[i]}_{years[j-1]}.nc"
             download_pressure_levels(years[i:j], months, file_name)
             file_names.append(file_name)
         # stitch the files together
         file_names = [os.path.join(ERA5_PATH, file_name) for file_name in file_names]
         output_file = os.path.join(ERA5_PATH, output_file)
-        xr.open_mfdataset(file_names, combine="by_coords", parallel=True).to_netcdf(
-            output_file
+        # append the files together along the time dimension and save to output_file
+        # using xarray
+        ds = xr.open_mfdataset(
+            file_names,
+            combine="by_coords",
+            concat_dim="time",
+            parallel=True,
         )
+        ds.to_netcdf(output_file)
+        # remove the temporary files
         if os.path.exists(output_file):
             for file_name in file_names:
                 os.remove(file_name)
@@ -104,6 +117,7 @@ def download_pressure_levels(
         os.path.join(ERA5_PATH, output_file),
     )
     print(f"Downloaded pressure-level data to {output_file}")
+    return
 
 
 if __name__ == "__main__":
