@@ -3,8 +3,8 @@
 import os
 import xarray as xr
 from sithom.time import timeit
-from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON
-from tcpips.constants import PI2_PATH
+from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
+from tcpips.constants import PI2_PATH, PI3_PATH
 from .utils import qtp2rh
 from .ps import parallelized_ps
 from .constants import DATA_PATH
@@ -15,22 +15,33 @@ OFFSET_D = {
     "galverston": {"point": GALVERSTON, "lon_offset": 0, "lat_offset": -0.9},
     "miami": {"point": MIAMI, "lon_offset": 0.2, "lat_offset": 0},
     "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -0.5},
+    # these ones are not checked
+    "shanghai": {"point": SHANGHAI, "lon_offset": 0.5, "lat_offset": 0},
+    "hong_kong": {"point": HONG_KONG, "lon_offset": 0.5, "lat_offset": 0},
+    "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": 0},
 }
-EX_DATA_PATH = os.path.join(PI2_PATH, "ssp585", "CESM2", "r4i1p1f1.nc")
+
+def ex_data_path(pi_version=2, member: int=4)
+    if pi_version == 2:
+        return os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+    elif pi_version == 3:
+        return os.path.join(PI3_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+    else:
+        raise ValueError("pi_version must be 2 or 3")
 
 
 @timeit
-def trimmed_cmip6_example(pressure_assumption="isopycnal", trial=1) -> None:
+def trimmed_cmip6_example(pressure_assumption="isothermal", trial=1, pi_version=2) -> None:
     """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
 
     Args:
         pressure_assumption (str, optional): pressure assumption. Defaults to "isopycnal".
         trial (int, optional): trial number. Defaults to 1.
     """
-    print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
+    # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
-    in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+    in_ds = xr.open_dataset(ex_data_path(pi_version=pi_version, member=4)).isel(
         lat=slice(215, 245),
         lon=slice(160, 205),
         time=7,  # slice(0, 12) # just august 2015
@@ -40,8 +51,9 @@ def trimmed_cmip6_example(pressure_assumption="isopycnal", trial=1) -> None:
     in_ds["rh"] = rh
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
 
-    # get rid of V_reduc accidentally added in for vmax calculation
-    in_ds["vmax"] = in_ds["vmax"] / 0.8
+    if pi_version == 2:
+        # get rid of V_reduc accidentally added in for vmax calculation
+        in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     print(out_ds)
     out_ds.to_netcdf(
@@ -53,10 +65,10 @@ def trimmed_cmip6_example(pressure_assumption="isopycnal", trial=1) -> None:
 
 
 @timeit
-def new_orleans_year() -> None:
+def new_orleans_year(pi_version=2) -> None:
     """Run potential size calculations on CMIP6 data to get New Orleans data."""
     # look at some seasonal data for new orleans
-    in_ds = xr.open_dataset(EX_DATA_PATH).isel(time=slice(0, 120))
+    in_ds = xr.open_dataset(ex_data_path(pi_version=pi_version)).isel(time=slice(0, 120))
     in_ds = in_ds.sel(
         lon=OFFSET_D["new_orleans"]["point"].lon
         + OFFSET_D["new_orleans"]["lon_offset"],
@@ -69,8 +81,9 @@ def new_orleans_year() -> None:
     in_ds["rh"] = rh
     qt_ds = in_ds[["q", "t", "otl"]]
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
-    # get rid of V_reduc accidentally added in for vmax calculation
-    in_ds["vmax"] = in_ds["vmax"] / 0.8
+    if pi_version == 2:
+        # get rid of V_reduc accidentally added in for vmax calculation
+        in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=20)
     out_ds["q"] = qt_ds["q"]
     out_ds["t"] = qt_ds["t"]
@@ -92,26 +105,27 @@ def global_cmip6(part="nw", year: int = 2015, version=2) -> None:
     year_offset = (year - 2015) * 12  # number of months since 2015
     southern_hemisphere_month = 1
     northern_hemisphere_month = 7
+    full_ds = xr.open_dataset(ex_data_path(pi_version=version, member=4))
     if part == "nw":
-        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+        in_ds = full_ds.isel(
             time=northern_hemisphere_month + year_offset,
             lat=slice(180, 300),
             lon=slice(0, 360),
         )
     elif part == "ne":
-        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+        in_ds = full_ds.isel(
             time=northern_hemisphere_month + year_offset,
             lat=slice(180, 300),
             lon=slice(360, 720),
         )
     elif part == "sw":  # just February
-        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+        in_ds = full_ds.isel(
             time=southern_hemisphere_month + year_offset,
             lat=slice(0, 180),
             lon=slice(0, 360),
         )
     elif part == "se":
-        in_ds = xr.open_dataset(EX_DATA_PATH).isel(
+        in_ds = full_ds.isel(
             time=southern_hemisphere_month + year_offset,
             lat=slice(0, 180),
             lon=slice(360, 720),
@@ -124,8 +138,9 @@ def global_cmip6(part="nw", year: int = 2015, version=2) -> None:
     in_ds["rh"] = rh
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
     print(in_ds)
-    # get rid of V_reduc accidentally added in for vmax calculation
-    in_ds["vmax"] = in_ds["vmax"] / 0.8
+    if pi_version == 2:
+        # get rid of V_reduc accidentally added in for vmax calculation
+        in_ds["vmax"] = in_ds["vmax"] / 0.8
     out_ds = parallelized_ps(in_ds, jobs=30)
     print(out_ds)
     out_ds.to_netcdf(
@@ -158,7 +173,7 @@ def load_global(year: int = 2015) -> xr.Dataset:
 
 
 def point_timeseries(
-    member: int = 10, place: str = "new_orleans", pressure_assumption="isothermal"
+    member: int = 10, place: str = "new_orleans", pressure_assumption="isothermal", pi_version=2
 ) -> None:
     """
     Point timeseries.
@@ -177,8 +192,9 @@ def point_timeseries(
     rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
     trimmed_ds = point_ds[["sst", "msl", "vmax", "t0"]]
     trimmed_ds["rh"] = rh
-    # accidentally added in V_reduc for vmax calculation before
-    trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
+    if pi_version == 2:
+        # accidentally added in V_reduc for vmax calculation before
+        trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
 
     print("trimmed", trimmed_ds)
     # select august data from every year of timeseries xarray

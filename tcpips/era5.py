@@ -176,6 +176,5 @@ def download_era5_data() -> None:
 
 
 if __name__ == "__main__":
-    # Specify the desired years and months.
     # python -m tcpips.era5
     download_era5_data()

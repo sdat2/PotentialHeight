@@ -382,7 +382,7 @@ def plot_seasonal_profiles():
     plt.close()
 
 
-def plot_two_spatial_new_orleans(axs: np.ndarray) -> None:
+def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     """
     Plot the potential intensity and size for the Gulf of Mexico area.
 
@@ -468,7 +468,7 @@ def plot_two_spatial_new_orleans(axs: np.ndarray) -> None:
 def plot_two_timeseries_new_orleans(
     axs: np.ndarray, text=True, color="black", member: int = 4
 ) -> None:
-    """Plot the potential and height timeseries for New Orleans for different ensemble members.
+    """Plot the potential intensity and size timeseries for the point near New Orleans for different ensemble members.
 
     Args:
         axs (np.ndarray): The axes to plot on.
@@ -560,7 +560,7 @@ def figure_two():
         width_ratios=[1, 1.5],
         height_ratios=[1, 1],
     )
-    plot_two_spatial_new_orleans(axs[:, 0])
+    plot_two_spatial_gulf_of_mexico(axs[:, 0])
     plot_two_timeseries_new_orleans(axs[:, 1], text=False)
     plot_two_timeseries_new_orleans(
         axs[:, 1],
