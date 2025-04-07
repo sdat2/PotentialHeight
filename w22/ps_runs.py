@@ -21,7 +21,17 @@ OFFSET_D = {
     "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": 0},
 }
 
-def ex_data_path(pi_version=2, member: int=4)
+
+def ex_data_path(pi_version=2, member: int = 4) -> str:
+    """Get the path to the example data.
+
+    Args:
+        pi_version (int, optional): version of the pi calculation. Defaults to 2.
+        member (int, optional): member number. Defaults to 4.
+
+    Returns:
+        str: path to the example data.
+    """
     if pi_version == 2:
         return os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     elif pi_version == 3:
@@ -31,7 +41,9 @@ def ex_data_path(pi_version=2, member: int=4)
 
 
 @timeit
-def trimmed_cmip6_example(pressure_assumption="isothermal", trial=1, pi_version=2) -> None:
+def trimmed_cmip6_example(
+    pressure_assumption="isothermal", trial=1, pi_version=2
+) -> None:
     """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
 
     Args:
@@ -68,7 +80,9 @@ def trimmed_cmip6_example(pressure_assumption="isothermal", trial=1, pi_version=
 def new_orleans_year(pi_version=2) -> None:
     """Run potential size calculations on CMIP6 data to get New Orleans data."""
     # look at some seasonal data for new orleans
-    in_ds = xr.open_dataset(ex_data_path(pi_version=pi_version)).isel(time=slice(0, 120))
+    in_ds = xr.open_dataset(ex_data_path(pi_version=pi_version)).isel(
+        time=slice(0, 120)
+    )
     in_ds = in_ds.sel(
         lon=OFFSET_D["new_orleans"]["point"].lon
         + OFFSET_D["new_orleans"]["lon_offset"],
@@ -173,7 +187,10 @@ def load_global(year: int = 2015) -> xr.Dataset:
 
 
 def point_timeseries(
-    member: int = 10, place: str = "new_orleans", pressure_assumption="isothermal", pi_version=2
+    member: int = 10,
+    place: str = "new_orleans",
+    pressure_assumption="isothermal",
+    pi_version=2,
 ) -> None:
     """
     Point timeseries.
