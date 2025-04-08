@@ -1,6 +1,7 @@
 """Potential Intensity Calculation script."""
 
 from typing import Callable
+import numpy as np
 import xarray as xr
 from tcpyPI import pi
 from sithom.time import timeit
@@ -37,7 +38,6 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
         xr.Dataset: xarray dataset with fixed temperature profile.
 
     Example:
-        >>> import numpy as np
         >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]], {"units": "degrees_Celsius"}),
         ...                  "t": (["x", "y", "p"], [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]], {"units": "degrees_Celsius"}),},
         ...                  coords={"x": [-80, -85], "y": [20, 25], "p": [1000, 850]})
@@ -45,7 +45,7 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
         >>> np.allclose(ds_fixed.isel(p=0).t.values, [[0, 3], [5, 3]])
         True
     """
-    # Fix the temperature profile (doesn't check how )
+    # Fix the temperature profile (doesn't check how)
     sea_level_temp = ds["sst"] - offset_temp_param
     # make all implausibly high values NaN
     # if air temperature > 300 C, set to NaN
