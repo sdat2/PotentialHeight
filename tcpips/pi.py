@@ -26,6 +26,9 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
     To fix this, we could assume an approximation that the temperature at these low levels
     is equal to sea surface temperature minus one kelvin (a standard parameterization for near surface air temperature).
 
+    TODO: Make this only effect the bottom NaNs of the profile.
+    TODO: convert all very high values to NaN (i.e. if t > 300 C, set to NaN).
+
     Args:
         ds (xr.Dataset): xarray dataset containing the necessary variables "t" and "sst".
         offset_temp_param (float, optional): Temperature offset parameter. Defaults to 1.
@@ -35,8 +38,8 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
 
     Example:
         >>> import numpy as np
-        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]]),
-        ...                  "t": (["x", "y", "p"], [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]])},
+        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]], {"units": "degrees_Celsius"}),
+        ...                  "t": (["x", "y", "p"], [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]], {"units": "degrees_Celsius"}),},
         ...                  coords={"x": [-80, -85], "y": [20, 25], "p": [1000, 850]})
         >>> ds_fixed = fix_temp_profile(ds, offset_temp_param=1)
         >>> np.allclose(ds_fixed.isel(p=0).t.values, [[0, 3], [5, 3]])
@@ -44,7 +47,11 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
     """
     # Fix the temperature profile (doesn't check how )
     sea_level_temp = ds["sst"] - offset_temp_param
+    # make all implausibly high values NaN
+    # if air temperature > 300 C, set to NaN
+    ds["t"] = ds["t"].where(ds["t"] < 300, np.nan)
     # fill in NaN values in the temperature profile with the sea level temperature
+    # If air temperature is NaN, set to sea level temperature
     ds["t"] = ds["t"].where(ds["t"].notnull(), sea_level_temp)
     return ds
 
@@ -93,20 +100,6 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         vectorize=True,
         # dask="allowed", # maybe this could work with dask, but at the moment I get an error
     )
-    """
-    numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)
-non-precise type pyobject
-During: typing of argument at /mnt/lustre/a2fs-work2/work/n02/n02/sdat2/micromamba/envs/t1/lib/python3.10/site-packages/tcpyPI/pi.py (361)
-
-File "../micromamba/envs/t1/lib/python3.10/site-packages/tcpyPI/pi.py", line 361:
-def cape(TP,RP,PP,T,R,P,ascent_flag=0,ptop=50,miss_handle=1):
-    <source elided>
-# define the function to calculate PI
-@nb.njit()
-^
-
-This error may have been caused by the following argument(s):
-    """
 
     # store the result in an xarray data structure
     vmax, pmin, ifl, t0, otl = result

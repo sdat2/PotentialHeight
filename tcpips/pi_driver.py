@@ -4,7 +4,7 @@ import xarray as xr
 from dask.diagnostics import ProgressBar
 from sithom.misc import human_readable_size, get_git_revision_hash
 from sithom.time import timeit, time_stamp
-from .constants import CDO_PATH, PI2_PATH, REGRIDDED_PATH, PI_PATH, PI3_PATH
+from .constants import CDO_PATH, PI2_PATH, REGRIDDED_PATH, PI_PATH, PI3_PATH, PI4_PATH
 from .files import locker
 from .convert import convert
 from .pi import calculate_pi
@@ -91,7 +91,7 @@ def investigate_cmip6_pairs() -> None:
 
 
 @timeit
-@locker(PI3_PATH)
+@locker(PI4_PATH)
 def pi_cmip6_part(
     exp: str = "ssp585",
     model: str = "CESM2",
@@ -154,7 +154,7 @@ def pi_cmip6_part(
     ds = ds.assign_coords({"time": ("time", ocean_time)})
     ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash()
     ds.attrs["pi_calculated_at_time"] = time_stamp()
-    folder = os.path.join(PI3_PATH, exp, model)
+    folder = os.path.join(PI4_PATH, exp, model)
     os.makedirs(folder, exist_ok=True)
     delayed_obj = ds.to_netcdf(
         os.path.join(folder, member + ".nc"),
