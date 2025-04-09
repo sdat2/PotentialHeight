@@ -10,7 +10,8 @@ from sithom.plot import (
 )  # , axis_formatter
 from sithom.time import timeit
 from .convert import convert  # , regrid_2d_1degree
-from .pi import propagate_attrs, calculate_pi, standard_name_to_long_name
+from .pi import calculate_pi
+from .xr_utils import propagate_attrs, standard_name_to_long_name
 from .plot import plot_features
 from .constants import (
     FIGURE_PATH,

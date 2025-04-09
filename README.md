@@ -76,7 +76,7 @@ If you use this code, please cite the following paper:
 ```bibtex
 @article{potential_height_paper_2025,
   title={Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization},
-  author={Thomas, Simon D. A. and Jones, Dani C. and Mayo, Talea and Taylor, John R. and Moss, Henry B. and Haigh, Ivan D. and Gopinathan, Devaraj},
+  author={Thomas, Simon D. A. and Jones, Dani C. and Mayo, Talea and Taylor, John R. and Moss, Henry B. and Munday, David R. and Haigh, Ivan D. and Gopinathan, Devaraj},
   journal={EarthArXiv (Submitted to Environmental Data Science)},
   year={2025},
   doi={10.31223/X57T5R}
