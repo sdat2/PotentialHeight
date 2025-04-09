@@ -73,20 +73,20 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         xr.Dataset: xarray dataset containing the calculated variables.
 
     Example:
-        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]],
+        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[20, 30], [30, 32]],
         ...                                    {"units": "degrees_Celsius"}),
         ...                            "msl": (["x", "y"], [[1000, 1005], [1010, 1015]],
         ...                                    {"units": "hPa"}),
         ...                            "t": (["x", "y", "p"],
-        ...                                  [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]],
+        ...                                  [[[np.nan, 23], [30, 21]], [[30, 21], [np.nan, 23]]],
         ...                                  {"units": "degrees_Celsius"}),
         ...                            "q": (["x", "y", "p"],
-        ...                                  [[[0.01, 0.02], [0.03, 0.04]], [[0.05, 0.06], [0.07, 0.08]]],
+        ...                                  [[[10, 20], [30, 40]], [[50, 60], [70, 80]]],
         ...                                  {"units": "g/kg"})},
         ...                 coords={"x": (["x"], [-80, -85], {"units": "degrees_East"}),
         ...                         "y": (["y"], [20, 25], {"units": "degrees_North"}),
         ...                         "p": (["p"], [1000, 850], {"units": "hPa"})})
-        >>> pi_ds = calculate_pi(ds) # doctest: +SKIP
+        >>> pi_ds = calculate_pi(ds, fix_temp=True) # doctest: +SKIP
     """
     if fix_temp:
         ds = fix_temp_profile(ds)
@@ -133,7 +133,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
 
     # add names and units to the structure
     out_ds.vmax.attrs["standard_name"], out_ds.vmax.attrs["units"] = (
-        "Maximum Potential Intensity",
+        "Potential Intensity",
         "m/s",
     )
     out_ds.pmin.attrs["standard_name"], out_ds.pmin.attrs["units"] = (
