@@ -44,6 +44,14 @@ tcpips.files module
    :undoc-members:
    :show-inheritance:
 
+tcpips.ibtracs module
+---------------------
+
+.. automodule:: tcpips.ibtracs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 tcpips.pangeo module
 --------------------
 
@@ -112,6 +120,14 @@ tcpips.rh module
 ----------------
 
 .. automodule:: tcpips.rh
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tcpips.xr\_utils module
+-----------------------
+
+.. automodule:: tcpips.xr_utils
    :members:
    :undoc-members:
    :show-inheritance:

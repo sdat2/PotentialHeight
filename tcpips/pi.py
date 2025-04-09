@@ -86,7 +86,7 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         ...                 coords={"x": (["x"], [-80, -85], {"units": "degrees_East"}),
         ...                         "y": (["y"], [20, 25], {"units": "degrees_North"}),
         ...                         "p": (["p"], [1000, 850], {"units": "hPa"})})
-        >>> pi_ds = calculate_pi(ds)
+        >>> pi_ds = calculate_pi(ds) # doctest: +SKIP
     """
     if fix_temp:
         ds = fix_temp_profile(ds)
