@@ -4,7 +4,9 @@ from typing import Callable
 import numpy as np
 import xarray as xr
 from tcpyPI import pi
-from sithom.time import timeit
+from sithom.time import timeit, time_stamp
+from sithom.misc import get_git_revision_hash
+from .constants import PROJECT_PATH
 from .xr_utils import standard_name_to_long_name
 
 CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
@@ -161,5 +163,9 @@ def calculate_pi(
     out_ds.attrs["V_reduc"] = V_reduc
     out_ds.attrs["CKCD"] = CKCD
     out_ds.attrs["ptop"] = PTOP
+    ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    ds.attrs["pi_calculated_at_time"] = time_stamp()
 
     return standard_name_to_long_name(out_ds)
