@@ -7,6 +7,8 @@ calculate the saturation pressure of water vapor at a given temperature.
 https://earthscience.stackexchange.com/a/24167
 """
 
+import numpy as np
+
 
 def saturation_pressure(temperature: float) -> float:
     """
@@ -19,7 +21,7 @@ def saturation_pressure(temperature: float) -> float:
         float: Saturation pressure in hPa.
     """
     # Constants for the Magnus-Tetens approximation
-    a = 6.1078
+    a = 6.1078  # hPa
     b = 17.1
     c = 235  # degrees Celsius
 

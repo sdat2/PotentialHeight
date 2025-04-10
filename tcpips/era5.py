@@ -13,6 +13,7 @@ import xarray as xr
 from sithom.time import timeit
 from .constants import ERA5_RAW_PATH, ERA5_PI_OG_PATH, ERA5_PI_PATH
 from .pi import calculate_pi
+from .rh import relative_humidity_from_dew_point
 
 
 @timeit
@@ -211,17 +212,95 @@ def download_era5_data() -> None:
     )
 
 
+def preprocess_single_level_data(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess the single-level data from ERA5.
+    This includes converting units and renaming variables.
+
+    Args:
+        ds (xr.Dataset): xarray dataset containing the single-level data.
+
+    Returns:
+        xr.Dataset: Preprocessed xarray dataset.
+    """
+    assert ds["d2m"].units == "K", "Sea surface temperature is not in Kelvin"
+    assert ds["t2m"].units == "K", "Mean sea level pressure is not in Pa"
+
+    ds["rh"] = relative_humidity_from_dew_point(ds["d2m"], ds["t2m"])
+    ds["rh"].attrs = {
+        "long_name": "Relative Humidity",
+        "units": "fraction",
+        "description": "Relative humidity at 2m calculated from dew point temperature and air temperature",
+    }
+    assert ds["sst"].units == "K", "Sea surface temperature is not in Kelvin"
+    ds["sst"] = ds["sst"] - 273.15
+    ds["sst"].attrs = {
+        "long_name": "Sea Surface Temperature",
+        "units": "Celsius",
+        "description": "Sea surface temperature",
+    }
+    assert ds["msl"].units == "Pa", "Mean sea level pressure is not in Pa"
+    ds["msl"] = ds["msl"] / 100
+    ds["msl"].attrs = {
+        "long_name": "Mean Sea Level Pressure",
+        "units": "hPa",
+        "description": "Mean sea level pressure",
+    }
+    del ds["d2m"]
+    del ds["t2m"]
+    ds = ds.rename({"valid_time": "time"})
+    return ds
+
+
+def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Preprocess the pressure-level data from ERA5.
+    This includes converting units and renaming variables.
+    Args:
+        ds (xr.Dataset): xarray dataset containing the pressure-level data.
+    Returns:
+        xr.Dataset: Preprocessed xarray dataset.
+    """
+    assert ds["t"].units == "K", "Temperature is not in Kelvin"
+
+    ds["t"] = ds["t"] - 273.15
+    ds["t"].attrs = {
+        "long_name": "Temperature",
+        "units": "Celsius",
+        "description": "Temperature at pressure levels",
+    }
+    assert ds["q"].units == "kg kg**-1", "Specific humidity is not in kg/kg"
+    ds["q"] = ds["q"] * 1000
+    ds["q"].attrs = {
+        "long_name": "Specific Humidity",
+        "units": "g/kg",
+        "description": "Specific humidity at pressure levels",
+    }
+    del ds["z"]
+    ds.rename({"valid_time": "time"})
+    return ds
+
+
 def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
+    """
+    Calculate potential intensity (PI) using the downloaded ERA5 data for a decade.
+    This function is a placeholder and should be implemented with the actual calculation logic.
+
+    Args:
+        single_level_path (str): Path to the single-level data file.
+        pressure_level_path (str): Path to the pressure-level data file.
+
+    Returns:
+        None
+    """
     years_str = single_level_path.split("years")[1].replace(".nc", "")
-    single_ds = xr.open_dataset(single_level_path)
-    pressure_ds = xr.open_dataset(pressure_level_path)
+    single_ds = preprocess_single_level_data(xr.open_dataset(single_level_path))
+    pressure_ds = preprocess_pressure_level_data(xr.open_dataset(pressure_level_path))
     # let's assume they are on the same grid
     # and that the time dimension is the same
     combined_ds = xr.merge([single_ds, pressure_ds])
-    # convert units and rename variables here (not implemented)
-    # combined_ds = convert_units(combined_ds)
     # calculate potential intensity
-    # pi_ds = calculate_pi(combined_ds)
+    pi_ds = calculate_pi(combined_ds, dim="pressure_level")
     # save the potential intensity dataset
     # pi_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, "era5_pi.nc"))
     combined_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, f"era5_pi_years{years_str}.nc"))
@@ -247,7 +326,7 @@ def era5_pi(years: List[str]) -> None:
 
 if __name__ == "__main__":
     # python -m tcpips.era5
-    download_era5_data()
+    # download_era5_data()
     era5_pi(
         [str(year) for year in range(1980, 2025)]
     )  # Modify or extend this list as needed.)
