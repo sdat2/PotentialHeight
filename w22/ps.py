@@ -11,6 +11,7 @@ from sithom.misc import get_git_revision_hash
 from .constants import (
     TEMP_0K,
     DATA_PATH,
+    PROJECT_PATH,
     W_COOL_DEFAULT,
     GAS_CONSTANT,
     GAS_CONSTANT_FOR_WATER_VAPOR,
@@ -303,7 +304,9 @@ def parallelized_ps(
             .unstack("stacked_dim")
         )
     output_ds.attrs["potential_size_pressure_assumption"] = pressure_assumption
-    output_ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash()
+    output_ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
     output_ds.attrs["pi_calculated_at_time"] = time_stamp()
     return output_ds
 

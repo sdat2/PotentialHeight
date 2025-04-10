@@ -59,7 +59,9 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
 
 
 @timeit
-def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
+def calculate_pi(
+    ds: xr.Dataset, dim: str = "p", fix_temp=False, V_reduc=1.0
+) -> xr.Dataset:
     """Calculate the potential intensity using the tcpyPI package.
 
     Data must have been converted to the tcpyPI units by `tcpips.convert'.
@@ -68,6 +70,8 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         ds (xr.Dataset): xarray dataset containing the necessary variables.
         dim (str, optional): Vertical dimension. Defaults to "p" for pressure level.
         fix_temp (bool, optional): Whether to fix the temperature profile. Defaults to True.
+        V_reduc (float, optional): Reduction factor for the wind speed. Defaults to 1.0.
+
 
     Returns:
         xr.Dataset: xarray dataset containing the calculated variables.
@@ -99,7 +103,12 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         ds["t"],
         ds["q"],
         kwargs=dict(
-            CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=PTOP, miss_handle=1, V_reduc=1
+            CKCD=CKCD,
+            ascent_flag=0,
+            diss_flag=1,
+            ptop=PTOP,
+            miss_handle=1,
+            V_reduc=V_reduc,
         ),
         input_core_dims=[
             [],
@@ -149,5 +158,8 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         "Outflow Temperature Level",
         "hPa",
     )
+    out_ds.attrs["V_reduc"] = V_reduc
+    out_ds.attrs["CKCD"] = CKCD
+    out_ds.attrs["ptop"] = PTOP
 
     return standard_name_to_long_name(out_ds)

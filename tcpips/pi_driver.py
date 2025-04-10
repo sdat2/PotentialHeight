@@ -4,7 +4,15 @@ import xarray as xr
 from dask.diagnostics import ProgressBar
 from sithom.misc import human_readable_size, get_git_revision_hash
 from sithom.time import timeit, time_stamp
-from .constants import CDO_PATH, PI2_PATH, REGRIDDED_PATH, PI_PATH, PI3_PATH, PI4_PATH
+from .constants import (
+    CDO_PATH,
+    PI2_PATH,
+    REGRIDDED_PATH,
+    PI_PATH,
+    PI3_PATH,
+    PI4_PATH,
+    PROJECT_PATH,
+)
 from .files import locker
 from .convert import convert
 from .pi import calculate_pi
@@ -152,7 +160,9 @@ def pi_cmip6_part(
         del ds["q"]
     ds = xr.merge([ds, pi])
     ds = ds.assign_coords({"time": ("time", ocean_time)})
-    ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash()
+    ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
     ds.attrs["pi_calculated_at_time"] = time_stamp()
     folder = os.path.join(PI4_PATH, exp, model)
     os.makedirs(folder, exist_ok=True)

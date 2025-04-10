@@ -178,3 +178,6 @@ def download_era5_data() -> None:
 if __name__ == "__main__":
     # python -m tcpips.era5
     download_era5_data()
+    # problem: the era5 pressure level data is too big to save in one file
+    # so I have split it into chunks of 10 years.
+    # This means that future scripts also need to be able to handle this.

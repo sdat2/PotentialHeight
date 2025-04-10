@@ -4,7 +4,7 @@ import os
 import xarray as xr
 from sithom.time import timeit
 from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
-from tcpips.constants import PI2_PATH, PI3_PATH
+from tcpips.constants import PI2_PATH, PI3_PATH, PI4_PATH
 from .utils import qtp2rh
 from .ps import parallelized_ps
 from .constants import DATA_PATH
@@ -16,9 +16,9 @@ OFFSET_D = {
     "miami": {"point": MIAMI, "lon_offset": 0.2, "lat_offset": 0},
     "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -0.5},
     # these ones are not checked
-    "shanghai": {"point": SHANGHAI, "lon_offset": 0.5, "lat_offset": 0},
-    "hong_kong": {"point": HONG_KONG, "lon_offset": 0.5, "lat_offset": 0},
-    "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": 0},
+    "shanghai": {"point": SHANGHAI, "lon_offset": 0.5, "lat_offset": -0.3},
+    "hong_kong": {"point": HONG_KONG, "lon_offset": 0.5, "lat_offset": -0.5},
+    "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": -0.1},
 }
 
 
@@ -26,7 +26,7 @@ def ex_data_path(pi_version=2, member: int = 4) -> str:
     """Get the path to the example data.
 
     Args:
-        pi_version (int, optional): version of the pi calculation. Defaults to 2.
+        pi_version (int, optional): pi_version of the pi calculation. Defaults to 2.
         member (int, optional): member number. Defaults to 4.
 
     Returns:
@@ -36,6 +36,8 @@ def ex_data_path(pi_version=2, member: int = 4) -> str:
         return os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     elif pi_version == 3:
         return os.path.join(PI3_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+    elif pi_version == 4:
+        return os.path.join(PI4_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
     else:
         raise ValueError("pi_version must be 2 or 3")
 
@@ -71,14 +73,21 @@ def trimmed_cmip6_example(
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"potential_size_gom_august_{pressure_assumption}_trial_{trial}.nc",
+            f"potential_size_gom_august_{pressure_assumption}_trial_{trial}_pi{pi_version}.nc",
         )
     )
 
 
 @timeit
-def new_orleans_year(pi_version=2) -> None:
-    """Run potential size calculations on CMIP6 data to get New Orleans data."""
+def new_orleans_10year(
+    pi_version: int = 2, pressure_assumption: str = "isothermal"
+) -> None:
+    """Run potential size calculations on CMIP6 data to get New Orleans data.
+
+    Args:
+        pi_version (int, optional): pi_version of the pi calculation. Defaults to 2.
+        pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
+    """
     # look at some seasonal data for new orleans
     in_ds = xr.open_dataset(ex_data_path(pi_version=pi_version)).isel(
         time=slice(0, 120)
@@ -103,23 +112,27 @@ def new_orleans_year(pi_version=2) -> None:
     out_ds["t"] = qt_ds["t"]
     out_ds["otl"] = qt_ds["otl"]
     print(out_ds)
-    out_ds.to_netcdf(os.path.join(DATA_PATH, "new_orleans_10year3.nc"))
+    out_ds.to_netcdf(
+        os.path.join(
+            DATA_PATH, f"new_orleans_10year_pi{pi_version}_{pressure_assumption}.nc"
+        )
+    )
 
 
 @timeit
-def global_cmip6(part="nw", year: int = 2015, version=2) -> None:
+def global_cmip6(part="nw", year: int = 2015, pi_version=2) -> None:
     """Run potential size calculations on CMIP6 data to make specific subsets.
     Args:
         part (str, optional): segment of the world to calculate. Defaults to "nw".
         year (int, optional): year to calculate. Defaults to 2015.
-        version (int, optional): version of the data. Defaults to 2.
+        pi_version (int, optional): pi_version of the data. Defaults to 2.
     """
     # just get North Hemisphere August
     # and South Hemisphere February
     year_offset = (year - 2015) * 12  # number of months since 2015
     southern_hemisphere_month = 1
     northern_hemisphere_month = 7
-    full_ds = xr.open_dataset(ex_data_path(pi_version=version, member=4))
+    full_ds = xr.open_dataset(ex_data_path(pi_version=pi_version, member=4))
     if part == "nw":
         in_ds = full_ds.isel(
             time=northern_hemisphere_month + year_offset,
@@ -158,7 +171,9 @@ def global_cmip6(part="nw", year: int = 2015, version=2) -> None:
     out_ds = parallelized_ps(in_ds, jobs=30)
     print(out_ds)
     out_ds.to_netcdf(
-        os.path.join(DATA_PATH, f"potential_size_global_{part}_{year}_{version}.nc")
+        os.path.join(
+            DATA_PATH, f"potential_size_global_{part}_{year}_pi{pi_version}.nc"
+        )
     )
 
 
@@ -190,7 +205,7 @@ def point_timeseries(
     member: int = 10,
     place: str = "new_orleans",
     pressure_assumption="isothermal",
-    pi_version=2,
+    pi_version=3,
 ) -> None:
     """
     Point timeseries.
@@ -221,7 +236,8 @@ def point_timeseries(
     out_ds = parallelized_ps(trimmed_ds, jobs=25)
     out_ds.to_netcdf(
         os.path.join(
-            DATA_PATH, f"{place}_august_ssp585_r{member}i1p1f1_{pressure_assumption}.nc"
+            DATA_PATH,
+            f"{place}_august_ssp585_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}.nc",
         )
     )
 
@@ -234,7 +250,7 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 2)"
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 2)"
     # trimmed_cmip6_example()
-    # new_orleans_year()
+    # new_orleans_10year()
     # global_cmip6()
     # python -c "from cle.ps_runs import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
     # python -c "from cle.ps_runs import new_orleans_timeseries as no; no(4); no(10); no(11)"
@@ -245,6 +261,16 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'miami'); pt(10, 'miami'); pt(11, 'miami')"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
     # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
+    #
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'shanghai'); pt(10, 'shanghai'); pt(11, 'shanghai')"
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hanoi'); pt(10, 'hanoi'); pt(11, 'hanoi')"
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hong_kong'); pt(10, 'hong_kong'); pt(11, 'hong_kong')"
+    # retry with pi_version = 4 for hong_kong only
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hong_kong', pi_version=4); pt(10, 'hong_kong', pi_version=4); pt(11, 'hong_kong', pi_version=4)"
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'shanghai', pi_version=4); pt(10, 'shanghai', pi_version=4); pt(11, 'shanghai', pi_version=4)"
+    # lets do it for New Orleans too
+    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'new_orleans', pi_version=4); pt(10, 'new_orleans', pi_version=4); pt(11, 'new_orleans', pi_version=4)"
+
     # set off global
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')" &> ne2.log
@@ -253,4 +279,4 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se2.log
 
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
-    # python -c "from w22.ps_runs import new_orleans_year as no; no()"
+    # python -c "from w22.ps_runs import new_orleans_10year as no; no()"
