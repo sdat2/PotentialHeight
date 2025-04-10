@@ -43,7 +43,8 @@ def download_single_levels(
             "variable": [
                 "sea_surface_temperature",
                 "mean_sea_level_pressure",
-                "relative_humidity",
+                "2m_dewpoint_temperature",
+                "2m_temperature",
             ],
             "year": years,
             "month": months,
@@ -198,7 +199,7 @@ def download_era5_data() -> None:
     months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 
     # Download the single-level (surface) variables.
-    download_single_levels(years, months, "era5_single_levels.nc", redo=False)
+    download_single_levels(years, months, "era5_single_levels.nc", redo=True)
 
     # break the single level file into decade chunks
     # and save them as separate files
