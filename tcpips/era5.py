@@ -324,7 +324,7 @@ def era5_pi(years: List[str]) -> None:
         era5_pi_decade(single_level_path, pressure_level_path)
 
 
-def get_era5_coordinates():
+def get_era5_coordinates() -> xr.Dataset:
     """
     Get the coordinates of the ERA5 data.
     This function is a placeholder and should be implemented with the actual calculation logic.
@@ -332,6 +332,27 @@ def get_era5_coordinates():
     return xr.open_dataset(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"))[
         ["longitude", "latitude", "valid_time"]
     ]
+
+
+def get_era5_combined() -> xr.Dataset:
+    """
+    Get the raw ERA5 data for potential intensity and size as a lazily loaded xarray dataset.
+    """
+    # open the single level file
+    single_ds = xr.open_dataset(
+        os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"), chunks={"time": 1}
+    )
+    # open the pressure level files for all of the decades using xr.open_mfdataset
+    file_paths = []
+    years = [str(year) for year in range(1980, 2025)]
+    for i in range(0, len(years), 10):
+        j = min(i + 10, len(years))
+        file_paths += os.path.join(
+            ERA5_RAW_PATH, f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc"
+        )
+    pressure_ds = xr.open_dataset(file_paths, chunks={"time": 1})
+    # merge the datasets
+    return xr.merge([single_ds, pressure_ds])
 
 
 if __name__ == "__main__":

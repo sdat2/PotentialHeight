@@ -8,10 +8,9 @@ import os
 import numpy as np
 import xarray as xr
 import ujson
-from sithom.io import write_json
 from sithom.time import timeit
 from .constants import DATA_PATH
-from .era5 import get_era5_coordinates
+from .era5 import get_era5_coordinates, get_era5_combined
 
 
 IBTRACS_DATA_PATH = os.path.join(DATA_PATH, "ibtracs")
@@ -143,6 +142,32 @@ def ibtracs_to_era5_map():
     )
 
 
+def era5_unique_points_raw() -> None:
+    """Get the data from the unique points in the ERA5 data, in order to be able to calculate potential intensity and size.
+
+    This function relies on os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc") already existing.
+    """
+    # open the unique points file
+    unique_points_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc")
+    )
+    # open the era5 data file
+    era5_ds = get_era5_combined()
+    # get the unique points from the unique points file
+    unique_points = unique_points_ds.unique_dim.values
+    # get the data from the era5 data file at the unique points
+    # we want to vector select the era5 data with the unique points which are the indices of the era5 data
+    # this is done by using the isel method of xarray
+    era5_data = era5_ds.isel(
+        longitude=unique_points[:, 0],
+        latitude=unique_points[:, 1],
+        time=unique_points[:, 2],
+    )
+    # the new dataset will have dimensions (u, p) where u is the number of unique points and p is the number of pressure levels
+    era5_data.to_netcdf(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc"))
+    print(era5_data)
+
+
 # open ibtracs data and era5 data
 # loop through ibtracs data (by track, then by time (only if start time is after 1980, and end time is before end of 2024)) and find the closest era5 data point to the centre of the cyclone at that timestep.
 # create a unique counter before looping through the ibtracs data
@@ -161,4 +186,5 @@ if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
-    ibtracs_to_era5_map()
+    # ibtracs_to_era5_map()
+    era5_unique_points_raw()
