@@ -49,9 +49,9 @@ def ibtracs_to_era5_map():
     # next get era5 coordinates (longitude, latitude, time)
 
     era5_coords_ds = get_era5_coordinates()
-    latitudes = era5_coords_ds.latitude.values
-    longitudes = era5_coords_ds.longitude.values
-    etimes = era5_coords_ds.valid_time.values
+    lats_e = era5_coords_ds.latitude.values
+    lons_e = era5_coords_ds.longitude.values
+    times_e = era5_coords_ds.valid_time.values
 
     # set up hashmap for unique x/y/t points
     point_d = {}
@@ -68,24 +68,31 @@ def ibtracs_to_era5_map():
         # get the start and end time of the storm
 
         # get the latitude and longitude of the storm centre
-        lat = storm.lat.values
-        lon = storm.lon.values
-        times = storm.time.values
+        lats_i = storm.lat.values
+        lons_i = storm.lon.values
+        times_i = storm.time.values
 
         # loop through the time steps of the storm
         for i in range(len(storm.time)):
             # get the latitude and longitude of the storm centre at this time step
-            lat_i = lat[i]
-            lon_i = lon[i]
-            time = times[i]
+            lat_i = lats_i[i]
+            lon_i = lons_i[i]
+            time = times_i[i]
             # if not nan
             # find closest era5 data point to the cyclone centre at this time step
             if not np.isnan(lat_i) and not np.isnan(lon_i):
                 # find the closest era5 data point to the cyclone centre at this time step
                 # (this part is not implemented yet)
-                x = np.argmin(np.abs(latitudes - lat_i))
-                y = np.argmin(np.abs(longitudes - lon_i))
-                t = np.argmin(np.abs(etimes - time))
+                # it's a rectilinear grid, so we can just find the closest point in each dimension separately
+                x = np.argmin(np.abs(lons_e - lon_i))  # lon dimension
+                y = np.argmin(np.abs(lats_e - lat_i))  # lat dimension
+                t = np.argmin(np.abs(times_e - time))  # time dimension
+
+                # print out the coordinates of cyclone centre and closest found era5 point
+                # print(f"lat_i: {lat_i}, lon_i: {lon_i}, time: {time}")
+                # print(
+                #    f"lat_e: {lats_e[x]}, lon_e: {lons_e[y]}, time: {times_e[t]}"
+                # )
 
                 # check if this point is already in the hashmap
                 if (x, y, t) not in point_d:
@@ -114,18 +121,23 @@ def ibtracs_to_era5_map():
     with open(os.path.join(IBTRACS_DATA_PATH, "unique_points_dict.json"), "w") as file:
         file.write(ujson.dumps(point_d))
     # save the unique points list
-    xr.DataArray(
-        unique_points_list,
-        dims=["unique_points", "coords"],
+    unique_points_list = np.array(unique_points_list)
+    xr.Dataset(
+        data_vars={
+            "unique_dim": (["u", "coords"], unique_points_list),
+            "longitude": (["u"], lons_e[unique_points_list[:, 0]]),
+            "latitude": (["u"], lats_e[unique_points_list[:, 1]]),
+            "time": (["u"], times_e[unique_points_list[:, 2]]),
+        },
         coords={
-            "unique_points": np.arange(len(unique_points_list)),
+            "u": (
+                ["u"],
+                np.arange(len(unique_points_list)),
+                {"description": "unique index"},
+            ),
             "coords": ["x", "y", "t"],
         },
-        name="unique_points",
-    ).to_dataframe().to_csv(
-        os.path.join(IBTRACS_DATA_PATH, "unique_points_list.csv"),
-        index=False,
-    )
+    ).to_netcdf(os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc"))
     print(
         f"Found {u} unique points from ERA5 that correspond to IBTrACS data since 1980."
     )
