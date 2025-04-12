@@ -340,17 +340,24 @@ def get_era5_combined() -> xr.Dataset:
     """
     # open the single level file
     single_ds = xr.open_dataset(
-        os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"), chunks={"time": 1}
+        os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
+        chunks={"valid_time": 1},
+        engine="netcdf4",
     )
     # open the pressure level files for all of the decades using xr.open_mfdataset
     file_paths = []
     years = [str(year) for year in range(1980, 2025)]
     for i in range(0, len(years), 10):
         j = min(i + 10, len(years))
-        file_paths += os.path.join(
-            ERA5_RAW_PATH, f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc"
-        )
-    pressure_ds = xr.open_dataset(file_paths, chunks={"time": 1})
+        file_paths += [
+            os.path.join(
+                ERA5_RAW_PATH, f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc"
+            )
+        ]
+    print(f"Opening pressure level files: {file_paths}")
+    pressure_ds = xr.open_mfdataset(
+        file_paths, chunks={"valid_time": 1}, engine="netcdf4"
+    )
     # merge the datasets
     return xr.merge([single_ds, pressure_ds])
 

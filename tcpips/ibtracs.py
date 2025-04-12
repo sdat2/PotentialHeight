@@ -161,7 +161,7 @@ def era5_unique_points_raw() -> None:
     era5_data = era5_ds.isel(
         longitude=unique_points[:, 0],
         latitude=unique_points[:, 1],
-        time=unique_points[:, 2],
+        valid_time=unique_points[:, 2],
     )
     # the new dataset will have dimensions (u, p) where u is the number of unique points and p is the number of pressure levels
     era5_data.to_netcdf(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc"))
