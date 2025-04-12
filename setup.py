@@ -29,6 +29,7 @@ REQUIRED: List[str] = [
     "slurmpy",  # to run SLURM jobs (adforce)
     "tcpypi",  # to calculate potential intensity (tcpips)
     "joblib",  # to parallize more easily potential size calculation (tcpips/w22)
+    "ujson",  # to read/write json dictionaries more flexibly (tcpips)
 ]
 
 

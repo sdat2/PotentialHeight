@@ -324,12 +324,22 @@ def era5_pi(years: List[str]) -> None:
         era5_pi_decade(single_level_path, pressure_level_path)
 
 
+def get_era5_coordinates():
+    """
+    Get the coordinates of the ERA5 data.
+    This function is a placeholder and should be implemented with the actual calculation logic.
+    """
+    return xr.open_dataset(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"))[
+        ["longitude", "latitude", "valid_time"]
+    ]
+
+
 if __name__ == "__main__":
     # python -m tcpips.era5
-    # download_era5_data()
-    era5_pi(
-        [str(year) for year in range(1980, 2025)]
-    )  # Modify or extend this list as needed.)
+    download_era5_data()
+    # era5_pi(
+    #    [str(year) for year in range(1980, #2025)]
+    # )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
