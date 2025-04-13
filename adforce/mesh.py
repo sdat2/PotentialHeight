@@ -405,6 +405,8 @@ def grad_for_triangle(
 
 # print(xr_loader("../data/fort.63.nc", use_dask=False))
 
+# unwritten function process a whole fort.63 file to dual graph format, for training a Graph Neural Network.
+
 
 @timeit
 def select_coast(

@@ -142,10 +142,14 @@ def ibtracs_to_era5_map():
     )
 
 
+@timeit
 def era5_unique_points_raw() -> None:
     """Get the data from the unique points in the ERA5 data, in order to be able to calculate potential intensity and size.
 
     This function relies on os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc") already existing.
+
+    Need to do vectorized indexing, which in xarray only seems to work with sel rather
+    than isel, hence we need to index by longitude, latitude, time.
     """
     # open the unique points file
     unique_points_ds = xr.open_dataset(
@@ -153,19 +157,26 @@ def era5_unique_points_raw() -> None:
     )
     # open the era5 data file
     era5_ds = get_era5_combined()
+    print("combined era5 data loaded")
+    print(era5_ds)
     # get the unique points from the unique points file
-    unique_points = unique_points_ds.unique_dim.values
+    # unique_points = unique_points_ds.unique_dim.values
+    # print(f"unique points shape is {unique_points.shape}")
+    print("unique_points_ds:", unique_points_ds)
     # get the data from the era5 data file at the unique points
     # we want to vector select the era5 data with the unique points which are the indices of the era5 data
     # this is done by using the isel method of xarray
-    era5_data = era5_ds.isel(
-        longitude=unique_points[:, 0],
-        latitude=unique_points[:, 1],
-        valid_time=unique_points[:, 2],
+    era5_unique_data = era5_ds.sel(
+        longitude=unique_points_ds.longitude,  # unique_points[:, 0],
+        latitude=unique_points_ds.latitude,
+        valid_time=unique_points_ds.time,
+        method="nearest",
     )
     # the new dataset will have dimensions (u, p) where u is the number of unique points and p is the number of pressure levels
-    era5_data.to_netcdf(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc"))
-    print(era5_data)
+    era5_unique_data.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc"), engine="h5netcdf"
+    )
+    print(era5_unique_data)
 
 
 # open ibtracs data and era5 data
