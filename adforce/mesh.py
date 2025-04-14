@@ -711,6 +711,10 @@ def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
     return adc_ds_n
 
 
+def filter_dual_graph(dg_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
+    raise NotImplementedError("Not yet implemented.")
+
+
 @timeit
 def bbox_mesh(
     file_path: str = os.path.join(DATA_PATH, "fort.63.nc"),  # "../data/fort.63.nc",
@@ -737,22 +741,6 @@ def bbox_mesh(
     both_in = xs_in & ys_in
     indices = np.where(both_in)[0]  # surviving old labels
     return filter_mesh(adc_ds, indices)
-    """
-    new_indices = np.where(indices)[0]  # new labels
-    neg_indices = np.where(~both_in)[0]  # indices to get rid of
-    elements = adc_ds.element.values - 1  # triangular component mesh
-    mask = ~np.isin(elements, neg_indices).any(axis=1)
-    filtered_elements = elements[mask]
-    mapping = dict(zip(indices, new_indices))
-    relabelled_elements = np.vectorize(mapping.get)(filtered_elements)
-    adc_ds_n = adc_ds.isel(node=indices)
-    del adc_ds_n["element"]  # remove old triangular component mesh
-    adc_ds_n["element"] = ( # add new triangular component mesh
-        ["nele", "nvertex"],
-        relabelled_elements + 1,
-    )  # add new triangular component mesh
-    return adc_ds_n
-    """
 
 
 @timeit
@@ -851,9 +839,10 @@ def plot_contour(
 if __name__ == "__main__":
     # python -m adforce.mesh
     # bbox_mesh()
-    print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
-    print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
-    print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
     # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
-    print(process_dual_graph(xr_loader(FORT63_EXAMPLE)))
+    # dg_ex = process_dual_graph(xr_loader(FORT63_EXAMPLE))
+    # dg_ex.to_netcdf(os.path.join(DATA_PATH, "fort.63.dual.nc"))
     print(xr_loader(FORT63_EXAMPLE))
