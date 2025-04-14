@@ -20,12 +20,12 @@ def plot_dual_graph() -> None:
         bbox=NO_BBOX,
         use_dask=False,
     )
-    
+
     dg = process_dual_graph(ds)
 
     # plot depth and depth gradient as two plots
     plot_defaults()
-    fig, axs = plt.subplots(3, 1, figsize=get_dim(ratio=1.5))
+    fig, axs = plt.subplots(3, 1, figsize=get_dim(ratio=1.1))
     im = axs[0].scatter(
         dg.x.values, dg.y.values, c=dg.depth.values, s=0.1, cmap="viridis"
     )
