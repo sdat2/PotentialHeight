@@ -1,9 +1,11 @@
-# wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/netcdf/IBTrACS.ALL.v04r01.nc
 """Process IBTrACS data to calculate along-track potential intensity and size from ERA5.
 
 We only want tracks from 1980-2024 (inclusive).
 
+wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/netcdf/IBTrACS.since1980.v04r01.nc
+
 """
+
 import os
 import numpy as np
 import xarray as xr
@@ -170,7 +172,7 @@ def era5_unique_points_raw() -> None:
         longitude=unique_points_ds.longitude,  # unique_points[:, 0],
         latitude=unique_points_ds.latitude,
         valid_time=unique_points_ds.time,
-        method="nearest",
+        method="nearest",  # maybe this doesn't need to be done
     )
     # the new dataset will have dimensions (u, p) where u is the number of unique points and p is the number of pressure levels
     era5_unique_data.to_netcdf(

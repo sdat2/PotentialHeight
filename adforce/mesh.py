@@ -3,9 +3,34 @@ Process ADCIRC meshes efficiently vectorized/sparses.
 This is the shared functionality for processing ADCIRC meshes.
 
 TODO: Add the dual graph calculation for SurgeNet.
+
+fort.63 format:
+dimensions:
+    time: (Unlimited) (604 currently)
+    node: (31435)
+    nele: (58368)
+    nvertex: (3)
+    nope: (1)
+    neta: (103)
+    max_nvdll: (103)
+    nbou: (59)
+    nvel: (4514)
+    max_nvell: (3050)
+    mesh: (1)
+coordinates:
+    time (time): (604)
+    x (node): (31435) longitude, degrees_east
+    y (node): (31435) latitude, degrees_north
+    element (nele, nvertex): (58368, 3) connectivity
+    node (node): (31435)
+data_vars:
+    depth (node): (31435) depth, meters
+    zeta (time, node): (604, 31435) water surface elevation, meters
+
 """
 
 from typing import Union, Tuple, List
+import os
 import numpy as np
 import collections
 from scipy.sparse import csr_matrix, coo_matrix
@@ -14,7 +39,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from .constants import NO_BBOX, FORT63_EXAMPLE
+from .constants import NO_BBOX, FORT63_EXAMPLE, DATA_PATH
 
 
 @timeit
@@ -257,6 +282,9 @@ def _test_xr_dataset() -> xr.Dataset:
     """
     Test xr.Dataset for dual graph.
 
+    This is a synthetic fort.63.nc dataset excluding some variables, which we have chosen
+    to ignore in the current setup.
+
     Returns:
         xr.Dataset: Dual graph dataset.
     """
@@ -270,8 +298,9 @@ def _test_xr_dataset() -> xr.Dataset:
                 },
             ),
             "depth": (["node"], np.array([1, 2, 3, 4])),
-            "x": (["node"], np.array([0, 1, 2, 3])),
-            "y": (["node"], np.array([0, -1, -1, -2])),
+            "x": (["node"], np.array([0, 1, 2, 3])),  # degrees_east
+            "y": (["node"], np.array([0, -1, -1, -2])),  # degrees_north
+            # between timesteps sea surface elevation increases by one meter
             "zeta": (["time", "node"], np.array([[1, 2, 3, 4], [2, 3, 4, 5]])),
         },
         coords={
@@ -311,27 +340,45 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
         True
         >>> np.isclose(ds.zeta.values, np.array([[2, 3], [3, 4]]), atol=1e-6).all()
         True
+        >>> np.isclose(ds.depth_grad.values, np.array([[1, 1], [0, 0]]), atol=1e-6).all()
+        True
     """
     # ds = xr_loader(path)
+    # get base object from the triangular elements
     dg = dual_graph_dataset(ds.element.values - 1)
+    # calculate the mean for static node features
     for val in ["x", "y", "depth"]:  # static fields
         dg[val] = (
             ["nele"],
             mean_for_triangle(ds[val].values, ds["element"].values - 1),
         )
+    # calculate the mean for dynamic node features
     for val in ["zeta"]:  # time varying fields
         dg[val] = (
             ["time", "nele"],
             np.mean(ds[val].values[:, ds["element"].values - 1], axis=2),
         )
-    # calculate the gradient of the depth
+    # calculate the gradient of the depth in x and y
     dg["depth_grad"] = (
         ["direction", "nele"],
         grad_for_triangle(
             ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
         ),
     )
+    # calculate the gradient of the zeta in x and y
+    # dg["zeta_grad"] = (
+    #     ["direction", "nele"],
+    #     grad_for_triangle(
+    #         ds.x.values, ds.y.values, ds.zeta.values, ds.element.values - 1
+    #     ),
+    # )
+
+    # not yet implemented: work out features for edges.
+
     return dg.assign_coords({"direction": ["x", "y"]})
+
+
+# not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
 
 
 def mean_for_triangle(
@@ -357,21 +404,23 @@ def mean_for_triangle(
 
 
 def grad_for_triangle(
-    x_lon: np.ndarray, y_lat: np.ndarray, values: np.ndarray, triangles: np.ndarray
+    x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
 ) -> np.ndarray:
     """
-    Calculate the gradient of the values for each triangle.
+    Calculate the gradient of the values (called z) for each triangle.
 
     Three points define a plane, so we can calculate the gradient of the plane.
+
+    TODO: maybe change so that values could be dimension (times x nodes)
 
     Args:
         x_lon (np.ndarray): N array of longitudes. The x values.
         y_lat (np.ndarray): N array of latitudes. The y values.
-        values (np.ndarray): N array of values. The z values.
+        z_values (np.ndarray): N array of z values. The z values. In the future a TxN array of z  values.
         triangles (np.ndarray): Mx3 array of triangle indices. The indices of each plane.
 
     Returns:
-        np.ndarray: 2xM array of gradients (dz/dx, dz/dy) for each triangle.
+        np.ndarray: 2xM array of gradients (dz/dx, dz/dy) for each triangle. In the future maybe a 2xTxM array for each triange at each point in time.
 
     Examples::
         >>> np.all(np.isclose(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 1, 0]), np.array([[0, 1, 2]])), np.array([[-1], [0]]), atol=1e-6))
@@ -388,9 +437,10 @@ def grad_for_triangle(
         True
         >>> assert np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 1, 0]), np.array([[0, 1, 2]])) == np.array([[0], [1]]))
     """
+    # vector index into the x, y, z arrays to get the values at each node for each triangle
     x = x_lon[triangles]  # Mx3
     y = y_lat[triangles]  # Mx3
-    z = values[triangles]  # Mx3
+    z = z_values[triangles]  # Mx3
 
     # get normal vectors
     c = np.stack((x, y, z), axis=2)  # stack the x, y, z values into columns (Mx3x3)
@@ -403,7 +453,11 @@ def grad_for_triangle(
     return np.stack((grad_x, grad_y))  # 2xM
 
 
+# unwritten: grad for edges
+
+
 # print(xr_loader("../data/fort.63.nc", use_dask=False))
+
 
 # unwritten function process a whole fort.63 file to dual graph format, for training a Graph Neural Network.
 
@@ -504,7 +558,7 @@ def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
 
 @timeit
 def bbox_mesh(
-    file_path: str = "../data/fort.63.nc",
+    file_path: str = os.path.join(DATA_PATH, "fort.63.nc"),  # "../data/fort.63.nc",
     bbox: BoundingBox = NO_BBOX,
     use_dask: bool = True,
 ) -> xr.Dataset:
