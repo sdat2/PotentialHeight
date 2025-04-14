@@ -348,6 +348,8 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
         True
         >>> np.isclose(ds.depth_grad.values, np.array([[1, 1, 1], [0, 0, 0]]), atol=1e-6).all()
         True
+        >>> np.isclose(ds.zeta_grad.values, np.array([[[1, 1, 1], [1, 1, 1]], [[0, 0, 0], [0, 0, 0]]]), atol=1e-6).all()
+        True
     """
     # ds = xr_loader(path)
     # get base object from the triangular elements
@@ -367,17 +369,17 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
     # calculate the gradient of the depth in x and y
     dg["depth_grad"] = (
         ["direction", "nele"],  # this might be the wrong way round
-        grad_for_triangle(
+        grad_for_triangle_static(
             ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
         ),
     )
     # calculate the gradient of the zeta in x and y
-    # dg["zeta_grad"] = (
-    #     ["direction", "nele"],
-    #     grad_for_triangle(
-    #         ds.x.values, ds.y.values, ds.zeta.values, ds.element.values - 1
-    #     ),
-    # )
+    dg["zeta_grad"] = (
+        ["direction", "time", "nele"],
+        grad_for_triangle_timeseries(
+            ds.x.values, ds.y.values, ds.zeta.values, ds.element.values - 1
+        ),
+    )
 
     # not yet implemented: work out features for edges.
 
@@ -409,54 +411,201 @@ def mean_for_triangle(
     return np.mean(values[triangles], axis=1)
 
 
-def grad_for_triangle(
+def grad_for_triangle_static(
     x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
 ) -> np.ndarray:
     """
-    Calculate the gradient of the values (called z) for each triangle.
+    Calculate the gradient of z-values for each triangle,
+    assuming z_values has shape (N,).
 
-    Three points define a plane, so we can calculate the gradient of the plane.
-
-    TODO: maybe change so that values could be dimension (times x nodes)
+    Three points define a plane, so we can calculate the
+    gradient of that plane (dz/dx, dz/dy).
 
     Args:
-        x_lon (np.ndarray): N array of longitudes. The x values.
-        y_lat (np.ndarray): N array of latitudes. The y values.
-        z_values (np.ndarray): N array of z values. The z values. In the future a TxN array of z  values.
-        triangles (np.ndarray): Mx3 array of triangle indices. The indices of each plane.
+        x_lon (np.ndarray): (N,) array of x-coordinates.
+        y_lat (np.ndarray): (N,) array of y-coordinates.
+        z_values (np.ndarray): (N,) array of z-values.
+        triangles (np.ndarray): (M, 3) array of triangle indices.
 
     Returns:
-        np.ndarray: 2xM array of gradients (dz/dx, dz/dy) for each triangle. In the future maybe a 2xTxM array for each triange at each point in time.
+        np.ndarray of shape (2, M):
+            [0, :] -> dz/dx for each triangle
+            [1, :] -> dz/dy for each triangle
 
-    Examples::
-        >>> np.all(np.isclose(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 1, 0]), np.array([[0, 1, 2]])), np.array([[-1], [0]]), atol=1e-6))
+    Examples:
+        >>> import numpy as np
+        >>> # First test
+        >>> np.all(
+        ...   np.isclose(
+        ...     grad_for_triangle_static(
+        ...         np.array([0, 0, 1]),
+        ...         np.array([0, 1, 0]),
+        ...         np.array([1, 1, 0]),
+        ...         np.array([[0, 1, 2]])
+        ...     ),
+        ...     np.array([[-1], [0]]),
+        ...     atol=1e-6
+        ...   )
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-1], [-1]]))
+
+        >>> # Second test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([1, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[-1], [-1]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 2]), np.array([0, 2, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2], [1, 2, 0]])) == np.array([[-0.5, -0.5], [-0.5, -0.5]]))
+
+        >>> # Third test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 2]),
+        ...     np.array([0, 2, 0]),
+        ...     np.array([1, 0, 0]),
+        ...     np.array([[0, 1, 2], [1, 2, 0]])
+        ...   ) == np.array([[-0.5, -0.5], [-0.5, -0.5]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 0.5]), np.array([0, 0.5, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-2], [-2]]))
+
+        >>> # Fourth test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 0.5]),
+        ...     np.array([0, 0.5, 0]),
+        ...     np.array([1, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[-2], [-2]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 0.5]), np.array([0, 0.5, 0]), np.array([2, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-4], [-4]]))
+
+        >>> # Fifth test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 0.5]),
+        ...     np.array([0, 0.5, 0]),
+        ...     np.array([2, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[-4], [-4]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 0, 0]), np.array([[0, 1, 2]])) == np.array([[0], [0]]))
+
+        >>> # Sixth test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([0, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[0], [0]])
+        ... )
         True
-        >>> assert np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 1, 0]), np.array([[0, 1, 2]])) == np.array([[0], [1]]))
+
+        >>> # Seventh test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[0], [1]])
+        ... )
+        True
     """
-    # vector index into the x, y, z arrays to get the values at each node for each triangle
-    x = x_lon[triangles]  # Mx3
-    y = y_lat[triangles]  # Mx3
-    z = z_values[triangles]  # Mx3
+    # M x 3 arrays of node coordinates/values
+    x = x_lon[triangles]  # (M, 3)
+    y = y_lat[triangles]  # (M, 3)
+    z = z_values[triangles]  # (M, 3)
 
-    # get normal vectors
-    c = np.stack((x, y, z), axis=2)  # stack the x, y, z values into columns (Mx3x3)
-    # (B-A) x (C-A)
-    normal = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)  # Mx3
-    # To avoid dividing by zero in case the triangles are degenerate
+    # Stack into shape (M, 3, 3): [ (xA,yA,zA), (xB,yB,zB), (xC,yC,zC) ]
+    c = np.stack((x, y, z), axis=2)
+    # normal = (B - A) x (C - A)
+    normal = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)  # (M, 3)
+
     with np.errstate(divide="ignore", invalid="ignore"):
-        grad_x = -normal[:, 0] / normal[:, 2]  # dz/dx  # M
-        grad_y = -normal[:, 1] / normal[:, 2]  # dz/dy  # M
-    return np.stack((grad_x, grad_y))  # 2xM
+        grad_x = -normal[:, 0] / normal[:, 2]  # (M,)
+        grad_y = -normal[:, 1] / normal[:, 2]  # (M,)
+
+    return np.stack((grad_x, grad_y))  # (2, M)
+
+
+def grad_for_triangle_timeseries(
+    x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
+) -> np.ndarray:
+    """
+    Calculate the gradient of z-values for each triangle,
+    assuming z_values has shape (T, N).
+
+    Three points define a plane, so we can calculate the
+    gradient (dz/dx, dz/dy). We do it for each of the T time steps.
+
+    Args:
+        x_lon (np.ndarray): (N,) array of x-coordinates.
+        y_lat (np.ndarray): (N,) array of y-coordinates.
+        z_values (np.ndarray): (T, N) array of z-values at each of T times.
+        triangles (np.ndarray): (M, 3) array of triangle indices.
+
+    Returns:
+        np.ndarray of shape (2, T, M):
+            [0, t, m] -> dz/dx for triangle m at time t
+            [1, t, m] -> dz/dy for triangle m at time t
+
+    Examples:
+        >>> import numpy as np
+        >>> # Suppose we have T=2 snapshots and N=3 nodes
+        >>> zt = np.array([
+        ...     [1, 1, 0],  # time=0
+        ...     [0, 1, 0]   # time=1
+        ... ])
+        >>> tri = np.array([[0, 1, 2]])
+        >>> result = grad_for_triangle_timeseries(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     zt,
+        ...     tri
+        ... )
+        >>> result.shape
+        (2, 2, 1)
+        >>> # We can also test that the first time-step's gradient
+        >>> # matches grad_for_triangle_static if we pass in the same z-values
+        >>> static_grad = grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([1, 1, 0]),
+        ...     tri
+        ... )
+        >>> np.allclose(result[:, 0, :], static_grad)  # compare time=0 vs static
+        True
+    """
+    T = z_values.shape[0]  # number of time steps
+    # M, 3 for the triangle indices
+    x = x_lon[triangles]
+    y = y_lat[triangles]
+
+    # z becomes (T, M, 3) after indexing
+    z = z_values[:, triangles]  # shape: (T, M, 3)
+
+    # Broadcast x, y to shape (1, M, 3) so that they match (T, M, 3)
+    x3 = np.repeat(x[np.newaxis, :, :], T, axis=0)  # shape: (T, M, 3)
+    y3 = np.repeat(y[np.newaxis, :, :], T, axis=0)  # shape: (T, M, 3)
+
+    # Combine into shape (T, M, 3, 3)
+    c = np.stack((x3, y3, z), axis=-1)  # (T, M, 3, 3)
+
+    # normal = cross((B - A), (C - A)) for each time and triangle
+    normal = np.cross(
+        c[..., 1, :] - c[..., 0, :], c[..., 2, :] - c[..., 0, :], axis=-1
+    )  # (T, M, 3)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        grad_x = -normal[..., 0] / normal[..., 2]  # (T, M)
+        grad_y = -normal[..., 1] / normal[..., 2]  # (T, M)
+
+    # shape: (2, T, M)
+    return np.stack((grad_x, grad_y), axis=0)
 
 
 # unwritten: grad for edges
