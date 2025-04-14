@@ -280,7 +280,7 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
 
 def _test_xr_dataset() -> xr.Dataset:
     """
-    Test xr.Dataset for dual graph.
+    Test xr.Dataset for dual graph. Kind of a mocker for tests to remove io operations.
 
     This is a synthetic fort.63.nc dataset excluding some variables, which we have chosen
     to ignore in the current setup.
@@ -292,26 +292,32 @@ def _test_xr_dataset() -> xr.Dataset:
         {
             "element": (
                 ["nele", "nvertex"],
-                np.array([[0, 1, 2], [1, 2, 3]]) + 1,
+                np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4]]) + 1,
                 {
                     "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
                 },
             ),
-            "depth": (["node"], np.array([1, 2, 3, 4])),
-            "x": (["node"], np.array([0, 1, 2, 3])),  # degrees_east
-            "y": (["node"], np.array([0, -1, -1, -2])),  # degrees_north
+            "depth": (["node"], np.array([1, 2, 3, 4, 4])),
+            "x": (["node"], np.array([0, 1, 2, 3, 3])),  # degrees_east
+            "y": (["node"], np.array([0, -1, -1, -2, -1])),  # degrees_north
             # between timesteps sea surface elevation increases by one meter
-            "zeta": (["time", "node"], np.array([[1, 2, 3, 4], [2, 3, 4, 5]])),
+            "zeta": (["time", "node"], np.array([[1, 2, 3, 4, 4], [2, 3, 4, 5, 5]])),
         },
         coords={
-            "nele": np.arange(2),
-            "nvertex": np.arange(3),
-            "node": np.arange(4),
-            "time": np.array(
-                [
-                    np.datetime64("2021-01-01 00:00:00"),
-                    np.datetime64("2021-01-01 01:00:00"),
-                ]
+            "nele": (["nele"], np.arange(3)),  # number of elements (triangles)
+            "nvertex": (
+                ["nvertex"],
+                np.arange(3),
+            ),  # triangular elements -> 3 vertices per element
+            "node": (["node"], np.arange(5)),  # number of nodes (5)
+            "time": (
+                ["time"],
+                np.array(
+                    [
+                        np.datetime64("2021-01-01 00:00:00"),
+                        np.datetime64("2021-01-01 01:00:00"),
+                    ]
+                ),
             ),
         },
         attrs={"description": "Test original dataset."},
@@ -330,17 +336,17 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
 
     Examples::
         >>> ds = process_dual_graph(_test_xr_dataset())
-        >>> np.isclose(ds.depth.values, np.array([2, 3]), atol=1e-6).all()
+        >>> np.isclose(ds.depth.values, np.array([2, 3, 4-1/3]), atol=1e-6).all()
         True
-        >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3]), atol=1e-6).all()
+        >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3, -1 - 1/3]), atol=1e-6).all()
         True
-        >>> np.isclose(ds.x.values, np.array([1, 2]), atol=1e-6).all()
+        >>> np.isclose(ds.x.values, np.array([1, 2, 3 - 1/3]), atol=1e-6).all()
         True
-        >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4]]))
         True
-        >>> np.isclose(ds.zeta.values, np.array([[2, 3], [3, 4]]), atol=1e-6).all()
+        >>> np.isclose(ds.zeta.values, np.array([[2, 3, 4-1/3], [3, 4, 5-1/3]]), atol=1e-6).all()
         True
-        >>> np.isclose(ds.depth_grad.values, np.array([[1, 1], [0, 0]]), atol=1e-6).all()
+        >>> np.isclose(ds.depth_grad.values, np.array([[1, 1, 1], [0, 0, 0]]), atol=1e-6).all()
         True
     """
     # ds = xr_loader(path)
@@ -360,7 +366,7 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
         )
     # calculate the gradient of the depth in x and y
     dg["depth_grad"] = (
-        ["direction", "nele"],
+        ["direction", "nele"],  # this might be the wrong way round
         grad_for_triangle(
             ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
         ),
