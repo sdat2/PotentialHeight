@@ -20,6 +20,7 @@ def plot_dual_graph() -> None:
         bbox=NO_BBOX,
         use_dask=False,
     )
+    
     dg = process_dual_graph(ds)
 
     # plot depth and depth gradient as two plots
@@ -42,7 +43,7 @@ def plot_dual_graph() -> None:
     plt.colorbar(
         im,
         ax=axs[1],
-        label="Depth $x$ Gradient [m $^{\circ}^{-1}$]",
+        label="Depth $x$ Gradient [m $^{\circ}\;^{-1}$]",
         orientation="vertical",
         shrink=0.3,
     )
@@ -58,7 +59,7 @@ def plot_dual_graph() -> None:
     plt.colorbar(
         im,
         ax=axs[2],
-        label="Depth $y$ Gradient [m $^{\circ}^{-1}$]",
+        label="Depth $y$ Gradient [m $^{\circ}\;^{-1}$]",
         orientation="vertical",
         shrink=0.3,
     )
