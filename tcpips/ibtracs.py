@@ -85,7 +85,8 @@ def ibtracs_to_era5_map():
                 # find the closest era5 data point to the cyclone centre at this time step
                 # (this part is not implemented yet)
                 # it's a rectilinear grid, so we can just find the closest point in each dimension separately
-                x = np.argmin(np.abs(lons_e - lon_i))  # lon dimension
+                x = np.argmin(np.abs(lons_e % 360 - lon_i % 360))  # lon dimension
+
                 y = np.argmin(np.abs(lats_e - lat_i))  # lat dimension
                 t = np.argmin(np.abs(times_e - time))  # time dimension
 
@@ -141,6 +142,70 @@ def ibtracs_to_era5_map():
     ).to_netcdf(os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc"))
     print(
         f"Found {u} unique points from ERA5 that correspond to IBTrACS data since 1980."
+    )
+
+
+@timeit
+def plot_unique_points():
+    # plot geographic distribution of unique points
+    import matplotlib.pyplot as plt
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+    import os
+    from .constants import PROJECT_PATH
+    from sithom.plot import plot_defaults, get_dim, label_subplots
+
+    ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc"))
+
+    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
+    os.makedirs(figure_path, exist_ok=True)
+    plot_defaults()
+
+    fig, ax = plt.subplots(
+        1,
+        1,  # figsize=get_dim(ratio=1.1),
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
+    ax.set_global()
+    ax.add_feature(cfeature.LAND, facecolor="green", edgecolor="black")
+    ax.scatter(
+        ds.longitude.values,
+        ds.latitude.values,
+        c="blue",
+        s=0.1,
+        transform=ccrs.PlateCarree(),
+    )
+    ax.set_title("Unique points from ERA5 that correspond to IBTrACS data since 1980")
+    plt.savefig(
+        os.path.join(figure_path, "unique_points_era5_ibtracs.png"),
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
+    plot_defaults()
+    fig, axs = plt.subplots(1, 2, sharey=True)
+
+    axs[0].hist(
+        ds.longitude.values,
+        bins=360,  # range=(-180, 180),
+        alpha=0.5,
+        label="Longitude [$^\circ$E]",
+    )
+    axs[1].hist(
+        ds.latitude.values,
+        bins=180,
+        range=(-90, 90),
+        alpha=0.5,
+        label="Latitude [$^\circ$N]",
+    )
+    axs[0].set_xlabel("Longitude [$^\circ$E]")
+    axs[1].set_xlabel("Latitude [$^\circ$N]")
+    axs[0].set_ylabel("Count")
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(figure_path, "unique_points_era5_ibtracs_hist.pdf"),
+        bbox_inches="tight",
     )
 
 
@@ -211,19 +276,24 @@ def example_plot_raw():
     )
     label_subplots(axs)
     # (a) sst, (b) , (c) msl
+    axs[0].add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+    )
     im = axs[0].scatter(
         era5_unique_data.longitude.values,
         era5_unique_data.latitude.values,
         c=era5_unique_data.sst.values[:],
         s=0.1,
-        cmap="viridis_r",
+        cmap="viridis",
         transform=ccrs.PlateCarree(),
     )
     axs[0].set_title("SST [K]")
     plt.colorbar(im, ax=axs[0], orientation="vertical")  # , shrink=0.3
     # plot coastline
     # axs[0].coastlines()
-    axs[0].add_feature(
+    axs[1].add_feature(
         NaturalEarthFeature("physical", "land", "110m"),
         edgecolor="black",
         facecolor="green",
@@ -231,15 +301,15 @@ def example_plot_raw():
     im = axs[1].scatter(
         era5_unique_data.longitude.values,
         era5_unique_data.latitude.values,
-        c=era5_unique_data.msl.values[:],
+        c=era5_unique_data.msl.values[:] / 100,  # convert to hPa
         s=0.1,
         cmap="viridis_r",
         transform=ccrs.PlateCarree(),
     )
-    axs[1].set_title("MSL [Pa]")
+    axs[1].set_title("MSL [hPa]")
     plt.colorbar(im, ax=axs[1], orientation="vertical")
 
-    axs[1].add_feature(
+    axs[2].add_feature(
         NaturalEarthFeature("physical", "land", "110m"),
         edgecolor="black",
         facecolor="green",
@@ -249,19 +319,14 @@ def example_plot_raw():
         era5_unique_data.latitude.values,
         c=era5_unique_data.t2m.values[:],
         s=0.1,
-        cmap="viridis_r",
+        cmap="viridis",
         transform=ccrs.PlateCarree(),
     )
     axs[2].set_title("T2M [K]")
     plt.colorbar(im, ax=axs[2], orientation="vertical")
     # facecolor green
-    axs[2].add_feature(
-        NaturalEarthFeature("physical", "land", "110m"),
-        edgecolor="black",
-        facecolor="green",
-    )
 
-    plt.savefig(os.path.join(figure_path, "era5_unique_points_raw.pdf"), dpi=300)
+    plt.savefig(os.path.join(figure_path, "era5_unique_points_raw.png"), dpi=300)
 
 
 # open ibtracs data and era5 data
@@ -283,5 +348,6 @@ if __name__ == "__main__":
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
-    era5_unique_points_raw()
-    example_plot_raw()
+    plot_unique_points()
+    # era5_unique_points_raw()
+    # example_plot_raw()
