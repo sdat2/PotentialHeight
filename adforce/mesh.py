@@ -137,6 +137,8 @@ def dual_graph_starts_ends_from_triangles(
     """
     Generate start, end indices for the dual graph from the triangles.
 
+    TODO: This looks slow.
+
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
 
@@ -169,7 +171,7 @@ def dual_graph_starts_ends_from_triangles(
                 starts.append(nodes[j])
                 ends.append(nodes[j])
                 ends.append(nodes[i])
-    return starts, ends
+    return np.array(starts), np.array(ends)
 
 
 # @timeit
