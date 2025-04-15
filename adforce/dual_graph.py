@@ -173,21 +173,43 @@ def plot_dual_graph() -> None:
                 writer.append_data(image)
 
     # animate_zeta_and_gradients()
-    # plot the grid for the original triangular component mesh in ds, and the dual graph in dg
+    @timeit
+    def plot_mesh_dual_graph():
+        # plot the grid for the original triangular component mesh in ds, and the dual graph in dg
+        plot_defaults()
 
-    fig, axs = plt.subplots(2, 1, figsize=get_dim(ratio=1.1))
-    # plot the original mesh
-    axs[0].triplot(
-        ds.x.values, ds.y.values, ds.element.values - 1, color="black", alpha=0.1
-    )
-    # plot the dual graph
+        fig, axs = plt.subplots(2, 1, figsize=get_dim(ratio=1.1), sharex=True)
+        label_subplots(axs)
+        axs[1].set_xlabel("Longitude [$^{\circ}$E]")
+        axs[0].set_ylabel("Latitude [$^{\circ}$N]")
+        axs[1].set_ylabel("Latitude [$^{\circ}$N]")
+        # plot the original mesh
+        axs[0].set_title("Original mesh")
+        axs[0].triplot(
+            ds.x.values, ds.y.values, ds.element.values - 1, color="black", alpha=0.1
+        )
+        axs[0].set_aspect("equal")
+        # plot the dual graph
+        axs[1].set_title("Dual graph")
+        for edge_i in range(len(dg.edge.values)):
+            axs[1].plot(
+                dg.x.values[[dg.start.values[edge_i], dg.end.values[edge_i]]],
+                dg.y.values[[dg.start.values[edge_i], dg.end.values[edge_i]]],
+                color="black",
+                alpha=0.1,
+            )
+        axs[1].set_aspect("equal")
+        NO_BBOX.ax_lim(axs[0])
+        NO_BBOX.ax_lim(axs[1])
 
-    plt.savefig(
-        os.path.join(figure_path, "dual_graph.pdf"),
-        bbox_inches="tight",
-    )
-    plt.clf()
-    plt.close()
+        plt.savefig(
+            os.path.join(figure_path, "dual_graph.pdf"),
+            bbox_inches="tight",
+        )
+        plt.clf()
+        plt.close()
+
+    plot_mesh_dual_graph()
 
 
 if __name__ == "__main__":
