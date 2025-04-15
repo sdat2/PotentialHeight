@@ -270,9 +270,9 @@ def dual_graph_ds_base_from_triangles(triangles: np.ndarray) -> xr.Dataset:
         >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
         True
     """
-    print("triangles", type(triangles))
-    print(triangles.shape)
-    print(triangles)
+    # print("triangles", type(triangles))
+    # print(triangles.shape)
+    # print(triangles)
     starts, ends = dual_graph_starts_ends_from_triangles(triangles)
     return xr.Dataset(
         {
@@ -671,9 +671,6 @@ def grad_for_triangle_timeseries(
 # unwritten: grad for edges
 
 
-# print(xr_loader("../data/fort.63.nc", use_dask=False))
-
-
 # unwritten function process a whole fort.63 file to dual graph format, for training a Graph Neural Network.
 
 
@@ -686,13 +683,24 @@ def edge_features(ds: xr.Dataset, dg_ds: xr.Dataset) -> xr.Dataset:
 
     e_{ij} = (n_{ij}, l_{ij})
 
-    where n_{ij} is the outward unit normal vector and l_{ij} is the cell sides' length. Thus, the edge features represent the geometrical properties of the mesh. We excluded the fluxes Fij as additional features as they depend on the hydraulic variables ui and uj, which are already included in the dynamic node features.
+    where n_{ij} is the outward unit normal vector and l_{ij} is the cell sides' length. Thus, the edge features represent the geometrical properties of the mesh. We excluded the fluxes F_{ij} as additional features as they depend on the hydraulic variables u_{i} and u_{j}, which are already included in the dynamic node features.
+
+    Raises:
+        NotImplementedError: This function is not yet implemented.
 
     Args:
         ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
         dg_ds (xr.Dataset): Dual graph dataset.
+
+    Returns:
+        xr.Dataset: Dual graph dataset with edge features.
     """
     raise NotImplementedError("Not yet implemented.")
+
+    # triangle mesh ds.x
+    # triangle mesh ds.y
+    # dual graph edge dg_ds.start
+    # dual graph edge dg_ds.end
 
     return dg_ds
 
