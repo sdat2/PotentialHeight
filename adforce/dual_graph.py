@@ -229,6 +229,10 @@ def test_dual_graph():
     xd = mean_for_triangle(x, triangles - 1)
     yd = mean_for_triangle(y, triangles - 1)
 
+    print("triangles", triangles - 1)
+    print("starts", starts)
+    print("ends", ends)
+
     # plot the dual graph
     plot_defaults()
 
@@ -260,7 +264,5 @@ def test_dual_graph():
 
 if __name__ == "__main__":
     # python -m adforce.dual_graph
-    # plot_dual_graph()
-    # download_ibtracs_data()
-    # ibtracs_to_era5_map()
+    plot_dual_graph()
     test_dual_graph()

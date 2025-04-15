@@ -156,9 +156,9 @@ def dual_graph_starts_ends_from_triangles(
     edge_dict = collections.defaultdict(list)
 
     for i, triangle in enumerate(triangles):
-        edge_dict[tuple(triangle[0:2])].append(i)
-        edge_dict[tuple(triangle[1:3])].append(i)
-        edge_dict[tuple(triangle[[0, 2]])].append(i)
+        edge_dict[tuple(sorted(triangle[0:2]))].append(i)
+        edge_dict[tuple(sorted(triangle[1:3]))].append(i)
+        edge_dict[tuple(sorted(triangle[[0, 2]]))].append(i)
 
     starts = []
     ends = []
@@ -222,6 +222,18 @@ def calculate_dual_graph_adjacency_matrix(
         >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), sparse=False) == np.array([[False, True], [True, False]]))
         True
         >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2], [2, 3, 4]]), sparse=False) == np.array([[False, False], [False, False]]))
+        True
+        >>> np.all(calculate_dual_graph_adjacency_matrix(
+        ... np.array([[1, 2, 3], [2, 3, 4], [3, 4, 5],
+        ...           [3, 5, 6], [3, 6, 7], [7, 3, 1]]) - 1,
+        ...          sparse=False
+        ... ) == np.array([
+        ... [False, True, False, False, False, True],
+        ... [True, False, True, False, False, False],
+        ... [False, True, False, True, False, False],
+        ... [False, False, True, False, True, False],
+        ... [False, False, False, True, False, True],
+        ... [True, False, False, False, True, False]]))
         True
     """
 
