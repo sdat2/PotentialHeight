@@ -244,7 +244,7 @@ def calculate_dual_graph_adjacency_matrix(
     )
 
 
-def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
+def dual_graph_ds_base_from_triangles(triangles: np.ndarray) -> xr.Dataset:
     """
     Calculate the dual graph adjacency matrix for a mesh of triangles.
 
@@ -262,7 +262,7 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
          - "end": 2E array of end indices. (Double counting)
 
     Examples::
-        >>> ds = dual_graph_dataset(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> ds = dual_graph_ds_base_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
         >>> np.all(ds.start.values == np.array([0, 1]))
         True
         >>> np.all(ds.end.values == np.array([1, 0]))
@@ -270,6 +270,9 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
         >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
         True
     """
+    print("triangles", type(triangles))
+    print(triangles.shape)
+    print(triangles)
     starts, ends = dual_graph_starts_ends_from_triangles(triangles)
     return xr.Dataset(
         {
@@ -338,7 +341,7 @@ def _test_xr_dataset() -> xr.Dataset:
     )
 
 
-def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
+def dual_graph_ds_from_mesh_ds(ds: xr.Dataset) -> xr.Dataset:
     """
     Create a dual graph dataset from an ADCIRC output dataset.
 
@@ -349,7 +352,7 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
         xr.Dataset: Dual graph dataset.
 
     Examples::
-        >>> ds = process_dual_graph(_test_xr_dataset())
+        >>> ds = dual_graph_ds_from_mesh_ds(_test_xr_dataset())
         >>> np.isclose(ds.depth.values, np.array([2, 3, 4-1/3]), atol=1e-6).all()
         True
         >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3, -1 - 1/3]), atol=1e-6).all()
@@ -367,19 +370,15 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
     """
     # ds = xr_loader(path)
     # get base object from the triangular elements
-    dg = dual_graph_dataset(ds.element.values - 1)
+
+    dg = dual_graph_ds_base_from_triangles(ds.element.values - 1)
     # calculate the mean for static node features
     for val in ["x", "y", "depth"]:  # static fields
         dg[val] = (
             ["nele"],
             mean_for_triangle(ds[val].values, ds["element"].values - 1),
         )
-    # calculate the mean for dynamic node features
-    for val in ["zeta"]:  # time varying fields
-        dg[val] = (
-            ["time", "nele"],
-            np.mean(ds[val].values[:, ds["element"].values - 1], axis=2),
-        )
+
     # calculate the gradient of the depth in x and y
     dg["depth_grad"] = (
         ["direction", "nele"],  # this might be the wrong way round
@@ -387,17 +386,64 @@ def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
             ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
         ),
     )
+    variable_names = ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"]
     # calculate the gradient of the zeta in x and y
-    dg["zeta_grad"] = (
-        ["direction", "time", "nele"],
-        grad_for_triangle_timeseries(
-            ds.x.values, ds.y.values, ds.zeta.values, ds.element.values - 1
-        ),
-    )
+    for variable in variable_names:
+        if variable in ds:
+            dg[variable] = (
+                ["time", "nele"],
+                np.mean(ds[variable].values[:, ds["element"].values - 1], axis=2),
+            )
+            # calculate the gradient for the variable in x and y
+            dg[f"{variable}_grad"] = (
+                ["direction", "time", "nele"],
+                grad_for_triangle_timeseries(
+                    ds.x.values, ds.y.values, ds[variable].values, ds.element.values - 1
+                ),
+            )
 
     # not yet implemented: work out features for edges.
 
     return dg.assign_coords({"direction": ["x", "y"]})
+
+
+@timeit
+def dual_graph_ds_from_mesh_ds_from_path(
+    path: str = os.path.join(DATA_PATH, "exp_0049")
+) -> xr.Dataset:
+    """
+    Process the dual graph from a path to the fort.*.nc files.
+
+    Args:
+        path (str, optional): Defaults to DATA_PATH.
+
+    Raises:
+        FileNotFoundError: If the fort.*.nc files do not exist. for * in [63, 64, 73, 74].
+
+    Returns:
+        xr.Dataset: Dual graph dataset.
+    """
+    # load the set of adcirc data
+    # and process to the dual graph
+    var_from_file_d = {
+        "63": ["zeta", "depth", "element"],
+        "64": ["u-vel", "v-vel"],
+        "73": ["pressure"],
+        "74": ["windx", "windy"],
+    }
+    paths = {
+        var: os.path.join(path, f"fort.{var}.nc") for var in var_from_file_d.keys()
+    }
+    ds_l = []
+    for var in var_from_file_d.keys():
+        if not os.path.exists(paths[var]):
+            raise FileNotFoundError(f"File {paths[var]} does not exist.")
+        else:
+            ds_l += [xr_loader(paths[var])[var_from_file_d[var]]]
+    print(ds_l)
+    print("merged_ds", xr.merge(ds_l))
+
+    return dual_graph_ds_from_mesh_ds(xr.merge(ds_l))
 
 
 # not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
@@ -857,6 +903,7 @@ if __name__ == "__main__":
     # print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
     # print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
     # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
-    # dg_ex = process_dual_graph(xr_loader(FORT63_EXAMPLE))
+    # dg_ex = dual_graph_ds_from_mesh_ds(xr_loader(FORT63_EXAMPLE))
     # dg_ex.to_netcdf(os.path.join(DATA_PATH, "fort.63.dual.nc"))
-    print(xr_loader(FORT63_EXAMPLE))
+    # print(xr_loader(FORT63_EXAMPLE))
+    print(dual_graph_ds_from_mesh_ds_from_path())

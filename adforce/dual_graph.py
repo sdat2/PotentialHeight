@@ -7,7 +7,7 @@ import imageio
 from sithom.plot import plot_defaults, get_dim, label_subplots
 from sithom.time import timeit
 from .constants import FIGURE_PATH, NO_BBOX, DATA_PATH
-from .mesh import bbox_mesh, process_dual_graph
+from .mesh import bbox_mesh, dual_graph_ds_from_mesh_ds
 
 
 @timeit
@@ -23,7 +23,7 @@ def plot_dual_graph() -> None:
         use_dask=False,
     )
 
-    dg = process_dual_graph(ds)
+    dg = dual_graph_ds_from_mesh_ds(ds)
 
     @timeit
     def plot_depth_and_gradients():
