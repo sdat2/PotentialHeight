@@ -677,6 +677,26 @@ def grad_for_triangle_timeseries(
 # unwritten function process a whole fort.63 file to dual graph format, for training a Graph Neural Network.
 
 
+def edge_features(ds: xr.Dataset, dg_ds: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate the edge features for the dual graph.
+    This is not yet implemented.
+
+    Edge features are defined as
+
+    e_{ij} = (n_{ij}, l_{ij})
+
+    where n_{ij} is the outward unit normal vector and l_{ij} is the cell sides' length. Thus, the edge features represent the geometrical properties of the mesh. We excluded the fluxes Fij as additional features as they depend on the hydraulic variables ui and uj, which are already included in the dynamic node features.
+
+    Args:
+        ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
+        dg_ds (xr.Dataset): Dual graph dataset.
+    """
+    raise NotImplementedError("Not yet implemented.")
+
+    return dg_ds
+
+
 @timeit
 def select_coast(
     mesh_ds: xr.Dataset, overtopping: bool = False, keep_sparse: bool = False
