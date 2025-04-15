@@ -143,7 +143,7 @@ def dual_graph_starts_ends_from_triangles(
         triangles (np.ndarray): Mx3 array of triangle indices.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: start, end indices for the dual graph.
+        Tuple[List[int], List[int]]: start, end indices for the dual graph.
 
     Examples::
         >>> start, end = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
@@ -171,7 +171,7 @@ def dual_graph_starts_ends_from_triangles(
                 starts.append(nodes[j])
                 ends.append(nodes[j])
                 ends.append(nodes[i])
-    return np.array(starts), np.array(ends)
+    return starts, ends
 
 
 # @timeit

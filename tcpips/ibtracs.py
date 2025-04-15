@@ -153,6 +153,9 @@ def era5_unique_points_raw() -> None:
     Need to do vectorized indexing, which in xarray only seems to work with sel rather
     than isel, hence we need to index by longitude, latitude, time.
     """
+    if os.path.exists(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")):
+        print("ERA5 unique points data already exists.")
+        return
     # open the unique points file
     unique_points_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc")
@@ -181,6 +184,86 @@ def era5_unique_points_raw() -> None:
     print(era5_unique_data)
 
 
+@timeit
+def example_plot_raw():
+    # Let's make a 3 panel plot of the era5_unique_points_raw.nc data
+    # plot it on global plattee carree projection with coastlines
+    from sithom.plot import plot_defaults, label_subplots, get_dim
+    import matplotlib.pyplot as plt
+    import os
+    from .constants import PROJECT_PATH
+    from cartopy import crs as ccrs
+    from cartopy.feature import NaturalEarthFeature
+    from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+    from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+
+    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
+    os.makedirs(figure_path, exist_ok=True)
+    era5_unique_data = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
+    )
+    print(era5_unique_data)
+
+    plot_defaults()
+
+    fig, axs = plt.subplots(
+        3, 1, figsize=get_dim(ratio=1.1), subplot_kw={"projection": ccrs.PlateCarree()}
+    )
+    label_subplots(axs)
+    # (a) sst, (b) , (c) msl
+    im = axs[0].scatter(
+        era5_unique_data.longitude.values,
+        era5_unique_data.latitude.values,
+        c=era5_unique_data.sst.values[:],
+        s=0.1,
+        cmap="viridis_r",
+        transform=ccrs.PlateCarree(),
+    )
+    axs[0].set_title("SST [K]")
+    plt.colorbar(im, ax=axs[0], orientation="vertical")  # , shrink=0.3
+    # plot coastline
+    # axs[0].coastlines()
+    axs[0].add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+    )
+    im = axs[1].scatter(
+        era5_unique_data.longitude.values,
+        era5_unique_data.latitude.values,
+        c=era5_unique_data.msl.values[:],
+        s=0.1,
+        cmap="viridis_r",
+        transform=ccrs.PlateCarree(),
+    )
+    axs[1].set_title("MSL [Pa]")
+    plt.colorbar(im, ax=axs[1], orientation="vertical")
+
+    axs[1].add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+    )
+    im = axs[2].scatter(
+        era5_unique_data.longitude.values,
+        era5_unique_data.latitude.values,
+        c=era5_unique_data.t2m.values[:],
+        s=0.1,
+        cmap="viridis_r",
+        transform=ccrs.PlateCarree(),
+    )
+    axs[2].set_title("T2M [K]")
+    plt.colorbar(im, ax=axs[2], orientation="vertical")
+    # facecolor green
+    axs[2].add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+    )
+
+    plt.savefig(os.path.join(figure_path, "era5_unique_points_raw.pdf"), dpi=300)
+
+
 # open ibtracs data and era5 data
 # loop through ibtracs data (by track, then by time (only if start time is after 1980, and end time is before end of 2024)) and find the closest era5 data point to the centre of the cyclone at that timestep.
 # create a unique counter before looping through the ibtracs data
@@ -201,3 +284,4 @@ if __name__ == "__main__":
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
     era5_unique_points_raw()
+    example_plot_raw()
