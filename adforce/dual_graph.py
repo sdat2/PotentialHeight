@@ -212,8 +212,55 @@ def plot_dual_graph() -> None:
     plot_mesh_dual_graph()
 
 
+def test_dual_graph():
+    """
+    Test dual graph maker.
+    """
+
+    from .mesh import dual_graph_starts_ends_from_triangles, mean_for_triangle
+
+    triangles = np.array(
+        [[1, 2, 3], [2, 3, 4], [3, 4, 5], [3, 5, 6], [3, 6, 7], [7, 3, 1]], dtype=int
+    )
+    x = np.array([0, 1, 2, 3, 4, 3, 1])
+    y = np.array([2, 4, 2, 4, 2, 0, 0])
+
+    starts, ends = dual_graph_starts_ends_from_triangles(triangles - 1)
+    xd = mean_for_triangle(x, triangles - 1)
+    yd = mean_for_triangle(y, triangles - 1)
+
+    # plot the dual graph
+    plot_defaults()
+
+    plt.triplot(x, y, triangles - 1, color="black", alpha=0.1, label="Original mesh")
+
+    for edge_i in range(len(starts)):
+        if edge_i == 0:
+            label_d = {"label": "Dual graph"}
+        else:
+            label_d = {}
+        plt.plot(
+            xd[[starts[edge_i], ends[edge_i]]],
+            yd[[starts[edge_i], ends[edge_i]]],
+            color="orange",
+            alpha=0.1,
+            **label_d,
+        )
+    # get rid of x and y ticks
+    plt.xticks([])
+    plt.yticks([])
+
+    plt.legend()
+
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "dual_graph_test.pdf"),
+        bbox_inches="tight",
+    )
+
+
 if __name__ == "__main__":
     # python -m adforce.dual_graph
-    plot_dual_graph()
+    # plot_dual_graph()
     # download_ibtracs_data()
     # ibtracs_to_era5_map()
+    test_dual_graph()
