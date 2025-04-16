@@ -243,7 +243,22 @@ def test_dual_graph():
         dot_prod = nx[i] * (xd[ends[i]] - xd[starts[i]]) + ny[i] * (
             yd[ends[i]] - yd[starts[i]]
         )
-        print("dot_prod", dot_prod)
+        print("dot_prod same direc (should be > 0)", dot_prod)
+
+    # let's do the dot product between the original mesh edge and the dual graph unit normal vector (should be 0 for all)
+    for i in range(len(starts)):
+        # find x joining traingle starts[i] and ends[i]
+        tri_1 = elements[starts[i]] - 1
+        tri_2 = elements[ends[i]] - 1
+        edge = set(tri_1).intersection(set(tri_2))
+        if len(edge) != 2:
+            raise ValueError("Edge not found in triangles")
+        edge = list(edge)
+        delta_x = x[edge[1]] - x[edge[0]]
+        delta_y = y[edge[1]] - y[edge[0]]
+        # take dot product
+        dot_prod = nx[i] * delta_x + ny[i] * delta_y
+        print("dot_prod (should be 0)", dot_prod)
 
     # plot the dual graph
     plot_defaults()
@@ -253,7 +268,7 @@ def test_dual_graph():
     for edge_i in range(len(starts)):
         if edge_i == 0:
             label_d = {"label": "Dual graph"}
-            arrow_d = {"label": "Unit normal vector"}
+            arrow_d = {"label": "Unit normal vectors"}
         else:
             label_d = {}
             arrow_d = {}
