@@ -150,7 +150,7 @@ def dual_graph_starts_ends_from_triangles(
     Returns:
         Tuple[List[int], List[int]]: start, end indices for the dual graph.
         or
-        Tuple[List[int], List[int], List[float], List[float], List[float]]: start, end, length, unit normal x, unit normal y.
+        Tuple[List[int], List[int], List[float], List[float], List[float]]: start, end, length, xdual, ydual, unit normal x, unit normal y.
 
     Examples::
         >>> start, end = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
@@ -158,15 +158,17 @@ def dual_graph_starts_ends_from_triangles(
         True
         >>> np.all(end == np.array([1, 0]))
         True
-        >>> start, end, length, unx, uny = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]), x=np.array([0, 1, 2, 3]), y=np.array([0, -1, -1, -2]))
+        >>> start, end, length, xd, yd, unx, uny = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]), x=np.array([0, 1, 2, 3]), y=np.array([0, -1, -1, -2]))
         >>> np.all(length == np.array([1.0, 1.0]))
         True
         >>> np.all(unx == np.array([0.0, 0.0]))
         True
-        >>> np.all(np.abs(uny) == np.array([1.0, 1.0]))
+        >>> np.all(uny  == np.array([1.0, -1.0]))
         True
 
     """
+
+    return_geometry = x is not None and y is not None
     edge_dict = collections.defaultdict(list)
 
     for i, triangle in enumerate(triangles):
@@ -178,10 +180,13 @@ def dual_graph_starts_ends_from_triangles(
     ends = []
 
     # could also calculate length of edge and normal vector here if x and y are given.
-    if x is not None and y is not None:
+    if return_geometry:
         len_edges = []
         unit_normal_x = []
         unit_normal_y = []
+        # calculate dual graph x and y coordinates
+        xd = mean_for_triangle(x, triangles)
+        yd = mean_for_triangle(y, triangles)
 
     for edge in edge_dict:
         nodes = edge_dict[edge]
@@ -192,16 +197,32 @@ def dual_graph_starts_ends_from_triangles(
             # the other way round
             starts.append(nodes[1])
             ends.append(nodes[0])
-            if x is not None and y is not None:
+            if return_geometry:
+                # calculate the length of the edge
                 delta_x = x[edge[1]] - x[edge[0]]
                 delta_y = y[edge[1]] - y[edge[0]]
                 len_edges += [np.sqrt((delta_x) ** 2 + (delta_y) ** 2)] * 2
+
                 # unit normal vector
-                unit_normal_x += [delta_y / len_edges[-1]]
-                unit_normal_y += [-delta_x / len_edges[-1]]
-                # unit normal vector (opposite direction)
-                unit_normal_x += [-delta_y / len_edges[-1]]
-                unit_normal_y += [delta_x / len_edges[-1]]
+                mx = delta_x / len_edges[-1]
+                my = delta_y / len_edges[-1]
+
+                # calculate the centre to centre vector for the dual graph edge 0 to 1
+                dg_delta_x = xd[nodes[1]] - yd[nodes[0]]
+                dg_delta_y = xd[nodes[1]] - yd[nodes[0]]
+
+                if dg_delta_x * my - dg_delta_y * mx < 0:
+                    # the dual graph 0 to 1 edge is in the opposite direction to the unit normal
+                    # so we need to flip the unit normal vector
+                    mx = -mx
+                    my = -my
+
+                # unit normal vector (perpendicular) (edge 0 to 1)
+                unit_normal_x += [my]
+                unit_normal_y += [-mx]
+                # unit normal vector (opposite direction) (edge 1 to 0)
+                unit_normal_x += [-my]
+                unit_normal_y += [mx]
                 # let's hope these happen to be the right way round.
                 # this is not guaranteed. The edges have been sorted, so are not necessarily
                 # in the same order as the triangles.
@@ -215,13 +236,13 @@ def dual_graph_starts_ends_from_triangles(
         #        starts.append(nodes[j])
         #        ends.append(nodes[j])
         #        ends.append(nodes[i])
-    if x is not None and y is not None:
+    if return_geometry:
         # starts = np.array(starts)
         # ends = np.array(ends)
         # len_edges = np.array(len_edges)
         # unit_normal_x = np.array(unit_normal_x)
         # unit_normal_y = np.array(unit_normal_y)
-        return starts, ends, len_edges, unit_normal_x, unit_normal_y
+        return starts, ends, len_edges, xd, yd, unit_normal_x, unit_normal_y
     else:
         return starts, ends
 
@@ -296,7 +317,9 @@ def calculate_dual_graph_adjacency_matrix(
     )
 
 
-def dual_graph_ds_base_from_triangles(triangles: np.ndarray) -> xr.Dataset:
+def dual_graph_ds_base_from_triangles(
+    triangles: np.ndarray, x: np.ndarray, y: np.ndarray
+) -> xr.Dataset:
     """
     Calculate the dual graph adjacency matrix for a mesh of triangles.
 
@@ -306,15 +329,22 @@ def dual_graph_ds_base_from_triangles(triangles: np.ndarray) -> xr.Dataset:
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices. Assumes nodes are numbered from 0 to N-1.
             where N is the number of nodes in the original mesh.
+        x (np.ndarray): x-coordinates of the nodes.
+        y (np.ndarray): y-coordinates of the nodes.
 
     Returns:
         xr.Dataset: Dual graph dataset.
          - "element": Mx3 array of triangle indices.
          - "start": 2E array of start indices. (Double counting)
          - "end": 2E array of end indices. (Double counting)
+         - "x": M array of x-coordinates of the dual graph nodes.
+         - "y": M array of y-coordinates of the dual graph nodes.
+         - "length": 2E array of lengths of the edges.
+         - "unit_normal_x": 2E array of x-coordinates of the unit normal vectors.
+         - "unit_normal_y": 2E array of y-coordinates of the unit normal vectors.
 
     Examples::
-        >>> ds = dual_graph_ds_base_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> ds = dual_graph_ds_base_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]), np.array([0, 1, 2, 3]), np.array([0, -1, -1, -2]))
         >>> np.all(ds.start.values == np.array([0, 1]))
         True
         >>> np.all(ds.end.values == np.array([1, 0]))
@@ -322,10 +352,11 @@ def dual_graph_ds_base_from_triangles(triangles: np.ndarray) -> xr.Dataset:
         >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
         True
     """
-    # print("triangles", type(triangles))
-    # print(triangles.shape)
-    # print(triangles)
-    starts, ends = dual_graph_starts_ends_from_triangles(triangles)
+
+    starts, ends, lengths, xd, yd, unx, uny = dual_graph_starts_ends_from_triangles(
+        triangles, x, y
+    )
+
     return xr.Dataset(
         {
             "element": (
@@ -335,8 +366,39 @@ def dual_graph_ds_base_from_triangles(triangles: np.ndarray) -> xr.Dataset:
                     "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
                 },
             ),
+            "x": (
+                ["nele"],
+                xd,
+                {
+                    "description": "Longitude of the dual graph nodes.",
+                    "units": "degrees_east",
+                },
+            ),
+            "y": (
+                ["nele"],
+                yd,
+                {
+                    "description": "Latitude of the dual graph nodes.",
+                    "units": "degrees_north",
+                },
+            ),
             "start": ("edge", starts, {"description": "Start indices of the edges."}),
             "end": ("edge", ends, {"description": "End indices of the edges."}),
+            "length": (
+                ["edge"],
+                lengths,
+                {"description": "Length of the edges.", "units": "degrees"},
+            ),
+            "unit_normal_x": (
+                ["edge"],
+                unx,
+                {"description": "Unit normal vector x-component."},
+            ),
+            "unit_normal_y": (
+                ["edge"],
+                uny,
+                {"description": "Unit normal vector y-component."},
+            ),
         },
         coords={
             "edge": np.arange(len(starts)),
@@ -393,12 +455,13 @@ def _test_xr_dataset() -> xr.Dataset:
     )
 
 
-def dual_graph_ds_from_mesh_ds(ds: xr.Dataset) -> xr.Dataset:
+def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
     """
     Create a dual graph dataset from an ADCIRC output dataset.
 
     Args:
         ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
+        take_grad (bool, optional): Whether to calculate the gradient of the depth and zeta. Defaults to True.
 
     Returns:
         xr.Dataset: Dual graph dataset.
@@ -423,21 +486,23 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset) -> xr.Dataset:
     # ds = xr_loader(path)
     # get base object from the triangular elements
 
-    dg = dual_graph_ds_base_from_triangles(ds.element.values - 1)
+    dg = dual_graph_ds_base_from_triangles(
+        ds.element.values - 1, ds.x.values, ds.y.values
+    )
     # calculate the mean for static node features
-    for val in ["x", "y", "depth"]:  # static fields
+    for val in ["depth"]:  # static fields # "x", "y",s
         dg[val] = (
             ["nele"],
             mean_for_triangle(ds[val].values, ds["element"].values - 1),
         )
-
-    # calculate the gradient of the depth in x and y
-    dg["depth_grad"] = (
-        ["direction", "nele"],  # this might be the wrong way round
-        grad_for_triangle_static(
-            ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
-        ),
-    )
+    if take_grad:
+        # calculate the gradient of the depth in x and y
+        dg["depth_grad"] = (
+            ["direction", "nele"],  # this might be the wrong way round
+            grad_for_triangle_static(
+                ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
+            ),
+        )
     variable_names = ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"]
     # calculate the gradient of the zeta in x and y
     for variable in variable_names:
@@ -447,14 +512,16 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset) -> xr.Dataset:
                 np.mean(ds[variable].values[:, ds["element"].values - 1], axis=2),
             )
             # calculate the gradient for the variable in x and y
-            dg[f"{variable}_grad"] = (
-                ["direction", "time", "nele"],
-                grad_for_triangle_timeseries(
-                    ds.x.values, ds.y.values, ds[variable].values, ds.element.values - 1
-                ),
-            )
-
-    # not yet implemented: work out features for edges.
+            if take_grad:
+                dg[f"{variable}_grad"] = (
+                    ["direction", "time", "nele"],
+                    grad_for_triangle_timeseries(
+                        ds.x.values,
+                        ds.y.values,
+                        ds[variable].values,
+                        ds.element.values - 1,
+                    ),
+                )
 
     return dg.assign_coords({"direction": ["x", "y"]})
 
