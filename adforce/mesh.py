@@ -208,9 +208,14 @@ def dual_graph_starts_ends_from_triangles(
                 my = delta_y / len_edges[-1]
 
                 # calculate the centre to centre vector for the dual graph edge 0 to 1
-                dg_delta_x = xd[nodes[1]] - yd[nodes[0]]
-                dg_delta_y = xd[nodes[1]] - yd[nodes[0]]
+
+                dg_delta_x = xd[nodes[1]] - xd[nodes[0]]
+                dg_delta_y = yd[nodes[1]] - yd[nodes[0]]
                 # if dot product is positive then vectors are in the same rough direction
+                # delta_dual_graph_center \cdot normal
+                # there is some bug here
+                # the dual graph 0 to 1 edge is in the same direction as the unit normal
+                # so we need to flip the unit normal vector
                 dot_prod = dg_delta_x * my - dg_delta_y * mx
                 if dot_prod > 0:  # < 0:
                     # the dual graph 0 to 1 edge is in the opposite direction to the unit normal

@@ -234,6 +234,16 @@ def test_dual_graph():
     print("triangles", elements - 1)
     print("starts", starts)
     print("ends", ends)
+    print("xd", xd)
+    print("yd", yd)
+    print("nx", nx)
+    print("ny", ny)
+
+    for i in range(len(starts)):
+        dot_prod = nx[i] * (xd[ends[i]] - xd[starts[i]]) + ny[i] * (
+            yd[ends[i]] - yd[starts[i]]
+        )
+        print("dot_prod", dot_prod)
 
     # plot the dual graph
     plot_defaults()
@@ -255,10 +265,10 @@ def test_dual_graph():
             **label_d,
         )
         plt.arrow(
-            xd[starts[edge_i]],
-            yd[starts[edge_i]],
-            nx[edge_i],
-            ny[edge_i],
+            xd[starts[edge_i]] + 0.5 * (xd[ends[edge_i]] - xd[starts[edge_i]]),
+            yd[starts[edge_i]] + 0.5 * (yd[ends[edge_i]] - yd[starts[edge_i]]),
+            nx[edge_i] / 10,
+            ny[edge_i] / 10,
             color="green",
             alpha=0.1,
             width=0.01,
