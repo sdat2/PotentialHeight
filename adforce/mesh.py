@@ -132,8 +132,11 @@ def standard_starts_ends_from_triangles(
 
 
 def dual_graph_starts_ends_from_triangles(
-    triangles: np.ndarray,
-) -> Tuple[List[int], List[int]]:
+    triangles: np.ndarray, x: np.ndarray = None, y: np.ndarray = None
+) -> Union[
+    Tuple[List[int], List[int]],
+    Tuple[List[int], List[int], List[float], List[float], List[float]],
+]:
     """
     Generate start, end indices for the dual graph from the triangles.
 
@@ -141,15 +144,26 @@ def dual_graph_starts_ends_from_triangles(
 
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
+        x (np.ndarray, optional): x-coordinates. Defaults to None.
+        y (np.ndarray, optional): y-coordinates. Defaults to None.
 
     Returns:
         Tuple[List[int], List[int]]: start, end indices for the dual graph.
+        or
+        Tuple[List[int], List[int], List[float], List[float], List[float]]: start, end, length, unit normal x, unit normal y.
 
     Examples::
         >>> start, end = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
         >>> np.all(start == np.array([0, 1]))
         True
         >>> np.all(end == np.array([1, 0]))
+        True
+        >>> start, end, length, unx, uny = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]), x=np.array([0, 1, 2, 3]), y=np.array([0, -1, -1, -2]))
+        >>> np.all(length == np.array([1.0, 1.0]))
+        True
+        >>> np.all(unx == np.array([0.0, 0.0]))
+        True
+        >>> np.all(np.abs(uny) == np.array([1.0, 1.0]))
         True
 
     """
@@ -163,15 +177,53 @@ def dual_graph_starts_ends_from_triangles(
     starts = []
     ends = []
 
+    # could also calculate length of edge and normal vector here if x and y are given.
+    if x is not None and y is not None:
+        len_edges = []
+        unit_normal_x = []
+        unit_normal_y = []
+
     for edge in edge_dict:
         nodes = edge_dict[edge]
-        for i in range(len(nodes)):
-            for j in range(i + 1, len(nodes)):
-                starts.append(nodes[i])
-                starts.append(nodes[j])
-                ends.append(nodes[j])
-                ends.append(nodes[i])
-    return starts, ends
+        if len(nodes) == 2:
+            # one way round
+            starts.append(nodes[0])
+            ends.append(nodes[1])
+            # the other way round
+            starts.append(nodes[1])
+            ends.append(nodes[0])
+            if x is not None and y is not None:
+                delta_x = x[edge[1]] - x[edge[0]]
+                delta_y = y[edge[1]] - y[edge[0]]
+                len_edges += [np.sqrt((delta_x) ** 2 + (delta_y) ** 2)] * 2
+                # unit normal vector
+                unit_normal_x += [delta_y / len_edges[-1]]
+                unit_normal_y += [-delta_x / len_edges[-1]]
+                # unit normal vector (opposite direction)
+                unit_normal_x += [-delta_y / len_edges[-1]]
+                unit_normal_y += [delta_x / len_edges[-1]]
+                # let's hope these happen to be the right way round.
+                # this is not guaranteed. The edges have been sorted, so are not necessarily
+                # in the same order as the triangles.
+        if len(nodes) == 3:
+            raise ValueError("An edge is shared by more than 2 triangles. Check mesh.")
+        # there should be at most only two triangles for each edge
+        # so these loops are not necessary
+        # for i in range(len(nodes)):
+        #    for j in range(i + 1, len(nodes)):
+        #        starts.append(nodes[i])
+        #        starts.append(nodes[j])
+        #        ends.append(nodes[j])
+        #        ends.append(nodes[i])
+    if x is not None and y is not None:
+        # starts = np.array(starts)
+        # ends = np.array(ends)
+        # len_edges = np.array(len_edges)
+        # unit_normal_x = np.array(unit_normal_x)
+        # unit_normal_y = np.array(unit_normal_y)
+        return starts, ends, len_edges, unit_normal_x, unit_normal_y
+    else:
+        return starts, ends
 
 
 # @timeit
