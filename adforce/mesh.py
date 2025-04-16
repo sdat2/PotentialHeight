@@ -163,7 +163,7 @@ def dual_graph_starts_ends_from_triangles(
         True
         >>> np.all(unx == np.array([0.0, 0.0]))
         True
-        >>> np.all(uny  == np.array([1.0, -1.0]))
+        >>> np.all(uny  == np.array([-1.0, 1.0]))
         True
 
     """
@@ -217,7 +217,7 @@ def dual_graph_starts_ends_from_triangles(
                 # the dual graph 0 to 1 edge is in the same direction as the unit normal
                 # so we need to flip the unit normal vector
                 dot_prod = dg_delta_x * my - dg_delta_y * mx
-                if dot_prod > 0:  # < 0:
+                if dot_prod < 0:
                     # the dual graph 0 to 1 edge is in the opposite direction to the unit normal
                     # so we need to flip the unit normal vector
                     mx = -mx
@@ -228,11 +228,11 @@ def dual_graph_starts_ends_from_triangles(
                     )
 
                 # unit normal vector (perpendicular) (edge 0 to 1)
-                unit_normal_x += [-my]
-                unit_normal_y += [mx]
-                # unit normal vector (opposite direction) (edge 1 to 0)
                 unit_normal_x += [my]
                 unit_normal_y += [-mx]
+                # unit normal vector (opposite direction) (edge 1 to 0)
+                unit_normal_x += [-my]
+                unit_normal_y += [mx]
                 # let's hope these happen to be the right way round.
                 # this is not guaranteed. The edges have been sorted, so are not necessarily
                 # in the same order as the triangles.
