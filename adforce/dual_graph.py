@@ -224,7 +224,7 @@ def test_dual_graph():
     elements = np.array(
         [[1, 2, 3], [2, 3, 4], [3, 4, 5], [3, 5, 6], [3, 6, 7], [7, 3, 1]], dtype=int
     )
-    x = np.array([0, 1, 2, 3, 4, 3, 1])
+    x = np.array([0, 1, 2, 3, 4, 3, 1]) + 1
     y = np.array([2, 4, 2, 4, 2, 0, 0])
 
     starts, ends, lengths, xd, yd, nx, ny = dual_graph_starts_ends_from_triangles(
@@ -257,8 +257,8 @@ def test_dual_graph():
         plt.arrow(
             xd[starts[edge_i]],
             yd[starts[edge_i]],
-            -nx[edge_i],
-            -ny[edge_i],
+            nx[edge_i],
+            ny[edge_i],
             color="green",
             alpha=0.1,
             width=0.01,
