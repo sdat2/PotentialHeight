@@ -6,6 +6,7 @@ REQUIRED: List[str] = [
     "xarray-datatree",  # to process netCDF4 files with groups (adforce).
     "netCDF4",  # to process netCDF4 files (adforce, tcpips).
     "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
+    "pyproj",  # to process geospatial data (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
     "uncertainties",  # common utility for linear error propagation
     # "sithom @ git+https://github.com/sdat2/sithom",

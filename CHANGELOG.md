@@ -1,6 +1,7 @@
 v0.0.4:
-- Added `ibtracs` scripts to compare observations with potential and intensity calculated from `era5` monthly averages.
-- Added more `dual_graph` functionality, fixing bugs in implementation.
+- Added `ibtracs` scripts to compare observations with potential and intensity calculated from `era5` monthly averages (all post 1980).
+- Added more `dual_graph` functionality so that we can train different ML algorithms with ADCIRC output, fixing bugs in implementation.
+- 
 
 
 v0.0.3:

@@ -210,19 +210,24 @@ def dual_graph_starts_ends_from_triangles(
                 # calculate the centre to centre vector for the dual graph edge 0 to 1
                 dg_delta_x = xd[nodes[1]] - yd[nodes[0]]
                 dg_delta_y = xd[nodes[1]] - yd[nodes[0]]
-
-                if dg_delta_x * my - dg_delta_y * mx < 0:
+                # if dot product is positive then vectors are in the same rough direction
+                dot_prod = dg_delta_x * my - dg_delta_y * mx
+                if dot_prod > 0:  # < 0:
                     # the dual graph 0 to 1 edge is in the opposite direction to the unit normal
                     # so we need to flip the unit normal vector
                     mx = -mx
                     my = -my
+                elif dot_prod == 0:
+                    raise ValueError(
+                        "Dot product is zero. Check mesh. This should not happen."
+                    )
 
                 # unit normal vector (perpendicular) (edge 0 to 1)
-                unit_normal_x += [my]
-                unit_normal_y += [-mx]
-                # unit normal vector (opposite direction) (edge 1 to 0)
                 unit_normal_x += [-my]
                 unit_normal_y += [mx]
+                # unit normal vector (opposite direction) (edge 1 to 0)
+                unit_normal_x += [my]
+                unit_normal_y += [-mx]
                 # let's hope these happen to be the right way round.
                 # this is not guaranteed. The edges have been sorted, so are not necessarily
                 # in the same order as the triangles.
@@ -785,43 +790,6 @@ def grad_for_triangle_timeseries(
 
     # shape: (2, T, M)
     return np.stack((grad_x, grad_y), axis=0)
-
-
-# unwritten: grad for edges
-
-
-# unwritten function process a whole fort.63 file to dual graph format, for training a Graph Neural Network.
-
-
-def edge_features(ds: xr.Dataset, dg_ds: xr.Dataset) -> xr.Dataset:
-    """
-    Calculate the edge features for the dual graph.
-    This is not yet implemented.
-
-    Edge features are defined as
-
-    e_{ij} = (n_{ij}, l_{ij})
-
-    where n_{ij} is the outward unit normal vector and l_{ij} is the cell sides' length. Thus, the edge features represent the geometrical properties of the mesh. We excluded the fluxes F_{ij} as additional features as they depend on the hydraulic variables u_{i} and u_{j}, which are already included in the dynamic node features.
-
-    Raises:
-        NotImplementedError: This function is not yet implemented.
-
-    Args:
-        ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
-        dg_ds (xr.Dataset): Dual graph dataset.
-
-    Returns:
-        xr.Dataset: Dual graph dataset with edge features.
-    """
-    raise NotImplementedError("Not yet implemented.")
-
-    # triangle mesh ds.x
-    # triangle mesh ds.y
-    # dual graph edge dg_ds.start
-    # dual graph edge dg_ds.end
-
-    return dg_ds
 
 
 @timeit

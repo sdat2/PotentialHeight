@@ -24,6 +24,8 @@ def plot_dual_graph() -> None:
     )
 
     dg = dual_graph_ds_from_mesh_ds(ds)
+    print("ds", ds)
+    print("dg", dg)
 
     @timeit
     def plot_depth_and_gradients():
@@ -217,38 +219,50 @@ def test_dual_graph():
     Test dual graph maker.
     """
 
-    from .mesh import dual_graph_starts_ends_from_triangles, mean_for_triangle
+    from .mesh import dual_graph_starts_ends_from_triangles
 
-    triangles = np.array(
+    elements = np.array(
         [[1, 2, 3], [2, 3, 4], [3, 4, 5], [3, 5, 6], [3, 6, 7], [7, 3, 1]], dtype=int
     )
     x = np.array([0, 1, 2, 3, 4, 3, 1])
     y = np.array([2, 4, 2, 4, 2, 0, 0])
 
-    starts, ends = dual_graph_starts_ends_from_triangles(triangles - 1)
-    xd = mean_for_triangle(x, triangles - 1)
-    yd = mean_for_triangle(y, triangles - 1)
-
-    print("triangles", triangles - 1)
+    starts, ends, lengths, xd, yd, nx, ny = dual_graph_starts_ends_from_triangles(
+        elements - 1, x, y
+    )
+    print("lengths", lengths)
+    print("triangles", elements - 1)
     print("starts", starts)
     print("ends", ends)
 
     # plot the dual graph
     plot_defaults()
 
-    plt.triplot(x, y, triangles - 1, color="black", alpha=0.1, label="Original mesh")
+    plt.triplot(x, y, elements - 1, color="black", alpha=0.1, label="Original mesh")
 
     for edge_i in range(len(starts)):
         if edge_i == 0:
             label_d = {"label": "Dual graph"}
+            arrow_d = {"label": "Unit normal vector"}
         else:
             label_d = {}
+            arrow_d = {}
         plt.plot(
             xd[[starts[edge_i], ends[edge_i]]],
             yd[[starts[edge_i], ends[edge_i]]],
             color="orange",
             alpha=0.1,
             **label_d,
+        )
+        plt.arrow(
+            xd[starts[edge_i]],
+            yd[starts[edge_i]],
+            -nx[edge_i],
+            -ny[edge_i],
+            color="green",
+            alpha=0.1,
+            width=0.01,
+            **arrow_d,
         )
     # get rid of x and y ticks
     plt.xticks([])
@@ -264,5 +278,5 @@ def test_dual_graph():
 
 if __name__ == "__main__":
     # python -m adforce.dual_graph
-    plot_dual_graph()
+    # plot_dual_graph()
     test_dual_graph()
