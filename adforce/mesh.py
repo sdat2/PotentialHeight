@@ -339,8 +339,8 @@ def dual_graph_ds_base_from_triangles(
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices. Assumes nodes are numbered from 0 to N-1.
             where N is the number of nodes in the original mesh.
-        x (np.ndarray): x-coordinates of the nodes.
-        y (np.ndarray): y-coordinates of the nodes.
+        x (np.ndarray): x-coordinates of the nodes. Degrees east.
+        y (np.ndarray): y-coordinates of the nodes. Degrees north.
 
     Returns:
         xr.Dataset: Dual graph dataset.
@@ -515,11 +515,14 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
         )
     variable_names = ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"]
     # calculate the gradient of the zeta in x and y
+    # ds["time"] = ("time", ds["time"].values)
+    # assign time coordinate
+    dg = dg.assign_coords({"time": ds.time.values})
     for variable in variable_names:
         if variable in ds:
             dg[variable] = (
                 ["time", "nele"],
-                np.mean(ds[variable].values[:, ds["element"].values - 1], axis=2),
+                np.mean(ds[variable].values[:, ds.element.values - 1], axis=2),
             )
             # calculate the gradient for the variable in x and y
             if take_grad:
@@ -538,13 +541,17 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
 
 @timeit
 def dual_graph_ds_from_mesh_ds_from_path(
-    path: str = os.path.join(DATA_PATH, "exp_0049")
+    path: str = os.path.join(DATA_PATH, "exp_0049"),
+    bbox: BoundingBox = None,
+    use_dask: bool = True,
 ) -> xr.Dataset:
     """
     Process the dual graph from a path to the fort.*.nc files.
 
     Args:
-        path (str, optional): Defaults to DATA_PATH.
+        path (str, optional): Defaults to DATA_PATH
+        bbox (BoundingBox, optional): Bounding box to filter the data. Defaults to NO_BBOX.
+        use_dask (bool, optional): Whether to use dask. Defaults to True.
 
     Raises:
         FileNotFoundError: If the fort.*.nc files do not exist. for * in [63, 64, 73, 74].
@@ -555,7 +562,7 @@ def dual_graph_ds_from_mesh_ds_from_path(
     # load the set of adcirc data
     # and process to the dual graph
     var_from_file_d = {
-        "63": ["zeta", "depth", "element"],
+        "63": ["zeta", "depth", "element", "x", "y", "time"],
         "64": ["u-vel", "v-vel"],
         "73": ["pressure"],
         "74": ["windx", "windy"],
@@ -568,9 +575,14 @@ def dual_graph_ds_from_mesh_ds_from_path(
         if not os.path.exists(paths[var]):
             raise FileNotFoundError(f"File {paths[var]} does not exist.")
         else:
-            ds_l += [xr_loader(paths[var])[var_from_file_d[var]]]
+            if bbox is not None:
+                ds_l += [
+                    bbox_mesh(paths[var], bbox, use_dask=use_dask)[var_from_file_d[var]]
+                ]
+            else:
+                ds_l += [xr_loader(paths[var], use_dask=use_dask)[var_from_file_d[var]]]
     print(ds_l)
-    print("merged_ds", xr.merge(ds_l))
+    # print("merged_ds", xr.merge(ds_l))
 
     return dual_graph_ds_from_mesh_ds(xr.merge(ds_l))
 
@@ -579,7 +591,8 @@ def dual_graph_ds_from_mesh_ds_from_path(
 
 
 def mean_for_triangle(
-    values: np.ndarray, triangles: np.ndarray, mean_axis=1
+    values: np.ndarray,
+    triangles: np.ndarray,
 ) -> np.ndarray:
     """
     Calculate the mean value for each triangle.

@@ -7,7 +7,11 @@ import imageio
 from sithom.plot import plot_defaults, get_dim, label_subplots
 from sithom.time import timeit
 from .constants import FIGURE_PATH, NO_BBOX, DATA_PATH
-from .mesh import bbox_mesh, dual_graph_ds_from_mesh_ds
+from .mesh import (
+    dual_graph_ds_from_mesh_ds_from_path,
+    dual_graph_ds_from_mesh_ds,
+    xr_loader,
+)
 
 
 @timeit
@@ -17,15 +21,53 @@ def plot_dual_graph() -> None:
     """
     figure_path = os.path.join(FIGURE_PATH, "dual_graph")
     os.makedirs(figure_path, exist_ok=True)
-    ds = bbox_mesh(
-        os.path.join(DATA_PATH, "fort.63.nc"),
-        bbox=NO_BBOX,
-        use_dask=False,
-    )
 
-    dg = dual_graph_ds_from_mesh_ds(ds)
+    ds = xr_loader(os.path.join(DATA_PATH, "exp_0049", "fort.64.nc"))
+    dg = dual_graph_ds_from_mesh_ds_from_path(
+        path=os.path.join(DATA_PATH, "exp_0049"),
+        bbox=NO_BBOX,
+    )
+    # dg = dual_graph_ds_from_mesh_ds(ds)
     print("ds", ds)
     print("dg", dg)
+
+    @timeit
+    def plot_mesh_dual_graph():
+        # plot the grid for the original triangular component mesh in ds, and the dual graph in dg
+        plot_defaults()
+
+        fig, axs = plt.subplots(2, 1, figsize=get_dim(ratio=1.1), sharex=True)
+        label_subplots(axs)
+        axs[1].set_xlabel("Longitude [$^{\circ}$E]")
+        axs[0].set_ylabel("Latitude [$^{\circ}$N]")
+        axs[1].set_ylabel("Latitude [$^{\circ}$N]")
+        # plot the original mesh
+        axs[0].set_title("Original mesh")
+        axs[0].triplot(
+            ds.x.values, ds.y.values, ds.element.values - 1, color="black", alpha=0.1
+        )
+        axs[0].set_aspect("equal")
+        # plot the dual graph
+        axs[1].set_title("Dual graph")
+        for edge_i in range(len(dg.edge.values)):
+            axs[1].plot(
+                dg.x.values[[dg.start.values[edge_i], dg.end.values[edge_i]]],
+                dg.y.values[[dg.start.values[edge_i], dg.end.values[edge_i]]],
+                color="black",
+                alpha=0.1,
+            )
+        axs[1].set_aspect("equal")
+        NO_BBOX.ax_lim(axs[0])
+        NO_BBOX.ax_lim(axs[1])
+
+        plt.savefig(
+            os.path.join(figure_path, "dual_graph.pdf"),
+            bbox_inches="tight",
+        )
+        plt.clf()
+        plt.close()
+
+    plot_mesh_dual_graph()
 
     @timeit
     def plot_depth_and_gradients():
@@ -89,7 +131,7 @@ def plot_dual_graph() -> None:
         plt.close()
         plt.clf()
 
-    # plot_depth_and_gradients()
+    plot_depth_and_gradients()
 
     def animate_zeta_and_gradients():
         # plot zeta and zeta gradients as a set of pngs, then animate them. Use the
@@ -108,15 +150,18 @@ def plot_dual_graph() -> None:
         tmp_path = os.path.join(figure_path, "zeta")
         os.makedirs(tmp_path, exist_ok=True)
 
-        figure_names = []
-
         @timeit
-        def plot_zeta_and_gradients(i: int) -> None:
+        def plot_var_and_gradients(
+            i: int,
+            figure_name: str,
+            var="zeta",
+        ) -> None:
+
             fig, axs = plt.subplots(3, 1, figsize=get_dim(ratio=1.1))
             im = axs[0].scatter(
                 dg.x.values,
                 dg.y.values,
-                c=dg.zeta.values[i, :],
+                c=dg[var].values[i, :],
                 s=0.1,
                 cmap="cmo.balance",
                 vmin=vmin_zeta,
@@ -129,26 +174,26 @@ def plot_dual_graph() -> None:
             axs[1].scatter(
                 dg.x.values,
                 dg.y.values,
-                c=dg.zeta_grad.values[0, i, :],
+                c=dg[f"{var}_grad"].values[0, i, :],
                 s=0.1,
                 cmap="cmo.balance",
                 vmin=vmin_grad,
                 vmax=vmax_grad,
             )
-            axs[1].set_title(r"Zeta $x$ Gradient [m $^{\circ}\;^{-1}$]")
+            axs[1].set_title(var + r" $x$ Gradient [m $^{\circ}\;^{-1}$]")
             plt.colorbar(im, ax=axs[1], orientation="vertical")
             axs[1].set_aspect("equal")
             NO_BBOX.ax_lim(axs[1])
             axs[2].scatter(
                 dg.x.values,
                 dg.y.values,
-                c=dg.zeta_grad.values[1, i, :],
+                c=dg[f"{var}_grad"].values[1, i, :],
                 s=0.1,
                 cmap="cmo.balance",
                 vmin=vmin_grad,
                 vmax=vmax_grad,
             )
-            axs[2].set_title(r"Zeta $y$ Gradient [m $^{\circ}\;^{-1}$]")
+            axs[2].set_title(var + r" $y$ Gradient [m $^{\circ}\;^{-1}$]")
             plt.colorbar(im, ax=axs[2], orientation="vertical")
             axs[2].set_aspect("equal")
             NO_BBOX.ax_lim(axs[2])
@@ -157,66 +202,35 @@ def plot_dual_graph() -> None:
             axs[2].set_ylabel("Latitude [$^{\circ}$N]")
             axs[1].set_ylabel("Latitude [$^{\circ}$N]")
             axs[0].set_ylabel("Latitude [$^{\circ}$N]")
-            tmp_file = os.path.join(tmp_path, f"zeta_{i:04d}.png")
-            figure_names.append(tmp_file)
-            plt.savefig(tmp_file, bbox_inches="tight")
+            plt.savefig(figure_name, bbox_inches="tight")
             plt.close()
             plt.clf()
 
-        for i in range(len(dg.zeta.values)):
-            plot_zeta_and_gradients(i)
+        for var in ["zeta", "pressure", "windx", "windy", "u-vel", "v-vel"]:
+            if var not in dg:
+                print(f"Variable {var} not in dg")
+                continue
+            # plot the variable and its gradients
+            tmp_path = os.path.join(figure_path, var)
+            os.makedirs(tmp_path, exist_ok=True)
+            figure_names = []
+            for i in range(len(dg.zeta.values)):
+                figure_name = os.path.join(tmp_path, var + f"_{i:04d}.png")
+                plot_var_and_gradients(i, figure_name, var=var)
+                figure_names.append(figure_name)
+            gif_path = os.path.join(figure_path, var + ".gif")
+            # make an animation of the zeta and zeta gradients
+            with imageio.get_writer(gif_path, mode="I") as writer:
+                for filename in figure_names:
+                    image = imageio.imread(filename)
+                    writer.append_data(image)
 
-        gif_path = os.path.join(figure_path, "zeta.gif")
-
-        # make an animation of the zeta and zeta gradients
-        with imageio.get_writer(gif_path, mode="I") as writer:
-            for filename in figure_names:
-                image = imageio.imread(filename)
-                writer.append_data(image)
-
-    # animate_zeta_and_gradients()
-    @timeit
-    def plot_mesh_dual_graph():
-        # plot the grid for the original triangular component mesh in ds, and the dual graph in dg
-        plot_defaults()
-
-        fig, axs = plt.subplots(2, 1, figsize=get_dim(ratio=1.1), sharex=True)
-        label_subplots(axs)
-        axs[1].set_xlabel("Longitude [$^{\circ}$E]")
-        axs[0].set_ylabel("Latitude [$^{\circ}$N]")
-        axs[1].set_ylabel("Latitude [$^{\circ}$N]")
-        # plot the original mesh
-        axs[0].set_title("Original mesh")
-        axs[0].triplot(
-            ds.x.values, ds.y.values, ds.element.values - 1, color="black", alpha=0.1
-        )
-        axs[0].set_aspect("equal")
-        # plot the dual graph
-        axs[1].set_title("Dual graph")
-        for edge_i in range(len(dg.edge.values)):
-            axs[1].plot(
-                dg.x.values[[dg.start.values[edge_i], dg.end.values[edge_i]]],
-                dg.y.values[[dg.start.values[edge_i], dg.end.values[edge_i]]],
-                color="black",
-                alpha=0.1,
-            )
-        axs[1].set_aspect("equal")
-        NO_BBOX.ax_lim(axs[0])
-        NO_BBOX.ax_lim(axs[1])
-
-        plt.savefig(
-            os.path.join(figure_path, "dual_graph.pdf"),
-            bbox_inches="tight",
-        )
-        plt.clf()
-        plt.close()
-
-    plot_mesh_dual_graph()
+    animate_zeta_and_gradients()
 
 
 def test_dual_graph():
     """
-    Test dual graph maker.
+    Test dual graph maker with a simple hexagon of triangles.
     """
 
     from .mesh import dual_graph_starts_ends_from_triangles
@@ -303,5 +317,5 @@ def test_dual_graph():
 
 if __name__ == "__main__":
     # python -m adforce.dual_graph
-    # plot_dual_graph()
+    plot_dual_graph()
     test_dual_graph()
