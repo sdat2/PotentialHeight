@@ -4,6 +4,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 import imageio
+from tqdm import tqdm
 from sithom.plot import plot_defaults, get_dim, label_subplots
 from sithom.time import timeit
 from .constants import FIGURE_PATH, NO_BBOX, DATA_PATH
@@ -133,24 +134,28 @@ def plot_dual_graph() -> None:
 
     plot_depth_and_gradients()
 
-    def animate_zeta_and_gradients():
+    @timeit
+    def animate_var_and_gradients(var="zeta"):
         # plot zeta and zeta gradients as a set of pngs, then animate them. Use the
         # same colormap and setup as above.
-        vmin_zeta = dg.zeta.values.min()
-        vmax_zeta = dg.zeta.values.max()
-        vmin_zeta, vmax_zeta = np.min([-vmax_zeta, vmin_zeta]), np.max(
-            [-vmin_zeta, vmax_zeta]
+        vmin_var = dg[var].min().values
+        vmax_var = dg[var].max().values
+        vmin_var, vmax_var = np.min([-vmax_var, vmin_var]), np.max(
+            [-vmin_var, vmax_var]
         )
 
-        vmin_grad = dg.zeta_grad.values.min()
-        vmax_grad = dg.zeta_grad.values.max()
+        vmin_grad = dg[f"{var}_grad"].min().values
+        vmax_grad = dg[f"{var}_grad"].max().values
         vmin_grad, vmax_grad = np.min([-vmax_grad, vmin_grad]), np.max(
             [-vmin_grad, vmax_grad]
         )
-        tmp_path = os.path.join(figure_path, "zeta")
+        print(
+            f"vmin_var {vmin_var}, vmax_var {vmax_var}, vmin_grad {vmin_grad}, vmax_grad {vmax_grad}"
+        )
+        tmp_path = os.path.join(figure_path, var)
         os.makedirs(tmp_path, exist_ok=True)
 
-        @timeit
+        # @timeit
         def plot_var_and_gradients(
             i: int,
             figure_name: str,
@@ -164,10 +169,10 @@ def plot_dual_graph() -> None:
                 c=dg[var].values[i, :],
                 s=0.1,
                 cmap="cmo.balance",
-                vmin=vmin_zeta,
-                vmax=vmax_zeta,
+                vmin=vmin_var,
+                vmax=vmax_var,
             )
-            axs[0].set_title(f"Zeta [m] at time {i}")
+            axs[0].set_title(var + f" [m] at time {i}")
             plt.colorbar(im, ax=axs[0], orientation="vertical")
             axs[0].set_aspect("equal")
             NO_BBOX.ax_lim(axs[0])
@@ -206,26 +211,27 @@ def plot_dual_graph() -> None:
             plt.close()
             plt.clf()
 
-        for var in ["zeta", "pressure", "windx", "windy", "u-vel", "v-vel"]:
-            if var not in dg:
-                print(f"Variable {var} not in dg")
-                continue
             # plot the variable and its gradients
-            tmp_path = os.path.join(figure_path, var)
-            os.makedirs(tmp_path, exist_ok=True)
-            figure_names = []
-            for i in range(len(dg.zeta.values)):
-                figure_name = os.path.join(tmp_path, var + f"_{i:04d}.png")
-                plot_var_and_gradients(i, figure_name, var=var)
-                figure_names.append(figure_name)
+
+        tmp_path = os.path.join(figure_path, var)
+        os.makedirs(tmp_path, exist_ok=True)
+        figure_names = []
+        for i in tqdm(range(len(dg.time.values)), desc=f"Making {var} animation"):
+            figure_name = os.path.join(tmp_path, var + f"_{i:04d}.png")
+            plot_var_and_gradients(i, figure_name, var=var)
+            figure_names.append(figure_name)
             gif_path = os.path.join(figure_path, var + ".gif")
             # make an animation of the zeta and zeta gradients
-            with imageio.get_writer(gif_path, mode="I") as writer:
-                for filename in figure_names:
-                    image = imageio.imread(filename)
-                    writer.append_data(image)
+        with imageio.get_writer(gif_path, mode="I") as writer:
+            for filename in figure_names:
+                image = imageio.imread(filename)
+                writer.append_data(image)
 
-    animate_zeta_and_gradients()
+    for var in ["zeta", "pressure", "windx", "windy", "u-vel", "v-vel"]:
+        if var not in dg:
+            print(f"Variable {var} not in dg")
+            continue
+        animate_var_and_gradients(var)
 
 
 def test_dual_graph():
@@ -315,7 +321,17 @@ def test_dual_graph():
     )
 
 
+@timeit
+def make_dual_graph_nc():
+    """Make full example dual graph netcdf file."""
+
+    dual_graph_ds_from_mesh_ds_from_path(
+        path=os.path.join(DATA_PATH, "exp_0049")
+    ).to_netcdf(os.path.join(DATA_PATH, "exp_0049", "dual_graph.nc"))
+
+
 if __name__ == "__main__":
     # python -m adforce.dual_graph
     plot_dual_graph()
-    test_dual_graph()
+    # test_dual_graph()
+    # make_dual_graph_nc()
