@@ -311,7 +311,6 @@ def line_with_impact(
     return lon_arr, lat_arr
 
 
-@timeit
 def clon_clat_from_config_and_times(
     cfg: dict, itime: int, times: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -340,7 +339,6 @@ def clon_clat_from_config_and_times(
     )
 
 
-@timeit
 def distances_bearings_to_center(
     lon_mat: np.ndarray, lat_mat: np.ndarray, lon_c: np.ndarray, lat_c: np.ndarray
 ) -> Tuple[np.ndarray, np.ndarray]:

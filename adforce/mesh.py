@@ -201,6 +201,7 @@ def dual_graph_starts_ends_from_triangles(
                 # calculate the length of the edge
                 delta_x = x[edge[1]] - x[edge[0]]
                 delta_y = y[edge[1]] - y[edge[0]]
+                # len_edges += [GEOD.inv(x[edge[0]], y[edge[0]], x[edge[1]], y[edge[1]])]
                 len_edges += [np.sqrt((delta_x) ** 2 + (delta_y) ** 2)] * 2
 
                 # unit normal vector
