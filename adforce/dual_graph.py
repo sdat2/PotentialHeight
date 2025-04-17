@@ -1,4 +1,6 @@
-"""Dual graph plotting module."""
+"""Dual graph plotting module.
+
+Dual graph mesh things currently """
 
 import os
 import numpy as np
@@ -28,6 +30,7 @@ def plot_dual_graph() -> None:
     dg = dual_graph_ds_from_mesh_ds_from_path(
         path=os.path.join(DATA_PATH, "exp_0049"),
         bbox=NO_BBOX,
+        take_grad=True,
     )
     # dg = dual_graph_ds_from_mesh_ds(ds)
     print("ds", ds)
@@ -137,7 +140,7 @@ def plot_dual_graph() -> None:
 
     var_units = {
         "zeta": "m",
-        "pressure": "hPa",
+        "pressure": "m water",
         "windx": "m s$^{-1}$",
         "windy": "m s$^{-1}$",
         "u-vel": "m s$^{-1}$",
@@ -250,7 +253,7 @@ def plot_dual_graph() -> None:
         if var not in dg:
             print(f"Variable {var} not in dg")
             continue
-        # animate_var_and_gradients(var)
+        animate_var_and_gradients(var)
 
     def make_in_out_ani():
         # make a large animation of the inputs and outputs of the ADCIRC model on the dual graph.

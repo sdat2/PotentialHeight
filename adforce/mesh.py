@@ -544,6 +544,7 @@ def dual_graph_ds_from_mesh_ds_from_path(
     path: str = os.path.join(DATA_PATH, "exp_0049"),
     bbox: BoundingBox = None,
     use_dask: bool = True,
+    take_grad: bool = False,
 ) -> xr.Dataset:
     """
     Process the dual graph from a path to the fort.*.nc files.
@@ -552,6 +553,7 @@ def dual_graph_ds_from_mesh_ds_from_path(
         path (str, optional): Defaults to DATA_PATH
         bbox (BoundingBox, optional): Bounding box to filter the data. Defaults to NO_BBOX.
         use_dask (bool, optional): Whether to use dask. Defaults to True.
+        take_grad (bool, optional): Whether to calculate the gradient of the variables. Defaults to False.
 
     Raises:
         FileNotFoundError: If the fort.*.nc files do not exist. for * in [63, 64, 73, 74].
@@ -582,9 +584,8 @@ def dual_graph_ds_from_mesh_ds_from_path(
             else:
                 ds_l += [xr_loader(paths[var], use_dask=use_dask)[var_from_file_d[var]]]
     print(ds_l)
-    # print("merged_ds", xr.merge(ds_l))
 
-    return dual_graph_ds_from_mesh_ds(xr.merge(ds_l))
+    return dual_graph_ds_from_mesh_ds(xr.merge(ds_l), take_grad=take_grad)
 
 
 # not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
