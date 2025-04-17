@@ -39,7 +39,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from .constants import NO_BBOX, FORT63_EXAMPLE, DATA_PATH
+from .constants import NO_BBOX, DATA_PATH, GEOD
 
 
 @timeit

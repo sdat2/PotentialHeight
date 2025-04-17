@@ -14,7 +14,7 @@ from sithom.time import timeit
 from sithom.io import write_json
 from w22.constants import DATA_PATH as CLE_DATA_PATH
 from .time import unknown_to_time
-from .constants import DATA_PATH
+from .constants import DATA_PATH, GEOD
 from .profile import read_profile
 
 
@@ -127,7 +127,9 @@ def moving_rectilinear_square(
         start, start + (tlen - 1) * (grid_config["timestep"]), tlen, dtype=np.int32
     )  # time in minutes from start of calendar
 
-    angle = tc_config["angle"]["value"]
+    angle = tc_config["angle"][
+        "value"
+    ]  # the forward azimuth of the storm centre (bearing)
     speed = tc_config["translation_speed"]["value"]
     ilon = tc_config["impact_location"]["value"][0]
     ilat = tc_config["impact_location"]["value"][1]

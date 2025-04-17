@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import imageio
 from tqdm import tqdm
+import datetime
 from sithom.plot import plot_defaults, get_dim, label_subplots
 from sithom.time import timeit
 from .constants import FIGURE_PATH, NO_BBOX, DATA_PATH
@@ -134,6 +135,15 @@ def plot_dual_graph() -> None:
 
     plot_depth_and_gradients()
 
+    var_units = {
+        "zeta": "m",
+        "pressure": "hPa",
+        "windx": "m s$^{-1}$",
+        "windy": "m s$^{-1}$",
+        "u-vel": "m s$^{-1}$",
+        "v-vel": "m s$^{-1}$",
+    }
+
     @timeit
     def animate_var_and_gradients(var="zeta"):
         # plot zeta and zeta gradients as a set of pngs, then animate them. Use the
@@ -172,7 +182,10 @@ def plot_dual_graph() -> None:
                 vmin=vmin_var,
                 vmax=vmax_var,
             )
-            axs[0].set_title(var + f" [m] at time {i}")
+            axs[0].set_title(
+                var
+                + f" [{var_units[var]}] at {dg.time.values[i].astype('datetime64[s]').astype(datetime.datetime).strftime('%Y-%m-%d %H:%M')}"
+            )
             plt.colorbar(im, ax=axs[0], orientation="vertical")
             axs[0].set_aspect("equal")
             NO_BBOX.ax_lim(axs[0])
@@ -185,7 +198,9 @@ def plot_dual_graph() -> None:
                 vmin=vmin_grad,
                 vmax=vmax_grad,
             )
-            axs[1].set_title(var + r" $x$ Gradient [m $^{\circ}\;^{-1}$]")
+            axs[1].set_title(
+                var + r" $x$ Gradient [" + var_units[var] + r" $^{\circ}\;^{-1}$]"
+            )
             plt.colorbar(im, ax=axs[1], orientation="vertical")
             axs[1].set_aspect("equal")
             NO_BBOX.ax_lim(axs[1])
@@ -198,7 +213,9 @@ def plot_dual_graph() -> None:
                 vmin=vmin_grad,
                 vmax=vmax_grad,
             )
-            axs[2].set_title(var + r" $y$ Gradient [m $^{\circ}\;^{-1}$]")
+            axs[2].set_title(
+                var + r" $y$ Gradient [" + var_units[var] + r" $^{\circ}\;^{-1}$]"
+            )
             plt.colorbar(im, ax=axs[2], orientation="vertical")
             axs[2].set_aspect("equal")
             NO_BBOX.ax_lim(axs[2])
@@ -216,7 +233,9 @@ def plot_dual_graph() -> None:
         tmp_path = os.path.join(figure_path, var)
         os.makedirs(tmp_path, exist_ok=True)
         figure_names = []
-        for i in tqdm(range(len(dg.time.values)), desc=f"Making {var} animation"):
+        for i in tqdm(
+            range(0, len(dg.time.values), 10), desc=f"Making {var} animation"
+        ):
             figure_name = os.path.join(tmp_path, var + f"_{i:04d}.png")
             plot_var_and_gradients(i, figure_name, var=var)
             figure_names.append(figure_name)
@@ -231,7 +250,89 @@ def plot_dual_graph() -> None:
         if var not in dg:
             print(f"Variable {var} not in dg")
             continue
-        animate_var_and_gradients(var)
+        # animate_var_and_gradients(var)
+
+    def make_in_out_ani():
+        # make a large animation of the inputs and outputs of the ADCIRC model on the dual graph.
+        # Column 1: pressure, windx, windy
+        # Column 2: zeta, u-vel, v-vel
+        vars = np.array([["pressure", "windx", "windy"], ["zeta", "u-vel", "v-vel"]]).T
+        # all should have a balanced colormap apart from pressure which should be viridis and not balanced
+        vmin = [
+            [dg[vars[i][j]].min().values for j in range(len(vars[i]))]
+            for i in range(len(vars))
+        ]
+        vmax = [
+            [dg[vars[i][j]].max().values for j in range(len(vars[i]))]
+            for i in range(len(vars))
+        ]
+        for i in range(len(vars)):
+            for j in range(len(vars[i])):
+                if vars[i][j] == "pressure":
+                    continue
+                vmin[i][j], vmax[i][j] = np.min([-vmax[i][j], vmin[i][j]]), np.max(
+                    [-vmin[i][j], vmax[i][j]]
+                )
+
+        cmap = np.array(
+            [
+                ["viridis_r", "cmo.balance", "cmo.balance"],
+                ["cmo.balance", "cmo.balance", "cmo.balance"],
+            ]
+        ).T
+        tmp_path = os.path.join(figure_path, "in_out")
+        os.makedirs(tmp_path, exist_ok=True)
+
+        def plot_in_out_timestep(t, figure_name):
+            # make twice previous width, same height (3 rows, 2 columns)
+            fig, axs = plt.subplots(
+                3,
+                2,
+                figsize=get_dim(fraction_of_line_width=2, ratio=1.1 / 2),
+                sharex=True,
+                sharey=True,
+            )
+            for i in range(len(vars)):
+                for j in range(len(vars[i])):
+                    # plot the variable and its gradients
+                    im = axs[i, j].scatter(
+                        dg.x.values,
+                        dg.y.values,
+                        c=dg[vars[i][j]].values[t, :],
+                        s=0.1,
+                        cmap=cmap[i][j],
+                        vmin=vmin[i][j],
+                        vmax=vmax[i][j],
+                    )
+                    axs[i, j].set_title(
+                        vars[i][j]
+                        + f" [{var_units[vars[i][j]]}] at {dg.time.values[t].astype('datetime64[s]').astype(datetime.datetime).strftime('%Y-%m-%d %H:%M')}"
+                    )
+                    plt.colorbar(im, ax=axs[i, j], orientation="vertical")
+                    axs[i, j].set_aspect("equal")
+                    NO_BBOX.ax_lim(axs[i, j])
+            for i in range(len(vars)):
+                axs[i, 0].set_ylabel("Latitude [$^{\circ}$N]")
+            for j in range(len(vars[0])):
+                axs[2, j].set_xlabel("Longitude [$^{\circ}$E]")
+            plt.savefig(figure_name, bbox_inches="tight")
+            plt.close()
+            plt.clf()
+
+        figure_names = []
+        for i in tqdm(
+            range(0, len(dg.time.values), 10), desc="Making in_out animation"
+        ):
+            figure_name = os.path.join(tmp_path, f"in_out_{i:04d}.png")
+            plot_in_out_timestep(i, figure_name)
+            figure_names.append(figure_name)
+        gif_path = os.path.join(figure_path, "in_out.gif")
+        with imageio.get_writer(gif_path, mode="I") as writer:
+            for filename in figure_names:
+                image = imageio.imread(filename)
+                writer.append_data(image)
+
+    make_in_out_ani()
 
 
 def test_dual_graph():
@@ -300,8 +401,8 @@ def test_dual_graph():
             **label_d,
         )
         plt.arrow(
-            xd[starts[edge_i]] + 0.5 * (xd[ends[edge_i]] - xd[starts[edge_i]]),
-            yd[starts[edge_i]] + 0.5 * (yd[ends[edge_i]] - yd[starts[edge_i]]),
+            0.5 * (xd[ends[edge_i]] + xd[starts[edge_i]]),
+            0.5 * (yd[ends[edge_i]] + yd[starts[edge_i]]),
             nx[edge_i] / 10,
             ny[edge_i] / 10,
             color="green",
