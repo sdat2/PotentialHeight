@@ -1,6 +1,7 @@
 """Script to explore the boundaries of the ADCIRC mesh."""
 
 import os
+import numpy as np
 import netCDF4 as nc
 from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, label_subplots, get_dim
@@ -59,11 +60,56 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE):
         os.path.join(figure_path, "mesh_boundaries.pdf"),
         bbox_inches="tight",
     )
+    plt.clf()
+    plt.close()
     for var in nc_ds.variables:
         print(var, nc_ds.variables[var])
     # normal flow:  nbou: nvell (number), ibtype (type)
     # neta: nbdv (nodes)
     # nope: nvdll (number)
+
+    plot_defaults()
+
+    plt.scatter(
+        np.arange(len(nvell)),
+        nvell,
+        c=ibtype,
+        marker="+",
+        cmap="viridis",
+        s=0.5,
+        label="Normal Flow Boundarys",
+    )
+    plt.scatter(
+        np.arange(len(nvdll)),
+        nvdll,
+        c=ibtypee,
+        marker="x",
+        cmap="plasma",
+        s=0.5,
+        label="Elevation Specified Boundary Segments",
+    )
+    print("unique normal coast boundary ", np.unique(ibtype))
+    print("number of segments", {i: np.sum(ibtype == i) for i in np.unique(ibtype)})
+
+    print(
+        "count of nodes in each category",
+        {i: np.sum(nvell[np.where(ibtype == i)[0]]) for i in np.unique(ibtype)},
+    )
+
+    print("unique elevation boundary ", np.unique(ibtypee))
+    print("number of segments", {i: np.sum(ibtypee == i) for i in np.unique(ibtypee)})
+    print(
+        "count of nodes in each category",
+        {i: np.sum(nvdll[np.where(ibtypee == i)[0]]) for i in np.unique(ibtypee)},
+    )
+    plt.legend()
+    plt.xlabel("Boundary Segment Number")
+    plt.ylabel("Number of Nodes")
+
+    plt.savefig(
+        os.path.join(figure_path, "mesh_boundaries_types.pdf"),
+        bbox_inches="tight",
+    )
 
 
 if __name__ == "__main__":
