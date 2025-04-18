@@ -132,7 +132,10 @@ def standard_starts_ends_from_triangles(
 
 
 def dual_graph_starts_ends_from_triangles(
-    triangles: np.ndarray, x: np.ndarray = None, y: np.ndarray = None
+    triangles: np.ndarray,
+    x: np.ndarray = None,
+    y: np.ndarray = None,
+    use_pyproj: bool = False,
 ) -> Union[
     Tuple[List[int], List[int]],
     Tuple[List[int], List[int], List[float], List[float], List[float]],
@@ -198,20 +201,35 @@ def dual_graph_starts_ends_from_triangles(
             starts.append(nodes[1])
             ends.append(nodes[0])
             if return_geometry:
-                # calculate the length of the edge
-                delta_x = x[edge[1]] - x[edge[0]]
-                delta_y = y[edge[1]] - y[edge[0]]
-                # len_edges += [GEOD.inv(x[edge[0]], y[edge[0]], x[edge[1]], y[edge[1]])]
-                len_edges += [np.sqrt((delta_x) ** 2 + (delta_y) ** 2)] * 2
+                if not use_pyproj:
+                    # calculate the centre to centre vector for the dual graph edge 0 to 1
+                    dg_delta_x = xd[nodes[1]] - xd[nodes[0]]
+                    dg_delta_y = yd[nodes[1]] - yd[nodes[0]]
+                    # calculate the length of the edge
+                    delta_x = x[edge[1]] - x[edge[0]]
+                    delta_y = y[edge[1]] - y[edge[0]]
+                    len_edges += [np.sqrt((delta_x) ** 2 + (delta_y) ** 2)] * 2
+                else:
+                    dg_delta_x = GEOD.inv(
+                        xd[nodes[0]], yd[nodes[0]], xd[nodes[1]], yd[nodes[0]]
+                    )[2]
+                    dg_delta_y = GEOD.inv(
+                        xd[nodes[0]], yd[nodes[0]], xd[nodes[0]], yd[nodes[1]]
+                    )[2]
+                    delta_x = GEOD.inv(x[edge[0]], y[edge[0]], x[edge[1]], y[edge[0]])[
+                        2
+                    ]
+                    delta_y = GEOD.inv(x[edge[0]], y[edge[0]], x[edge[0]], y[edge[1]])[
+                        2
+                    ]
+                    len_edges += [
+                        GEOD.inv(x[edge[0]], y[edge[0]], x[edge[1]], y[edge[1]])[2]
+                    ]
 
                 # unit normal vector
                 mx = delta_x / len_edges[-1]
                 my = delta_y / len_edges[-1]
 
-                # calculate the centre to centre vector for the dual graph edge 0 to 1
-
-                dg_delta_x = xd[nodes[1]] - xd[nodes[0]]
-                dg_delta_y = yd[nodes[1]] - yd[nodes[0]]
                 # if dot product is positive then vectors are in the same rough direction
                 # delta_dual_graph_center \cdot normal
                 # there is some bug here
@@ -727,6 +745,11 @@ def grad_for_triangle_static(
     # Stack into shape (M, 3, 3): [ (xA,yA,zA), (xB,yB,zB), (xC,yC,zC) ]
     c = np.stack((x, y, z), axis=2)
     # normal = (B - A) x (C - A)
+    # question: if we convert from (lon, lat, z) to local coordinates (x, y, z),
+    # would that bet better?
+    # i.e. use pyproj to convert to some local coordinate system before taking the
+    # gradient, so that the gradient is per metre instead of per degree?
+    # in the current setup we implicitly assume that lon at lat are the same size
     normal = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)  # (M, 3)
 
     with np.errstate(divide="ignore", invalid="ignore"):
