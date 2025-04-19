@@ -37,12 +37,39 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE):
     print("nbvv", nc_ds.variables["nbvv"])
     print("nbdv", nc_ds.variables["nbdv"])
     print()
+    coast_type_l = []
+    for segment, coast_type in enumerate(ibtype):
+        coast_type_l += [coast_type] * nvell[segment]
+    assert len(coast_type_l) == len(nbvv)
     fig, axs = plt.subplots(1, 1, figsize=get_dim(), sharex=True, sharey=True)
-    axs.scatter(x[nbvv], y[nbvv], s=0.1, color="blue", label="Normal Flow Boundary")
+    coast_type = np.array(coast_type_l)
+    # axs.scatter(x[nbvv], y[nbvv], s=0.1, color="blue", label="Normal Flow Boundary")
+    # just plot normal flow boundary where coast_type is 0
+    axs.scatter(
+        x[nbvv[np.where(coast_type == 0)[0]]],
+        y[nbvv[np.where(coast_type == 0)[0]]],
+        s=0.1,
+        color="red",
+        label="Normal Flow Boundary (Type 0)",
+    )
+    # Plot the normal flow boundary where coast_type is 1
+    axs.scatter(
+        x[nbvv[np.where(coast_type == 1)[0]]],
+        y[nbvv[np.where(coast_type == 1)[0]]],
+        s=0.1,
+        color="green",
+        label="Normal Flow Boundary (Type 1)",
+    )
+
     axs.set_aspect("equal")
     axs.set_title("eastcoast_95d_ll_select.grd")  # "EC95d Mesh")
+
     axs.scatter(
-        x[nbdv], y[nbdv], s=0.1, color="red", label="Elevation Specified Boundary"
+        x[nbdv],
+        y[nbdv],
+        s=0.1,
+        color="blue",
+        label="Elevation Specified Boundary (Type 0)",
     )
     axs.triplot(
         x, y, triangles, color="grey", alpha=0.5, linewidth=0.2, label="Mesh Triangles"
