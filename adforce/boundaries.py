@@ -8,7 +8,7 @@ from sithom.plot import plot_defaults, label_subplots, get_dim
 from .constants import FORT63_EXAMPLE, FIGURE_PATH
 
 
-def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE):
+def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE, typ="medium"):
     figure_path = os.path.join(FIGURE_PATH, "mesh_boundaries")
     os.makedirs(figure_path, exist_ok=True)
     plot_defaults()
@@ -62,7 +62,7 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE):
     )
 
     axs.set_aspect("equal")
-    axs.set_title("eastcoast_95d_ll_select.grd")  # "EC95d Mesh")
+    axs.set_title(typ)  # "eastcoast_95d_ll_select.grd")  # "EC95d Mesh")
 
     axs.scatter(
         x[nbdv],
@@ -84,7 +84,7 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE):
     axs.set_ylabel("Latitude [$^\circ$N]")
     # axs[1].set_xlabel("Longitude [$^\circ$E]")
     plt.savefig(
-        os.path.join(figure_path, "mesh_boundaries.pdf"),
+        os.path.join(figure_path, f"mesh_boundaries_{typ}.pdf"),
         bbox_inches="tight",
     )
     plt.clf()
@@ -137,8 +137,14 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE):
         os.path.join(figure_path, "mesh_boundaries_types.pdf"),
         bbox_inches="tight",
     )
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
     # python -m adforce.boundaries
-    find_boundaries_in_fort63()
+    from .constants import DATA_PATH
+
+    # find_boundaries_in_fort63()
+    find_boundaries_in_fort63(os.path.join(DATA_PATH, "tiny.maxele.63.nc"), typ="small")
+    # find_boundaries_in_fort63(os.path.join(DATA_PATH, "big.maxele.63.nc"), typ="big")
