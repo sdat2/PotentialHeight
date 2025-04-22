@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from adforce.constants import NO_BBOX
+from adforce.constants import NO_BBOX, NEW_ORLEANS
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from tcpips.constants import FIGURE_PATH, DATA_PATH
 from adforce.mesh import xr_loader
@@ -73,8 +73,16 @@ def plot_diff(
 ) -> None:
     """
     Plot difference between two years.
+
+    Args:
+        exps (Tuple[str, str], optional): Experiment names. Defaults to ("miami-2015", "miami-2100").
+        figure_name (str, optional): Figure name. Defaults to "2015-vs-2100-miami.pdf".
     """
     plot_defaults()
+    # there are now some new experiments called miami-2015-1, miami-2015-2
+    # and miami-2100-1, miami-2100-2 etc.
+    # so we need to check if they exist and use them if they do.
+    # they are repeats of the original experiments with different random seeds.
     exp1_dir = os.path.join(EXP_PATH, exps[0])
     exp2_dir = os.path.join(EXP_PATH, exps[1])
     paths = [os.path.join(direc, "experiments.json") for direc in [exp1_dir, exp2_dir]]
@@ -271,7 +279,7 @@ def find_differences() -> None:
 
 
 @timeit
-def plot_many(year="2015") -> None:
+def plot_many(year: str = "2015") -> None:
     """
     Plot difference between two years.
     """
@@ -411,6 +419,7 @@ def plot_places(
 
     """
     lats: List[float] = [
+        NEW_ORLEANS.lat,
         30.404389,
         30.25,
         28.932222,
@@ -420,6 +429,7 @@ def plot_places(
         29.6675,
     ]  # Latitude in degrees North
     lons: List[float] = [
+        NEW_ORLEANS.lon,
         -87.211194,
         -88.075,
         -89.4075,
@@ -429,6 +439,7 @@ def plot_places(
         -91.237611,
     ]  # Longitude in degrees East
     stationid: List[str] = [
+        "new-orleans",
         "8729840",
         "8735180",
         "8760922",
@@ -532,7 +543,8 @@ def plot_places(
     plt.xlabel("Longitude [$^\circ$E]")
     plt.ylabel("Latitude [$^\circ$N]")
     figure_name = os.path.join(FIGURE_PATH, subfolder, "stationid_map.pdf")
-    plt.savefig(figure_name)
+    plt.tight_layout()
+    plt.savefig(figure_name, bbox_inches="tight")
     plt.close()
     print(f"Saved figure to {figure_name}")
     # CESM, GFDL, GISS, MIROC, UKESM
@@ -551,20 +563,18 @@ def custom_parallel_coordinates(
     """
     Plots a parallel coordinates chart where each column has its own vertical scale.
 
-    Parameters:
-    -----------
-    df : pd.DataFrame
-        Input DataFrame containing the features (and optionally a class column).
-    cols : list
-        List of columns in df to include as parallel axes (y-axes).
-    class_column : str, optional
-        Column in df to use for grouping/coloring lines (e.g., 'group' or 'class').
-        If None, lines are all the same color.
-    colors : dict, optional
-        A dictionary mapping each class value (from class_column) to a desired color.
-        Example: {'A': 'blue', 'B': 'green', 'C': 'red'}
-    title : str, optional
-        Title of the plot.
+    Args:
+        df (pd.DataFrame): DataFrame with data to plot.
+        class_column (str, optional): Column to use for coloring. Defaults to None.
+        cols (list, optional): Columns to plot. Defaults to None.
+        colors (dict, optional): Colors to use for each class. Defaults to None.
+        constraints (dict, optional): Constraints for each column. Defaults to None.
+        balance (bool, optional): Balance the data. Defaults to False.
+        legend (bool, optional): Show legend. Defaults to True.
+        ax (Optional[plt.Axes], optional): Axis to plot on. Defaults to None.
+
+    Returns:
+        plt.Axes: Axis with plot.
     """
     NEW_LABELS = {
         "res": "Max SSH, $z^*$ [m]",
@@ -713,7 +723,7 @@ def plot_multi_argmax():
     am2_res = mean_std(am2_l)
     amd_res = mean_std(amd_l)
     print("\n\n2015\n", am1_res, "\n\n2100\n", am2_res, "\n\nDiff\n", amd_res)
-    fig, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
+    _, axs = plt.subplots(3, 1, figsize=(8, 10), sharex=True)
 
     for i, (aml, name) in enumerate(
         [(am1_l, "2015"), (am2_l, "2100"), (amd_l, "diff")]
@@ -766,8 +776,15 @@ def plot_multi_argmax():
     plt.clf()
 
 
-def get_max_from_ib_list(iblist: List[Tuple[int, int]]) -> float:
+def get_max_from_ib_list(
+    iblist: List[Tuple[int, int]],
+) -> Tuple[List[float], List[int]]:
+    """
+    Get max from ib list.
 
+    Args:
+        iblist (List[Tuple[int, int]]): List of tuples.
+    """
     res_list = []
     b_list = []
     for i, b in iblist:
