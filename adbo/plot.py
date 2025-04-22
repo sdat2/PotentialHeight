@@ -79,19 +79,33 @@ def plot_diff(
         figure_name (str, optional): Figure name. Defaults to "2015-vs-2100-miami.pdf".
     """
     plot_defaults()
+    # miami-2015 and miami-2100 are the original experiments.
     # there are now some new experiments called miami-2015-1, miami-2015-2
     # and miami-2100-1, miami-2100-2 etc.
     # so we need to check if they exist and use them if they do.
     # they are repeats of the original experiments with different random seeds.
-    exp1_dir = os.path.join(EXP_PATH, exps[0])
-    exp2_dir = os.path.join(EXP_PATH, exps[1])
-    paths = [os.path.join(direc, "experiments.json") for direc in [exp1_dir, exp2_dir]]
-    if not all([os.path.exists(path) for path in paths]):
+    exp1_dirs = [os.path.join(EXP_PATH, f"{exps[0]}")]
+    exp1_dirs += [
+        os.path.join(EXP_PATH, f"{exps[0]}-{i}")
+        for i in range(1, 4)
+        if os.path.exists(os.path.join(EXP_PATH, f"{exps[0]}-{i}"))
+    ]
+    exp2_dirs = [os.path.join(EXP_PATH, f"{exps[1]}")]
+    exp2_dirs += [
+        os.path.join(EXP_PATH, f"{exps[1]}-{i}")
+        for i in range(1, 4)
+        if os.path.exists(os.path.join(EXP_PATH, f"{exps[1]}-{i}"))
+    ]
+    if len(exp1_dirs) == 0 or len(exp2_dirs) == 0:
         print("One or more experiments do not exist.", paths)
         return
 
-    exp1 = read_json(os.path.join(exp1_dir, "experiments.json"))
-    exp2 = read_json(os.path.join(exp2_dir, "experiments.json"))
+    exp1_dicts = [
+        read_json(os.path.join(exp1_dir, "experiments.json")) for exp1_dir in exp1_dirs
+    ]
+    exp2_dicts = [
+        read_json(os.path.join(exp2_dir, "experiments.json")) for exp2_dir in exp2_dirs
+    ]
     _, axs = plt.subplots(4, 1, figsize=(8, 8), sharex=True)
 
     def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
@@ -148,8 +162,8 @@ def plot_diff(
     # axs[0].legend()
     label_subplots(axs)
 
-    plot_exp(exp1, "2015", "blue")
-    plot_exp(exp2, "2100", "red")
+    [plot_exp(exp1, "2015", "blue") for exp1 in exp1_dicts]
+    [plot_exp(exp2, "2100", "red") for exp2 in exp2_dicts]
     axs[0].legend()
     vline(25.5)  # after 25 samples goes to Bayesian optimization
     plt.xlim(1, 50)
@@ -958,11 +972,11 @@ if __name__ == "__main__":
             figure_name=f"2015-vs-2100-{point}.pdf",
         )
     plt.clf()
-    plot_many("2015")
-    plot_many("2100")
-    plot_places()
-    find_differences()
-    plot_multi_argmax()
+    #plot_many("2015")
+    #plot_many("2100")
+    #plot_places()
+    #find_differences()
+    #plot_multi_argmax()
     # plot_bo_exp()
     # plot_bo_comp()
 

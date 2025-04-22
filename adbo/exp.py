@@ -18,7 +18,7 @@ import tensorflow_probability as tfp
 import gpflow
 import trieste
 from trieste.acquisition import (
-    # ExpectedImprovement,
+    ExpectedImprovement,
     MinValueEntropySearch,
 )
 from omegaconf import OmegaConf
@@ -420,6 +420,8 @@ def run_bayesopt_exp(
     obs_lat: float = NEW_ORLEANS.lat,
     init_steps: int = 10,
     daf_steps: int = 10,
+    daf: str = "mes",  # mes, ei, ucb
+    kernel: str = "Matern52",  # Matern32, Matern52, SE
     wrap_test: bool = False,
 ) -> None:
     """
@@ -433,6 +435,11 @@ def run_bayesopt_exp(
         root_exp_direc (str, optional): Root directory for the experiments. Defaults to "/work/n01/n01/sithom/adcirc-swan/exp".
         init_steps (int, optional): How many sobol sambles. Defaults to 10.
         daf_steps (int, optional): How many acquisition points. Defaults to 10.
+        obs_lon (float, optional): Longitude of the observation point. Defaults to NEW_ORLEANS.lon.
+        obs_lat (float, optional): Latitude of the observation point. Defaults to NEW_ORLEANS.lat.
+        resolution (str, optional): Resolution of the model. Defaults to "mid".
+        daf (str, optional): Type of acquisition function. Defaults to "mes".
+        kernel (str, optional): Kernel to use. Defaults to "Matern52".
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
     """
     direc = os.path.join(root_exp_direc, exp_name)
@@ -469,37 +476,37 @@ def run_bayesopt_exp(
     initial_query_points = search_space.sample_sobol(init_steps)
     print("initial_query_points", initial_query_points, type(initial_query_points))
     init_objective = objective_f(cfg)
-    put_through_sotp = False
 
-    if (
-        put_through_sotp
-    ):  # put through single objective test problem: shouldn't be necessary
-        obs_class = SingleObjectiveTestProblem(
-            name="adcirc35k",
-            search_space=search_space,
-            objective=init_objective,
-            minimizers=tf.constant(
-                [[0.114614, 0.555649, 0.852547]], tf.float64
-            ),  # what does the minimizer do?
-            minimum=tf.constant([-10], tf.float64),
-        )
-        print("obs_class", obs_class, type(obs_class))
-        observer = trieste.objectives.utils.mk_observer(obs_class.objective)
-    else:
-        # observer = trieste.objectives.utils.mk_observer(obs_class.objective)
-        observer = trieste.objectives.utils.mk_observer(init_objective)
+    # observer = trieste.objectives.utils.mk_observer(obs_class.objective)
+    observer = trieste.objectives.utils.mk_observer(init_objective)
     print("observer", observer, type(observer))
     initial_data = observer(initial_query_points)
     print("initial_data", initial_data, type(initial_data))
     # set up bayesopt loop
+    if kernel is "Matern52":
+        gp_kernel = gpflow.kernels.Matern52()
+    elif kernel is "Matern32":
+        gp_kernel = gpflow.kernels.Matern32()
+    elif kernel is "SE":
+        gp_kernel = gpflow.kernels.SquaredExponential()
+    else:
+        raise ValueError(f"Unknown kernel {kernel}")
+
     gpr = trieste.models.gpflow.build_gpr(  # by default Matern 52
-        initial_data, search_space
+        initial_data, search_space, kernel=gp_kernel
     )  # should add kernel choice here.
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
     # choices mves,
-    acquisition_func = MinValueEntropySearch(
-        search_space
-    )  # should add in acquisition function choice here.
+    if daf == "mes":
+        acquisition_func = MinValueEntropySearch(
+            search_space
+        )  # should add in acquisition function choice here.
+    elif daf == "ei":
+        acquisition_func = ExpectedImprovement(
+            search_space  # , best_observation=initial_data.maximum()
+        )
+    # elif daf == "ucb":
+    #    acquisition_func = UpperConfidenceBound(search_space, beta=1.0)
     acquisition_rule = EfficientGlobalOptimization(acquisition_func)
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
     # run bayesopt loop
