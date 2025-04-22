@@ -63,6 +63,16 @@ LABELS = {
 
 
 def listify(exp: dict, key: str) -> List[float]:
+    """
+    Listify the values of a key in a dictionary.
+
+    Args:
+        exp (dict): Experiment dictionary.
+        key (str): Key to listify.
+
+    Returns:
+        List[float]: List of values.
+    """
     return [float(exp[call][key]) for call in exp.keys()]
 
 
@@ -169,8 +179,8 @@ def plot_diff(
     axs[1].set_ylabel(LABELS["displacement"])
     axs[2].set_ylabel(LABELS["angle"])
     axs[3].set_ylabel(LABELS["trans_speed"])
-    axs[3].set_xlabel("Number of Samples")
-    # axs[0].legend()
+    axs[3].set_xlabel("Number of Samples, $s$")
+
     label_subplots(axs)
     [
         plot_exp(exp1, "2015", "blue", use_label=(i == 0))
@@ -892,7 +902,7 @@ def plot_bo_comp() -> None:
     # take cumulative maximum over each trial
     cum_max_array = np.maximum.accumulate(res_array, axis=2)
     # take cumulative maximum over each trial
-    trial_label = ["50 LHS points", "25 LHS, 25 BO points"]
+    trial_label = ["50 LHS points", "25 LHS, 25 BO points"]  # , "10 LHS, 40 BO points"]
     colors = ["blue", "red"]
 
     def plot_ensemble(
