@@ -20,9 +20,9 @@ import trieste
 from trieste.acquisition import (
     ExpectedImprovement,
     MinValueEntropySearch,
+    NegativeLowerConfidenceBound,
 )
 from omegaconf import OmegaConf
-from trieste.objectives import SingleObjectiveTestProblem
 from trieste.acquisition.rule import EfficientGlobalOptimization
 from trieste.experimental.plotting.plotting import plot_bo_points, plot_regret
 from trieste.objectives.single_objectives import check_objective_shapes
@@ -505,8 +505,10 @@ def run_bayesopt_exp(
         acquisition_func = ExpectedImprovement(
             search_space  # , best_observation=initial_data.maximum()
         )
-    # elif daf == "ucb":
-    #    acquisition_func = UpperConfidenceBound(search_space, beta=1.0)
+    elif daf == "ucb":
+        acquisition_func = NegativeLowerConfidenceBound(search_space)
+    else:
+        raise ValueError(f"Unknown acquisition function {daf}")
     acquisition_rule = EfficientGlobalOptimization(acquisition_func)
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
     # run bayesopt loop

@@ -97,7 +97,7 @@ def plot_diff(
         if os.path.exists(os.path.join(EXP_PATH, f"{exps[1]}-{i}"))
     ]
     if len(exp1_dirs) == 0 or len(exp2_dirs) == 0:
-        print("One or more experiments do not exist.", paths)
+        print("One or more experiments do not exist.")
         return
 
     exp1_dicts = [
@@ -108,7 +108,9 @@ def plot_diff(
     ]
     _, axs = plt.subplots(4, 1, figsize=(8, 8), sharex=True)
 
-    def plot_exp(exp: dict, label: str, color: str, marker_size: float = 1) -> None:
+    def plot_exp(
+        exp: dict, label: str, color: str, marker_size: float = 1, use_label=False
+    ) -> None:
         """
         Plot experiment.
 
@@ -134,12 +136,21 @@ def plot_diff(
             if r > maxr:
                 maxr = r
             max_res.append(maxr)
-
-        axs[0].scatter(calls, res, label=label, color=color, s=marker_size)
-        axs[0].plot(calls, max_res, color=color, linestyle="-", label=f"{label} max")
-        axs[1].scatter(calls, displacement, label=label, color=color, s=marker_size)
-        axs[2].scatter(calls, angle, label=label, color=color, s=marker_size)
-        axs[3].scatter(calls, trans_speed, label=label, color=color, s=marker_size)
+        if use_label:
+            label_d_max = {"label": f"{label} max"}
+            label_d_scatter = {"label": label}
+        else:
+            label_d_max = {}
+            label_d_scatter = {}
+        axs[0].scatter(calls, res, **label_d_scatter, color=color, s=marker_size)
+        axs[0].plot(calls, max_res, color=color, linestyle="-", **label_d_max)
+        axs[1].scatter(
+            calls, displacement, **label_d_scatter, color=color, s=marker_size
+        )
+        axs[2].scatter(calls, angle, **label_d_scatter, color=color, s=marker_size)
+        axs[3].scatter(
+            calls, trans_speed, **label_d_scatter, color=color, s=marker_size
+        )
         print(f"{label} max_res: {max_res[-1]} m")
         if len(max_res) > 25:
             print(f"{label} max_res25: {max_res[-26]} m")
@@ -161,9 +172,14 @@ def plot_diff(
     axs[3].set_xlabel("Number of Samples")
     # axs[0].legend()
     label_subplots(axs)
-
-    [plot_exp(exp1, "2015", "blue") for exp1 in exp1_dicts]
-    [plot_exp(exp2, "2100", "red") for exp2 in exp2_dicts]
+    [
+        plot_exp(exp1, "2015", "blue", use_label=(i == 0))
+        for i, exp1 in enumerate(exp1_dicts)
+    ]
+    [
+        plot_exp(exp2, "2100", "red", use_label=(i == 0))
+        for i, exp2 in enumerate(exp2_dicts)
+    ]
     axs[0].legend()
     vline(25.5)  # after 25 samples goes to Bayesian optimization
     plt.xlim(1, 50)
@@ -972,11 +988,11 @@ if __name__ == "__main__":
             figure_name=f"2015-vs-2100-{point}.pdf",
         )
     plt.clf()
-    #plot_many("2015")
-    #plot_many("2100")
-    #plot_places()
-    #find_differences()
-    #plot_multi_argmax()
+    # plot_many("2015")
+    # plot_many("2100")
+    # plot_places()
+    # find_differences()
+    # plot_multi_argmax()
     # plot_bo_exp()
     # plot_bo_comp()
 
