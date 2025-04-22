@@ -1,6 +1,6 @@
 """Dual graph plotting module.
 
-Dual graph mesh things currently """
+Dual graph mesh things currently"""
 
 import os
 import numpy as np
@@ -136,7 +136,7 @@ def plot_dual_graph() -> None:
         plt.close()
         plt.clf()
 
-    plot_depth_and_gradients()
+    # plot_depth_and_gradients()
 
     var_units = {
         "zeta": "m",
@@ -253,7 +253,7 @@ def plot_dual_graph() -> None:
         if var not in dg:
             print(f"Variable {var} not in dg")
             continue
-        animate_var_and_gradients(var)
+        # animate_var_and_gradients(var)
 
     def make_in_out_ani():
         # make a large animation of the inputs and outputs of the ADCIRC model on the dual graph.
@@ -297,12 +297,24 @@ def plot_dual_graph() -> None:
             )
             for i in range(len(vars)):
                 for j in range(len(vars[i])):
-                    # plot the variable and its gradients
+                    for edge_i in range(len(dg.edge.values)):
+                        axs[i, j].plot(
+                            dg.x.values[
+                                [dg.start.values[edge_i], dg.end.values[edge_i]]
+                            ],
+                            dg.y.values[
+                                [dg.start.values[edge_i], dg.end.values[edge_i]]
+                            ],
+                            color="black",
+                            alpha=0.1,
+                            linewidth=0.2,
+                        )
+
                     im = axs[i, j].scatter(
                         dg.x.values,
                         dg.y.values,
                         c=dg[vars[i][j]].values[t, :],
-                        s=0.1,
+                        s=0.2,
                         cmap=cmap[i][j],
                         vmin=vmin[i][j],
                         vmax=vmax[i][j],
@@ -323,12 +335,18 @@ def plot_dual_graph() -> None:
             plt.clf()
 
         figure_names = []
+        snapshots = [320]
         for i in tqdm(
             range(0, len(dg.time.values), 10), desc="Making in_out animation"
         ):
             figure_name = os.path.join(tmp_path, f"in_out_{i:04d}.png")
             plot_in_out_timestep(i, figure_name)
             figure_names.append(figure_name)
+            if i in snapshots:
+                plot_in_out_timestep(
+                    i, os.path.join(FIGURE_PATH, f"in_out_{i:04d}_snap.pdf")
+                )
+
         gif_path = os.path.join(figure_path, "in_out.gif")
         with imageio.get_writer(gif_path, mode="I") as writer:
             for filename in figure_names:
@@ -338,7 +356,7 @@ def plot_dual_graph() -> None:
     make_in_out_ani()
 
 
-def test_dual_graph():
+def test_dual_graph() -> None:
     """
     Test dual graph maker with a simple hexagon of triangles.
     """
@@ -426,7 +444,7 @@ def test_dual_graph():
 
 
 @timeit
-def make_dual_graph_nc():
+def make_dual_graph_nc() -> None:
     """Make full example dual graph netcdf file."""
 
     dual_graph_ds_from_mesh_ds_from_path(
