@@ -11,6 +11,7 @@ from .fort22 import create_fort22
 from .slurm import setoff_slurm_job_and_wait
 from .subprocess import setoff_subprocess_job_and_wait
 from .mesh import xr_loader
+from .config import save_config
 
 
 def observe_max_point(cfg: DictConfig) -> float:
@@ -37,16 +38,6 @@ def observe_max_point(cfg: DictConfig) -> float:
     )
 
     return maxele
-
-
-def save_config(cfg: DictConfig) -> None:
-    """Save the configuration file.
-
-    Args:
-        cfg (DictConfig): configuration.
-    """
-    with open(os.path.join(cfg.files.run_folder, "config.yaml"), "w") as fp:
-        OmegaConf.save(config=cfg, f=fp.name)
 
 
 @timeit
