@@ -41,7 +41,10 @@ def regenerate_fort22_if_does_not_exist(path: str) -> None:
         create_fort22(path, cfg.grid, cfg.tc)
         print("fort.22.nc regenerated")
     else:
-        print("fort.22.nc already exists or config.yaml not found")
+        if os.path.exists(os.path.join(path, "fort.22.nc")):
+            print("fort.22.nc already exists")
+        elif not os.path.exists(os.path.join(path, "config.yaml")):
+            print("config.yaml not found")
 
 
 @timeit
@@ -553,9 +556,19 @@ def single_wind_and_height_step(
     print(vmin_eta, vmax_eta)
     levels = np.linspace(vmin_eta, vmax_eta, num=400)
     cbar_levels = np.linspace(vmin_eta, vmax_eta, num=5)
+    config = load_config(os.path.join(path_in, "config.yaml"))
+    ilon, ilat = config.tc.impact_location.value
+    ipoint = Point(ilon, ilat)
+
     f22_main_ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["Main"].to_dataset()
-    f22_main_ds = line_up_f22(f22_main_ds, path_in, NEW_ORLEANS)
+    f22_main_ds = line_up_f22(f22_main_ds, path_in, ipoint)
     f22_main_ds = f22_main_ds.coarsen(xi=coarsen, yi=coarsen, boundary="trim").mean()
+    f22_tc_ds = read_fort22(os.path.join(path_in, "fort.22.nc"))["TC1"].to_dataset()[
+        ["clon", "clat", "time"]
+    ]
+    del f22_tc_ds["time"]
+    f22_tc_ds["time"] = ("time", f22_main_ds.time.values)
+    # print("f22_tc_ds", f22_tc_ds)
 
     ckwargs = {
         "label": "Storm Surge Height [m]",
@@ -633,7 +646,7 @@ def single_wind_and_height_step(
         **fd,
     )
 
-    _ = plt.quiverkey(
+    qk = plt.quiverkey(
         quiver,
         # 1.08,
         x_pos,
@@ -647,25 +660,46 @@ def single_wind_and_height_step(
         # ,
         **fd,
     )
-    # print(ts)
-    # plt.xlabel(r"Longitude [$^{\circ}$E]")
-    plt.xlabel("")
-    # plt.ylabel(r"Latitude [$^{\circ}$N]")
-    plt.ylabel("")
 
-    #    NEW_ORLEANS.lon,
-    # plt.scatter(
-    #    NEW_ORLEANS.lat,
-    #    marker=".",
-    #    color="purple",
-    #    label="New Orleans",
-    #    **fd,
-    # )
     if plot_loc and fd != {}:
         plot_locations(path_in, ax, **fd)
         plot_trajectory(path_in, ax, **fd)
     if bbox is not None:
         bbox.ax_lim(ax)
+
+    centre = f22_tc_ds.sel(time=time, method="nearest")
+    print("centre", centre)
+    # plot cyclone centre
+    plt.scatter(
+        centre.clon.values,
+        centre.clat.values,
+        marker=".",
+        color="green",
+        label="Tropical Cyclone Centre",
+        **fd,
+    )
+    # go one time step after the time_i
+    centre_next = f22_tc_ds.sel(time=f63_ds.time.values[time_i + 1], method="nearest")
+    print("centre_next", centre_next)
+
+    # plot single arrow from cyclone centre to next time step
+    plt.arrow(
+        centre.clon.values,
+        centre.clat.values,
+        (centre_next.clon.values - centre.clon.values) * 5,
+        (centre_next.clat.values - centre.clat.values) * 5,
+        color="green",
+        width=0.05,
+        # head_width=2,
+        label="Tropical Cyclone Movement",
+        **fd,
+    )
+
+    # print(ts)
+    # plt.xlabel(r"Longitude [$^{\circ}$E]")
+    plt.xlabel("")
+    # plt.ylabel(r"Latitude [$^{\circ}$N]")
+    plt.ylabel("")
 
     ax.set_title("")
     plt.title("")
@@ -721,7 +755,13 @@ def single_wind_and_height_step(
 
     # plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
     # figure_name = os.path.join(img_folder, add_name + "snapshot.pdf")
-    plt.savefig(os.path.join(FIGURE_PATH, figure_name))
+    fig = plt.gcf()
+    fig.tight_layout()
+    fig.savefig(
+        os.path.join(FIGURE_PATH, figure_name),
+        bbox_inches="tight",
+        bbox_extra_artists=[qk],
+    )
     plt.close()
     plt.clf()
 
@@ -740,7 +780,7 @@ if __name__ == "__main__":
     single_wind_and_height_step(
         path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/8761724-2015/exp_0049",
         bbox=NO_BBOX.pad(1),
-        time_i=320,
+        time_i=360,
         coarsen=3,
         plot_loc=True,
         figure_name="2015_nearby_snapshot.pdf",
@@ -750,18 +790,22 @@ if __name__ == "__main__":
     single_wind_and_height_step(
         path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/miami-2015/exp_0049",
         bbox=MIAMI.bbox(),
-        time_i=330,
+        time_i=360,
         coarsen=3,
         plot_loc=True,
         figure_name="miami_2015_snapshot.pdf",
+        x_pos=1.0,
+        y_pos=-0.05,
     )
     single_wind_and_height_step(
         path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/galverston-2015/exp_0049",
         bbox=GALVERSTON.bbox(),
-        time_i=330,
+        time_i=360,
         coarsen=3,
         plot_loc=True,
         figure_name="galverston_2015_snapshot.pdf",
+        x_pos=1.0,
+        y_pos=-0.05,
     )
 
     # single_wind_and_height_step()
