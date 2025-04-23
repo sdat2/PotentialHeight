@@ -19,11 +19,29 @@ from sithom.time import timeit
 import argparse
 from .mesh import bbox_mesh, xr_loader
 from .fort22datatree import read_fort22
-from .constants import NO_BBOX, NEW_ORLEANS
+from .constants import NO_BBOX, NEW_ORLEANS, FIGURE_PATH
 from .config import load_config
 from .fort22 import create_fort22
 
 # from sithom.xr import plot_units
+
+
+def regenerate_fort22_if_does_not_exist(path: str) -> None:
+    """
+    Regenerate fort.22 if it does not exist.
+
+    Args:
+        path (str): path to fort.22.nc.
+    """
+    if not os.path.exists(os.path.join(path, "fort.22.nc")) and os.path.exists(
+        os.path.join(path, "config.yaml")
+    ):
+        print("Regenerating fort.22.nc")
+        cfg = load_config(os.path.join(path, "config.yaml"))
+        create_fort22(path, cfg.grid, cfg.tc)
+        print("fort.22.nc regenerated")
+    else:
+        print("fort.22.nc already exists or config.yaml not found")
 
 
 @timeit
@@ -121,18 +139,26 @@ def ani_heights(
             writer.append_data(image)
 
 
-def plot_locations(path, ax: plt.Axes, transform=None) -> None:
+def plot_locations(path: str, ax: plt.Axes, transform=None) -> None:
     """
     Plot the attempted and actual observation locations.
 
     Args:
         path (str): path the config.yaml file is in.
         ax (plt.Axes): axes to plot on.
+        transform (optional): transform to use for the plot. Defaults to None.
     """
 
     config = load_config(os.path.join(path, "config.yaml"))
     at_lon, at_lat = config.adcirc.attempted_observation_location.value
     ac_lon, ac_lat = config.adcirc.actual_observation_location.value
+    imp_lon, imp_lat = config.tc.impact_location.value
+    print("Impact Location: ", imp_lon, imp_lat)
+    print("Attempted Observation Location: ", at_lon, at_lat)
+    print("Actual Observation Location: ", ac_lon, ac_lat)
+
+    if transform is None:
+        transform = ax.transData
 
     ax.scatter(
         at_lon,
@@ -150,6 +176,60 @@ def plot_locations(path, ax: plt.Axes, transform=None) -> None:
         label="Actual Observation Location",
         transform=transform,
     )
+    ax.scatter(
+        imp_lon,
+        imp_lat,
+        marker=".",
+        color="black",
+        label="Impact Location",
+        transform=transform,
+    )
+
+
+def plot_trajectory(path: str, ax: plt.Axes, transform=None) -> None:
+    """
+    Plot the trajectory of the tropical cyclone.
+
+    Args:
+        path (str): path the config.yaml file is in.
+        ax (plt.Axes): axes to plot on.
+        transform (optional): transform to use for the plot. Defaults to None.
+    """
+
+    config = load_config(os.path.join(path, "config.yaml"))
+    from .fort22 import line_with_impact
+
+    angle = config.tc.angle.value
+    translation_speed = config.tc.translation_speed.value
+    imp_lon, imp_lat = config.tc.impact_location.value
+
+    print("Impact Location: ", imp_lon, imp_lat)
+    print("Angle: ", angle)
+    print("Translation Speed: ", translation_speed)
+    # go 60 hours before and after impact
+    times = np.linspace(-120 * 60 * 60, 120 * 60 * 60, 100 * 60)
+
+    lons, lats = line_with_impact(
+        0,
+        imp_lon,
+        imp_lat,
+        translation_speed,
+        angle,
+        times,
+    )
+    if transform is None:
+        transform = ax.transData
+
+    ax.plot(
+        lons,
+        lats,
+        color="black",
+        label="Line of Impact",
+        transform=transform,
+        linestyle="--",
+        linewidth=1,
+    )
+    print(lons, lats)
 
 
 @timeit
@@ -429,12 +509,12 @@ def run_animation() -> None:
     # python -m adforce.ani --path_in /work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049 --step_size 10 --coarsen 2
 
 
+@timeit
 def single_wind_and_height_step(
-    path_in: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/8761724-2015/exp_0049",  # "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
+    path_in: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049",  # "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
     time_i: int = 380,
     coarsen: int = 2,
     bbox: Optional[BoundingBox] = NO_BBOX,
-    add_name: str = "",
     x_pos: float = 0.4,
     y_pos: float = 1.05,
     scale: float = 800,
@@ -445,11 +525,10 @@ def single_wind_and_height_step(
     Plot a single snapshot of height and wind.
 
     Args:
-        path_in (str, optional): path to data. Defaults to "/work/n01/n01/sithom/adcirc-swan/exp/ani-2d-2/exp_0049".
+        path_in (str, optional): path to data. Defaults to "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049".
         time_i (int, optional): time index. Defaults to 380.
         coarsen (int, optional): coarsen the wind data by this factor. Defaults to 2.
         bbox (Optional[BoundingBox], optional): bounding box. Defaults to NO_BBOX.
-        add_name (str, optional): additional prefix name. Defaults to "".
         x_pos (float, optional): relative x position of quiver label. Defaults to 0.9.
         y_pos (float, optional): relative y position of quiver label. Defaults to 1.05.
         scale (float, optional): scale of the quiver plot. Defaults to 800.
@@ -488,6 +567,21 @@ def single_wind_and_height_step(
 
     try:
         import cartopy
+
+        print("cartopy version", cartopy.__version__)
+        from packaging import version
+
+        if version.parse(cartopy.__version__) < version.parse("0.23"):
+            from cartopy.crs import Projection
+
+            _orig_qvt = Projection.quick_vertices_transform
+
+            def _safe_qvt(self, vertices, src_crs):
+                if vertices.size == 0:
+                    return vertices
+                return _orig_qvt(self, vertices, src_crs)
+
+            Projection.quick_vertices_transform = _safe_qvt
         import cartopy.crs as ccrs
 
         ax = plt.axes(projection=ccrs.PlateCarree())
@@ -495,10 +589,8 @@ def single_wind_and_height_step(
         ax.add_feature(cartopy.feature.LAKES, alpha=0.5)
         # ax.add_feature(cartopy.feature.BORDERS, linestyle=":")
         ax.add_feature(cartopy.feature.RIVERS)
-        ax.add_feature(cartopy.feature.STATES, linestyle=":")
+        # ax.add_feature(cartopy.feature.STATES, linestyle=":")
         fd = dict(transform=ccrs.PlateCarree())
-        if plot_loc:
-            plot_locations(path_in, ax)
     except:
         fd = dict()
 
@@ -538,6 +630,7 @@ def single_wind_and_height_step(
         v="V10",
         scale=scale,
         add_guide=False,
+        **fd,
     )
 
     _ = plt.quiverkey(
@@ -555,23 +648,30 @@ def single_wind_and_height_step(
         **fd,
     )
     # print(ts)
-    plt.xlabel(r"Longitude [$^{\circ}$E]")
-    plt.ylabel(r"Latitude [$^{\circ}$N]")
-    plt.scatter(
-        NEW_ORLEANS.lon,
-        NEW_ORLEANS.lat,
-        marker=".",
-        color="purple",
-        label="New Orleans",
-        transform=ccrs.PlateCarree(),
-    )
+    # plt.xlabel(r"Longitude [$^{\circ}$E]")
+    plt.xlabel("")
+    # plt.ylabel(r"Latitude [$^{\circ}$N]")
+    plt.ylabel("")
+
+    #    NEW_ORLEANS.lon,
+    # plt.scatter(
+    #    NEW_ORLEANS.lat,
+    #    marker=".",
+    #    color="purple",
+    #    label="New Orleans",
+    #    **fd,
+    # )
+    if plot_loc and fd != {}:
+        plot_locations(path_in, ax, **fd)
+        plot_trajectory(path_in, ax, **fd)
     if bbox is not None:
-        bbox.ax_lim(plt.gca())
-    ax.set_aspect("equal")
+        bbox.ax_lim(ax)
+
     ax.set_title("")
     plt.title("")
 
     if fd != {}:
+
         ax.set_yticks(
             [
                 x
@@ -592,49 +692,78 @@ def single_wind_and_height_step(
             ],
             crs=ccrs.PlateCarree(),
         )
-        # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+        from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
-        # ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
-        # ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
-    # plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
-    from tcpips.constants import FIGURE_PATH
+        ax.xaxis.set_major_formatter(LONGITUDE_FORMATTER)
+        ax.yaxis.set_major_formatter(LATITUDE_FORMATTER)
 
-    # figure_name = os.path.join(img_folder, add_name + "snapshot.pdf")
-    plt.savefig(figure_name)
-    plt.savefig(os.path.join(FIGURE_PATH, figure_name))
-
-    plt.clf()
-
-
-def regenerate_fort22_if_does_not_exist(path: str) -> None:
-    """
-    Regenerate fort.22 if it does not exist.
-
-    Args:
-        path (str): path to fort.22.nc.
-    """
-    if not os.path.exists(os.path.join(path, "fort.22.nc")) and os.path.exists(
-        os.path.join(path, "config.yaml")
-    ):
-        print("Regenerating fort.22.nc")
-        cfg = load_config(os.path.join(path, "config.yaml"))
-        create_fort22(path, cfg.grid, cfg.tc)
-        print("fort.22.nc regenerated")
     else:
-        print("fort.22.nc already exists or config.yaml not found")
+        ax.set_aspect("equal")
+        ax.set_yticks
+        (
+            [
+                x
+                for x in range(
+                    int((bbox.lat[0] // 1) + 1),
+                    int((bbox.lat[1] // 1) + 1),
+                )
+            ]
+        )
+        ax.set_xticks(
+            [
+                x
+                for x in range(
+                    int((bbox.lon[0] // 1) + 1),
+                    int((bbox.lon[1] // 1) + 1),
+                )
+            ]
+        )
+
+    # plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
+    # figure_name = os.path.join(img_folder, add_name + "snapshot.pdf")
+    plt.savefig(os.path.join(FIGURE_PATH, figure_name))
+    plt.close()
+    plt.clf()
 
 
 if __name__ == "__main__":
     # python -m adforce.ani
     # run_animation()
     single_wind_and_height_step(
-        path_in=".",
+        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049",
         bbox=NO_BBOX.pad(1),
+        time_i=300,
         coarsen=3,
         plot_loc=True,
         figure_name="2015_worst_mid_notide_snapshot.pdf",
     )
-    single_wind_and_height_step()
+    single_wind_and_height_step(
+        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/8761724-2015/exp_0049",
+        bbox=NO_BBOX.pad(1),
+        time_i=320,
+        coarsen=3,
+        plot_loc=True,
+        figure_name="2015_nearby_snapshot.pdf",
+    )
+    from .constants import MIAMI, GALVERSTON
+
+    single_wind_and_height_step(
+        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/miami-2015/exp_0049",
+        bbox=MIAMI.bbox(),
+        time_i=330,
+        coarsen=3,
+        plot_loc=True,
+        figure_name="miami_2015_snapshot.pdf",
+    )
+    single_wind_and_height_step(
+        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/galverston-2015/exp_0049",
+        bbox=GALVERSTON.bbox(),
+        time_i=330,
+        coarsen=3,
+        plot_loc=True,
+        figure_name="galverston_2015_snapshot.pdf",
+    )
+
     # single_wind_and_height_step()
 
 # if __name__ == "__main__":
