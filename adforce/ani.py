@@ -20,6 +20,8 @@ import argparse
 from .mesh import bbox_mesh, xr_loader
 from .fort22datatree import read_fort22
 from .constants import NO_BBOX, NEW_ORLEANS
+from .config import load_config
+from .fort22 import create_fort22
 
 # from sithom.xr import plot_units
 
@@ -145,6 +147,7 @@ def ani_heights_and_winds(
         x_pos (float, optional): relative x position of quiver label.
         y_pos (float, optional): relative y position of quiver label.
     """
+    regenerate_fort22_if_does_not_exist(path_in)
     plot_defaults()
     img_folder = os.path.join(path_in, "img", "height_and_wind")
     gif_folder = os.path.join(path_in, "gif", "height_and_wind")
@@ -421,6 +424,8 @@ def single_wind_and_height_step(
     """
     plot_defaults()
 
+    regenerate_fort22_if_does_not_exist(path_in)
+
     img_folder = os.path.join(path_in, "img")
     os.makedirs(img_folder, exist_ok=True)
     if bbox is not None:
@@ -562,6 +567,24 @@ def single_wind_and_height_step(
     plt.savefig(os.path.join(FIGURE_PATH, "2025_mid_notide_snapshot.pdf"))
 
     plt.clf()
+
+
+def regenerate_fort22_if_does_not_exist(path: str) -> None:
+    """
+    Regenerate fort.22 if it does not exist.
+
+    Args:
+        path (str): path to fort.22.nc.
+    """
+    if not os.path.exists(os.path.join(path, "fort.22.nc")) and os.path.exists(
+        os.path.join(path, "config.yaml")
+    ):
+        print("Regenerating fort.22.nc")
+        cfg = load_config(os.path.join(path, "config.yaml"))
+        create_fort22(path, cfg.grid, cfg.tc)
+        print("fort.22.nc regenerated")
+    else:
+        print("fort.22.nc already exists or config.yaml not found")
 
 
 if __name__ == "__main__":
