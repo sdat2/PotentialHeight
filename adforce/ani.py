@@ -106,7 +106,7 @@ def ani_heights(
         if bbox is not None:
             bbox.ax_lim(plt.gca())
         ax.set_aspect("equal")
-        plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
+        plt.title(ts.strftime("%d  %H:%M"))
         figure_name = os.path.join(img_folder, add_name + f"height_{time_i:04}.png")
         plt.savefig(figure_name)
         figure_names.append(figure_name)
@@ -119,6 +119,37 @@ def ani_heights(
         for filename in figure_names:
             image = imageio.imread(filename)
             writer.append_data(image)
+
+
+def plot_locations(path, ax: plt.Axes, transform=None) -> None:
+    """
+    Plot the attempted and actual observation locations.
+
+    Args:
+        path (str): path the config.yaml file is in.
+        ax (plt.Axes): axes to plot on.
+    """
+
+    config = load_config(os.path.join(path, "config.yaml"))
+    at_lon, at_lat = config.adcirc.attempted_observation_location.value
+    ac_lon, ac_lat = config.adcirc.actual_observation_location.value
+
+    ax.scatter(
+        at_lon,
+        at_lat,
+        marker=".",
+        color="red",
+        label="Attempted Observation Location",
+        transform=transform,
+    )
+    ax.scatter(
+        ac_lon,
+        ac_lat,
+        marker=".",
+        color="blue",
+        label="Actual Observation Location",
+        transform=transform,
+    )
 
 
 @timeit
@@ -242,7 +273,7 @@ def ani_heights_and_winds(
         if bbox is not None:
             bbox.ax_lim(plt.gca())
         ax.set_aspect("equal")
-        plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
+        plt.title(ts.strftime("%m-%d  %H:%M"))
         figure_name = os.path.join(
             img_folder, add_name + f"height_and_wind_{time_i:04}.png"
         )
@@ -399,7 +430,7 @@ def run_animation() -> None:
 
 
 def single_wind_and_height_step(
-    path_in: str = "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
+    path_in: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/8761724-2015/exp_0049",  # "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
     time_i: int = 380,
     coarsen: int = 2,
     bbox: Optional[BoundingBox] = NO_BBOX,
@@ -407,6 +438,8 @@ def single_wind_and_height_step(
     x_pos: float = 0.4,
     y_pos: float = 1.05,
     scale: float = 800,
+    plot_loc: bool = False,
+    figure_name: str = "snapshot.pdf",
 ) -> None:
     """
     Plot a single snapshot of height and wind.
@@ -420,6 +453,8 @@ def single_wind_and_height_step(
         x_pos (float, optional): relative x position of quiver label. Defaults to 0.9.
         y_pos (float, optional): relative y position of quiver label. Defaults to 1.05.
         scale (float, optional): scale of the quiver plot. Defaults to 800.
+        plot_loc (bool, optional): whether to plot the locations. Defaults to False.
+        figure_name (str, optional): name of the figure. Defaults to "snapshot.pdf".
 
     """
     plot_defaults()
@@ -462,6 +497,8 @@ def single_wind_and_height_step(
         ax.add_feature(cartopy.feature.RIVERS)
         ax.add_feature(cartopy.feature.STATES, linestyle=":")
         fd = dict(transform=ccrs.PlateCarree())
+        if plot_loc:
+            plot_locations(path_in, ax)
     except:
         fd = dict()
 
@@ -562,9 +599,9 @@ def single_wind_and_height_step(
     # plt.title(ts.strftime("%Y-%m-%d  %H:%M"))
     from tcpips.constants import FIGURE_PATH
 
-    figure_name = os.path.join(img_folder, add_name + "snapshot.pdf")
+    # figure_name = os.path.join(img_folder, add_name + "snapshot.pdf")
     plt.savefig(figure_name)
-    plt.savefig(os.path.join(FIGURE_PATH, "2025_mid_notide_snapshot.pdf"))
+    plt.savefig(os.path.join(FIGURE_PATH, figure_name))
 
     plt.clf()
 
@@ -589,8 +626,15 @@ def regenerate_fort22_if_does_not_exist(path: str) -> None:
 
 if __name__ == "__main__":
     # python -m adforce.ani
-    run_animation()
-    # single_wind_and_height_step(path_in=".", bbox=NO_BBOX.pad(1), coarsen=3)
+    # run_animation()
+    single_wind_and_height_step(
+        path_in=".",
+        bbox=NO_BBOX.pad(1),
+        coarsen=3,
+        plot_loc=True,
+        figure_name="2015_worst_mid_notide_snapshot.pdf",
+    )
+    single_wind_and_height_step()
     # single_wind_and_height_step()
 
 # if __name__ == "__main__":
