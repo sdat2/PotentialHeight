@@ -26,7 +26,6 @@ CONFIG_PATH: str = os.path.join(SRC_PATH, "config")
 DATA_PATH: str = os.path.join(PROJECT_PATH, "data")
 
 # General data from e.g. paper or cmip etc.
-DATA_PATH: str = os.path.join(PROJECT_PATH, "data")
 GOM: Tuple[float] = (25.443701, -90.013120)  # Centre of Gulf of Mexico, lat, lon
 MONTHS: List[str] = [  # 3 letter month names
     "Jan",
@@ -50,9 +49,24 @@ QUARTERS: List[str] = [  # 3-letter quarter names Q1, Q2, Q3, Q4
     "OND",
 ]
 
-# Directories for CMIP6 data processing steps: make them ahead of time.
+SEASONS: List[str] = [  # 3-letter season names DJF, MAM, JJA, SON
+    "DJF",
+    "MAM",
+    "JJA",
+    "SON",
+]
+
+# Directories for ERA5 data processing steps: make them ahead of time.
 ERA5_PATH: str = os.path.join(DATA_PATH, "era5")  # main data folder
 os.makedirs(ERA5_PATH, exist_ok=True)
+ERA5_RAW_PATH: str = os.path.join(ERA5_PATH, "raw")  # download data here
+os.makedirs(ERA5_RAW_PATH, exist_ok=True)
+ERA5_REGRIDDED_PATH: str = os.path.join(ERA5_PATH, "regrid")  # regridded data here
+os.makedirs(ERA5_REGRIDDED_PATH, exist_ok=True)
+ERA5_PI_OG_PATH: str = os.path.join(ERA5_PATH, "pi_og")  # pi no bias correction before
+os.makedirs(ERA5_PI_OG_PATH, exist_ok=True)  # potential intensity on original grid
+ERA5_PI_PATH: str = os.path.join(ERA5_PATH, "pi")  # pi on new grid
+os.makedirs(ERA5_PI_PATH, exist_ok=True)  # potential intensity on new grid
 
 # Directories for CMIP6 data processing steps: make them ahead of time.
 CMIP6_PATH: str = os.path.join(DATA_PATH, "cmip6")  # main data folder
@@ -73,6 +87,8 @@ PI2_PATH: str = os.path.join(CMIP6_PATH, "pi2")  # pi after cdo regridding
 os.makedirs(PI2_PATH, exist_ok=True)
 PI3_PATH: str = os.path.join(CMIP6_PATH, "pi3")  # pi after temp profile fix
 os.makedirs(PI3_PATH, exist_ok=True)
+PI4_PATH: str = os.path.join(CMIP6_PATH, "pi4")  # pi with different temp profile fix
+os.makedirs(PI4_PATH, exist_ok=True)
 BC_PI_PATH: str = os.path.join(CMIP6_PATH, "bc_pi")  # pi after bias correction
 os.makedirs(BC_PI_PATH, exist_ok=True)
 

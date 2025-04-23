@@ -1,14 +1,14 @@
 """Potential Intensity Calculation script."""
 
 from typing import Callable
+import numpy as np
 import xarray as xr
 from tcpyPI import pi
-from sithom.time import timeit
+from sithom.time import timeit, time_stamp
+from sithom.misc import get_git_revision_hash
+from .constants import PROJECT_PATH
+from .xr_utils import standard_name_to_long_name
 
-
-TCPYPI_SAMPLE_DATA: str = (
-    "../tcpypi/data/sample_data.nc"  # Sample data for the tcpyPI package
-)
 CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
 PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
 
@@ -26,6 +26,9 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
     To fix this, we could assume an approximation that the temperature at these low levels
     is equal to sea surface temperature minus one kelvin (a standard parameterization for near surface air temperature).
 
+    TODO: Make this only effect the bottom NaNs of the profile.
+    TODO: convert all very high values to NaN (i.e. if t > 300 C, set to NaN).
+
     Args:
         ds (xr.Dataset): xarray dataset containing the necessary variables "t" and "sst".
         offset_temp_param (float, optional): Temperature offset parameter. Defaults to 1.
@@ -34,23 +37,33 @@ def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset
         xr.Dataset: xarray dataset with fixed temperature profile.
 
     Example:
-        >>> import numpy as np
-        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]]),
-        ...                  "t": (["x", "y", "p"], [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]])},
-        ...                  coords={"x": [-80, -85], "y": [20, 25], "p": [1000, 850]})
+        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]],
+        ...                                    {"units": "degrees_Celsius"}),
+        ...                            "t": (["x", "y", "p"],
+        ...                              [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]],
+        ...                              {"units": "degrees_Celsius"})},
+        ...                 coords={"x": (["x"], [-80, -85], {"units": "degrees_East"}),
+        ...                         "y": (["y"], [20, 25], {"units": "degrees_North"}),
+        ...                         "p": (["p"], [1000, 850], {"units": "hPa"})})
         >>> ds_fixed = fix_temp_profile(ds, offset_temp_param=1)
         >>> np.allclose(ds_fixed.isel(p=0).t.values, [[0, 3], [5, 3]])
         True
     """
-    # Fix the temperature profile (doesn't check how )
+    # Fix the temperature profile (doesn't check how)
     sea_level_temp = ds["sst"] - offset_temp_param
+    # make all implausibly high values NaN
+    # if air temperature > 300 C, set to NaN
+    ds["t"] = ds["t"].where(ds["t"] < 300, np.nan)
     # fill in NaN values in the temperature profile with the sea level temperature
+    # If air temperature is NaN, set to sea level temperature
     ds["t"] = ds["t"].where(ds["t"].notnull(), sea_level_temp)
     return ds
 
 
 @timeit
-def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
+def calculate_pi(
+    ds: xr.Dataset, dim: str = "p", fix_temp=False, V_reduc=1.0
+) -> xr.Dataset:
     """Calculate the potential intensity using the tcpyPI package.
 
     Data must have been converted to the tcpyPI units by `tcpips.convert'.
@@ -59,9 +72,27 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         ds (xr.Dataset): xarray dataset containing the necessary variables.
         dim (str, optional): Vertical dimension. Defaults to "p" for pressure level.
         fix_temp (bool, optional): Whether to fix the temperature profile. Defaults to True.
+        V_reduc (float, optional): Reduction factor for the wind speed. Defaults to 1.0.
+
 
     Returns:
         xr.Dataset: xarray dataset containing the calculated variables.
+
+    Example:
+        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[20, 30], [30, 32]],
+        ...                                    {"units": "degrees_Celsius"}),
+        ...                            "msl": (["x", "y"], [[1000, 1005], [1010, 1015]],
+        ...                                    {"units": "hPa"}),
+        ...                            "t": (["x", "y", "p"],
+        ...                                  [[[np.nan, 23], [30, 21]], [[30, 21], [np.nan, 23]]],
+        ...                                  {"units": "degrees_Celsius"}),
+        ...                            "q": (["x", "y", "p"],
+        ...                                  [[[10, 20], [30, 40]], [[50, 60], [70, 80]]],
+        ...                                  {"units": "g/kg"})},
+        ...                 coords={"x": (["x"], [-80, -85], {"units": "degrees_East"}),
+        ...                         "y": (["y"], [20, 25], {"units": "degrees_North"}),
+        ...                         "p": (["p"], [1000, 850], {"units": "hPa"})})
+        >>> pi_ds = calculate_pi(ds, fix_temp=True) # doctest: +SKIP
     """
     if fix_temp:
         ds = fix_temp_profile(ds)
@@ -74,7 +105,12 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         ds["t"],
         ds["q"],
         kwargs=dict(
-            CKCD=CKCD, ascent_flag=0, diss_flag=1, ptop=PTOP, miss_handle=1, V_reduc=1
+            CKCD=CKCD,
+            ascent_flag=0,
+            diss_flag=1,
+            ptop=PTOP,
+            miss_handle=1,
+            V_reduc=V_reduc,
         ),
         input_core_dims=[
             [],
@@ -93,20 +129,6 @@ def calculate_pi(ds: xr.Dataset, dim: str = "p", fix_temp=False) -> xr.Dataset:
         vectorize=True,
         # dask="allowed", # maybe this could work with dask, but at the moment I get an error
     )
-    """
-    numba.core.errors.TypingError: Failed in nopython mode pipeline (step: nopython frontend)
-non-precise type pyobject
-During: typing of argument at /mnt/lustre/a2fs-work2/work/n02/n02/sdat2/micromamba/envs/t1/lib/python3.10/site-packages/tcpyPI/pi.py (361)
-
-File "../micromamba/envs/t1/lib/python3.10/site-packages/tcpyPI/pi.py", line 361:
-def cape(TP,RP,PP,T,R,P,ascent_flag=0,ptop=50,miss_handle=1):
-    <source elided>
-# define the function to calculate PI
-@nb.njit()
-^
-
-This error may have been caused by the following argument(s):
-    """
 
     # store the result in an xarray data structure
     vmax, pmin, ifl, t0, otl = result
@@ -122,7 +144,7 @@ This error may have been caused by the following argument(s):
 
     # add names and units to the structure
     out_ds.vmax.attrs["standard_name"], out_ds.vmax.attrs["units"] = (
-        "Maximum Potential Intensity",
+        "Potential Intensity",
         "m/s",
     )
     out_ds.pmin.attrs["standard_name"], out_ds.pmin.attrs["units"] = (
@@ -138,66 +160,12 @@ This error may have been caused by the following argument(s):
         "Outflow Temperature Level",
         "hPa",
     )
+    out_ds.attrs["V_reduc"] = V_reduc
+    out_ds.attrs["CKCD"] = CKCD
+    out_ds.attrs["ptop"] = PTOP
+    ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    ds.attrs["pi_calculated_at_time"] = time_stamp()
 
     return standard_name_to_long_name(out_ds)
-
-
-def standard_name_to_long_name(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Turn the standard_name attribute into a long_name attribute.
-
-    Args:
-        ds (xr.Dataset): dataset with standard_name attributes.
-
-    Returns:
-        xr.Dataset: dataset with long_name attributes.
-    """
-    for var in ds:
-        if "standard_name" in ds[var].attrs:
-            ds[var].attrs["long_name"] = ds[var].attrs["standard_name"]
-    return ds
-
-
-def propagate_attrs(ds_old: xr.Dataset, ds_new: xr.Dataset) -> xr.Dataset:
-    """
-    Propagate the standard_name and units attributes from one dataset to another.
-
-    Args:
-        ds_old (xr.Dataset): dataset with standard_name and units attributes.
-        ds_new (xr.Dataset): dataset with standard_name and units attributes.
-
-    Returns:
-        xr.Dataset: dataset with standard_name and units attributes.
-    """
-
-    for var in ds_old:
-        if var in ds_new:
-            if "units" in ds_old[var].attrs:
-                ds_new[var].attrs["units"] = ds_old[var].attrs["units"]
-            elif "units" not in ds_new[var].attrs:
-                ds_new[var].attrs["units"] = ""
-            if "long_name" in ds_old[var].attrs:
-                ds_new[var].attrs["long_name"] = ds_old[var].attrs["long_name"]
-            if "standard_name" in ds_old[var].attrs:
-                ds_new[var].attrs["standard_name"] = ds_old[var].attrs["standard_name"]
-    return ds_new
-
-
-def propogate_wrapper(
-    func: Callable[[xr.Dataset], xr.Dataset],
-) -> Callable[[xr.Dataset], xr.Dataset]:
-    """
-    Wrapper to propagate the standard_name and units attributes from one dataset to another.
-
-    Args:
-        func (Callable[xr.Dataset, xr.Dataset]): function to wrap.
-
-    Returns:
-        Callable[xr.Dataset, xr.Dataset]: wrapped function.
-    """
-
-    def wrapper(ds_old: xr.Dataset) -> xr.Dataset:
-        ds_new = func(ds_old)
-        return propagate_attrs(ds_old, ds_new)
-
-    return wrapper

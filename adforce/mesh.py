@@ -3,9 +3,34 @@ Process ADCIRC meshes efficiently vectorized/sparses.
 This is the shared functionality for processing ADCIRC meshes.
 
 TODO: Add the dual graph calculation for SurgeNet.
+
+fort.63 format:
+dimensions:
+    time: (Unlimited) (604 currently)
+    node: (31435)
+    nele: (58368)
+    nvertex: (3)
+    nope: (1)
+    neta: (103)
+    max_nvdll: (103)
+    nbou: (59)
+    nvel: (4514)
+    max_nvell: (3050)
+    mesh: (1)
+coordinates:
+    time (time): (604)
+    x (node): (31435) longitude, degrees_east
+    y (node): (31435) latitude, degrees_north
+    element (nele, nvertex): (58368, 3) connectivity
+    node (node): (31435)
+data_vars:
+    depth (node): (31435) depth, meters
+    zeta (time, node): (604, 31435) water surface elevation, meters
+
 """
 
 from typing import Union, Tuple, List
+import os
 import numpy as np
 import collections
 from scipy.sparse import csr_matrix, coo_matrix
@@ -14,7 +39,7 @@ import xarray as xr
 import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from .constants import NO_BBOX, FORT63_EXAMPLE
+from .constants import NO_BBOX, DATA_PATH, GEOD
 
 
 @timeit
@@ -107,16 +132,25 @@ def standard_starts_ends_from_triangles(
 
 
 def dual_graph_starts_ends_from_triangles(
-    triangles: np.ndarray,
-) -> Tuple[List[int], List[int]]:
+    triangles: np.ndarray, x: np.ndarray = None, y: np.ndarray = None
+) -> Union[
+    Tuple[List[int], List[int]],
+    Tuple[List[int], List[int], List[float], List[float], List[float]],
+]:
     """
     Generate start, end indices for the dual graph from the triangles.
 
+    TODO: This looks slow.
+
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices.
+        x (np.ndarray, optional): x-coordinates. Defaults to None.
+        y (np.ndarray, optional): y-coordinates. Defaults to None.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: start, end indices for the dual graph.
+        Tuple[List[int], List[int]]: start, end indices for the dual graph.
+        or
+        Tuple[List[int], List[int], List[float], List[float], List[float]]: start, end, length, xdual, ydual, unit normal x, unit normal y.
 
     Examples::
         >>> start, end = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]))
@@ -124,27 +158,104 @@ def dual_graph_starts_ends_from_triangles(
         True
         >>> np.all(end == np.array([1, 0]))
         True
+        >>> start, end, length, xd, yd, unx, uny = dual_graph_starts_ends_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]), x=np.array([0, 1, 2, 3]), y=np.array([0, -1, -1, -2]))
+        >>> np.all(length == np.array([1.0, 1.0]))
+        True
+        >>> np.all(unx == np.array([0.0, 0.0]))
+        True
+        >>> np.all(uny  == np.array([-1.0, 1.0]))
+        True
 
     """
+
+    return_geometry = x is not None and y is not None
     edge_dict = collections.defaultdict(list)
 
     for i, triangle in enumerate(triangles):
-        edge_dict[tuple(triangle[0:2])].append(i)
-        edge_dict[tuple(triangle[1:3])].append(i)
-        edge_dict[tuple(triangle[[0, 2]])].append(i)
+        edge_dict[tuple(sorted(triangle[0:2]))].append(i)
+        edge_dict[tuple(sorted(triangle[1:3]))].append(i)
+        edge_dict[tuple(sorted(triangle[[0, 2]]))].append(i)
 
     starts = []
     ends = []
 
+    # could also calculate length of edge and normal vector here if x and y are given.
+    if return_geometry:
+        len_edges = []
+        unit_normal_x = []
+        unit_normal_y = []
+        # calculate dual graph x and y coordinates
+        xd = mean_for_triangle(x, triangles)
+        yd = mean_for_triangle(y, triangles)
+
     for edge in edge_dict:
         nodes = edge_dict[edge]
-        for i in range(len(nodes)):
-            for j in range(i + 1, len(nodes)):
-                starts.append(nodes[i])
-                starts.append(nodes[j])
-                ends.append(nodes[j])
-                ends.append(nodes[i])
-    return starts, ends
+        if len(nodes) == 2:
+            # one way round
+            starts.append(nodes[0])
+            ends.append(nodes[1])
+            # the other way round
+            starts.append(nodes[1])
+            ends.append(nodes[0])
+            if return_geometry:
+                # calculate the length of the edge
+                delta_x = x[edge[1]] - x[edge[0]]
+                delta_y = y[edge[1]] - y[edge[0]]
+                # len_edges += [GEOD.inv(x[edge[0]], y[edge[0]], x[edge[1]], y[edge[1]])]
+                len_edges += [np.sqrt((delta_x) ** 2 + (delta_y) ** 2)] * 2
+
+                # unit normal vector
+                mx = delta_x / len_edges[-1]
+                my = delta_y / len_edges[-1]
+
+                # calculate the centre to centre vector for the dual graph edge 0 to 1
+
+                dg_delta_x = xd[nodes[1]] - xd[nodes[0]]
+                dg_delta_y = yd[nodes[1]] - yd[nodes[0]]
+                # if dot product is positive then vectors are in the same rough direction
+                # delta_dual_graph_center \cdot normal
+                # there is some bug here
+                # the dual graph 0 to 1 edge is in the same direction as the unit normal
+                # so we need to flip the unit normal vector
+                dot_prod = dg_delta_x * my - dg_delta_y * mx
+                if dot_prod < 0:
+                    # the dual graph 0 to 1 edge is in the opposite direction to the unit normal
+                    # so we need to flip the unit normal vector
+                    mx = -mx
+                    my = -my
+                elif dot_prod == 0:
+                    raise ValueError(
+                        "Dot product is zero. Check mesh. This should not happen."
+                    )
+
+                # unit normal vector (perpendicular) (edge 0 to 1)
+                unit_normal_x += [my]
+                unit_normal_y += [-mx]
+                # unit normal vector (opposite direction) (edge 1 to 0)
+                unit_normal_x += [-my]
+                unit_normal_y += [mx]
+                # let's hope these happen to be the right way round.
+                # this is not guaranteed. The edges have been sorted, so are not necessarily
+                # in the same order as the triangles.
+        if len(nodes) == 3:
+            raise ValueError("An edge is shared by more than 2 triangles. Check mesh.")
+        # there should be at most only two triangles for each edge
+        # so these loops are not necessary
+        # for i in range(len(nodes)):
+        #    for j in range(i + 1, len(nodes)):
+        #        starts.append(nodes[i])
+        #        starts.append(nodes[j])
+        #        ends.append(nodes[j])
+        #        ends.append(nodes[i])
+    if return_geometry:
+        # starts = np.array(starts)
+        # ends = np.array(ends)
+        # len_edges = np.array(len_edges)
+        # unit_normal_x = np.array(unit_normal_x)
+        # unit_normal_y = np.array(unit_normal_y)
+        return starts, ends, len_edges, xd, yd, unit_normal_x, unit_normal_y
+    else:
+        return starts, ends
 
 
 # @timeit
@@ -196,6 +307,18 @@ def calculate_dual_graph_adjacency_matrix(
         True
         >>> np.all(calculate_dual_graph_adjacency_matrix(np.array([[0, 1, 2], [2, 3, 4]]), sparse=False) == np.array([[False, False], [False, False]]))
         True
+        >>> np.all(calculate_dual_graph_adjacency_matrix(
+        ... np.array([[1, 2, 3], [2, 3, 4], [3, 4, 5],
+        ...           [3, 5, 6], [3, 6, 7], [7, 3, 1]]) - 1,
+        ...          sparse=False
+        ... ) == np.array([
+        ... [False, True, False, False, False, True],
+        ... [True, False, True, False, False, False],
+        ... [False, True, False, True, False, False],
+        ... [False, False, True, False, True, False],
+        ... [False, False, False, True, False, True],
+        ... [True, False, False, False, True, False]]))
+        True
     """
 
     M = len(triangles)
@@ -205,7 +328,9 @@ def calculate_dual_graph_adjacency_matrix(
     )
 
 
-def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
+def dual_graph_ds_base_from_triangles(
+    triangles: np.ndarray, x: np.ndarray, y: np.ndarray
+) -> xr.Dataset:
     """
     Calculate the dual graph adjacency matrix for a mesh of triangles.
 
@@ -215,15 +340,22 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
     Args:
         triangles (np.ndarray): Mx3 array of triangle indices. Assumes nodes are numbered from 0 to N-1.
             where N is the number of nodes in the original mesh.
+        x (np.ndarray): x-coordinates of the nodes. Degrees east.
+        y (np.ndarray): y-coordinates of the nodes. Degrees north.
 
     Returns:
         xr.Dataset: Dual graph dataset.
          - "element": Mx3 array of triangle indices.
          - "start": 2E array of start indices. (Double counting)
          - "end": 2E array of end indices. (Double counting)
+         - "x": M array of x-coordinates of the dual graph nodes.
+         - "y": M array of y-coordinates of the dual graph nodes.
+         - "length": 2E array of lengths of the edges.
+         - "unit_normal_x": 2E array of x-coordinates of the unit normal vectors.
+         - "unit_normal_y": 2E array of y-coordinates of the unit normal vectors.
 
     Examples::
-        >>> ds = dual_graph_dataset(np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> ds = dual_graph_ds_base_from_triangles(np.array([[0, 1, 2], [1, 2, 3]]), np.array([0, 1, 2, 3]), np.array([0, -1, -1, -2]))
         >>> np.all(ds.start.values == np.array([0, 1]))
         True
         >>> np.all(ds.end.values == np.array([1, 0]))
@@ -231,7 +363,11 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
         >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
         True
     """
-    starts, ends = dual_graph_starts_ends_from_triangles(triangles)
+
+    starts, ends, lengths, xd, yd, unx, uny = dual_graph_starts_ends_from_triangles(
+        triangles, x, y
+    )
+
     return xr.Dataset(
         {
             "element": (
@@ -241,8 +377,39 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
                     "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
                 },
             ),
+            "x": (
+                ["nele"],
+                xd,
+                {
+                    "description": "Longitude of the dual graph nodes.",
+                    "units": "degrees_east",
+                },
+            ),
+            "y": (
+                ["nele"],
+                yd,
+                {
+                    "description": "Latitude of the dual graph nodes.",
+                    "units": "degrees_north",
+                },
+            ),
             "start": ("edge", starts, {"description": "Start indices of the edges."}),
             "end": ("edge", ends, {"description": "End indices of the edges."}),
+            "length": (
+                ["edge"],
+                lengths,
+                {"description": "Length of the edges.", "units": "degrees"},
+            ),
+            "unit_normal_x": (
+                ["edge"],
+                unx,
+                {"description": "Unit normal vector x-component."},
+            ),
+            "unit_normal_y": (
+                ["edge"],
+                uny,
+                {"description": "Unit normal vector y-component."},
+            ),
         },
         coords={
             "edge": np.arange(len(starts)),
@@ -255,7 +422,10 @@ def dual_graph_dataset(triangles: np.ndarray) -> xr.Dataset:
 
 def _test_xr_dataset() -> xr.Dataset:
     """
-    Test xr.Dataset for dual graph.
+    Test xr.Dataset for dual graph. Kind of a mocker for tests to remove io operations.
+
+    This is a synthetic fort.63.nc dataset excluding some variables, which we have chosen
+    to ignore in the current setup.
 
     Returns:
         xr.Dataset: Dual graph dataset.
@@ -264,78 +434,167 @@ def _test_xr_dataset() -> xr.Dataset:
         {
             "element": (
                 ["nele", "nvertex"],
-                np.array([[0, 1, 2], [1, 2, 3]]) + 1,
+                np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4]]) + 1,
                 {
                     "description": "Original mesh triangles, with each new node corresponding to the face of the old triangle mesh."
                 },
             ),
-            "depth": (["node"], np.array([1, 2, 3, 4])),
-            "x": (["node"], np.array([0, 1, 2, 3])),
-            "y": (["node"], np.array([0, -1, -1, -2])),
-            "zeta": (["time", "node"], np.array([[1, 2, 3, 4], [2, 3, 4, 5]])),
+            "depth": (["node"], np.array([1, 2, 3, 4, 4])),
+            "x": (["node"], np.array([0, 1, 2, 3, 3])),  # degrees_east
+            "y": (["node"], np.array([0, -1, -1, -2, -1])),  # degrees_north
+            # between timesteps sea surface elevation increases by one meter
+            "zeta": (["time", "node"], np.array([[1, 2, 3, 4, 4], [2, 3, 4, 5, 5]])),
         },
         coords={
-            "nele": np.arange(2),
-            "nvertex": np.arange(3),
-            "node": np.arange(4),
-            "time": np.array(
-                [
-                    np.datetime64("2021-01-01 00:00:00"),
-                    np.datetime64("2021-01-01 01:00:00"),
-                ]
+            "nele": (["nele"], np.arange(3)),  # number of elements (triangles)
+            "nvertex": (
+                ["nvertex"],
+                np.arange(3),
+            ),  # triangular elements -> 3 vertices per element
+            "node": (["node"], np.arange(5)),  # number of nodes (5)
+            "time": (
+                ["time"],
+                np.array(
+                    [
+                        np.datetime64("2021-01-01 00:00:00"),
+                        np.datetime64("2021-01-01 01:00:00"),
+                    ]
+                ),
             ),
         },
         attrs={"description": "Test original dataset."},
     )
 
 
-def process_dual_graph(ds: xr.Dataset) -> xr.Dataset:
+def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
     """
     Create a dual graph dataset from an ADCIRC output dataset.
 
     Args:
         ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
+        take_grad (bool, optional): Whether to calculate the gradient of the depth and zeta. Defaults to True.
 
     Returns:
         xr.Dataset: Dual graph dataset.
 
     Examples::
-        >>> ds = process_dual_graph(_test_xr_dataset())
-        >>> np.isclose(ds.depth.values, np.array([2, 3]), atol=1e-6).all()
+        >>> ds = dual_graph_ds_from_mesh_ds(_test_xr_dataset())
+        >>> np.isclose(ds.depth.values, np.array([2, 3, 4-1/3]), atol=1e-6).all()
         True
-        >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3]), atol=1e-6).all()
+        >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3, -1 - 1/3]), atol=1e-6).all()
         True
-        >>> np.isclose(ds.x.values, np.array([1, 2]), atol=1e-6).all()
+        >>> np.isclose(ds.x.values, np.array([1, 2, 3 - 1/3]), atol=1e-6).all()
         True
-        >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3]]))
+        >>> np.all(ds.element.values - 1 == np.array([[0, 1, 2], [1, 2, 3], [2, 3, 4]]))
         True
-        >>> np.isclose(ds.zeta.values, np.array([[2, 3], [3, 4]]), atol=1e-6).all()
+        >>> np.isclose(ds.zeta.values, np.array([[2, 3, 4-1/3], [3, 4, 5-1/3]]), atol=1e-6).all()
+        True
+        >>> np.isclose(ds.depth_grad.values, np.array([[1, 1, 1], [0, 0, 0]]), atol=1e-6).all()
+        True
+        >>> np.isclose(ds.zeta_grad.values, np.array([[[1, 1, 1], [1, 1, 1]], [[0, 0, 0], [0, 0, 0]]]), atol=1e-6).all()
         True
     """
     # ds = xr_loader(path)
-    dg = dual_graph_dataset(ds.element.values - 1)
-    for val in ["x", "y", "depth"]:  # static fields
+    # get base object from the triangular elements
+
+    dg = dual_graph_ds_base_from_triangles(
+        ds.element.values - 1, ds.x.values, ds.y.values
+    )
+    # calculate the mean for static node features
+    for val in ["depth"]:  # static fields # "x", "y",s
         dg[val] = (
             ["nele"],
             mean_for_triangle(ds[val].values, ds["element"].values - 1),
         )
-    for val in ["zeta"]:  # time varying fields
-        dg[val] = (
-            ["time", "nele"],
-            np.mean(ds[val].values[:, ds["element"].values - 1], axis=2),
+    if take_grad:
+        # calculate the gradient of the depth in x and y
+        dg["depth_grad"] = (
+            ["direction", "nele"],  # this might be the wrong way round
+            grad_for_triangle_static(
+                ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
+            ),
         )
-    # calculate the gradient of the depth
-    dg["depth_grad"] = (
-        ["direction", "nele"],
-        grad_for_triangle(
-            ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
-        ),
-    )
+    variable_names = ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"]
+    # calculate the gradient of the zeta in x and y
+    # ds["time"] = ("time", ds["time"].values)
+    # assign time coordinate
+    dg = dg.assign_coords({"time": ds.time.values})
+    for variable in variable_names:
+        if variable in ds:
+            dg[variable] = (
+                ["time", "nele"],
+                np.mean(ds[variable].values[:, ds.element.values - 1], axis=2),
+            )
+            # calculate the gradient for the variable in x and y
+            if take_grad:
+                dg[f"{variable}_grad"] = (
+                    ["direction", "time", "nele"],
+                    grad_for_triangle_timeseries(
+                        ds.x.values,
+                        ds.y.values,
+                        ds[variable].values,
+                        ds.element.values - 1,
+                    ),
+                )
+
     return dg.assign_coords({"direction": ["x", "y"]})
 
 
+@timeit
+def dual_graph_ds_from_mesh_ds_from_path(
+    path: str = os.path.join(DATA_PATH, "exp_0049"),
+    bbox: BoundingBox = None,
+    use_dask: bool = True,
+    take_grad: bool = False,
+) -> xr.Dataset:
+    """
+    Process the dual graph from a path to the fort.*.nc files.
+
+    Args:
+        path (str, optional): Defaults to DATA_PATH
+        bbox (BoundingBox, optional): Bounding box to filter the data. Defaults to NO_BBOX.
+        use_dask (bool, optional): Whether to use dask. Defaults to True.
+        take_grad (bool, optional): Whether to calculate the gradient of the variables. Defaults to False.
+
+    Raises:
+        FileNotFoundError: If the fort.*.nc files do not exist. for * in [63, 64, 73, 74].
+
+    Returns:
+        xr.Dataset: Dual graph dataset.
+    """
+    # load the set of adcirc data
+    # and process to the dual graph
+    var_from_file_d = {
+        "63": ["zeta", "depth", "element", "x", "y", "time"],
+        "64": ["u-vel", "v-vel"],
+        "73": ["pressure"],
+        "74": ["windx", "windy"],
+    }
+    paths = {
+        var: os.path.join(path, f"fort.{var}.nc") for var in var_from_file_d.keys()
+    }
+    ds_l = []
+    for var in var_from_file_d.keys():
+        if not os.path.exists(paths[var]):
+            raise FileNotFoundError(f"File {paths[var]} does not exist.")
+        else:
+            if bbox is not None:
+                ds_l += [
+                    bbox_mesh(paths[var], bbox, use_dask=use_dask)[var_from_file_d[var]]
+                ]
+            else:
+                ds_l += [xr_loader(paths[var], use_dask=use_dask)[var_from_file_d[var]]]
+    print(ds_l)
+
+    return dual_graph_ds_from_mesh_ds(xr.merge(ds_l), take_grad=take_grad)
+
+
+# not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
+
+
 def mean_for_triangle(
-    values: np.ndarray, triangles: np.ndarray, mean_axis=1
+    values: np.ndarray,
+    triangles: np.ndarray,
 ) -> np.ndarray:
     """
     Calculate the mean value for each triangle.
@@ -356,54 +615,201 @@ def mean_for_triangle(
     return np.mean(values[triangles], axis=1)
 
 
-def grad_for_triangle(
-    x_lon: np.ndarray, y_lat: np.ndarray, values: np.ndarray, triangles: np.ndarray
+def grad_for_triangle_static(
+    x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
 ) -> np.ndarray:
     """
-    Calculate the gradient of the values for each triangle.
+    Calculate the gradient of z-values for each triangle,
+    assuming z_values has shape (N,).
 
-    Three points define a plane, so we can calculate the gradient of the plane.
+    Three points define a plane, so we can calculate the
+    gradient of that plane (dz/dx, dz/dy).
 
     Args:
-        x_lon (np.ndarray): N array of longitudes. The x values.
-        y_lat (np.ndarray): N array of latitudes. The y values.
-        values (np.ndarray): N array of values. The z values.
-        triangles (np.ndarray): Mx3 array of triangle indices. The indices of each plane.
+        x_lon (np.ndarray): (N,) array of x-coordinates.
+        y_lat (np.ndarray): (N,) array of y-coordinates.
+        z_values (np.ndarray): (N,) array of z-values.
+        triangles (np.ndarray): (M, 3) array of triangle indices.
 
     Returns:
-        np.ndarray: 2xM array of gradients (dz/dx, dz/dy) for each triangle.
+        np.ndarray of shape (2, M):
+            [0, :] -> dz/dx for each triangle
+            [1, :] -> dz/dy for each triangle
 
-    Examples::
-        >>> np.all(np.isclose(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 1, 0]), np.array([[0, 1, 2]])), np.array([[-1], [0]]), atol=1e-6))
+    Examples:
+        >>> import numpy as np
+        >>> # First test
+        >>> np.all(
+        ...   np.isclose(
+        ...     grad_for_triangle_static(
+        ...         np.array([0, 0, 1]),
+        ...         np.array([0, 1, 0]),
+        ...         np.array([1, 1, 0]),
+        ...         np.array([[0, 1, 2]])
+        ...     ),
+        ...     np.array([[-1], [0]]),
+        ...     atol=1e-6
+        ...   )
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-1], [-1]]))
+
+        >>> # Second test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([1, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[-1], [-1]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 2]), np.array([0, 2, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2], [1, 2, 0]])) == np.array([[-0.5, -0.5], [-0.5, -0.5]]))
+
+        >>> # Third test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 2]),
+        ...     np.array([0, 2, 0]),
+        ...     np.array([1, 0, 0]),
+        ...     np.array([[0, 1, 2], [1, 2, 0]])
+        ...   ) == np.array([[-0.5, -0.5], [-0.5, -0.5]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 0.5]), np.array([0, 0.5, 0]), np.array([1, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-2], [-2]]))
+
+        >>> # Fourth test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 0.5]),
+        ...     np.array([0, 0.5, 0]),
+        ...     np.array([1, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[-2], [-2]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 0.5]), np.array([0, 0.5, 0]), np.array([2, 0, 0]), np.array([[0, 1, 2]])) == np.array([[-4], [-4]]))
+
+        >>> # Fifth test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 0.5]),
+        ...     np.array([0, 0.5, 0]),
+        ...     np.array([2, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[-4], [-4]])
+        ... )
         True
-        >>> np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 0, 0]), np.array([[0, 1, 2]])) == np.array([[0], [0]]))
+
+        >>> # Sixth test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([0, 0, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[0], [0]])
+        ... )
         True
-        >>> assert np.all(grad_for_triangle(np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([0, 1, 0]), np.array([[0, 1, 2]])) == np.array([[0], [1]]))
+
+        >>> # Seventh test
+        >>> np.all(
+        ...   grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([[0, 1, 2]])
+        ...   ) == np.array([[0], [1]])
+        ... )
+        True
     """
-    x = x_lon[triangles]  # Mx3
-    y = y_lat[triangles]  # Mx3
-    z = values[triangles]  # Mx3
+    # M x 3 arrays of node coordinates/values
+    x = x_lon[triangles]  # (M, 3)
+    y = y_lat[triangles]  # (M, 3)
+    z = z_values[triangles]  # (M, 3)
 
-    # get normal vectors
-    c = np.stack((x, y, z), axis=2)  # stack the x, y, z values into columns (Mx3x3)
-    # (B-A) x (C-A)
-    normal = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)  # Mx3
-    # To avoid dividing by zero in case the triangles are degenerate
+    # Stack into shape (M, 3, 3): [ (xA,yA,zA), (xB,yB,zB), (xC,yC,zC) ]
+    c = np.stack((x, y, z), axis=2)
+    # normal = (B - A) x (C - A)
+    normal = np.cross(c[:, 1] - c[:, 0], c[:, 2] - c[:, 0], axis=1)  # (M, 3)
+
     with np.errstate(divide="ignore", invalid="ignore"):
-        grad_x = -normal[:, 0] / normal[:, 2]  # dz/dx  # M
-        grad_y = -normal[:, 1] / normal[:, 2]  # dz/dy  # M
-    return np.stack((grad_x, grad_y))  # 2xM
+        grad_x = -normal[:, 0] / normal[:, 2]  # (M,)
+        grad_y = -normal[:, 1] / normal[:, 2]  # (M,)
+
+    return np.stack((grad_x, grad_y))  # (2, M)
 
 
-# print(xr_loader("../data/fort.63.nc", use_dask=False))
+def grad_for_triangle_timeseries(
+    x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
+) -> np.ndarray:
+    """
+    Calculate the gradient of z-values for each triangle,
+    assuming z_values has shape (T, N).
+
+    Three points define a plane, so we can calculate the
+    gradient (dz/dx, dz/dy). We do it for each of the T time steps.
+
+    Args:
+        x_lon (np.ndarray): (N,) array of x-coordinates.
+        y_lat (np.ndarray): (N,) array of y-coordinates.
+        z_values (np.ndarray): (T, N) array of z-values at each of T times.
+        triangles (np.ndarray): (M, 3) array of triangle indices.
+
+    Returns:
+        np.ndarray of shape (2, T, M):
+            [0, t, m] -> dz/dx for triangle m at time t
+            [1, t, m] -> dz/dy for triangle m at time t
+
+    Examples:
+        >>> import numpy as np
+        >>> # Suppose we have T=2 snapshots and N=3 nodes
+        >>> zt = np.array([
+        ...     [1, 1, 0],  # time=0
+        ...     [0, 1, 0]   # time=1
+        ... ])
+        >>> tri = np.array([[0, 1, 2]])
+        >>> result = grad_for_triangle_timeseries(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     zt,
+        ...     tri
+        ... )
+        >>> result.shape
+        (2, 2, 1)
+        >>> # We can also test that the first time-step's gradient
+        >>> # matches grad_for_triangle_static if we pass in the same z-values
+        >>> static_grad = grad_for_triangle_static(
+        ...     np.array([0, 0, 1]),
+        ...     np.array([0, 1, 0]),
+        ...     np.array([1, 1, 0]),
+        ...     tri
+        ... )
+        >>> np.allclose(result[:, 0, :], static_grad)  # compare time=0 vs static
+        True
+    """
+    T = z_values.shape[0]  # number of time steps
+    # M, 3 for the triangle indices
+    x = x_lon[triangles]
+    y = y_lat[triangles]
+
+    # z becomes (T, M, 3) after indexing
+    z = z_values[:, triangles]  # shape: (T, M, 3)
+
+    # Broadcast x, y to shape (1, M, 3) so that they match (T, M, 3)
+    x3 = np.repeat(x[np.newaxis, :, :], T, axis=0)  # shape: (T, M, 3)
+    y3 = np.repeat(y[np.newaxis, :, :], T, axis=0)  # shape: (T, M, 3)
+
+    # Combine into shape (T, M, 3, 3)
+    c = np.stack((x3, y3, z), axis=-1)  # (T, M, 3, 3)
+
+    # normal = cross((B - A), (C - A)) for each time and triangle
+    normal = np.cross(
+        c[..., 1, :] - c[..., 0, :], c[..., 2, :] - c[..., 0, :], axis=-1
+    )  # (T, M, 3)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        grad_x = -normal[..., 0] / normal[..., 2]  # (T, M)
+        grad_y = -normal[..., 1] / normal[..., 2]  # (T, M)
+
+    # shape: (2, T, M)
+    return np.stack((grad_x, grad_y), axis=0)
 
 
 @timeit
@@ -500,9 +906,13 @@ def filter_mesh(adc_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
     return adc_ds_n
 
 
+def filter_dual_graph(dg_ds: xr.Dataset, indices: np.ndarray) -> xr.Dataset:
+    raise NotImplementedError("Not yet implemented.")
+
+
 @timeit
 def bbox_mesh(
-    file_path: str = "../data/fort.63.nc",
+    file_path: str = os.path.join(DATA_PATH, "fort.63.nc"),  # "../data/fort.63.nc",
     bbox: BoundingBox = NO_BBOX,
     use_dask: bool = True,
 ) -> xr.Dataset:
@@ -526,22 +936,6 @@ def bbox_mesh(
     both_in = xs_in & ys_in
     indices = np.where(both_in)[0]  # surviving old labels
     return filter_mesh(adc_ds, indices)
-    """
-    new_indices = np.where(indices)[0]  # new labels
-    neg_indices = np.where(~both_in)[0]  # indices to get rid of
-    elements = adc_ds.element.values - 1  # triangular component mesh
-    mask = ~np.isin(elements, neg_indices).any(axis=1)
-    filtered_elements = elements[mask]
-    mapping = dict(zip(indices, new_indices))
-    relabelled_elements = np.vectorize(mapping.get)(filtered_elements)
-    adc_ds_n = adc_ds.isel(node=indices)
-    del adc_ds_n["element"]  # remove old triangular component mesh
-    adc_ds_n["element"] = ( # add new triangular component mesh
-        ["nele", "nvertex"],
-        relabelled_elements + 1,
-    )  # add new triangular component mesh
-    return adc_ds_n
-    """
 
 
 @timeit
@@ -640,9 +1034,11 @@ def plot_contour(
 if __name__ == "__main__":
     # python -m adforce.mesh
     # bbox_mesh()
-    print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
-    print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
-    print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[0, 1, 2], [1, 2, 3]]), 4, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 3, sparse=False))
+    # print(calculate_adjacency_matrix(np.array([[0, 1, 2]]), 5, sparse=False))
     # print(calculate_adjacency_matrix(np.array([[]]), 2, sparse=False))
-    print(process_dual_graph(xr_loader(FORT63_EXAMPLE)))
-    print(xr_loader(FORT63_EXAMPLE))
+    # dg_ex = dual_graph_ds_from_mesh_ds(xr_loader(FORT63_EXAMPLE))
+    # dg_ex.to_netcdf(os.path.join(DATA_PATH, "fort.63.dual.nc"))
+    # print(xr_loader(FORT63_EXAMPLE))
+    print(dual_graph_ds_from_mesh_ds_from_path())

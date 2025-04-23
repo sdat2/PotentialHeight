@@ -2,7 +2,11 @@
 
 import os
 from pathlib import Path
+from pyproj import Geod
 from sithom.place import BoundingBox, Point
+
+# Let's assume a simple Geod for all calculations (won't make much difference)
+GEOD = Geod(ellps="WGS84")
 
 # regional bounding boxes for ERA5 download.
 # Gulf of Mexico box (lons, lats)

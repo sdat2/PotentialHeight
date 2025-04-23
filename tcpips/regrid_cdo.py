@@ -1,3 +1,9 @@
+"""
+Regrid CMIP6 data using CDO
+
+This script provides functionality to regrid CMIP6 data using the Climate Data Operators (CDO) tool.
+"""
+
 import os
 from sithom.time import timeit
 from .constants import CONFIG_PATH, CDO_PATH, RAW_PATH
@@ -5,6 +11,20 @@ from .files import locker
 
 
 def call_cdo(input_path: str, output_path: str) -> None:
+    """
+    Call cdo to regrid the input file to the output file.
+
+    This function uses the cdo command line tool to regrid the input file
+    to the output file. It first prints the header of the input file, then
+    deletes the unnecessary coordinates, and finally remaps the file
+    bilinearly using cdo. The output file is saved in the specified
+    output path. The temporary file created during the process is deleted
+    after the process is completed.
+
+    Args:
+        input_path (str): Path to the input file.
+        output_path (str): Path to the output file.
+    """
     os.system(f"ncdump -h {input_path}")
     # delete the misnamed coordinates (xmip's fault?)
     os.system(
@@ -29,6 +49,19 @@ def regrid_cmip6_part(
     model: str = "CESM2",
     member: str = "r4i1p1f1",
 ) -> None:
+    """
+    Regrid CMIP6 part of the experiment.
+    This function regrids the CMIP6 part of the experiment using the
+    CDO tool. It takes the experiment, type, model, and member as input
+    parameters. It constructs the input and output paths based on these
+    parameters and calls the CDO function to perform the regridding.
+
+    Args:
+        exp (str, optional): Experiment name. Defaults to "ssp585".
+        typ (str, optional): Type of data. Defaults to "ocean".
+        model (str, optional): Model name. Defaults to "CESM2".
+        member (str, optional): Member name. Defaults to "r4i1p1f1".
+    """
     print(f"exp:{exp} typ:{typ} model:{model} member:{member}")
     in_path = os.path.join(RAW_PATH, exp, typ, model, member) + ".nc"
     folder = os.path.join(CDO_PATH, exp, typ, model)
