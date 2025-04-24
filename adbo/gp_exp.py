@@ -8,8 +8,13 @@ import tensorflow_probability as tfp
 import gpflow
 from .constants import DATA_PATH, EXP_PATH
 
+# from tf.keras.metrics import R2Score, RootMeanSquaredError
 
-def gather_data(columns=["displacement", "bearing", "angle", "res"]) -> None:
+
+SAVE_DATA_PATH = os.path.join(DATA_PATH, "gpr_data.csv")
+
+
+def gather_data(columns=["angle", "displacement", "trans_speed", "res"]) -> None:
     """Gather data from existing experiments.
 
     Get all the LHS samples from the 3D experiments.
@@ -17,7 +22,6 @@ def gather_data(columns=["displacement", "bearing", "angle", "res"]) -> None:
     Save it all as a large csv file
     x(displacement, bearing, angle), z (maximum storm height).
     """
-    save_data_path = os.path.join(DATA_PATH, "gpr_data.csv")
     print(f"Gathering data from {EXP_PATH} to {save_data_path}.")
     df = pd.DataFrame(columns=columns)  # create empty dataframe
     for i, b in [(1, 49), (3, 47), (25, 25), (50, 0)]:
@@ -28,7 +32,7 @@ def gather_data(columns=["displacement", "bearing", "angle", "res"]) -> None:
                 name = f"i{i}b{b}t{t}"
             exp_file_path = os.path.join(EXP_PATH, name, "experiments.json")
             if os.path.exists(exp_file_path):
-                tmp_df = pd.read_json(j, orient="index").iloc[
+                tmp_df = pd.read_json(exp_file_path, orient="index").iloc[
                     :i
                 ]  # rows come from "0","1",…
                 # drop the stray column whose name is the empty string
@@ -42,13 +46,25 @@ def gather_data(columns=["displacement", "bearing", "angle", "res"]) -> None:
     df = df.drop_duplicates()
     # remove rows with NaN values
     df = df.dropna()
-    df.to_csv(save_data_path, index=False)  # create empty csv file
+    df.to_csv(SAVE_DATA_PATH, index=False)  # create empty csv file
+
+
+def load_data(data_path: str = SAVE_DATA_PATH) -> pd.DataFrame:
+    """Load data from a csv file.
+    Args:
+        data_path (str): Path to the csv file.
+    Returns:
+        pd.DataFrame: Dataframe containing the data.
+    """
+    if not os.path.exists(data_path):
+        gather_data()
+    return pd.read_csv(data_path)
 
 
 def log_likelihood(
     model: gpflow.models.GPR, x_test: np.ndarray, y_test: np.ndarray, noisy: bool = True
 ) -> float:
-    """Return the sum of predictive log-likelihood on a test set.
+    """Return the mean of predictive log-likelihood on a test set.
 
     Args:
         model (gpflow.models.GPR): The GP model.
@@ -66,7 +82,7 @@ def log_likelihood(
 
     dist = tfp.distributions.Normal(loc=mu, scale=tf.sqrt(var))
     logdens = dist.log_prob(y_test)  # shape (N, 1)
-    return tf.reduce_sum(logdens)  # or tf.reduce_means(logdens)
+    return tf.reduce_mean(logdens)  # or tf.reduce_mean(logdens) .reduce_sum(logdens)
 
 
 def fit_gp(
@@ -167,14 +183,60 @@ def fit_gp(
     return model
 
 
-if __name__ == "__main__":
-    # gather_data()
-    gather_data()
-    print(
-        fit_gp(
-            x=np.random.rand(100, 3),
-            y=np.random.rand(100, 1),
-            kernel="Matern52",
-            mean_function="Constant",
-        )
+def run_exp():
+    """Run the experiment.
+
+    - Scale the data.
+    - Split the data into training and test sets.
+    - Fit the GP model to the training set.
+    - Evaluate the model on the test set (log liklihood, r2, rmse).
+    - Save the results in a csv file.
+    """
+    # load data
+    df = load_data()
+    # scale data
+    x = df[["angle", "displacement", "trans_speed"]].values
+    y = df["res"].values.reshape(-1, 1)
+    x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
+    # y = (y - np.mean(y)) / np.std(y)
+
+    # split data into training and test sets
+    n_train = int(0.8 * len(x))
+    x_train, x_test = x[:n_train], x[n_train:]
+    y_train, y_test = y[:n_train], y[n_train:]
+
+    # fit GP model
+    model = fit_gp(x_train, y_train, kernel="Matern52", mean_function="Constant")
+
+    # evaluate model
+    ll = log_likelihood(model, x_test, y_test)
+    y_pred, var = model.predict_y(x_test)  # includes likelihood noise
+    rmse = np.sqrt(
+        np.mean((y_pred - y_test) ** 2)
+    )  # np.sqrt(mean_squared_error(y_test, model.predict(x_test)))
+    r2 = 1 - (
+        np.sum((y_test - y_pred) ** 2) / np.sum((y_test - np.mean(y_test)) ** 2)
+    )  # 1 - (mean_squared_error(y_test, model.predict(x_test)) / np.var(y_test))
+    print(f"Log likelihood: {ll.numpy()}")
+    print(f"RMSE: {rmse}")
+    print(f"R2: {r2}")
+
+    # save results
+    results = pd.DataFrame(
+        {
+            "kernel": ["Matern52"],
+            "mean_function": ["Constant"],
+            "log_likelihood": [ll.numpy()],
+            "rmse": [rmse],
+            "r2": [r2],
+        }
     )
+    results.to_csv(
+        os.path.join(DATA_PATH, "results.csv"), index=False, mode="a", header=False
+    )
+
+
+if __name__ == "__main__":
+    # python -m adbo.gp_exp &> gp_exp.log
+    # gather_data()
+    run_exp()
