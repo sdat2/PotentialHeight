@@ -1,6 +1,6 @@
 """Dual graph plotting module.
 
-Dual graph mesh things currently"""
+Dual graph functions in .mesh currently"""
 
 import os
 import numpy as np

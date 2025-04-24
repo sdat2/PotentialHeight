@@ -27,6 +27,8 @@ def run_3d_exp() -> None:
     parser.add_argument("--daf_steps", type=int, default=25)
     parser.add_argument("--resolution", type=str, default="mid")
     parser.add_argument("--exp_name", type=str, default="bo")
+    parser.add_argument("--kernel", type=str, default="Matern52")
+    parser.add_argument("--daf", type=strm default="mes") # data acquisition function
 
     # adding ability to override constraints in the command line
     cs = DEFAULT_CONSTRAINTS
@@ -66,6 +68,8 @@ def run_3d_exp() -> None:
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
         wrap_test=args.test,
+        kernel=args.kernel,
+        daf=args.daf,
     )
     print(args)
 

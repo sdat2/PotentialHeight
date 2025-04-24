@@ -2,7 +2,6 @@
 
 TODO: There is a lot of repeated code in the plotting functions. This should be refactored.
 
-TODO: Add geographic plotting options for including cartopy maps with coastlines, etc. if cartopy is installed.
 """
 
 from typing import Optional
@@ -157,6 +156,7 @@ def plot_locations(path: str, ax: plt.Axes, transform=None) -> None:
     ac_lon, ac_lat = config.adcirc.actual_observation_location.value
     imp_lon, imp_lat = config.tc.impact_location.value
     print("Impact Location: ", imp_lon, imp_lat)
+    print("Displacement lon (impact_point - actual)", imp_lon - ac_lon)
     print("Attempted Observation Location: ", at_lon, at_lat)
     print("Actual Observation Location: ", ac_lon, ac_lat)
 
