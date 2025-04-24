@@ -483,11 +483,11 @@ def run_bayesopt_exp(
     initial_data = observer(initial_query_points)
     print("initial_data", initial_data, type(initial_data))
     # set up bayesopt loop
-    if kernel is "Matern52":
+    if kernel == "Matern52":
         gp_kernel = gpflow.kernels.Matern52()
-    elif kernel is "Matern32":
+    elif kernel == "Matern32":
         gp_kernel = gpflow.kernels.Matern32()
-    elif kernel is "SE":
+    elif kernel == "SE":
         gp_kernel = gpflow.kernels.SquaredExponential()
     else:
         raise ValueError(f"Unknown kernel {kernel}")
