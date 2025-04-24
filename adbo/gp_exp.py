@@ -1,9 +1,12 @@
-"""GP experiment module; check the gains from different kernels, and\or different prior mean functions."""
+"""GP experiment module: check the gains from different kernels, and\or different prior mean functions."""
 
 import os
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+import tensorflow_probability as tfp
 import gpflow
+from .constants import DATA_PATH, EXP_PATH
 
 
 def gather_data() -> None:
@@ -14,7 +17,36 @@ def gather_data() -> None:
     Save it all as a large csv file
     x(displacement, bearing, angle), z (maximum storm height).
     """
-    raise NotImplementedError("Gather data not implemented yet.")
+    save_data_path = os.path.join(DATA_PATH, "gpr_data.csv")
+    print(f"Gathering data from {EXP_PATH} to {save_data_path}.")
+    df = pd.DataFrame(
+        columns=["displacement", "bearing", "angle", "storm_height"]
+    )  # create empty dataframe
+    df.to_csv(save_data_path, index=False)  # create empty csv file
+
+
+def log_likelihood(
+    model: gpflow.models.GPR, x_test: np.ndarray, y_test: np.ndarray, noisy: bool = True
+) -> float:
+    """Return the sum of predictive log-likelihood on a test set.
+
+    Args:
+        model (gpflow.models.GPR): The GP model.
+        x_test (np.ndarray): Test input data.
+        y_test (np.ndarray): Test output data.
+        noisy (bool, optional): Whether to include noise in the prediction. Defaults to True.
+
+    Returns:
+        float: The average log-likelihood.
+    """
+    if noisy:
+        mu, var = model.predict_y(x_test)  # includes likelihood noise
+    else:
+        mu, var = model.predict_f(x_test)  # latent/noise-free
+
+    dist = tfp.distributions.Normal(loc=mu, scale=tf.sqrt(var))
+    logdens = dist.log_prob(y_test)  # shape (N, 1)
+    return tf.reduce_sum(logdens)  # or tf.reduce_means(logdens)
 
 
 def fit_gp(
@@ -117,6 +149,7 @@ def fit_gp(
 
 if __name__ == "__main__":
     # gather_data()
+    gather_data()
     print(
         fit_gp(
             x=np.random.rand(100, 3),
