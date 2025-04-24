@@ -9,7 +9,7 @@ import gpflow
 from .constants import DATA_PATH, EXP_PATH
 
 
-def gather_data() -> None:
+def gather_data(columns=["displacement", "bearing", "angle", "res"]) -> None:
     """Gather data from existing experiments.
 
     Get all the LHS samples from the 3D experiments.
@@ -19,9 +19,29 @@ def gather_data() -> None:
     """
     save_data_path = os.path.join(DATA_PATH, "gpr_data.csv")
     print(f"Gathering data from {EXP_PATH} to {save_data_path}.")
-    df = pd.DataFrame(
-        columns=["displacement", "bearing", "angle", "storm_height"]
-    )  # create empty dataframe
+    df = pd.DataFrame(columns=columns)  # create empty dataframe
+    for i, b in [(1, 49), (3, 47), (25, 25), (50, 0)]:
+        for t in range(10):
+            if t == 0:
+                name = f"i{i}b{b}"
+            else:
+                name = f"i{i}b{b}t{t}"
+            exp_file_path = os.path.join(EXP_PATH, name, "experiments.json")
+            if os.path.exists(exp_file_path):
+                tmp_df = pd.read_json(j, orient="index").iloc[
+                    :i
+                ]  # rows come from "0","1",…
+                # drop the stray column whose name is the empty string
+                tmp_df = tmp_df.drop(columns=[""])
+                # put the columns in the order you prefer
+                tmp_df = tmp_df[columns]
+
+                df = pd.concat([df, tmp_df], ignore_index=True)
+
+    # remove duplicates
+    df = df.drop_duplicates()
+    # remove rows with NaN values
+    df = df.dropna()
     df.to_csv(save_data_path, index=False)  # create empty csv file
 
 
