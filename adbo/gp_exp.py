@@ -14,9 +14,19 @@ from .constants import DATA_PATH, EXP_PATH
 
 
 SAVE_DATA_PATH = os.path.join(DATA_PATH, "gpr_data.csv")
+OUTPUT_COLUMNS = [
+    "norm_x",
+    "norm_y",
+    "kernel",
+    "mean_function",
+    "log_likelihood",
+    "rmse",
+    "r2",
+]
+INPUT_COLUMNS = ["angle", "angle", "displacement", "trans_speed", "res"]
 
 
-def gather_data(columns=["angle", "displacement", "trans_speed", "res"]) -> None:
+def gather_data(columns=INPUT_COLUMNS) -> None:
     """Gather data from existing experiments.
 
     Get all the LHS samples from the 3D experiments.
@@ -24,7 +34,7 @@ def gather_data(columns=["angle", "displacement", "trans_speed", "res"]) -> None
     Save it all as a large csv file
     x(displacement, bearing, angle), z (maximum storm height).
     """
-    print(f"Gathering data from {EXP_PATH} to {save_data_path}.")
+    print(f"Gathering data from {EXP_PATH} to {SAVE_DATA_PATH}.")
     df = pd.DataFrame(columns=columns)  # create empty dataframe
     for i, b in [(1, 49), (3, 47), (25, 25), (50, 0)]:
         for t in range(10):
@@ -189,14 +199,24 @@ def fit_gp(
 def run_single_fit(
     norm_x: bool = True,
     norm_y: bool = True,
+    seed: int = 42,
+    n_train: int = 25,
     kernel: str = "Matern52",
     mean_function: str = "Constant",
 ) -> None:
+    """Run a single fit of the GP model.
+
+    Args:
+        norm_x (bool, optional): Whether to normalize x. Defaults to True.
+        norm_y (bool, optional): Whether to normalize y. Defaults to True.
+        kernel (str, optional): Kernel to use. Defaults to "Matern52".
+        mean_function (str, optional): Mean function to use. Defaults to "Constant".
+    """
 
     df = load_data()
     # scale data
-    x = df[["angle", "displacement", "trans_speed"]].values
-    y = df["res"].values.reshape(-1, 1)
+    x = df[INPUT_COLUMNS[:-1]].values
+    y = df[INPUT_COLUMNS[-1]].values.reshape(-1, 1)
     x_mean = np.mean(x, axis=0)
     x_std = np.std(x, axis=0)
     y_mean = np.mean(y)
@@ -209,7 +229,15 @@ def run_single_fit(
     # y = (y - np.mean(y)) / np.std(y)
 
     # split data into training and test sets
-    n_train = int(0.8 * len(x))
+    # n_train = int(0.8 * len(x))
+    print(f"Training on {n_train} samples, testing on {len(x) - n_train} samples.")
+    # shuffle data
+    idx = np.arange(len(x))
+    np.random.seed(seed)
+    np.random.shuffle(idx)
+    x = x[idx]
+    y = y[idx]
+    # split data
     x_train, x_test = x[:n_train], x[n_train:]
     y_train, y_test = y[:n_train], y[n_train:]
 
@@ -224,6 +252,7 @@ def run_single_fit(
     )  # np.sqrt(mean_squared_error(y_test, model.predict(x_test)))
     if norm_y:
         rmse = rmse * y_std  # unscale rmse
+        ll = ll - tf.math.log(y_std)  # unscale log likelihood
     r2 = 1 - (
         np.sum((y_test - y_pred) ** 2) / np.sum((y_test - np.mean(y_test)) ** 2)
     )  # 1 - (mean_squared_error(y_test, model.predict(x_test)) / np.var(y_test))
@@ -246,48 +275,67 @@ def run_single_fit(
 
 
 @timeit
-def run_exp():
+def run_exp(
+    kernels: tuple = ("Matern52", "Matern12", "SE", "RationalQuadratic"),
+    mean_functions: tuple = (
+        "Constant",
+        "Linear",
+        "Polynomial",
+        "Zero",
+        "Exponential",
+        "Periodic",
+    ),
+    n_train: int = 25,
+) -> None:
     """Run the experiment.
 
     - Scale the data.
     - Split the data into training and test sets.
     - Fit the GP model to the training set.
     - Evaluate the model on the test set (log liklihood, r2, rmse).
-    - Save the results in a csv file.
+    - Save the results in a csv file and a tex file.
     """
-    results = pd.DataFrame(
-        columns=[
-            "norm_x",
-            "norm_y",
-            "kernel",
-            "mean_function",
-            "log_likelihood",
-            "rmse",
-            "r2",
-        ]
-    )
+    results = pd.DataFrame(columns=OUTPUT_COLUMNS)
     for norm_x in [True, False]:
         for norm_y in [True, False]:
-            for kernel in ["Matern52", "Matern12", "SE", "RationalQuadratic"]:
-                for mean_function in [
-                    "Constant",
-                    "Linear",
-                    "Polynomial",
-                    "Zero",
-                    "Exponential",
-                    "Periodic",
-                ]:
-                    print(
-                        f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}"
-                    )
+            for kernel in kernels:
+                for mean_function in mean_functions:
+                    # empty tmp dataframe
+                    tmp_results = pd.DataFrame(columns=OUTPUT_COLUMNS)
+                    for seed in range(100):
+                        print(
+                            f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}"
+                        )
+                        tmp_results = pd.concat(
+                            [
+                                tmp_results,
+                                run_single_fit(
+                                    seed=seed,
+                                    norm_x=norm_x,
+                                    norm_y=norm_y,
+                                    kernel=kernel,
+                                    mean_function=mean_function,
+                                ),
+                            ],
+                            ignore_index=True,
+                        )
+                    # TODO: Change this to add in standard deviation of the mean as well
+
                     results = pd.concat(
                         [
                             results,
-                            run_single_fit(
-                                norm_x=norm_x,
-                                norm_y=norm_y,
-                                kernel=kernel,
-                                mean_function=mean_function,
+                            pd.DataFrame(
+                                {
+                                    "norm_x": [norm_x],
+                                    "norm_y": [norm_y],
+                                    "kernel": [kernel],
+                                    "mean_function": [mean_function],
+                                    "log_likelihood": [
+                                        tmp_results["log_likelihood"].mean()
+                                    ],
+                                    "rmse": [tmp_results["rmse"].mean()],
+                                    "r2": [tmp_results["r2"].mean()],
+                                }
                             ),
                         ],
                         ignore_index=True,
@@ -295,11 +343,11 @@ def run_exp():
 
     # load data
     results.to_csv(
-        os.path.join(DATA_PATH, "gp_results.csv"),
+        os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.csv"),
         index=False,
     )
     results.to_latex(
-        os.path.join(DATA_PATH, "gp_results.tex"),
+        os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.tex"),
         index=False,
     )
 
@@ -307,4 +355,4 @@ def run_exp():
 if __name__ == "__main__":
     # python -m adbo.gp_exp &> gp_exp.log
     # gather_data()
-    run_exp()
+    run_exp(kernels=("Matern52",), mean_functions=("Constant",), n_train=25)
