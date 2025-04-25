@@ -20,8 +20,11 @@ OUTPUT_COLUMNS = [
     "kernel",
     "mean_function",
     "log_likelihood",
+    "log_likelihood_sem",
     "rmse",
+    "rmse_sem",
     "r2",
+    "r2_sem",
 ]
 INPUT_COLUMNS = ["angle", "angle", "displacement", "trans_speed", "res"]
 
@@ -242,7 +245,7 @@ def run_single_fit(
     y_train, y_test = y[:n_train], y[n_train:]
 
     # fit GP model
-    model = fit_gp(x_train, y_train, kernel="Matern52", mean_function="Constant")
+    model = fit_gp(x_train, y_train, kernel=kernel, mean_function=mean_function)
 
     # evaluate model
     ll = log_likelihood(model, x_test, y_test)
@@ -286,6 +289,7 @@ def run_exp(
         "Periodic",
     ),
     n_train: int = 25,
+    repeats: int = 100,
 ) -> None:
     """Run the experiment.
 
@@ -295,16 +299,29 @@ def run_exp(
     - Evaluate the model on the test set (log liklihood, r2, rmse).
     - Save the results in a csv file and a tex file.
     """
-    results = pd.DataFrame(columns=OUTPUT_COLUMNS)
+    results = pd.DataFrame(
+        columns=[
+            "norm_x",
+            "norm_y",
+            "kernel",
+            "mean_function",
+            "log_likelihood",
+            "log_likelihood_sem",
+            "rmse",
+            "rmse_sem",
+            "r2",
+            "r2_sem",
+        ]
+    )
     for norm_x in [True, False]:
         for norm_y in [True, False]:
             for kernel in kernels:
                 for mean_function in mean_functions:
                     # empty tmp dataframe
                     tmp_results = pd.DataFrame(columns=OUTPUT_COLUMNS)
-                    for seed in range(100):
+                    for seed in range(repeats):
                         print(
-                            f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}"
+                            f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}, seed={seed}, n_train={n_train}"
                         )
                         tmp_results = pd.concat(
                             [
@@ -315,12 +332,12 @@ def run_exp(
                                     norm_y=norm_y,
                                     kernel=kernel,
                                     mean_function=mean_function,
+                                    n_train=n_train,
                                 ),
                             ],
                             ignore_index=True,
                         )
-                    # TODO: Change this to add in standard deviation of the mean as well
-
+                    # Store mean and SEM for each metric
                     results = pd.concat(
                         [
                             results,
@@ -333,26 +350,110 @@ def run_exp(
                                     "log_likelihood": [
                                         tmp_results["log_likelihood"].mean()
                                     ],
+                                    "log_likelihood_sem": [
+                                        tmp_results["log_likelihood"].std(ddof=1)
+                                        / np.sqrt(len(tmp_results))
+                                    ],
                                     "rmse": [tmp_results["rmse"].mean()],
+                                    "rmse_sem": [
+                                        tmp_results["rmse"].std(ddof=1)
+                                        / np.sqrt(len(tmp_results))
+                                    ],
                                     "r2": [tmp_results["r2"].mean()],
+                                    "r2_sem": [
+                                        tmp_results["r2"].std(ddof=1)
+                                        / np.sqrt(len(tmp_results))
+                                    ],
                                 }
                             ),
                         ],
                         ignore_index=True,
                     )
 
-    # load data
+    # --- format <mean ± SEM> strings for LaTeX output, bolding the best ---
+    pretty = results.copy()
+
+    # nice kernel names for LaTeX
+    pretty["kernel"] = (
+        pretty["kernel"]
+        .str.replace("Matern52", r"Matern-\(\frac{5}{2}\)")
+        .str.replace("Matern32", r"Matern-\(\frac{3}{2}\)")
+        .str.replace("Matern12", r"Matern-\(\frac{1}{2}\)")
+        .str.replace("SE", "SE")
+    )
+
+    # find best values
+    best_vals = {
+        "log_likelihood": results["log_likelihood"].max(),  # highest is best
+        "rmse": results["rmse"].min(),  # lowest is best
+        "r2": results["r2"].max(),  # highest is best
+    }
+
+    # helper: format mean ± sem, bold if mean equals best (allow tiny tol)
+    def fmt_val(metric, mean, sem):
+        base = f"{mean:.3f} $\\pm$ {sem:.3f}"
+        if abs(mean - best_vals[metric]) < 1e-9:
+            return f"\\textbf{{{mean:.3f}}} \\(\\pm\\) \\textbf{{sem:.3f}}"
+        return base
+
+    for metric in ("log_likelihood", "rmse", "r2"):
+        sem_col = metric + "_sem"
+        pretty[metric] = pretty.apply(
+            lambda row, m=metric: fmt_val(m, row[m], row[sem_col]), axis=1
+        )
+        pretty = pretty.drop(columns=[sem_col])
+
+    # rename columns for LaTeX header
+    pretty = pretty.rename(
+        columns={
+            "log_likelihood": r"Mean Log Likelihood \(\bar{\mathcal{L}}\) ",
+            "rmse": "RMSE [m]",
+            "r2": r"\(r^2\)",
+            "kernel": "Kernel",
+            "mean_function": "Mean Function",
+            "norm_x": "Norm. $x$",
+            "norm_y": "Norm. $y$",
+        }
+    )
+
+    # write plain CSV with all columns
     results.to_csv(
         os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.csv"),
         index=False,
     )
-    results.to_latex(
+    # write LaTeX table with pretty strings
+    pretty.to_latex(
         os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.tex"),
         index=False,
+        escape=False,
     )
+    return  # end of run_exp
 
 
 if __name__ == "__main__":
     # python -m adbo.gp_exp &> gp_exp.log
     # gather_data()
-    run_exp(kernels=("Matern52",), mean_functions=("Constant",), n_train=25)
+    # run_exp(kernels=("Matern52",), mean_functions=("Constant",), n_train=25)
+    run_exp(
+        kernels=(
+            "Matern52",
+            "Matern12",
+            "SE",
+            # "RationalQuadratic",
+            "Exponential",
+            # "Linear",
+            # "Periodic",
+            "Polynomial",
+            # "Constant",
+            # "White",
+        ),
+        mean_functions=(
+            "Constant",
+            # "Linear",
+            # "Polynomial",
+            "Zero",
+            # "Exponential",
+            # "Periodic",
+        ),
+        n_train=25,
+    )
