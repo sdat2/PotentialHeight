@@ -6,6 +6,8 @@ import pandas as pd
 import tensorflow as tf
 import tensorflow_probability as tfp
 import gpflow
+from sithom.time import timeit
+from sithom.plot import plot_defaults, label_subplots, get_dim
 from .constants import DATA_PATH, EXP_PATH
 
 # from tf.keras.metrics import R2Score, RootMeanSquaredError
@@ -183,21 +185,27 @@ def fit_gp(
     return model
 
 
-def run_exp():
-    """Run the experiment.
+@timeit
+def run_single_fit(
+    norm_x: bool = True,
+    norm_y: bool = True,
+    kernel: str = "Matern52",
+    mean_function: str = "Constant",
+) -> None:
 
-    - Scale the data.
-    - Split the data into training and test sets.
-    - Fit the GP model to the training set.
-    - Evaluate the model on the test set (log liklihood, r2, rmse).
-    - Save the results in a csv file.
-    """
-    # load data
     df = load_data()
     # scale data
     x = df[["angle", "displacement", "trans_speed"]].values
     y = df["res"].values.reshape(-1, 1)
-    x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
+    x_mean = np.mean(x, axis=0)
+    x_std = np.std(x, axis=0)
+    y_mean = np.mean(y)
+    y_std = np.std(y)
+    if norm_x:
+        x = (x - x_mean) / x_std
+    if norm_y:
+        y = (y - y_mean) / y_std
+    # x = (x - np.mean(x, axis=0)) / np.std(x, axis=0)
     # y = (y - np.mean(y)) / np.std(y)
 
     # split data into training and test sets
@@ -214,6 +222,8 @@ def run_exp():
     rmse = np.sqrt(
         np.mean((y_pred - y_test) ** 2)
     )  # np.sqrt(mean_squared_error(y_test, model.predict(x_test)))
+    if norm_y:
+        rmse = rmse * y_std  # unscale rmse
     r2 = 1 - (
         np.sum((y_test - y_pred) ** 2) / np.sum((y_test - np.mean(y_test)) ** 2)
     )  # 1 - (mean_squared_error(y_test, model.predict(x_test)) / np.var(y_test))
@@ -222,17 +232,75 @@ def run_exp():
     print(f"R2: {r2}")
 
     # save results
-    results = pd.DataFrame(
+    return pd.DataFrame(
         {
-            "kernel": ["Matern52"],
-            "mean_function": ["Constant"],
+            "norm_x": [norm_x],
+            "norm_y": [norm_y],
+            "kernel": [kernel],
+            "mean_function": [mean_function],
             "log_likelihood": [ll.numpy()],
             "rmse": [rmse],
             "r2": [r2],
         }
     )
+
+
+@timeit
+def run_exp():
+    """Run the experiment.
+
+    - Scale the data.
+    - Split the data into training and test sets.
+    - Fit the GP model to the training set.
+    - Evaluate the model on the test set (log liklihood, r2, rmse).
+    - Save the results in a csv file.
+    """
+    results = pd.DataFrame(
+        columns=[
+            "norm_x",
+            "norm_y",
+            "kernel",
+            "mean_function",
+            "log_likelihood",
+            "rmse",
+            "r2",
+        ]
+    )
+    for norm_x in [True, False]:
+        for norm_y in [True, False]:
+            for kernel in ["Matern52", "Matern12", "SE", "RationalQuadratic"]:
+                for mean_function in [
+                    "Constant",
+                    "Linear",
+                    "Polynomial",
+                    "Zero",
+                    "Exponential",
+                    "Periodic",
+                ]:
+                    print(
+                        f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}"
+                    )
+                    results = pd.concat(
+                        [
+                            results,
+                            run_single_fit(
+                                norm_x=norm_x,
+                                norm_y=norm_y,
+                                kernel=kernel,
+                                mean_function=mean_function,
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+
+    # load data
     results.to_csv(
-        os.path.join(DATA_PATH, "results.csv"), index=False, mode="a", header=False
+        os.path.join(DATA_PATH, "gp_results.csv"),
+        index=False,
+    )
+    results.to_latex(
+        os.path.join(DATA_PATH, "gp_results.tex"),
+        index=False,
     )
 
 
