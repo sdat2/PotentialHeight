@@ -26,7 +26,9 @@ os.makedirs(DATA_PATH, exist_ok=True)
 AD_PATH = pathlib.Path(
     os.path.dirname(PROJECT_PATH)
 )  # assume adcirc is in the parent directory of the project
-EXP_PATH = os.path.join(AD_PATH, "exp")  # for n02 use AD_PATH, for n01 use PROJECT_PATH
+EXP_PATH = os.path.join(
+    PROJECT_PATH, "exp"
+)  # for n02 use AD_PATH, for n01 use PROJECT_PATH
 os.makedirs(EXP_PATH, exist_ok=True)
 # ROOT: str = "/work/n01/n01/sithom/adcirc-swan/"  # ARCHER2 path, move to constants
 

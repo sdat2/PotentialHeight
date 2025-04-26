@@ -14,7 +14,7 @@ from sithom.plot import plot_defaults, label_subplots, get_dim
 from tcpips.constants import FIGURE_PATH, DATA_PATH
 from adforce.mesh import xr_loader
 from .constants import EXP_PATH, DEFAULT_CONSTRAINTS
-
+from .constants import DATA_PATH as DATA_PATH_ADBO
 
 # from pandas.plotting import parallel_coordinates
 # This might not be a great way of choosing colors
@@ -32,6 +32,8 @@ stationid: List[str] = [
 
 stationid_to_names: Dict[str, str] = {
     "new-orleans": "New Orleans",  # (-90.070, 29.950)
+    "miami": "Miami",  # (-80.191, 25.761)
+    "galverston": "Galveston",  # (-94.797, 29.301)
     "8729840": "Pensacola",  # (-87.211, 30.404)
     "8735180": "Dauphin Island",  #  (-88.075, 30.250)",
     "8760922": "Pilots Station East, S.W. Pass",  # (-89.407, 28.932)",
@@ -993,14 +995,87 @@ def plot_bo_comp() -> None:
     # r"Empirical Regret for dataset $i$ at step $s$, $\max\left(\max\left(\vec{z}^1\right), \cdots \max\left(\vec{z}^n\right)\right) - \max\left(\vec{z}^i_{1,\cdots,s}\right)$ [m]"
 
 
-if __name__ == "__main__":
-    # python -m adbo.plot
+def make_argmax_table():
+    """We want to make a table of the argmax values for each experiment.
+
+    columns:
+        - Name (e.g New Orleans, Galverston, Miami)
+        - Year (e.g 2015, 2100)
+        - Trial (e.g 0, 1, 2)
+        - Argmax index (1 to 50)
+        - Displacement
+        - Angle
+        - Translation Speed
+        - Max SSH
+    """
+    df = pd.DataFrame(
+        columns=[
+            "Name",
+            "Year",
+            "Trial",
+            "Argmax index",
+            "Displacement",
+            "Angle",
+            "Translation Speed [m s$^{-1}$]",
+            "Max SSH [m]",
+        ]
+    )
     for point in ["new-orleans", "miami", "galverston"]:
-        plot_diff(
-            exps=(f"{point}-2015", f"{point}-2100"),
-            figure_name=f"2015-vs-2100-{point}.pdf",
-        )
-    plt.clf()
+        for year in ["2015", "2100"]:
+            for trial in range(11):
+                if trial == 0:
+                    exp_name = f"{point}-{year}"
+                else:
+                    exp_name = f"{point}-{year}-{trial}"
+                if not os.path.exists(os.path.join(EXP_PATH, exp_name)):
+                    print(f"Experiment {exp_name} does not exist.")
+                    continue
+                else:
+                    exp = read_json(
+                        os.path.join(EXP_PATH, exp_name, "experiments.json")
+                    )
+                    # calls = list(exp.keys())
+                    res = listify(exp, "res")
+                    max_res = max(res)
+                    argmax_index = res.index(max_res)
+                    displacement = listify(exp, "displacement")[argmax_index]
+                    angle = listify(exp, "angle")[argmax_index]
+                    trans_speed = listify(exp, "trans_speed")[argmax_index]
+                    df = pd.concat(
+                        [
+                            df,
+                            pd.DataFrame(
+                                {
+                                    "Name": [stationid_to_names[point]],
+                                    "Year": [year],
+                                    "Trial": [trial],
+                                    r"\(i\)": [argmax_index],
+                                    r"Displacement \(c\)": [displacement],
+                                    r"Angle [\(^{\circ}\)]": [angle],
+                                    r"Translation Speed [m s\(^{-1}\)]": [trans_speed],
+                                    "Max SSH [m]": [max_res],
+                                }
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
+    # save to csv
+    df.to_csv(os.path.join(DATA_PATH_ADBO, "argmax_table.csv"), index=False)
+    df.to_latex(
+        os.path.join(DATA_PATH_ADBO, "argmax_table.tex"), index=False, escape=False
+    )  # decimal=3,
+    # TODO: also trigger animation using adforce.ani to plot the worst case scenario from each trial.
+
+
+if __name__ == "__main__":
+    make_argmax_table()
+    # python -m adbo.plot
+    # for point in ["new-orleans", "miami", "galverston"]:
+    #    plot_diff(
+    #        exps=(f"{point}-2015", f"{point}-2100"),
+    #        figure_name=f"2015-vs-2100-{point}.pdf",
+    #    )
+    # plt.clf()
     # plot_many("2015")
     # plot_many("2100")
     # plot_places()
