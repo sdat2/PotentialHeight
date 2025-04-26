@@ -379,15 +379,21 @@ def run_exp(
                         ignore_index=True,
                     )
 
-    # write plain CSV with all columns
+    # save results
     results.to_csv(
         os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.csv"),
         index=False,
     )
+    # save results in LaTeX table
     save_results_tex(n_train=n_train)
 
 
 def save_results_tex(n_train: int = 25):
+    """Save the results in a LaTeX table.
+
+    Args:
+        n_train (int, optional): Number of training samples. Defaults to 25.
+    """
     df = pd.read_csv(os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.csv"))
 
     # --- format <mean ± SEM> strings for LaTeX output, bolding the best ---
@@ -453,6 +459,7 @@ if __name__ == "__main__":
     run_exp(
         kernels=(
             "Matern52",
+            "Matern32",
             "Matern12",
             "SE",
             # "RationalQuadratic",
@@ -471,5 +478,5 @@ if __name__ == "__main__":
             # "Exponential",
             # "Periodic",
         ),
-        n_train=50,
+        n_train=100,
     )
