@@ -651,8 +651,6 @@ def run_bayesopt_exp(
         plt.clf()
         plt.close()
 
-    plot_results()
-
     def plt_regret() -> None:
         # plot the regret
         _, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -669,6 +667,8 @@ def run_bayesopt_exp(
         plt.clf()
         plt.close()
 
+    if len(constraints["order"]) == 2:
+        plot_results()
     plt_regret()
 
     # plot the gp model changes for 2d case:

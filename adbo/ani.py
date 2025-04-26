@@ -61,7 +61,7 @@ def plot_gps(
     """
     plot_defaults()
     # read config yaml
-    config = read_json(os.path.join(path_in, "bo-config.json"))
+    config = read_json(os.path.join(path_in, "bo-config.json"))["constraints"]
     F = len(config["order"])  # number of features
 
     if F > 2:
@@ -109,23 +109,34 @@ def plot_gps(
 
     for call_i in tqdm(range(len_active_points), desc="Plotting GPs"):
         if F == 1 and "acq" in ds:
-            fig, axs = plt.subplots(3, 1, sharex=True)
+            fig, axs = plt.subplots(2, 1, sharex=True)
             axs[0].plot(ds.x1.values, ds.ypred.isel(call=call_i).values)
-            axs[0].set_ylabel(r"GP mean, $\mu_{\hat{f}}$")
-            axs[1].plot(ds.x1.values, ds.ystd.isel(call=call_i).values)
-            axs[1].set_ylabel(r"GP std. dev., $\sigma_{\hat{f}}$")
-            axs[2].plot(ds.x1.values, ds.acq.isel(call=call_i).values)
-            axs[2].set_ylabel(r"Acquisition function, $\alpha_t$")
-            axs[2].set_xlabel(
+            # axs[0].set_ylabel(r"GP mean, $\mu_{\hat{f}}$")
+            axs[0].fill_between(
+                ds.x1.values,
+                ds.ypred.isel(call=call_i).values - ds.ystd.isel(call=call_i).values,
+                ds.ypred.isel(call=call_i).values + ds.ystd.isel(call=call_i).values,
+                alpha=0.2,
+            )
+            axs[0].set_ylabel(r"Storm surge height [m]")
+            # axs[1].plot(ds.x1.values, ds.ystd.isel(call=call_i).values)
+            # axs[1].set_ylabel(r"GP std. dev., $\sigma_{\hat{f}}$")
+            axs[1].plot(ds.x1.values, ds.acq.isel(call=call_i).values)
+            axs[1].set_ylabel(r"Acquisition function, $\alpha_t$")
+            axs[1].set_xlabel(
                 VAR_TO_LABEL[config["order"][0]]
                 + " ["
                 + VAR_TO_UNITS[config["order"][0]]
                 + "]"
             )
-            axs[0].set_title("Additional sample " + str(call_i + 1))
-            axs[0].set_ylim(vminm, vmaxm)
-            axs[1].set_ylim(0, vmaxstd)
-            axs[2].set_ylim(vminacq, vmaxacq)
+            # axs[0].set_title("Additional sample " + str(call_i + 1))
+            axs[0].set_ylim(vminm - vmaxstd, vmaxm + vmaxstd)
+            # axs[1].set_ylim(0, vmaxstd)
+            axs[1].set_ylim(vminacq, vmaxacq)
+            axs[0].set_xlim(
+                ds.x1.min().values,
+                ds.x1.max().values,
+            )
 
         elif plot_acq and "acq" in ds:  # plot three panels
             fig, axs = feature_grid(

@@ -33,7 +33,6 @@ def create_1d_run() -> None:
     args.add_argument(
         "--profile_name", type=str, default="2015_new_orleans_profile_r4i1p1f1"
     )
-    args.add_argument("--wrap_test", type=bool, default=False)
     # adding ability to override constraints in the command line
 
     for key in constraints.keys():
@@ -61,10 +60,11 @@ def create_1d_run() -> None:
         resolution=args.resolution,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
-        wrap_test=args.wrap_test,
+        wrap_test=args.test,
         kernel=args.kernel,
     )
 
 
 if __name__ == "__main__":
+    # python -m adbo.exp_1d --test True --exp_name 1dtest
     create_1d_run()
