@@ -28,7 +28,7 @@ python -m w22.test
 
 ## adforce
 
-ADCIRC forcing and processing. Some generic mesh processing. Assume gradient wind reduction factor V_reduc=0.8 for 10m wind. Runs using `hydra` for config management.
+ADCIRC forcing and processing. Some generic mesh processing. Assumes gradient wind reduction factor V_reduc=0.8 for 10m wind. Runs using `hydra` for config management.
 
 ```bash
 python -m adforce.wrap
@@ -43,7 +43,7 @@ A repo with our compilation settings for ADCIRC, and small edits, is available a
 Bayesian optimization using `adforce` to force ADCIRC with a `trieste` Bayesian optimization loop. Runs using `argparse` for config management, and then calls `adbo` which uses `hydra`.
 
 ```bash
-python -m adbo.exp_3d
+python -m adbo.exp_1d --test True --exp_name test
 ```
 
 ## worst
@@ -55,24 +55,30 @@ Statistical worst-case GEV fit using `tensorflow`. Varies whether to assume an u
 
 Developer install:
 
+Use conda to install a python virtual environment:
+
 ```bash
-# Use conda to install a python virtual environment
 conda env create -n tcpips -f env.yml
 conda activate tcpips
+```
 
-# or use micromamba (faster)
-# maybe you need to activate micromamba "$(micromamba shell hook --shell zsh)"
+Alternatively use micromamba (faster):
+
+```bash
 micromamba create -n tcpips -f env.yml
 micromamba activate tcpips
+```
 
-# Install repository in editable version
+Install repository in editable version:
+
+```bash
 pip install -e .
-
 ```
 
 ## Citations
 
 If you use this code, please cite the following paper:
+
 ```bibtex
 @article{potential_height_paper_2025,
   title={Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization},
@@ -84,6 +90,7 @@ If you use this code, please cite the following paper:
 ```
 
 And if you use the code, please cite it as:
+
 ```bibtex
 @software{worstsurge_code,
   author = {Thomas, Simon D. A.},
@@ -104,7 +111,7 @@ We also currently use the matlab code from Chavas, Lin, and Emanuel (2015), whic
   month = {Jun},
   url = {https://purr.purdue.edu/publications/4066/1},
   year = {2022},
-  doi = {doi:/10.4231/CZ4P-D448},
+  doi = {10.4231/CZ4P-D448},
   author = {Daniel Robert Chavas}
 }
 ```

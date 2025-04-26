@@ -1,10 +1,10 @@
 v0.0.4:
 - Added `tcpips/ibtracs.py` script to compare observations with potential and intensity calculated from `era5` monthly averages (all post 1980).
 - Added more dual graph functionality in `adforce/dual_graph.py` so that we can train different ML algorithms with ADCIRC output, fixing bugs in imp lementation. Is pretty well tested, but takes around a minute to convert each run of ADCIRC to a dual graph (5GB of data).
-- `pyproj` now used for all distance calculations so no more flat earth approximations! It is a bit slow though, and now takes 6x longer to make fort.22.nc file. Fairly well tested, but could be improved.
+- `pyproj` now used for all distance calculations so no more flat earth approximations! It is a bit slow though, and now takes 6x longer to make the `fort.22.nc` input file for ADCIRC. Fairly well tested, but could be improved.
 - Added ability to choose between different GP kernels and data acquisition functions in `adbo/exp.py`.
-- Explored using differnt GP kernels in `adbo/gp_exp`.
-
+- Explored using different GP kernels in `adbo/gp_exp`.
+- Added 1D Bayesian optimization expeirment to `adbo/exp_1d.py` and `adbo/gp_exp.py`.
 
 v0.0.3:
 - Improved `era5` data download script.
