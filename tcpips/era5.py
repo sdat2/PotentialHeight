@@ -277,8 +277,7 @@ def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
         "description": "Specific humidity at pressure levels",
     }
     del ds["z"]
-    ds.rename({"valid_time": "time"})
-    return ds
+    return ds.rename({"valid_time": "time"})
 
 
 def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
@@ -364,10 +363,11 @@ def get_era5_combined() -> xr.Dataset:
 
 if __name__ == "__main__":
     # python -m tcpips.era5
-    download_era5_data()
-    # era5_pi(
-    #    [str(year) for year in range(1980, #2025)]
-    # )  # Modify or extend this list as needed.)
+    # python -m tcpips.era5 &> era5_pi_2.log
+    # download_era5_data()
+    era5_pi(
+        [str(year) for year in range(1980, 2025)]
+    )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.

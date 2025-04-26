@@ -270,7 +270,7 @@ def find_argdifference(stationid: str) -> Tuple[float, float, float]:
         stationid (int): Station ID.
 
     Returns:
-        float: Difference in max value.
+        Tuple[float, float, float]: argmax1, argmax2, take_diff(argmax1, argmax2)
     """
 
     def get_argmax(fp):
@@ -322,6 +322,9 @@ def find_differences() -> None:
 def plot_many(year: str = "2015") -> None:
     """
     Plot difference between two years.
+
+    Args:
+        year (str, optional): Year to plot. Defaults to "2015".
     """
     plot_defaults()
 
