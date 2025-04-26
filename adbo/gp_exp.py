@@ -8,6 +8,7 @@ import tensorflow_probability as tfp
 import gpflow
 from sithom.time import timeit
 from sithom.plot import plot_defaults, label_subplots, get_dim
+from worst.utils import retry_wrapper
 from .constants import DATA_PATH, EXP_PATH
 
 # from tf.keras.metrics import R2Score, RootMeanSquaredError
@@ -199,6 +200,7 @@ def fit_gp(
 
 
 @timeit
+@retry_wrapper(max_retries=10)
 def run_single_fit(
     norm_x: bool = True,
     norm_y: bool = True,
@@ -298,6 +300,13 @@ def run_exp(
     - Fit the GP model to the training set.
     - Evaluate the model on the test set (log liklihood, r2, rmse).
     - Save the results in a csv file and a tex file.
+
+    Args:
+        kernels (tuple, optional): Kernels to use. Defaults to ("Matern52", "Matern12", "SE", "RationalQuadratic").
+        mean_functions (tuple, optional): Mean functions to use. Defaults to ("Constant", "Linear", "Polynomial", "Zero", "Exponential", "Periodic").
+        n_train (int, optional): Number of training samples. Defaults to 25.
+        repeats (int, optional): Number of repeats for each experiment. Defaults to 100.
+
     """
     results = pd.DataFrame(
         columns=[
@@ -370,59 +379,64 @@ def run_exp(
                         ignore_index=True,
                     )
 
-    # --- format <mean ± SEM> strings for LaTeX output, bolding the best ---
-    pretty = results.copy()
-
-    # nice kernel names for LaTeX
-    pretty["kernel"] = (
-        pretty["kernel"]
-        .str.replace("Matern52", r"Matern-\(\frac{5}{2}\)")
-        .str.replace("Matern32", r"Matern-\(\frac{3}{2}\)")
-        .str.replace("Matern12", r"Matern-\(\frac{1}{2}\)")
-        .str.replace("SE", "SE")
-    )
-
-    # find best values
-    best_vals = {
-        "log_likelihood": results["log_likelihood"].max(),  # highest is best
-        "rmse": results["rmse"].min(),  # lowest is best
-        "r2": results["r2"].max(),  # highest is best
-    }
-
-    # helper: format mean ± sem, bold if mean equals best (allow tiny tol)
-    def fmt_val(metric, mean, sem):
-        base = f"{mean:.3f} $\\pm$ {sem:.3f}"
-        if abs(mean - best_vals[metric]) < 1e-9:
-            return f"\\textbf{{{mean:.3f}}} \\(\\pm\\) \\textbf{{sem:.3f}}"
-        return base
-
-    for metric in ("log_likelihood", "rmse", "r2"):
-        sem_col = metric + "_sem"
-        pretty[metric] = pretty.apply(
-            lambda row, m=metric: fmt_val(m, row[m], row[sem_col]), axis=1
-        )
-        pretty = pretty.drop(columns=[sem_col])
-
-    # rename columns for LaTeX header
-    pretty = pretty.rename(
-        columns={
-            "log_likelihood": r"Mean Log Likelihood \(\bar{\mathcal{L}}\) ",
-            "rmse": "RMSE [m]",
-            "r2": r"\(r^2\)",
-            "kernel": "Kernel",
-            "mean_function": "Mean Function",
-            "norm_x": "Norm. $x$",
-            "norm_y": "Norm. $y$",
-        }
-    )
-
     # write plain CSV with all columns
     results.to_csv(
         os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.csv"),
         index=False,
     )
-    # write LaTeX table with pretty strings
-    pretty.to_latex(
+    save_results_tex(n_train=n_train)
+
+
+def save_results_tex(n_train: int = 25):
+    df = pd.read_csv(os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.csv"))
+
+    # --- format <mean ± SEM> strings for LaTeX output, bolding the best ---
+
+    # nice kernel names for LaTeX
+    df["kernel"] = (
+        df["kernel"]
+        .str.replace("Matern52", r"Mat\'ern-\({5}/{2}\)")
+        .str.replace("Matern32", r"Mat\'ern-\({3}/{2}\)")
+        .str.replace("Matern12", r"Mat\'ern-\({1}/{2}\)")
+        .str.replace("SE", "SE")
+    )
+
+    # find best values
+    best_vals = {
+        "log_likelihood": df["log_likelihood"].max(),  # highest is best
+        "rmse": df["rmse"].min(),  # lowest is best
+        "r2": df["r2"].max(),  # highest is best
+    }
+
+    # helper: format mean ± sem, bold if mean equals best (allow tiny tol)
+    def fmt_val(metric: str, mean: float, sem: float) -> str:
+        base = f"{mean:.3f} \\(\\pm\\) {sem:.3f}"
+        if abs(mean - best_vals[metric]) < 1e-9:
+            return f"\\textbf{{{mean:.3f}}} \\(\\pm\\)  \\textbf{{{sem:.3f}}}"
+        return base
+
+    for metric in ("log_likelihood", "rmse", "r2"):
+        sem_col = metric + "_sem"
+        df[metric] = df.apply(
+            lambda row, m=metric: fmt_val(m, row[m], row[sem_col]), axis=1
+        )
+        df = df.drop(columns=[sem_col])
+
+    # rename columns for LaTeX header
+    df = df.rename(
+        columns={
+            "log_likelihood": r"\(\bar{\mathcal{L}}\) ",
+            "rmse": "RMSE [m]",
+            "r2": r"\(r^2\)",
+            "kernel": "Kernel",
+            "mean_function": "Mean F.",
+            "norm_x": r"Norm. \(x\)",
+            "norm_y": r"Norm. \(y\)",
+        }
+    )
+
+    # write LaTeX table with df strings
+    df.to_latex(
         os.path.join(DATA_PATH, f"gp_results_n_train_{n_train}.tex"),
         index=False,
         escape=False,
@@ -434,6 +448,8 @@ if __name__ == "__main__":
     # python -m adbo.gp_exp &> gp_exp.log
     # gather_data()
     # run_exp(kernels=("Matern52",), mean_functions=("Constant",), n_train=25)
+    # save_results_tex(n_train=50)  # 100)
+
     run_exp(
         kernels=(
             "Matern52",
@@ -455,5 +471,5 @@ if __name__ == "__main__":
             # "Exponential",
             # "Periodic",
         ),
-        n_train=25,
+        n_train=50,
     )

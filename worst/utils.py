@@ -145,6 +145,28 @@ def retry_wrapper(max_retries: int = 10) -> callable:
 
     Returns:
         callable: Wrapper function to recall the function in case of failure.
+
+    Example::
+        >>> @retry_wrapper(max_retries=5)
+        ... def my_function():
+        ...     # Some code that will fail
+        ...     assert False
+        >>> try:
+        ...    my_function()
+        ... except Exception as e:
+        ...    print(e)
+            Exception:
+            Retrying my_function 1/5
+            Exception:
+            Retrying my_function 2/5
+            Exception:
+            Retrying my_function 3/5
+            Exception:
+            Retrying my_function 4/5
+            Exception:
+            Retrying my_function 5/5
+            Max retries exceeded for function my_function
+
     """
 
     def retry_decorator(func: callable) -> callable:

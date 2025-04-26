@@ -1,3 +1,5 @@
+"""Vary the shape and scale parameters of the GEV distribution."""
+
 import os
 from typing import List
 import hydra
@@ -32,8 +34,8 @@ def try_fit(
 
     Args:
         z_star (float): z_star.
-        beta (float): beta.
-        gamma (float): gamma.
+        beta (float): beta. Scale parameter.
+        gamma (float): gamma. Shape parameter.
         ns (int): Number of samples.
         seed (int): Seed.
         quantiles (List[float], optional): Quantiles. Defaults to [1/100, 1/500].
