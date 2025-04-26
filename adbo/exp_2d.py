@@ -19,7 +19,6 @@ def create_2d_ani_run() -> None:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", type=bool, default=False)
-    parser.add_argument("--year", type=int, default=2025)
     parser.add_argument("--obs_lon", type=float, default=NEW_ORLEANS.lon)
     parser.add_argument("--obs_lat", type=float, default=NEW_ORLEANS.lat)
     parser.add_argument("--init_steps", type=int, default=25)

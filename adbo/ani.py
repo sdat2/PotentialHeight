@@ -1,6 +1,7 @@
 """afdorce.ani.py"""
 
 import os
+import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib
@@ -12,6 +13,21 @@ from sithom.time import timeit
 
 matplotlib.use("Agg")
 
+VAR_TO_LABEL = {
+    "angle": r"Track Bearing, $\chi$",
+    "displacement": r"Track Displacement, $c$",
+    "ypred": r"GP mean, $\mu_{\hat{f}}$",
+    "ystd": r"GP std. dev., $\sigma_{\hat{f}}$",
+    "acq": r"Acquisition function, $\alpha_t$",
+}
+VAR_TO_UNITS = {
+    "angle": r"$^{\circ}$",
+    "displacement": r"$^{\circ}$E",
+    "ypred": "m",
+    "ystd": "m",
+    "acq": "",
+}
+
 
 @timeit
 def plot_gps(
@@ -21,9 +37,10 @@ def plot_gps(
     add_name: str = "",
     verbose: bool = False,
     save_pdf: set = set(),
+    side_length=3,
 ) -> None:
     """
-    Plot GPs.
+    Plot GPs. Now supports 1D and 2D plots.
 
     Function currently assumes that the GP file contains the following variables:
     - ypred: GP prediction
@@ -32,8 +49,9 @@ def plot_gps(
 
     And has the following dimensions:
     - call: number of calls
-    - x1: angle (bearing) [degrees from North]
-    - x2: displacement [degrees east of New Orleans]
+    Either x1 or x1 and x2.
+
+    Reads bo-config.json to determine the order of the variables.
 
     Args:
         path_in (str, optional): name of data folder. Defaults to "mult1".
@@ -42,12 +60,25 @@ def plot_gps(
         add_name (str, optional): Additional name for the gif. Defaults to "".
     """
     plot_defaults()
+    # read config yaml
+    config = read_json(os.path.join(path_in, "bo-config.json"))
+    F = len(config["order"])  # number of features
+
+    if F > 2:
+        raise ValueError("Only 2D and 1D plots are supported")
 
     exp = read_json(os.path.join(path_in, "experiments.json"))
+    if len(exp) == 0:
+        raise ValueError("No experiments found in experiments.json")
     calls = list(exp.keys())
     res = [float(exp[call]["res"]) for call in calls]
-    displacement = [float(exp[call]["displacement"]) for call in calls]
-    angle = [float(exp[call]["angle"]) for call in calls]
+    x_vals = []
+    for key in config["order"]:
+        x_vals.append([float(exp[call][key]) for call in calls])
+
+    X = np.array(x_vals)
+    assert X.shape == (F, len(calls)), "X shape mismatch"
+
     calls = [float(call) + 1 for call in calls]
 
     img_folder = os.path.join(path_in, "img")
@@ -71,16 +102,32 @@ def plot_gps(
     if plot_acq and "acq" in ds:
         vminacq, vmaxacq = ds.acq.min().values, ds.acq.max().values
 
-    # x1_units = ds.x1.attrs["units"]
-    # x2_units = ds.x2.attrs["units"]
     len_active_points = len(ds.call.values)
     num_init_data_points = len(calls) - len_active_points
     print("len_active_points", len_active_points)
     print("num_init_data_points", num_init_data_points)
-    side_length = 3
 
     for call_i in tqdm(range(len_active_points), desc="Plotting GPs"):
-        if plot_acq and "acq" in ds:  # plot three panels
+        if F == 1 and "acq" in ds:
+            fig, axs = plt.subplots(3, 1, sharex=True)
+            axs[0].plot(ds.x1.values, ds.ypred.isel(call=call_i).values)
+            axs[0].set_ylabel(r"GP mean, $\mu_{\hat{f}}$")
+            axs[1].plot(ds.x1.values, ds.ystd.isel(call=call_i).values)
+            axs[1].set_ylabel(r"GP std. dev., $\sigma_{\hat{f}}$")
+            axs[2].plot(ds.x1.values, ds.acq.isel(call=call_i).values)
+            axs[2].set_ylabel(r"Acquisition function, $\alpha_t$")
+            axs[2].set_xlabel(
+                VAR_TO_LABEL[config["order"][0]]
+                + " ["
+                + VAR_TO_UNITS[config["order"][0]]
+                + "]"
+            )
+            axs[0].set_title("Additional sample " + str(call_i + 1))
+            axs[0].set_ylim(vminm, vmaxm)
+            axs[1].set_ylim(0, vmaxstd)
+            axs[2].set_ylim(vminacq, vmaxacq)
+
+        elif plot_acq and "acq" in ds:  # plot three panels
             fig, axs = feature_grid(
                 ds.isel(call=call_i),
                 [["ypred", "ystd", "acq"]],
@@ -101,9 +148,15 @@ def plot_gps(
                 ],
                 ["", "", ""],
                 figsize=(side_length * 3, side_length),
-                xy=(
-                    ("x1", r"Track Bearing, $\chi$", r"$^{\circ}$"),
-                    ("x2", r"Track Displacement, $c$", r"$^{\circ}$E"),
+                xy=tuple(
+                    [
+                        (
+                            f"x{i+1}",
+                            VAR_TO_LABEL[config["order"][i]],
+                            VAR_TO_UNITS[config["order"][i]],
+                        )
+                        for i in range(F)
+                    ]
                 ),
             )
         else:  # plot 2 panels
@@ -121,44 +174,67 @@ def plot_gps(
                 ["", ""],
                 figsize=(side_length * 2, side_length),
                 xy=(
-                    ("x1", r"Track Bearing, $\chi$", r"$^{\circ}$"),
+                    (
+                        "x1",
+                        VAR_TO_LABEL[config["order"][0]],
+                        VAR_TO_UNITS[config["order"][0]],
+                    ),
                     (
                         "x2",
-                        r"Track Displacement, $c$",
-                        r"$^{\circ}$E",
+                        VAR_TO_LABEL[config["order"][1]],
+                        VAR_TO_UNITS[config["order"][1]],
                     ),
                 ),
             )
-        # this seems not to work properly
-        if verbose:
+
+        if verbose and F == 2:
             # initial data points
             print(
                 "intial_points",
-                angle[:num_init_data_points],
-                displacement[:num_init_data_points],
+                X[0, :num_init_data_points],
+                X[1, :num_init_data_points],
             )
             # BO/active data points
             print(
                 "active_points",
-                angle[num_init_data_points : -len_active_points + call_i],
+                X[0, num_init_data_points : -len_active_points + call_i],
+                X[1, num_init_data_points : -len_active_points + call_i],
             )
-        for i in range(axs.ravel().shape[0]):
-            axs.ravel()[i].scatter(
-                angle[:num_init_data_points],
-                displacement[:num_init_data_points],
-                marker="x",
-                s=55,
-                color="blue",
-            )
-            #
-            axs.ravel()[i].scatter(
-                angle[num_init_data_points : num_init_data_points + call_i + 1],
-                displacement[num_init_data_points : num_init_data_points + call_i + 1],
-                s=100,
-                marker="+",
-                color="green",
-            )
-        label_subplots(axs, override="outside")
+        if F == 1:
+            for i in range(axs.ravel().shape[0]):
+                axs[i].scatter(
+                    X[0, :num_init_data_points],
+                    res[:num_init_data_points],
+                    marker="x",
+                    s=5,
+                    color="blue",
+                )
+                #
+                axs[i].scatter(
+                    X[0, num_init_data_points : num_init_data_points + call_i + 1],
+                    res[num_init_data_points : num_init_data_points + call_i + 1],
+                    s=5,
+                    marker="+",
+                    color="green",
+                )
+        elif F == 2:
+            for i in range(axs.ravel().shape[0]):
+                axs.ravel()[i].scatter(
+                    X[0, :num_init_data_points],
+                    X[1, :num_init_data_points],
+                    marker="x",
+                    s=55,
+                    color="blue",
+                )
+                #
+                axs.ravel()[i].scatter(
+                    X[0, num_init_data_points : num_init_data_points + call_i + 1],
+                    X[1, num_init_data_points : num_init_data_points + call_i + 1],
+                    s=100,
+                    marker="+",
+                    color="green",
+                )
+            label_subplots(axs, override="outside")
         if call_i in save_pdf:
             figure_name = os.path.join(img_folder, f"gp_{call_i}.pdf")
             plt.savefig(figure_name)

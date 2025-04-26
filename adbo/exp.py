@@ -224,7 +224,20 @@ def gp_model_callback_maker(
     call: int = 0
     dimensions = len(constraints["order"])
 
-    if dimensions == 2:  # if 2D save GP model output
+    if dimensions == 1:  # if 1D save GP model output
+        nx1 = 100
+        x1 = np.linspace(0, 1, num=nx1)
+        x1_r = rescale_inverse(np.column_stack([x1]), constraints=constraints)[:, 0]
+        assert x1.shape == (nx1,)
+        assert x1_r.shape == x1.shape
+        x_input = np.column_stack([x1])
+        assert x_input.shape == (nx1, 1)
+        ypred_list: List[np.ndarray] = []
+        ystd_list: List[np.ndarray] = []
+        acq_list: List[np.ndarray] = []
+        # x_r = rescale_inverse(np.column_stack([x1]), constraints=constraints)
+
+    elif dimensions == 2:  # if 2D save GP model output
 
         nx1, nx2 = 100, 102  # resolution of the plot
         # added some asymmetry to try to see if axes flip.
@@ -293,6 +306,64 @@ def gp_model_callback_maker(
             # plt.show()
             plt.clf()
             plt.close()
+            if dimensions == 1:
+                # fig, axs = plt.subplots(1, 1, figsize=(10, 5))
+                y_mean, y_var = gp_models[model].predict_y(x_input)
+                y_mean, y_var = y_mean.numpy(), y_var.numpy()
+                y_mean, y_var = y_mean.reshape((nx1)), y_var.reshape((nx1))
+
+                ypred_list.append(y_mean)
+                ystd_list.append(np.sqrt(y_var))
+                print("np.array(ypred_list))", np.array(ypred_list).shape)
+                print("np.array(yvar_list))", np.array(ystd_list).shape)
+                data_vars = {
+                    "ypred": (
+                        ("call", "x1"),
+                        np.array(ypred_list),
+                        {"units": "m", "long_name": "Mean prediction"},
+                    ),
+                    "ystd": (
+                        ("call", "x1"),
+                        np.array(ystd_list),
+                        {"units": "m", "long_name": "Std. Dev. in prediction"},
+                    ),
+                }
+                if acq_rule is not None:
+                    if acq_rule.acquisition_function is not None:
+                        acq = acq_rule.acquisition_function(
+                            tf.expand_dims(x_input, axis=-2)
+                        )
+                        acq = np.reshape(acq, (nx1,))
+                    else:
+                        acq = np.zeros((nx1,))
+                    acq_list.append(acq)
+                    print("np.array(acq_list))", np.array(acq_list).shape)
+                    data_vars["acq"] = (
+                        ("call", "x1"),
+                        np.array(acq_list),
+                        {"units": "dimensionless", "long_name": "acquisition function"},
+                    )
+                    print("np.array(acq_list))", np.array(acq_list).shape)
+
+                print(
+                    "np.array([x + 1 for x in range(call)]))",
+                    [x + 1 for x in range(len(ypred_list))],
+                )
+                xr.Dataset(
+                    data_vars=data_vars,
+                    coords={
+                        "x1": (
+                            ("x1"),
+                            x1_r,
+                            {"units": constraints[constraints["order"][0]]["units"]},
+                        ),
+                        "call": (
+                            ("call"),
+                            [x + 1 for x in range(len(ypred_list))],
+                            {"units": "dimensionless", "long_name": "call number"},
+                        ),
+                    },
+                ).to_netcdf(os.path.join(direc, f"gp_model_outputs.nc"))
             if dimensions == 2:
                 # what's a good way to check that this puts the dimensions the right way around?
                 # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -497,6 +568,7 @@ def run_bayesopt_exp(
     )  # should add kernel choice here.
     model = trieste.models.gpflow.GaussianProcessRegression(gpr)
     # choices mves,
+    # TODO: make another choice for this.
     if daf == "mes":
         acquisition_func = MinValueEntropySearch(
             search_space
@@ -600,7 +672,7 @@ def run_bayesopt_exp(
     plt_regret()
 
     # plot the gp model changes for 2d case:
-    if len(constraints["order"]) == 2:
+    if len(constraints["order"]) in (1, 2):
         plot_gps(path_in=direc, plot_acq=True)
 
 
