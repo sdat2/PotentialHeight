@@ -9,12 +9,14 @@ import matplotlib.pyplot as plt
 from sithom.io import read_json
 from sithom.time import timeit
 from sithom.place import BoundingBox
-from adforce.constants import NO_BBOX, NEW_ORLEANS
+from adforce.constants import NO_BBOX, NEW_ORLEANS, GALVERSTON, MIAMI
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from tcpips.constants import FIGURE_PATH, DATA_PATH
 from adforce.mesh import xr_loader
+from adforce.ani import single_wind_and_height_step
 from .constants import EXP_PATH, DEFAULT_CONSTRAINTS
 from .constants import DATA_PATH as DATA_PATH_ADBO
+
 
 # from pandas.plotting import parallel_coordinates
 # This might not be a great way of choosing colors
@@ -41,6 +43,11 @@ stationid_to_names: Dict[str, str] = {
     "8762075": "Port Fourchon, Belle Pass ",  # (-90.199, 29.114)",
     "8762482": "West Bank 1, Bayou Gauche",  # (-90.420, 29.789)",
     "8764044": "Berwick, Atchafalaya River",  # (-91.238, 29.668)",
+}
+stationid_to_bbox: Dict[str, BoundingBox] = {
+    "new-orleans": NO_BBOX.pad(1),
+    "miami": MIAMI.bbox(3),
+    "galverston": GALVERSTON.bbox(3),
 }
 # stationid_to_names = {}
 # ds = xr.open_dataset(os.path.join(DATA_PATH, "katrina_tides.nc"))
@@ -995,6 +1002,7 @@ def plot_bo_comp() -> None:
     # r"Empirical Regret for dataset $i$ at step $s$, $\max\left(\max\left(\vec{z}^1\right), \cdots \max\left(\vec{z}^n\right)\right) - \max\left(\vec{z}^i_{1,\cdots,s}\right)$ [m]"
 
 
+@timeit
 def make_argmax_table():
     """We want to make a table of the argmax values for each experiment.
 
@@ -1013,11 +1021,11 @@ def make_argmax_table():
             "Name",
             "Year",
             "Trial",
-            "Argmax index",
-            "Displacement",
-            "Angle",
-            "Translation Speed [m s$^{-1}$]",
-            "Max SSH [m]",
+            r"\(i\)",
+            r"\(c\) [\(^{\circ}\)]",
+            r"\(\chi\) [\(^{\circ}\)]",
+            r"\(V_t\) [m s\(^{-1}\)]",
+            r"\(z^{*}\) [m]",
         ]
     )
     for point in ["new-orleans", "miami", "galverston"]:
@@ -1050,21 +1058,56 @@ def make_argmax_table():
                                     "Year": [year],
                                     "Trial": [trial],
                                     r"\(i\)": [argmax_index],
-                                    r"Displacement \(c\)": [displacement],
-                                    r"Angle [\(^{\circ}\)]": [angle],
-                                    r"Translation Speed [m s\(^{-1}\)]": [trans_speed],
-                                    "Max SSH [m]": [max_res],
+                                    r"\(c\) [\(^{\circ}\)]": [displacement],
+                                    r"\(\chi\) [\(^{\circ}\)]": [angle],
+                                    r"\(V_t\) [m s\(^{-1}\)]": [trans_speed],
+                                    r"\(z^{*}\) [m]": [max_res],
                                 }
                             ),
                         ],
                         ignore_index=True,
                     )
     # save to csv
-    df.to_csv(os.path.join(DATA_PATH_ADBO, "argmax_table.csv"), index=False)
+    # add 1 to argmax index
+    df[r"\(i\)"] = df[r"\(i\)"] + 1
     df.to_latex(
         os.path.join(DATA_PATH_ADBO, "argmax_table.tex"), index=False, escape=False
     )  # decimal=3,
     # TODO: also trigger animation using adforce.ani to plot the worst case scenario from each trial.
+    # loop through dataframe and reconstruct paths to run the animation script in
+    # something like EXP_PATH/new-orleans-2015/exp_0023/
+    paths_to_plot = []
+    N2ID = {v: k for k, v in stationid_to_names.items()}
+    for _, row in df.iterrows():
+        # exp_name = f"{row['Name']}-{row['Year']}-{int(row['Trial'])}"
+        if int(row["Trial"]) == 0:
+            exp_name = f"{N2ID[row['Name']]}-{row['Year']}"
+        else:
+            exp_name = f"{N2ID[row['Name']]}-{row['Year']}-{int(row['Trial'])}"
+        # print(exp_name)
+        j = int(row[r"\(i\)"]) - 1
+        paths_to_plot.append(os.path.join(EXP_PATH, exp_name, f"exp_{j:04}"))
+
+    # add to dataframe
+    df["Path"] = paths_to_plot
+    df.to_csv(os.path.join(DATA_PATH_ADBO, "argmax_table.csv"), index=False)
+
+    figure_path = os.path.join(FIGURE_PATH, "argmax_snapshots")
+    os.makedirs(figure_path, exist_ok=True)
+
+    for i, row in df.iterrows():
+        single_wind_and_height_step(
+            path_in=row["Path"],
+            bbox=stationid_to_bbox[N2ID[row["Name"]]],
+            time_i=None,
+            coarsen=3,
+            plot_loc=True,
+            figure_name=os.path.join(
+                figure_path, f"{row['Name']}_{row['Year']}_{int(row['Trial'])}.pdf"
+            ),
+            x_pos=1.0,
+            y_pos=-0.05,
+        )
 
 
 if __name__ == "__main__":

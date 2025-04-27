@@ -515,7 +515,7 @@ def run_animation() -> None:
 @timeit
 def single_wind_and_height_step(
     path_in: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049",  # "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
-    time_i: int = 380,
+    time_i: Optional[int] = 380,
     coarsen: int = 2,
     bbox: Optional[BoundingBox] = NO_BBOX,
     x_pos: float = 0.4,
@@ -529,7 +529,7 @@ def single_wind_and_height_step(
 
     Args:
         path_in (str, optional): path to data. Defaults to "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049".
-        time_i (int, optional): time index. Defaults to 380.
+        time_i (Optional[int], optional): time index. Defaults to 380. If None, we find the maximum maxele for the observation location.
         coarsen (int, optional): coarsen the wind data by this factor. Defaults to 2.
         bbox (Optional[BoundingBox], optional): bounding box. Defaults to NO_BBOX.
         x_pos (float, optional): relative x position of quiver label. Defaults to 0.9.
@@ -569,6 +569,19 @@ def single_wind_and_height_step(
     del f22_tc_ds["time"]
     f22_tc_ds["time"] = ("time", f22_main_ds.time.values)
     # print("f22_tc_ds", f22_tc_ds)
+
+    if time_i is None:
+        # find the time index of the maximum maxele for the observation location
+        # assumes that the actual observation location is in the bbox that was selected.
+        config = load_config(os.path.join(path_in, "config.yaml"))
+        ac_lon, ac_lat = config.adcirc.actual_observation_location.value
+        print("Actual Observation Location: ", ac_lon, ac_lat)
+        sq_distances = (f63_ds.x.values - ac_lon) ** 2 + (f63_ds.y.values - ac_lat) ** 2
+        min_idx = sq_distances.argmin()
+        print("min_idx", min_idx)
+        elevation_array = f63_ds.zeta.isel(node=min_idx).values
+        time_i = np.argmax(elevation_array)
+        print("time_i", time_i)
 
     ckwargs = {
         "label": "Storm Surge Height [m]",
