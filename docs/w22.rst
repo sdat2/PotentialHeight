@@ -12,14 +12,6 @@ w22.constants module
    :undoc-members:
    :show-inheritance:
 
-w22.old\_plot module
---------------------
-
-.. automodule:: w22.old_plot
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 w22.plot module
 ---------------
 

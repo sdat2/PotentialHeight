@@ -52,6 +52,14 @@ adbo.exp\_3d module
    :undoc-members:
    :show-inheritance:
 
+adbo.gp\_exp module
+-------------------
+
+.. automodule:: adbo.gp_exp
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 adbo.plot module
 ----------------
 

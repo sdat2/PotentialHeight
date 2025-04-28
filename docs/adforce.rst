@@ -12,6 +12,14 @@ adforce.ani module
    :undoc-members:
    :show-inheritance:
 
+adforce.boundaries module
+-------------------------
+
+.. automodule:: adforce.boundaries
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 adforce.config module
 ---------------------
 
@@ -24,6 +32,14 @@ adforce.constants module
 ------------------------
 
 .. automodule:: adforce.constants
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+adforce.dual\_graph module
+--------------------------
+
+.. automodule:: adforce.dual_graph
    :members:
    :undoc-members:
    :show-inheritance:
@@ -56,6 +72,14 @@ adforce.fort63 module
 ---------------------
 
 .. automodule:: adforce.fort63
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+adforce.geo module
+------------------
+
+.. automodule:: adforce.geo
    :members:
    :undoc-members:
    :show-inheritance:
