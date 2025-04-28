@@ -6,7 +6,7 @@ TODO: Is there a faster package than pyproj for distance and bearing calculation
 """
 
 import os
-from typing import Union, Optional, Callable, Tuple
+from typing import Union, Optional, Callable, Tuple, Literal
 import netCDF4 as nc
 import numpy as np
 from sithom.time import timeit
@@ -16,12 +16,17 @@ from .constants import DATA_PATH
 from .geo import (
     distances_bearings_to_center_pyproj,
     line_with_impact_pyproj,
+    line_with_impact_sphere,
+    distances_bearings_to_center_sphere,
 )
 from .profile import read_profile
 
 
 def clon_clat_from_config_and_times(
-    cfg: dict, itime: int, times: np.ndarray
+    cfg: dict,
+    itime: int,
+    times: np.ndarray,
+    geoid: Literal["pyproj", "sphere"] = "pyproj",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Get the center of the storm from the config and times.
 
@@ -38,14 +43,28 @@ def clon_clat_from_config_and_times(
     ilon = cfg["impact_location"]["value"][0]
     ilat = cfg["impact_location"]["value"][1]
 
-    return line_with_impact_pyproj(
-        impact_time=itime * 60,  # convert to seconds.
-        impact_lat=ilat,
-        impact_lon=ilon,
-        translation_speed=speed,
-        bearing=angle,
-        times=times * 60,  # convert to seconds.
-    )
+    if geoid == "sphere":
+        return line_with_impact_sphere(
+            impact_time=itime * 60,  # convert to seconds.
+            impact_lat=ilat,
+            impact_lon=ilon,
+            translation_speed=speed,
+            bearing=angle,
+            times=times * 60,  # convert to seconds.
+        )
+    elif geoid == "pyproj":
+        return line_with_impact_pyproj(
+            impact_time=itime * 60,  # convert to seconds.
+            impact_lat=ilat,
+            impact_lon=ilon,
+            translation_speed=speed,
+            bearing=angle,
+            times=times * 60,  # convert to seconds.
+        )
+    else:
+        raise ValueError(
+            f"geoid must be 'pyproj' or 'sphere', not {geoid}. Please check the config."
+        )
 
 
 @timeit
@@ -118,6 +137,7 @@ def moving_rectilinear_square(
     ds: nc.Dataset,
     grid_config: dict,
     tc_config: dict,
+    geoid: Literal["pyproj", "sphere"] = "pyproj",
 ) -> nc.Dataset:
     """
     Create a rectilinear grid with square cells based on config.
@@ -163,7 +183,7 @@ def moving_rectilinear_square(
         grid_config["time_calendar"],
     )
 
-    clons, clats = clon_clat_from_config_and_times(tc_config, itime, times)
+    clons, clats = clon_clat_from_config_and_times(tc_config, itime, times, geoid=geoid)
 
     lons = lons + clons.reshape(tlen, 1, 1)
     lats = lats + clats.reshape(tlen, 1, 1)
@@ -274,6 +294,7 @@ def add_psfc_u10(
     tc_config: Optional[dict] = None,
     background_pressure: float = 1010,
     v_reduc: float = 0.8,
+    geoid: Literal["pyproj", "sphere"] = "pyproj",
 ) -> nc.Dataset:
     """Add pressure and velocity fields to an existing netcdf dataset.
 
@@ -319,9 +340,19 @@ def add_psfc_u10(
             lons = np.expand_dims(lons, axis=0)
         if lats.shape == (len(ds.dimensions["yi"]), len(ds.dimensions["xi"])):
             lats = np.expand_dims(lats, axis=0)
-        dist, bearing = distances_bearings_to_center_pyproj(
-            lons, lats, clons.reshape(tlen, 1, 1), clats.reshape(tlen, 1, 1)
-        )
+        # pyproj option
+        if geoid == "pyproj":
+            dist, bearing = distances_bearings_to_center_pyproj(
+                lons, lats, clons.reshape(tlen, 1, 1), clats.reshape(tlen, 1, 1)
+            )
+        elif geoid == "sphere":
+            dist, bearing = distances_bearings_to_center_sphere(
+                lons, lats, clons.reshape(tlen, 1, 1), clats.reshape(tlen, 1, 1)
+            )
+        else:
+            raise ValueError(
+                f"geoid must be 'pyproj' or 'sphere', not {geoid}. Please check the config."
+            )
         del lons, lats
         assert dist.shape == shape
         assert bearing.shape == shape
@@ -371,6 +402,14 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
         grid_config (dict): Grid configuration dictionary.
         tc_config (dict): Idealized TC configuration dictionary.
     """
+    if "geoid" in grid_config:
+        geoid = grid_config["geoid"]
+    else:
+        geoid = "pyproj"
+    if "v_reduc" in tc_config:
+        v_reduc = tc_config["v_reduc"]["value"]
+    else:
+        v_reduc = 0.8
     # Create a new netCDF4 file
     ds = nc.Dataset(os.path.join(nc_path, "fort.22.nc"), "w", format="NETCDF4")
     if "profile_name" in tc_config:
@@ -382,14 +421,22 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     main_group = ds.createGroup("Main")
     main_group = rectilinear_square(main_group, grid_config["Main"])
     main_group = add_psfc_u10(
-        main_group, tc_config, v_reduc=tc_config["v_reduc"]["value"]
+        main_group,
+        tc_config,
+        v_reduc=tc_config["v_reduc"]["value"],
+        geoid=geoid,
     )
     main_group.description = "Main grid"
     # Create the "TC1" group within root (rank 2)
     tc1_group = ds.createGroup("TC1")
-    tc1_group = moving_rectilinear_square(tc1_group, grid_config["TC1"], tc_config)
+    tc1_group = moving_rectilinear_square(
+        tc1_group, grid_config["TC1"], tc_config, geoid=geoid
+    )
     tc1_group = add_psfc_u10(
-        tc1_group, tc_config=tc_config, v_reduc=tc_config["v_reduc"]["value"]
+        tc1_group,
+        tc_config=tc_config,
+        v_reduc=tc_config["v_reduc"]["value"],
+        geoid=geoid,
     )
     tc1_group.description = "TC1 grid"
 
@@ -415,4 +462,7 @@ if __name__ == "__main__":
         open(os.path.join(CONFIG_PATH, "grid", "grid_fort22_config.yaml"))
     )
 
+    create_fort22(DATA_PATH, grid_config, tc_config)
+
+    grid_config["geoid"] = "sphere"
     create_fort22(DATA_PATH, grid_config, tc_config)

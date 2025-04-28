@@ -75,15 +75,15 @@ def line_with_impact_pyproj(
 
     # Distance traveled from impact point, can be negative if t < impact_time
     # (i.e. behind the point along the same line).
-    distancess = dt * translation_speed  # in meters
+    distances = dt * translation_speed  # in meters
 
     # Build arrays for initial conditions
-    lon_init = np.full_like(distancess, impact_lon, dtype=float)
-    lat_init = np.full_like(distancess, impact_lat, dtype=float)
-    bearing_arr = np.full_like(distancess, bearing, dtype=float)
+    lon_init = np.full_like(distances, impact_lon, dtype=float)
+    lat_init = np.full_like(distances, impact_lat, dtype=float)
+    bearing_arr = np.full_like(distances, bearing, dtype=float)
 
     # Use forward geodesic to find location at each distances along bearing
-    lon_arr, lat_arr, _ = GEOD.fwd(lon_init, lat_init, bearing_arr, distancess)
+    lon_arr, lat_arr, _ = GEOD.fwd(lon_init, lat_init, bearing_arr, distances)
 
     return lon_arr, lat_arr
 
@@ -275,7 +275,7 @@ def forward_point_sphere(
     return lon_deg.astype(np.float32), lat_deg.astype(np.float32)
 
 
-def distances_bearings_to_centers_sphere(
+def distances_bearings_to_center_sphere(
     lon_mat: ArrayLike,
     lat_mat: ArrayLike,
     lon_c: ArrayLike,
@@ -297,13 +297,16 @@ def distances_bearings_to_centers_sphere(
         >>> import numpy as np
         >>> lon = np.array([[0., 1.], [2., 3.]], dtype=np.float32)
         >>> lat = np.array([[0., 1.], [2., 3.]], dtype=np.float32)
-        >>> d, b = distances_bearings_to_centers_sphere(lon, lat, 0.0, 0.0)
+        >>> d, b = distances_bearings_to_center_sphere(lon, lat, 0.0, 0.0)
         >>> d.dtype, b.dtype
         (dtype('float32'), dtype('float32'))
         >>> round(float(b[0, 1]), 1)
         225.0
     """
     lon1, lat1, lon2, lat2 = np.broadcast_arrays(lon_mat, lat_mat, lon_c, lat_c)
+    assert lon1.shape == lon2.shape
+    assert lat1.shape == lat2.shape
+    assert lon1.shape == lat1.shape
     return haversine_dist_bearing(lon1, lat1, lon2, lat2)
 
 
@@ -319,15 +322,15 @@ def line_with_impact_sphere(
     Great-circle trajectory that passes a known impact point at a given time.
 
     Args:
-        impact_time: Time when the object is at (impact_lon, impact_lat).
+        impact_time: Time when the object is at (impact_lon, impact_lat). In seconds from beginning of calendar.
         impact_lon:  Impact longitude (°E).
         impact_lat:  Impact latitude  (°N).
-        translation_speed: Speed along the bearing (m s⁻¹).
+        translation_speed: Speed along the bearing (meters/second).
         bearing: Constant bearing (° clockwise from north).
-        times: Array of times at which to evaluate the position.
+        times: Array of times at which to evaluate the position. In seconds from beginning of calendar.
 
     Returns:
-        ``(lon_arr, lat_arr)`` arrays (float32) matching *times*.
+        Tuple[np.ndarray, np.ndarray] ``(lon_arr, lat_arr)`` arrays (float32) matching *times*.
 
     Examples:
         >>> times = np.array([9., 10., 11.], dtype=np.float32)
