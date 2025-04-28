@@ -21,4 +21,4 @@ TC1: # tropical cylone moves with the center of the grid
   timestep: 15 # minutes
   time_unit: minutes since 1990-01-01T01:00:00
   time_calendar: proleptic_gregorian
-geoid: pyproj # geoid type, can be 'pyproj' or 'sphere'
+geoid: sphere # geoid type, can be 'pyproj' or 'sphere'

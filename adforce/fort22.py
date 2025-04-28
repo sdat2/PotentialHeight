@@ -26,7 +26,7 @@ def clon_clat_from_config_and_times(
     cfg: dict,
     itime: int,
     times: np.ndarray,
-    geoid: Literal["pyproj", "sphere"] = "pyproj",
+    geoid: Literal["pyproj", "sphere"] = "sphere",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Get the center of the storm from the config and times.
 
@@ -137,7 +137,7 @@ def moving_rectilinear_square(
     ds: nc.Dataset,
     grid_config: dict,
     tc_config: dict,
-    geoid: Literal["pyproj", "sphere"] = "pyproj",
+    geoid: Literal["pyproj", "sphere"] = "sphere",
 ) -> nc.Dataset:
     """
     Create a rectilinear grid with square cells based on config.
@@ -294,7 +294,7 @@ def add_psfc_u10(
     tc_config: Optional[dict] = None,
     background_pressure: float = 1010,
     v_reduc: float = 0.8,
-    geoid: Literal["pyproj", "sphere"] = "pyproj",
+    geoid: Literal["pyproj", "sphere"] = "sphere",
 ) -> nc.Dataset:
     """Add pressure and velocity fields to an existing netcdf dataset.
 
@@ -405,7 +405,7 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     if "geoid" in grid_config:
         geoid = grid_config["geoid"]
     else:
-        geoid = "pyproj"
+        geoid = "sphere"
     if "v_reduc" in tc_config:
         v_reduc = tc_config["v_reduc"]["value"]
     else:
@@ -464,5 +464,5 @@ if __name__ == "__main__":
 
     create_fort22(DATA_PATH, grid_config, tc_config)
 
-    grid_config["geoid"] = "sphere"
+    grid_config["geoid"] = "pyproj"
     create_fort22(DATA_PATH, grid_config, tc_config)
