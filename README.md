@@ -89,16 +89,16 @@ If you use this code, please cite the following paper:
 }
 ```
 
-And if you use the code, please cite it as:
+And cite the code as:
 
 ```bibtex
 @software{worstsurge_code,
   author = {Thomas, Simon D. A.},
   doi = {10.5281/zenodo.15073504},
-  month = mar,
+  month = {Mar},
   title = {{WorstSurge - Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
   url = {https://github.com/sdat2/worstsurge},
-  version = {v0.0.2},
+  version = {v0.0.4},
   year = {2025}
 }
 ```

@@ -267,16 +267,28 @@ def example_plot_raw():
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
     )
+
     # get era5 coordinates
     era5_coords_ds = get_era5_coordinates()
+    print("era5_coords", era5_coords_ds)
     print("era5 unique", era5_unique_data)
     # get rid of time dimension
-    era5_unique_data = era5_unique_data.squeeze(dim="valid_time")
+    del era5_coords_ds["valid_time"]
+    del era5_coords_ds["expver"]
+    print("era5_coords", era5_coords_ds)
 
-    era5_coords_ds["counts"] = (
+    era5_coords_ds["cnt"] = (
         ("longitude", "latitude"),
         np.zeros((len(era5_coords_ds.longitude), len(era5_coords_ds.latitude))),
     )
+    # loop through the unique points and increment the count at that point
+    for i in range(len(era5_unique_data.longitude.values)):
+        lon = era5_unique_data.longitude.values[i]
+        lat = era5_unique_data.latitude.values[i]
+        # increment the count at that point
+        era5_coords_ds["cnt"].loc[dict(longitude=lon, latitude=lat)] += 1
+
+    print("era5_coords", era5_coords_ds)
 
     # create histogram of unique points back onto the lon/lat grid of ERA5
     # take all of the era5 unique data points
@@ -287,6 +299,67 @@ def example_plot_raw():
 
     plot_defaults()
 
+    fig, ax = plt.subplots(
+        1,
+        1,  # figsize=get_dim(ratio=1.1),
+        subplot_kw={"projection": ccrs.PlateCarree()},
+    )
+    ax.set_global()
+    # add feature at back of plot
+    ax.add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+        alpha=0.3,
+        linewidth=0.5,
+    )
+    era5_coords_ds["cnt"] = era5_coords_ds["cnt"].where(
+        era5_coords_ds["cnt"] > 0, np.nan
+    )
+
+    era5_coords_ds["cnt"].plot(
+        x="longitude",
+        y="latitude",
+        cmap="viridis_r",
+        cbar_kwargs={
+            "label": "Number of Unique Gridpoints",
+            "cmap": "viridis",
+            "shrink": 0.63,
+        },
+        transform=ccrs.PlateCarree(),
+        add_colorbar=True,
+        add_labels=True,
+        rasterized=True,
+    )
+
+    # plt.title("Count of unique points in ERA5 data")
+    plt.title("")
+
+    # add in LATITUDE_FORMATTER and LONGITUDE_FORMATTER
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(),
+        draw_labels=True,
+        linewidth=0.5,
+        color="gray",
+        alpha=0.5,
+        linestyle="--",
+    )
+    gl.xlocator = plt.MaxNLocator(5)
+    gl.ylocator = plt.MaxNLocator(5)
+    gl.xformatter = LongitudeFormatter()
+    gl.yformatter = LatitudeFormatter()
+    # only on bottom and left of plot
+    gl.top_labels = False
+    gl.right_labels = False
+
+    plt.savefig(
+        os.path.join(figure_path, "era5_unique_points_count.pdf"),
+        bbox_inches="tight",
+        dpi=400,
+    )
+    plt.clf()
+    plt.close()
+
     fig, axs = plt.subplots(
         3, 1, figsize=get_dim(ratio=1.1), subplot_kw={"projection": ccrs.PlateCarree()}
     )
@@ -296,6 +369,8 @@ def example_plot_raw():
         NaturalEarthFeature("physical", "land", "110m"),
         edgecolor="black",
         facecolor="green",
+        alpha=0.3,
+        linewidth=0.5,
     )
     im = axs[0].scatter(
         era5_unique_data.longitude.values,
@@ -364,6 +439,6 @@ if __name__ == "__main__":
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
-    plot_unique_points()
+    # plot_unique_points()
     # era5_unique_points_raw()
-    # example_plot_raw()
+    example_plot_raw()
