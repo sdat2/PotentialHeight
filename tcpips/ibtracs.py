@@ -302,7 +302,7 @@ def example_plot_raw():
     fig, ax = plt.subplots(
         1,
         1,  # figsize=get_dim(ratio=1.1),
-        subplot_kw={"projection": ccrs.PlateCarree()},
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
     ax.set_global()
     # add feature at back of plot
@@ -344,7 +344,7 @@ def example_plot_raw():
         alpha=0.5,
         linestyle="--",
     )
-    gl.xlocator = plt.MaxNLocator(5)
+    gl.xlocator = plt.MaxNLocator(4)
     gl.ylocator = plt.MaxNLocator(5)
     gl.xformatter = LongitudeFormatter()
     gl.yformatter = LatitudeFormatter()
