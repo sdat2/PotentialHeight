@@ -21,8 +21,7 @@ from .fort22datatree import read_fort22
 from .constants import NO_BBOX, NEW_ORLEANS, FIGURE_PATH
 from .config import load_config
 from .fort22 import create_fort22
-
-# from sithom.xr import plot_units
+from .geo import line_with_impact_pyproj as line_with_impact
 
 
 def regenerate_fort22_if_does_not_exist(path: str) -> None:
@@ -200,8 +199,6 @@ def plot_trajectory(path: str, ax: plt.Axes, transform=None) -> None:
     """
 
     config = load_config(os.path.join(path, "config.yaml"))
-    from .fort22 import line_with_impact
-
     angle = config.tc.angle.value
     translation_speed = config.tc.translation_speed.value
     imp_lon, imp_lat = config.tc.impact_location.value
