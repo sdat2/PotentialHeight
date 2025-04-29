@@ -44,8 +44,8 @@ p25=2015_new_orleans_profile_r4i1p1f1
 p97=2100_new_orleans_profile_r4i1p1f1
 obs_lon=-90.0715
 obs_lat=29.9511
-seed=30
+seed=35
 
-# 1
-# python -m adbo.exp_3d --exp_name=new-orleans-2015-2 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
-python -m adbo.exp_3d --exp_name=new-orleans-2100-2 --profile_name=$p97 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
+# 3
+python -m adbo.exp_3d --exp_name=new-orleans-2015-3 --profile_name=$p25 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
+python -m adbo.exp_3d --exp_name=new-orleans-2100-3 --profile_name=$p97 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed

@@ -580,7 +580,7 @@ def single_wind_and_height_step(
         min_idx = sq_distances.argmin()
         print("min_idx", min_idx)
         elevation_array = f63_ds.zeta.isel(node=min_idx).values
-        time_i = np.argmax(elevation_array)
+        time_i = np.nanargmax(elevation_array)
         print("time_i", time_i)
 
     ckwargs = {

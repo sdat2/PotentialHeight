@@ -1,4 +1,4 @@
-"""Plot results from adcirc bayesian optimization experiments."""
+"""Plot results from adcirc Bayesian optimization experiments."""
 
 from typing import Tuple, List, Optional, Dict
 import os
@@ -1096,6 +1096,10 @@ def make_argmax_table():
     os.makedirs(figure_path, exist_ok=True)
 
     for i, row in df.iterrows():
+        if row["Name"] == "New Orleans":
+            qk_loc = {"x_pos": 0.5, "y_pos": 1.05}
+        else:
+            qk_loc = {"x_pos": 1, "y_pos": -0.05}
         single_wind_and_height_step(
             path_in=row["Path"],
             bbox=stationid_to_bbox[N2ID[row["Name"]]],
@@ -1103,10 +1107,10 @@ def make_argmax_table():
             coarsen=3,
             plot_loc=True,
             figure_name=os.path.join(
-                figure_path, f"{row['Name']}_{row['Year']}_{int(row['Trial'])}.pdf"
+                figure_path,
+                f"{N2ID[row['Name']]}_{row['Year']}_{int(row['Trial'])}_snapshot.pdf",
             ),
-            x_pos=1.0,
-            y_pos=-0.05,
+            **qk_loc,
         )
 
 
@@ -1126,28 +1130,3 @@ if __name__ == "__main__":
     # plot_multi_argmax()
     # plot_bo_exp()
     # plot_bo_comp()
-
-
-"""
-Old (isopycnal approx, profile from centre of GOM).
-Pensacola (-87.211, 30.404), max1: 4.191 m, max2: 4.772 m, diff: 0.581 m, 13.9 %
-Dauphin Island (-88.075, 30.250), max1: 3.567 m, max2: 3.946 m, diff: 0.379 m, 10.6 %
-Pilots Station East, S.W. Pass (-89.407, 28.932), max1: 1.879 m, max2: 2.420 m, diff: 0.541 m, 28.8 %
-Grand Isle (-89.957, 29.263), max1: 5.886 m, max2: 7.141 m, diff: 1.255 m, 21.3 %
-Port Fourchon, Belle Pass (-90.199, 29.114), max1: 4.903 m, max2: 5.274 m, diff: 0.371 m, 7.6 %
-West Bank 1, Bayou Gauche (-90.420, 29.789), max1: 11.694 m, max2: 12.714 m, diff: 1.020 m, 8.7 %
-Berwick, Atchafalaya River (-91.238, 29.668), max1: 9.911 m, max2: 11.102 m, diff: 1.192 m, 12.0 %
-Average difference: 0.763 m
-Average percentage difference: 14.708 %
-
-New (isothermal approx) profile from near New Orleans:
-Pensacola, max1: 5.6 m, max2: 6.0 m, diff: 0.4 m, 7 %
-Dauphin Island, max1: 3.9 m, max2: 4.5 m, diff: 0.6 m, 16 %
-Pilots Station East, S.W. Pass, max1: 2.4 m, max2: 2.7 m, diff: 0.3 m, 13 %
-Grand Isle, max1: 8.2 m, max2: 9.3 m, diff: 1.1 m, 13 %
-Port Fourchon, Belle Pass, max1: 6.3 m, max2: 6.9 m, diff: 0.6 m, 10 %
-West Bank 1, Bayou Gauche, max1: 15.0 m, max2: 16.6 m, diff: 1.5 m, 10 %
-Berwick, Atchafalaya River, max1: 12.6 m, max2: 13.7 m, diff: 1.2 m, 9 %
-Average difference: 0.8 m
-Average percentage difference: 11 %
-"""
