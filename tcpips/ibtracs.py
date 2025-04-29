@@ -281,12 +281,44 @@ def example_plot_raw():
         ("longitude", "latitude"),
         np.zeros((len(era5_coords_ds.longitude), len(era5_coords_ds.latitude))),
     )
+    era5_coords_ds["sst"] = (
+        ("longitude", "latitude"),
+        np.zeros((len(era5_coords_ds.longitude), len(era5_coords_ds.latitude))),
+    )
+    era5_coords_ds["msl"] = (
+        ("longitude", "latitude"),
+        np.zeros((len(era5_coords_ds.longitude), len(era5_coords_ds.latitude))),
+    )
+    era5_coords_ds["t2m"] = (
+        ("longitude", "latitude"),
+        np.zeros((len(era5_coords_ds.longitude), len(era5_coords_ds.latitude))),
+    )
+
     # loop through the unique points and increment the count at that point
     for i in range(len(era5_unique_data.longitude.values)):
         lon = era5_unique_data.longitude.values[i]
         lat = era5_unique_data.latitude.values[i]
-        # increment the count at that point
+        # increment the count at that points
         era5_coords_ds["cnt"].loc[dict(longitude=lon, latitude=lat)] += 1
+        N = era5_coords_ds["cnt"].loc[dict(longitude=lon, latitude=lat)]
+        # take mean of the sst at that point
+        era5_coords_ds["sst"].loc[dict(longitude=lon, latitude=lat)] = (
+            N - 1
+        ) / N * era5_coords_ds["sst"].loc[dict(longitude=lon, latitude=lat)] + (
+            era5_unique_data.sst.values[i] / N
+        )
+        # take mean of the msl at that point
+        era5_coords_ds["msl"].loc[dict(longitude=lon, latitude=lat)] = (
+            N - 1
+        ) / N * era5_coords_ds["msl"].loc[dict(longitude=lon, latitude=lat)] + (
+            era5_unique_data.msl.values[i] / N
+        )
+        # take mean of the t2m at that point
+        era5_coords_ds["t2m"].loc[dict(longitude=lon, latitude=lat)] = (
+            N - 1
+        ) / N * era5_coords_ds["t2m"].loc[dict(longitude=lon, latitude=lat)] + (
+            era5_unique_data.t2m.values[i] / N
+        )
 
     print("era5_coords", era5_coords_ds)
 
@@ -360,8 +392,72 @@ def example_plot_raw():
     plt.clf()
     plt.close()
 
+    # let's plot the sst mean from era5_coords_ds
+
+    fig, ax = plt.subplots(
+        1,
+        1,  # figsize=get_dim(ratio=1.1),
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+    )
+    ax.set_global()
+    # add feature at back of plot
+    ax.add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+        alpha=0.3,
+        linewidth=0.5,
+    )
+    era5_coords_ds["sst"] = era5_coords_ds["sst"].where(
+        era5_coords_ds["sst"] > 0, np.nan
+    )
+    era5_coords_ds["sst"].plot(
+        x="longitude",
+        y="latitude",
+        cmap="viridis_r",
+        cbar_kwargs={
+            "label": "Mean SST [K]",
+            "cmap": "viridis_r",
+            "shrink": 0.63,
+        },
+        transform=ccrs.PlateCarree(),
+        add_colorbar=True,
+        add_labels=True,
+        rasterized=True,
+    )
+    plt.title("")
+
+    # add in LATITUDE_FORMATTER and LONGITUDE_FORMATTER
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(),
+        draw_labels=True,
+        linewidth=0.5,
+        color="gray",
+        alpha=0.5,
+        linestyle="--",
+    )
+    gl.xlocator = plt.MaxNLocator(4)
+    gl.ylocator = plt.MaxNLocator(5)
+    gl.xformatter = LongitudeFormatter()
+    gl.yformatter = LatitudeFormatter()
+    # only on bottom and left of plot
+    gl.top_labels = False
+    gl.right_labels = False
+
+    plt.savefig(
+        os.path.join(figure_path, "era5_unique_points_sst.pdf"),
+        bbox_inches="tight",
+        dpi=400,
+    )
+    plt.clf()
+    plt.close()
+    # let's plot the msl mean from era5_coords_ds
+
     fig, axs = plt.subplots(
-        3, 1, figsize=get_dim(ratio=1.1), subplot_kw={"projection": ccrs.PlateCarree()}
+        3,
+        1,
+        figsize=get_dim(ratio=1.1),
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
     label_subplots(axs)
     # (a) sst, (b) , (c) msl
