@@ -267,7 +267,23 @@ def example_plot_raw():
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
     )
-    print(era5_unique_data)
+    # get era5 coordinates
+    era5_coords_ds = get_era5_coordinates()
+    print("era5 unique", era5_unique_data)
+    # get rid of time dimension
+    era5_unique_data = era5_unique_data.squeeze(dim="valid_time")
+
+    era5_coords_ds["counts"] = (
+        ("longitude", "latitude"),
+        np.zeros((len(era5_coords_ds.longitude), len(era5_coords_ds.latitude))),
+    )
+
+    # create histogram of unique points back onto the lon/lat grid of ERA5
+    # take all of the era5 unique data points
+    # and work out if the longitude and latitudes correspond to a point
+
+    # for i in range(era5_unique_data.sst.values):
+    # print("era5 unique", era5_unique_data)
 
     plot_defaults()
 
