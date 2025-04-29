@@ -49,8 +49,16 @@ p15=2015_galverston_profile_r4i1p1f1
 p100=2100_galverston_profile_r4i1p1f1
 obs_lon=-94.7977
 obs_lat=29.3013
-seed=35
+name=galverston
 
-# 1
- python -m adbo.exp_3d --exp_name=galverston-2015-3 --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
-python -m adbo.exp_3d --exp_name=galverston-2100-3 --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
+# 4
+seed=40
+exp=4
+python -m adbo.exp_3d --exp_name=${name}-2015-${exp} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
+python -m adbo.exp_3d --exp_name=${name}-2100-${exp} --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed
+
+# 5
+seed=45
+exp=5
+python -m adbo.exp_3d --exp_name=${name}-2015-${exp} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed
+python -m adbo.exp_3d --exp_name=${name}-2100-${exp} --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed
