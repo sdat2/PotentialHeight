@@ -149,8 +149,6 @@ def download_pressure_levels(
                     os.remove(file_path)
             print(f"Downloaded pressure-level data to {output_path}")
         return
-    # if len(years) <= 10, download the data normally using cdsapi
-
     c = cdsapi.Client()
     c.retrieve(
         "reanalysis-era5-pressure-levels-monthly-means",
@@ -280,10 +278,10 @@ def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
     return ds.rename({"valid_time": "time"})
 
 
+@timeit
 def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
     """
     Calculate potential intensity (PI) using the downloaded ERA5 data for a decade.
-    This function is a placeholder and should be implemented with the actual calculation logic.
 
     Args:
         single_level_path (str): Path to the single-level data file.
@@ -301,17 +299,15 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
     # calculate potential intensity
     pi_ds = calculate_pi(combined_ds, dim="pressure_level")
     # save the potential intensity dataset
+
     # pi_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, "era5_pi.nc"))
-    combined_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, f"era5_pi_years{years_str}.nc"))
+    pi_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, f"era5_pi_years{years_str}.nc"))
 
 
 def era5_pi(years: List[str]) -> None:
     """
-    Calculate potential intensity (PI) using the downloaded ERA5 data.
-    This function is a placeholder and should be implemented with the actual calculation logic.
+    Calculate potential intensity (PI) using the downloaded ERA5 data for a range of years. Go decade by decade.
     """
-    # Placeholder for potential intensity calculation logic
-    # First convert the data
     for i in range(0, len(years), 10):
         j = min(i + 10, len(years))
         single_level_path = os.path.join(
