@@ -352,3 +352,105 @@ def line_with_impact_sphere(
     )
     dist_m: NDArray[np.float32] = dt * np.float32(translation_speed)
     return forward_point_sphere(impact_lon, impact_lat, bearing, dist_m)
+
+
+DEG2RAD = np.pi / 180.0
+RAD2DEG = 180.0 / np.pi
+R_EARTH = 6_371_000.0  # mean Earth radius [m]
+
+
+def parabolic_track_with_impact_sphere(
+    impact_time: float,
+    impact_lon: float,
+    impact_lat: float,
+    translation_speed: float,
+    bearing: float,
+    curvature: float,
+    times: ArrayLike,
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    """
+    Return the longitude/latitude of a storm centre that follows Ide-style
+    *parabolic* track and crosses a chosen impact point at a specified time.
+
+    Args:
+        impact_time (float): Epoch seconds when the eye is exactly over
+            ``(impact_lon, impact_lat)``.
+        impact_lon (float): Impact longitude in degrees East.
+        impact_lat (float): Impact latitude in degrees North.
+        translation_speed (float): Forward speed along the initial bearing
+            (metres s⁻¹).
+        bearing (float): Initial bearing, degrees clockwise from north
+            (0 ° = due north).
+        curvature (float): Parabolic curvature *r*.
+            * Positive → track bends **right** of the bearing.
+            * Negative → bends **left**.
+            * |r| ≈ 0.5 ≙ turning-radius ≈ 110 km.
+        times (ArrayLike): 1-D epoch seconds at which to evaluate the position.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]:
+            ``(lon_arr, lat_arr)`` — float32 arrays matching *times*.
+
+    Notes:
+        * Setting ``curvature = 0`` collapses to great-circle motion identical
+          to the original ``line_with_impact_sphere`` helper.
+        * Uses small-angle ENU projection (good for ≤ 300 km cross-track).
+          Swap Section 4 with a geodesic solver for long crossings.
+
+    Examples:
+        Straight track (no curvature) heading north::
+
+            >>> import numpy as np
+            >>> t = np.array([9., 10., 11.], dtype=np.float32)
+            >>> lon, lat = parabolic_track_with_impact_sphere(
+            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=0.0, curvature=0.0,
+            ...     times=t)
+            >>> float(lat[1])
+            50.0
+            >>> lat[2] > lat[1] > lat[0]
+            True
+
+        Right-hand bend (positive curvature) increases longitude::
+
+            >>> lon2, _ = parabolic_track_with_impact_sphere(
+            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=0.0, curvature=0.5,
+            ...     times=t)
+            >>> round(float(lon2[1]), 6)
+            2.0
+            >>> lon2[2] > lon2[1]
+            True
+
+        Left-hand bend (negative curvature) decreases longitude::
+
+            >>> lon3, _ = parabolic_track_with_impact_sphere(
+            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=0.0, curvature=-0.5,
+            ...     times=t)
+            >>> lon3[0] < 2.0 and lon3[2] < 2.0   # middle point is exactly 2.0
+            True
+
+    """
+    # 1 ─ along-track distance from impact vertex (metres)
+    dt: NDArray[np.float32] = np.asarray(times, dtype=np.float32) - np.float32(
+        impact_time
+    )
+    s: NDArray[np.float32] = dt * np.float32(translation_speed)
+
+    # 2 ─ cross-track offset: n(s) = r · s² (metres)
+    n: NDArray[np.float32] = np.float32(curvature) * s**2
+
+    # 3 ─ rotate from storm-local axes to ENU (metres)
+    θ = bearing * DEG2RAD
+    cosθ, sinθ = np.cos(θ), np.sin(θ)
+    east = n * cosθ + s * sinθ
+    north = -n * sinθ + s * cosθ
+
+    # 4 ─ convert ENU metres to lon/lat degrees (small-angle)
+    lat0_rad = impact_lat * DEG2RAD
+    dlat = north / R_EARTH
+    dlon = east / (R_EARTH * np.cos(lat0_rad))
+    lat = impact_lat + dlat * RAD2DEG
+    lon = impact_lon + dlon * RAD2DEG
+    return lon.astype(np.float32), lat.astype(np.float32)
