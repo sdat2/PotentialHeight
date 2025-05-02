@@ -40,8 +40,8 @@ which python
 #    options to srun commands in the job script. If this is not done,
 #    process/thread pinning may be incorrect leading to poor performance
 # export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
-p25=2015_new_orleans_profile_r4i1p1f1
-p97=2100_new_orleans_profile_r4i1p1f1
+p15=2015_new_orleans_profile_r4i1p1f1
+p100=2100_new_orleans_profile_r4i1p1f1
 obs_lon=-90.0715
 obs_lat=29.9511
 name=new-orleans
