@@ -356,7 +356,6 @@ def line_with_impact_sphere(
 
 DEG2RAD = np.pi / 180.0
 RAD2DEG = 180.0 / np.pi
-R_EARTH = 6_371_000.0  # mean Earth radius [m]
 
 
 def parabolic_track_with_impact_sphere(
@@ -449,8 +448,120 @@ def parabolic_track_with_impact_sphere(
 
     # 4 ─ convert ENU metres to lon/lat degrees (small-angle)
     lat0_rad = impact_lat * DEG2RAD
-    dlat = north / R_EARTH
-    dlon = east / (R_EARTH * np.cos(lat0_rad))
+    dlat = north / EARTH_RADIUS
+    dlon = east / (EARTH_RADIUS * np.cos(lat0_rad))
     lat = impact_lat + dlat * RAD2DEG
     lon = impact_lon + dlon * RAD2DEG
+    return lon.astype(np.float32), lat.astype(np.float32)
+
+
+def _arc_len(s: NDArray[np.float64], r: float) -> NDArray[np.float64]:
+    """Arc-length L(s) for n = r·s² (see Ide et al.)."""
+    if r == 0.0:
+        return s
+    k = 2.0 * r
+    return 0.5 * s * np.sqrt(1.0 + (k * s) ** 2) + np.arcsinh(k * s) / (2.0 * k)
+
+
+def _inv_arc_len(L: NDArray[np.float64], r: float) -> NDArray[np.float64]:
+    """Inverse of L(s) by ≤3 Newton steps (good to <10-6 m)."""
+    if r == 0.0:
+        return L
+    s = L.copy()
+    k = 2.0 * r
+    for _ in range(3):  # convergence in ≤2, keep a 3rd for safety
+        f = 0.5 * s * np.sqrt(1.0 + (k * s) ** 2) + np.arcsinh(k * s) / (2.0 * k) - L
+        fp = np.sqrt(1.0 + (k * s) ** 2)  # dL/ds
+        s -= f / fp
+    return s
+
+
+def parabolic_track_with_impact_pyproj(
+    impact_time: float,
+    impact_lon: float,
+    impact_lat: float,
+    translation_speed: float,
+    bearing: float,
+    curvature: float,
+    times: ArrayLike,
+) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
+    """
+    Accurate Ide-style parabolic track **with constant ground speed** on WGS-84.
+
+    Args:
+        impact_time (float): Epoch seconds when the eye is over the point
+            (``impact_lon``, ``impact_lat``).
+        impact_lon (float): Impact longitude (°E).
+        impact_lat (float): Impact latitude  (°N).
+        translation_speed (float): True ground speed along the curved centre-line
+            (m s⁻¹).
+        bearing (float): Initial bearing (° clockwise from north; 0 ° = due N).
+        curvature (float): Parabolic curvature *r*.  Positive bends right,
+            negative bends left.  |r| ≃ 5 × 10⁻⁶ m⁻¹ reproduces Ide’s r = ±0.5
+            when s ≈ 100 km.
+        times (ArrayLike): 1-D epoch seconds at which to sample the trajectory.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray]: ``(lon_arr, lat_arr)`` – float32 arrays
+            matching *times*.
+
+    Examples:
+        Straight great-circle (curvature = 0) heading north::
+
+            >>> import numpy as np, pyproj, math
+            >>> t = np.array([9., 10., 11.], dtype=np.float64)
+            >>> lon, lat = parabolic_track_with_impact_pyproj(
+            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=0.0, curvature=0.0,
+            ...     times=t)
+            >>> float(lat[1])                                   # at impact
+            50.0
+            >>> lat[2] > lat[1] > lat[0]                        # moves north
+            True
+            >>> # -- distance between successive eye positions ≈ 100 m
+            >>> az12, az21, d12 = GEOD.inv(
+            ...     lon[1], lat[1], lon[2], lat[2])
+            >>> abs(d12 - 100.0) < 2.0
+            True
+
+        Right-hand bend (positive curvature) moves both flanks eastward::
+
+            >>> lon2, _ = parabolic_track_with_impact_pyproj(
+            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=0.0, curvature=5e-6,
+            ...     times=t)
+            >>> lon2[0] > lon2[1] and lon2[2] > lon2[1]       # middle = impact
+            True
+
+        Left-hand bend (negative curvature) decreases longitude::
+
+            >>> lon3, _ = parabolic_track_with_impact_pyproj(
+            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=0.0, curvature=-5e-6,
+            ...     times=t)
+            >>> lon3[0] < 2.0 and lon3[2] < 2.0                # middle = 2.0
+            True
+    """
+    # 1 ─ arc-length travelled since impact (can be ±)
+    L = (np.asarray(times, dtype=np.float64) - impact_time) * translation_speed
+
+    # 2 ─ invert to storm-local parameter s
+    s = _inv_arc_len(L, curvature)
+
+    # 3 ─ cross-track offset n(s) = r·s² and rotate to ENU
+    n = curvature * s**2
+    θ = bearing * DEG2RAD
+    cosθ, sinθ = np.cos(θ), np.sin(θ)
+    east = n * cosθ + s * sinθ
+    north = -n * sinθ + s * cosθ
+
+    # 4 ─ forward geodesic from the impact point by (azimuth, distance)
+    dist = np.hypot(east, north)
+    azimuth = (np.degrees(np.arctan2(east, north)) + 360.0) % 360.0
+    lon, lat, _ = GEOD.fwd(
+        np.full_like(dist, impact_lon),
+        np.full_like(dist, impact_lat),
+        azimuth,
+        dist,
+    )
     return lon.astype(np.float32), lat.astype(np.float32)
