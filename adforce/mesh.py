@@ -2,8 +2,6 @@
 Process ADCIRC meshes efficiently vectorized/sparses.
 This is the shared functionality for processing ADCIRC meshes.
 
-TODO: Add the dual graph calculation for SurgeNet.
-
 fort.63 format:
 dimensions:
     time: (Unlimited) (604 currently)
@@ -26,7 +24,6 @@ coordinates:
 data_vars:
     depth (node): (31435) depth, meters
     zeta (time, node): (604, 31435) water surface elevation, meters
-
 """
 
 from typing import Union, Tuple, List

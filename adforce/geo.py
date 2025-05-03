@@ -1,7 +1,7 @@
 """
 adforce.geo
 
-Do some geographic calculations, including either using a sphere or a GEOID.
+Module for geographic calculations, either using a sphere or a GEOID.
 
 """
 
@@ -486,7 +486,7 @@ def parabolic_track_with_impact_pyproj(
     times: ArrayLike,
 ) -> tuple[NDArray[np.float32], NDArray[np.float32]]:
     """
-    Accurate Ide-style parabolic track **with constant ground speed** on WGS-84.
+    Accurate Ide 2022/2024-style parabolic track **with constant ground speed** on WGS-84.
 
     Args:
         impact_time (float): Epoch seconds when the eye is over the point
@@ -497,37 +497,37 @@ def parabolic_track_with_impact_pyproj(
             (m s⁻¹).
         bearing (float): Initial bearing (° clockwise from north; 0 ° = due N).
         curvature (float): Parabolic curvature *r*.  Positive bends right,
-            negative bends left.  |r| ≃ 5 × 10⁻⁶ m⁻¹ reproduces Ide’s r = ±0.5
+            negative bends left.  |r| ≃ 5 x 10⁻⁶ m⁻¹ reproduces Ide's r = ±0.5
             when s ≈ 100 km.
         times (ArrayLike): 1-D epoch seconds at which to sample the trajectory.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: ``(lon_arr, lat_arr)`` – float32 arrays
+        tuple[np.ndarray, np.ndarray]: ``(lon_arr, lat_arr)`` - float32 arrays
             matching *times*.
 
     Examples:
         Straight great-circle (curvature = 0) heading north::
 
             >>> import numpy as np, pyproj, math
-            >>> t = np.array([9., 10., 11.], dtype=np.float64)
+            >>> t = np.array([9., 10., 11.], dtype=np.float64)*1000
             >>> lon, lat = parabolic_track_with_impact_pyproj(
-            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     impact_time=10.0*1000, impact_lon=2.0, impact_lat=50.0,
             ...     translation_speed=100.0, bearing=0.0, curvature=0.0,
             ...     times=t)
             >>> float(lat[1])                                   # at impact
             50.0
             >>> lat[2] > lat[1] > lat[0]                        # moves north
             True
-            >>> # -- distance between successive eye positions ≈ 100 m
+            >>> # -- distance between successive eye positions ≈ 100 m * dt
             >>> az12, az21, d12 = GEOD.inv(
             ...     lon[1], lat[1], lon[2], lat[2])
-            >>> abs(d12 - 100.0) < 2.0
+            >>> abs(d12 - 100.0 * 1000) < 2.0
             True
 
         Right-hand bend (positive curvature) moves both flanks eastward::
 
             >>> lon2, _ = parabolic_track_with_impact_pyproj(
-            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     impact_time=10.0*1000, impact_lon=2.0, impact_lat=50.0,
             ...     translation_speed=100.0, bearing=0.0, curvature=5e-6,
             ...     times=t)
             >>> lon2[0] > lon2[1] and lon2[2] > lon2[1]       # middle = impact
@@ -536,11 +536,25 @@ def parabolic_track_with_impact_pyproj(
         Left-hand bend (negative curvature) decreases longitude::
 
             >>> lon3, _ = parabolic_track_with_impact_pyproj(
-            ...     impact_time=10.0, impact_lon=2.0, impact_lat=50.0,
+            ...     impact_time=10.0*1000, impact_lon=2.0, impact_lat=50.0,
             ...     translation_speed=100.0, bearing=0.0, curvature=-5e-6,
             ...     times=t)
             >>> lon3[0] < 2.0 and lon3[2] < 2.0                # middle = 2.0
             True
+
+        Should match behaviour of `line_with_impact_pyproj` if curvature is zero.
+            >>> lonc, latc = parabolic_track_with_impact_pyproj(
+            ...     impact_time=10.0*1000, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=45, curvature=0.0,
+            ...     times=t)
+            >>> lonl, latl =  line_with_impact_pyproj(
+            ...     impact_time=10.0*1000, impact_lon=2.0, impact_lat=50.0,
+            ...     translation_speed=100.0, bearing=45, times=t)
+            >>> np.allclose(lonl, lonc)
+            True
+            >>> np.allclose(latl, latc)
+            True
+
     """
     # 1 ─ arc-length travelled since impact (can be ±)
     L = (np.asarray(times, dtype=np.float64) - impact_time) * translation_speed

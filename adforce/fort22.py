@@ -1,8 +1,6 @@
 """fort.22.nc file creation functions.
 
 TODO: Add option for Lin and Chavas 2012 Asymmetric wind profile part based on trajectory.
-
-TODO: Is there a faster package than pyproj for distance and bearing calculations?
 """
 
 import os
@@ -18,6 +16,8 @@ from .geo import (
     line_with_impact_pyproj,
     line_with_impact_sphere,
     distances_bearings_to_center_sphere,
+    parabolic_track_with_impact_pyproj,
+    parabolic_track_with_impact_sphere,
 )
 from .profile import read_profile
 
@@ -42,8 +42,9 @@ def clon_clat_from_config_and_times(
     speed = cfg["translation_speed"]["value"]
     ilon = cfg["impact_location"]["value"][0]
     ilat = cfg["impact_location"]["value"][1]
+    curvature = cfg["impact_location"]["value"]
 
-    if geoid == "sphere":
+    if geoid == "sphere" and curvature < 1e-8:
         return line_with_impact_sphere(
             impact_time=itime * 60,  # convert to seconds.
             impact_lat=ilat,
@@ -52,13 +53,33 @@ def clon_clat_from_config_and_times(
             bearing=angle,
             times=times * 60,  # convert to seconds.
         )
-    elif geoid == "pyproj":
+    elif geoid == "sphere" and curvature >= 1e-9:
+        return parabolic_track_with_impact_sphere(
+            impact_time=itime * 60,  # convert to seconds.
+            impact_lat=ilat,
+            impact_lon=ilon,
+            translation_speed=speed,
+            bearing=angle,
+            curvature=curvature,
+            times=times * 60,  # convert to seconds.
+        )
+    elif geoid == "pyproj" and curvature < 1e-9:
         return line_with_impact_pyproj(
             impact_time=itime * 60,  # convert to seconds.
             impact_lat=ilat,
             impact_lon=ilon,
             translation_speed=speed,
             bearing=angle,
+            times=times * 60,  # convert to seconds.
+        )
+    elif geoid == "pyproj" and curvature >= 1e-9:
+        return parabolic_track_with_impact_pyproj(
+            impact_time=itime * 60,  # convert to seconds.
+            impact_lat=ilat,
+            impact_lon=ilon,
+            translation_speed=speed,
+            bearing=angle,
+            curvature=curvature,
             times=times * 60,  # convert to seconds.
         )
     else:
@@ -356,6 +377,8 @@ def add_psfc_u10(
         del lons, lats
         assert dist.shape == shape
         assert bearing.shape == shape
+
+        # TODO: would have to change this part to implement Lin and Chavas Asymmetry
         # generate the interpolation function from the wind profile
         interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
         # interpolate the pressure and gradient wind fields from the wind profile file
@@ -423,7 +446,7 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     main_group = add_psfc_u10(
         main_group,
         tc_config,
-        v_reduc=tc_config["v_reduc"]["value"],
+        v_reduc=v_reduc,
         geoid=geoid,
     )
     main_group.description = "Main grid"
@@ -440,13 +463,9 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     )
     tc1_group.description = "TC1 grid"
 
-    # institution: Oceanweather Inc. (OWI)
     ds.institution = "Oceanweather Inc. (OWI)"
     ds.conventions = "CF-1.6 OWI-NWS13"
     ds.group_order = "Main TC1"
-    # conventions: CF-1.6 OWI-NWS13
-
-    # print(ds)
     ds.close()
 
 
