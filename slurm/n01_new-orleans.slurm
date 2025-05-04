@@ -46,15 +46,13 @@ obs_lon=-90.0715
 obs_lat=29.9511
 name=new-orleans
 
-# 4
-
-seed=50
-exp=6
+seed=70
+exp=10
 python -m adbo.exp_3d --exp_name=${name}-2015-${exp} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon --seed=$seed
 python -m adbo.exp_3d --exp_name=${name}-2100-${exp} --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed
 
 # 7
-seed=55
-exp=7
+seed=75
+exp=11
 python -m adbo.exp_3d --exp_name=${name}-2015-${exp} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed
 python -m adbo.exp_3d --exp_name=${name}-2100-${exp} --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed

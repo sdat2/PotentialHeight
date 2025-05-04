@@ -14,10 +14,11 @@ GOM_BBOX = BoundingBox([-100, -80], [15, 35], desc="Gulf of Mexico Bounding Box"
 # New Orleans box (lons, lats)
 NO_BBOX = BoundingBox([-92, -86.5], [28.5, 30.8], desc="New Orleans Area Bounding Box")
 
-# Significant places (lon, lat)
+
+# Significant places in North America (lon, lat)
 NEW_ORLEANS = Point(-90.0715, 29.9511, desc="New Orleans")  # lon , lat
 MIAMI = Point(-80.1918, 25.7617, desc="Miami")
-GALVERSTON = Point(-94.7977, 29.3013, desc="Galverston")
+GALVERSTON = Point(-94.7977, 29.3013, desc="Galveston")
 
 # Comparable East Asian cities
 HONG_KONG = Point(114.1095, 22.3964, desc="Hong Kong")
@@ -28,6 +29,20 @@ SHANGHAI = Point(121.4737, 31.2304, desc="Shanghai")
 # Paths
 SRC_PATH = Path(__file__).parent
 SETUP_PATH = os.path.join(SRC_PATH, "setup")
+
+
+# check if we are in n01 or n02
+if "n01/n01" in SRC_PATH.as_posix():
+    CON = "n01"
+elif "n02/n02" in SRC_PATH.as_posix():
+    CON = "n02"
+else:
+    CON = None
+    print("src path", SRC_PATH.as_posix())
+    raise Warning(
+        "Not in n01 or n02 consortium of archer2, file paths may not be correct"
+    )
+
 PROJ_PATH = Path(SRC_PATH).parent
 DATA_PATH = os.path.join(PROJ_PATH, "data")
 TMP_PATH = os.path.join(DATA_PATH, "tmp")
