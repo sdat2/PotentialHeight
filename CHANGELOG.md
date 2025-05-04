@@ -6,6 +6,8 @@ v0.0.4:
 - Added ability to choose between different GP kernels and data acquisition functions in `adbo/exp.py`.
 - Explored using different GP kernels in `adbo/gp_exp`.
 - Added 1D Bayesian optimization expeirment to `adbo/exp_1d.py` and `adbo/gp_exp.py`.
+- Added `lc12` asymmetry option to `adforce/fort22.py`.
+- Added Ide et al. 2022 curved parabolic tropical cyclone tracks to `adforce/fort22.py` and `adforce/geo.py`.
 
 v0.0.3:
 - Improved `era5` data download script.

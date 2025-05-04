@@ -32,3 +32,7 @@ v_reduc:
   value: 0.8
   description: "Reduction factor for the wind speed from gradient wind to 10m height"
   units: "dimensionless"
+use_lc12:
+  value: true
+  description: "Use the LC12 wind asymmetry"
+  units: "dimensionless"
