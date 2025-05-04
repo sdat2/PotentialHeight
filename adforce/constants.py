@@ -39,9 +39,9 @@ elif "n02/n02" in SRC_PATH.as_posix():
 else:
     CON = None
     print("src path", SRC_PATH.as_posix())
-    raise Warning(
-        "Not in n01 or n02 consortium of archer2, file paths may not be correct"
-    )
+    # raise Warning(
+    #    "Not in n01 or n02 consortium of archer2, file paths may not be correct"
+    # )
 
 PROJ_PATH = Path(SRC_PATH).parent
 DATA_PATH = os.path.join(PROJ_PATH, "data")

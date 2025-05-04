@@ -23,7 +23,6 @@ from .geo import (
 from .profile import read_profile
 
 
-# --- Helper for Lin & Chavas (2012) background wind ---
 def _lc12_background_wind(tc_cfg: dict) -> Tuple[float, float]:
     """Return background wind components (U_bg, V_bg) following Lin & Chavas (2012).
 
@@ -43,10 +42,9 @@ def _lc12_background_wind(tc_cfg: dict) -> Tuple[float, float]:
                 - translation_speed_factor    {'value': 0.55}     # beta
                 - rotation_angle              {'value': 20.0}     # degrees
 
-    Returns
-    -------
-    Tuple[float, float]
-        (U_bg, V_bg) - eastward and northward background-wind components (m s-1).
+    Returns:
+        Tuple[float, float]:
+            (U_bg, V_bg) - eastward and northward background-wind components (m s-1).
     """
     beta = tc_cfg.get("translation_speed_factor", {"value": 0.55})["value"]
     phi = tc_cfg.get("rotation_angle", {"value": 20.0})["value"]
