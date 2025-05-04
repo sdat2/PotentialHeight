@@ -42,7 +42,11 @@ def clon_clat_from_config_and_times(
     speed = cfg["translation_speed"]["value"]
     ilon = cfg["impact_location"]["value"][0]
     ilat = cfg["impact_location"]["value"][1]
-    curvature = cfg["impact_location"]["value"]
+
+    if "curvature" in cfg:
+        curvature = cfg["curvature"]["value"]
+    else:
+        curvature = 0.0
 
     if geoid == "sphere" and curvature < 1e-8:
         return line_with_impact_sphere(

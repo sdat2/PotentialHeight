@@ -254,20 +254,8 @@ def dual_graph_starts_ends_from_triangles(
                 # in the same order as the triangles.
         if len(nodes) == 3:
             raise ValueError("An edge is shared by more than 2 triangles. Check mesh.")
-        # there should be at most only two triangles for each edge
-        # so these loops are not necessary
-        # for i in range(len(nodes)):
-        #    for j in range(i + 1, len(nodes)):
-        #        starts.append(nodes[i])
-        #        starts.append(nodes[j])
-        #        ends.append(nodes[j])
-        #        ends.append(nodes[i])
+
     if return_geometry:
-        # starts = np.array(starts)
-        # ends = np.array(ends)
-        # len_edges = np.array(len_edges)
-        # unit_normal_x = np.array(unit_normal_x)
-        # unit_normal_y = np.array(unit_normal_y)
         return starts, ends, len_edges, xd, yd, unit_normal_x, unit_normal_y
     else:
         return starts, ends
