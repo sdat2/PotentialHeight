@@ -19,7 +19,45 @@ from .geo import (
     parabolic_track_with_impact_pyproj,
     parabolic_track_with_impact_sphere,
 )
+
 from .profile import read_profile
+
+
+# --- Helper for Lin & Chavas (2012) background wind ---
+def _lc12_background_wind(tc_cfg: dict) -> Tuple[float, float]:
+    """Return background wind components (U_bg, V_bg) following Lin & Chavas (2012).
+
+    The background wind is a uniform vector whose magnitude is
+        beta * V_trans,
+    where `beta` is the translation-speed reduction factor (≈0.55 by default)
+    and `V_trans` is the storm translation speed.  The vector is rotated
+    `rotation_angle` degrees cyclonically (counter-clockwise in the Northern
+    Hemisphere, clockwise in the Southern) from the direction of motion.
+
+    Args:
+        tc_cfg (dict):
+            Tropical-cyclone configuration dictionary containing at least:
+                - translation_speed          {'value': <float>}  # m s-1
+                - angle                       {'value': <float>}  # bearing (0°=north, 90° = east)
+            Optional (with defaults):
+                - translation_speed_factor    {'value': 0.55}     # beta
+                - rotation_angle              {'value': 20.0}     # degrees
+
+    Returns
+    -------
+    Tuple[float, float]
+        (U_bg, V_bg) - eastward and northward background-wind components (m s-1).
+    """
+    beta = tc_cfg.get("translation_speed_factor", {"value": 0.55})["value"]
+    phi = tc_cfg.get("rotation_angle", {"value": 20.0})["value"]
+    v_trans = tc_cfg["translation_speed"]["value"]
+    bearing = tc_cfg["angle"]["value"]
+
+    # Cyclonic rotation: add +phi degrees (CCW in NH, CW in SH if phi negative).
+    theta_rad = np.deg2rad(bearing + phi)
+    u_bg = beta * v_trans * np.sin(theta_rad)  # east‑component
+    v_bg = beta * v_trans * np.cos(theta_rad)  # north‑component
+    return float(u_bg), float(v_bg)
 
 
 def clon_clat_from_config_and_times(
@@ -48,7 +86,7 @@ def clon_clat_from_config_and_times(
     else:
         curvature = 0.0
 
-    if geoid == "sphere" and curvature < 1e-8:
+    if geoid == "sphere" and curvature < 1e-8:  # if curvature is 0, use line
         return line_with_impact_sphere(
             impact_time=itime * 60,  # convert to seconds.
             impact_lat=ilat,
@@ -88,7 +126,7 @@ def clon_clat_from_config_and_times(
         )
     else:
         raise ValueError(
-            f"geoid must be 'pyproj' or 'sphere', not {geoid}. Please check the config."
+            f"geoid must be 'pyproj' or 'sphere', not {geoid}. Please check the config. pyproj corresponds to a WGS84 ellipsoid, while sphere corresponds to a spherical Earth."
         )
 
 
@@ -330,6 +368,8 @@ def add_psfc_u10(
 
     Returns:
         ds (nc.Dataset): reference to transformed netcdf4 dataset.
+
+    If tc_config['use_lc12']['value'] is True, a uniform background wind following Lin & Chavas (2012) is superposed on the symmetric field using parameters 'translation_speed_factor' and 'rotation_angle'.
     """
     ds.createVariable("PSFC", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
     ds.createVariable("U10", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
@@ -382,7 +422,6 @@ def add_psfc_u10(
         assert dist.shape == shape
         assert bearing.shape == shape
 
-        # TODO: would have to change this part to implement Lin and Chavas Asymmetry
         # generate the interpolation function from the wind profile
         interp_func = gen_ps_f(profile_path_or_dict=tc_config["profile_path"]["value"])
         # interpolate the pressure and gradient wind fields from the wind profile file
@@ -399,6 +438,12 @@ def add_psfc_u10(
             np.sin(np.deg2rad(bearing) + np.pi / 2) * wsp * v_reduc,
             np.cos(np.deg2rad(bearing) + np.pi / 2) * wsp * v_reduc,
         )
+
+        # ----- Optional Lin & Chavas (2012) translational asymmetry -----
+        if "use_lc12" in tc_config and tc_config["use_lc12"].value:
+            u_bg, v_bg = _lc12_background_wind(tc_config)
+            u10 += u_bg
+            v10 += v_bg
         del wsp
         assert u10.shape == shape
         assert v10.shape == shape
@@ -471,6 +516,49 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     ds.conventions = "CF-1.6 OWI-NWS13"
     ds.group_order = "Main TC1"
     ds.close()
+
+
+def plot_trajectories(
+    grid_config: dict,
+    tc_config: dict,
+    geoid: Literal["pyproj", "sphere"] = "sphere",
+) -> None:
+    """Plot the trajectories of the tropical cyclone.
+
+    Args:
+        ds (nc.Dataset): reference to input netcdf4 dataset.
+        tc_config (dict): A dictionary containing the information necesary to reconstruct the tropical cyclone trajectory.
+        geoid (Literal["pyproj", "sphere"], optional): Geoid type. Defaults to "sphere".
+    """
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+
+    tlen = grid_config["tlen"]
+    start = unknown_to_time(
+        grid_config["start"], grid_config["time_unit"], grid_config["time_calendar"]
+    )
+
+    times = np.linspace(
+        start, start + (tlen - 1) * (grid_config["timestep"]), tlen, dtype=np.int32
+    )  # time in minutes from start of calendar
+
+    itime = unknown_to_time(
+        tc_config["impact_time"]["value"],
+        tc_config["time_unit"],
+        tc_config["time_calendar"],
+    )
+
+    if geoid not in ["pyproj", "sphere"]:
+        raise ValueError("Invalid geoid type. Must be 'pyproj' or 'sphere'.")
+
+    clons, clats = clon_clat_from_config_and_times(tc_config, itime, times, geoid=geoid)
+    fig, ax = plt.subplots()
+    for i in range(len(times)):
+        ax.plot(clons[i], clats[i], marker="o", color=cm.viridis(i / len(times)))
+    ax.set_xlabel("Longitude")
+    ax.set_ylabel("Latitude")
+    ax.set_title("Tropical Cyclone Trajectories")
+    plt.show()
 
 
 if __name__ == "__main__":
