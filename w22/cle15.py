@@ -228,7 +228,7 @@ def quick_plot(V: Callable, info: Dict[str, float]) -> None:  # pragma: no cover
     """Plot wind profile with markers at r_m, r_a, r_0."""
     import matplotlib.pyplot as plt
 
-    r = np.linspace(0.0, info["r0"], 1400)
+    r = np.linspace(0.0, info["r0"], 14000)
     plt.plot(r * 1e-3, V(r), label="V(r)")
     for k, col in (("rm", "r"), ("ra", "g"), ("r0", "k")):
         plt.axvline(info[k] * 1e-3, ls="--", c=col, label=k)
@@ -239,10 +239,178 @@ def quick_plot(V: Callable, info: Dict[str, float]) -> None:  # pragma: no cover
     plt.show()
 
 
+# ---------------------------------------------------------------------
+# 1. Inner-core angular momentum (Emanuel & Rotunno 2011)
+# ---------------------------------------------------------------------
+def m_inner(
+    r: NDArray | float, m_m: float, r_m: float, ck_over_cd: float
+) -> NDArray | float:
+    """
+    Eyewall / inner-core absolute angular momentum *M(r)*.
+
+    Args:
+        r: Radius (m) or array of radii.
+        m_m: Angular momentum at ``r_m`` (m² s⁻¹).
+        r_m: Radius of maximum wind (m).
+        ck_over_cd: Ratio Ck/Cd (< 1).
+
+    Returns:
+        M(r) in m² s⁻¹.
+
+    >>> m_inner(30_000., 3.6e6, 30_000., 0.8)
+    3600000.0
+    """
+    if ck_over_cd >= 1.0:
+        raise ValueError("Ck/Cd must be < 1")
+    r_arr = np.asarray(r, float)
+    m_eye = m_m * (r_arr / r_m) ** 2
+    base = (2.0 + ck_over_cd) * ((r_arr / r_m) ** 2 - 1.0)
+    expo = 1.0 / (2.0 - 2.0 * ck_over_cd)
+    m_er = m_m * np.maximum(base, 0.0) ** expo
+    out = np.where(r_arr <= r_m, m_eye, m_er)
+    return out if np.ndim(r) else float(out)
+
+
+# ---------------------------------------------------------------------
+# 2. Emanuel (2004) outer ODE helper
+# ---------------------------------------------------------------------
+def dmdr_outer(r: float, m: float, r0: float, f: float, cd: float, wc: float) -> float:
+    """Derivative dM/dr that tends to 0 as r→r₀⁻."""
+    denom = r0**2 - r**2
+    return 0.0 if denom <= 0.0 else 2 * cd * wc * (m - 0.5 * f * r**2) ** 2 / denom
+
+
+def integrate_outer(
+    r0: float, r_stop: float, f: float, cd: float, wc: float, n: int = 4000
+) -> Tuple[NDArray, NDArray]:
+    """
+    Inward 4-th-order RK integration of the outer ODE.
+
+    Returns:
+        radii (descending) and M(r).
+    """
+    r0_in = r0 * (1 - 1e-6)
+    dr = -(r0_in - r_stop) / n
+    rs = np.linspace(r0_in, r_stop, n + 1)
+    Ms = np.empty_like(rs)
+    Ms[0] = 0.5 * f * r0**2
+    for i in range(n):
+        r, m = rs[i], Ms[i]
+        k1 = dmdr_outer(r, m, r0, f, cd, wc)
+        k2 = dmdr_outer(r + 0.5 * dr, m + 0.5 * dr * k1, r0, f, cd, wc)
+        k3 = dmdr_outer(r + 0.5 * dr, m + 0.5 * dr * k2, r0, f, cd, wc)
+        k4 = dmdr_outer(r + dr, m + dr * k3, r0, f, cd, wc)
+        Ms[i + 1] = m + (dr / 6) * (k1 + 2 * k2 + 2 * k3 + k4)
+    return rs, Ms
+
+
+# ---------------------------------------------------------------------
+# 3. Reverse solver   (given r0 → rm)
+# ---------------------------------------------------------------------
+def solve_reverse(
+    cfg: Dict, *, n_outer: int = 6000
+) -> Tuple[Callable[[NDArray | float], NDArray | float], Dict[str, float]]:
+    """
+    Compute wind profile for a fixed outer radius.
+
+    Args:
+        cfg: Must contain
+            r0 (m), Vm_guess (m/s), f (s⁻¹), Ck, Cd, Wcool (m/s)
+        n_outer: RK steps for outer integration.
+
+    Returns:
+        V(r) callable and information dict.
+
+    >>> cfg = {'r0':180e3,'Vm_guess':45.,'f':5e-5,
+    ...         'Ck':8e-4,'Cd':1e-3,'Wcool':0.002}
+    >>> V, info = solve_reverse(cfg)
+    >>> info['rm'] < info['r0']
+    True
+    >>> abs(V(info['rm']) - cfg['Vm_guess']) < 5
+    True
+    """
+    r0, Vm0 = cfg["r0"], cfg["Vm_guess"]
+    f, Ck, Cd, Wc = cfg["f"], cfg["Ck"], cfg["Cd"], cfg["Wcool"]
+    ckcd = Ck / Cd
+    if ckcd >= 1.0:
+        raise ValueError("Ck/Cd must be < 1")
+
+    def mismatch(rm_val: float) -> float:
+        M_m = rm_val * Vm0 + 0.5 * f * rm_val**2
+        _, M_out = integrate_outer(r0, rm_val, f, Cd, Wc, max(800, n_outer // 30))
+        return M_out[-1] - M_m
+
+    rm = brentq(mismatch, 1e3, 0.9 * r0, maxiter=80)
+    Vm = Vm0
+    M_m = rm * Vm + 0.5 * f * rm**2
+    r_out, M_out = integrate_outer(r0, rm, f, Cd, Wc, n_outer)
+
+    def gap(r_val: float) -> float:
+        M_outer = np.interp(r_val, r_out[::-1], M_out[::-1])
+        return m_inner(r_val, M_m, rm, ckcd) - M_outer
+
+    ra = brentq(gap, rm * 1.001, r0 * 0.999, maxiter=80)
+    M_a = m_inner(ra, M_m, rm, ckcd)
+
+    r_cache = np.hstack([r_out, ra, r0])
+    M_cache = np.hstack([M_out, M_a, 0.5 * f * r0**2])
+
+    def V(r: NDArray | float) -> NDArray | float:
+        """Tangential wind speed (m/s) at radius *r* (m)."""
+        R = np.asarray(r, float)
+        Vv = np.zeros_like(R)
+        eye = R < rm
+        inner = (R >= rm) & (R <= ra)
+        outer = (R > ra) & (R <= r0)
+        Vv[eye] = Vm * (R[eye] / rm)
+        Vv[inner] = m_inner(R[inner], M_m, rm, ckcd) / R[inner] - 0.5 * f * R[inner]
+        Vv[outer] = (
+            np.interp(R[outer], r_cache[::-1], M_cache[::-1]) / R[outer]
+            - 0.5 * f * R[outer]
+        )
+        return Vv if np.ndim(r) else float(Vv)
+
+    return V, {"r0": r0, "rm": rm, "ra": ra, "Vm": Vm}
+
+
+# ---------------------------------------------------------------------
+def quick_plot_two(V: Callable, info: Dict[str, float]) -> None:  # pragma: no cover
+    """Matplotlib sanity check."""
+    import matplotlib.pyplot as plt
+
+    r = np.linspace(0, info["r0"], 1400)
+    plt.plot(r / 1000, V(r))
+    for k, c in (("rm", "r"), ("ra", "g"), ("r0", "k")):
+        plt.axvline(info[k] / 1000, ls="--", c=c, label=k)
+    plt.xlabel("Radius (km)")
+    plt.ylabel("Wind (m/s)")
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+if __name__ == "__main__":  # pragma: no cover
+    cfg_demo = {
+        "r0": 180e3,
+        "Vm_guess": 45.0,
+        "f": 5e-5,
+        "Ck": 8e-4,
+        "Cd": 1e-3,
+        "Wcool": 0.002,
+    }
+    V_demo, info_demo = solve_reverse(cfg_demo)
+    print(info_demo)
+    try:
+        quick_plot(V_demo, info_demo)
+    except ImportError:
+        pass
+
+
 # ----------------------------------------------------------------------
 # 5. Demo when executed directly
 # ----------------------------------------------------------------------
 if __name__ == "__main__":  # pragma: no cover
+    # python -m w22.cle15
     cfg_demo = {
         "Vm": 50.0,
         "rm": 30_000.0,
@@ -254,6 +422,6 @@ if __name__ == "__main__":  # pragma: no cover
     V_demo, info_demo = solve_profile(cfg_demo)
     print(info_demo)
     try:
-        quick_plot(V_demo, info_demo)
+        quick_plot_two(V_demo, info_demo)
     except ImportError:
         print("matplotlib not installed — skipping plot.")
