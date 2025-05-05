@@ -4,6 +4,8 @@ Python translation of MATLAB code for calculating the Chavas et al. (2015)
 tropical cyclone wind profile, merging Emanuel & Rotunno (2011) inner
 profile and Emanuel (2004) outer profile, using r0 as input.
 
+Translated by Gemini-2.5-pro (experimental) on 2025-05-05.
+
 Based on MATLAB scripts:
 - ER11E04_nondim_r0input.m
 - E04_outerwind_r0input_nondim_MM0.m
@@ -25,11 +27,14 @@ References:
     Cambridge University Press.
 """
 
+from typing import Tuple, Union
+from numpy.typing import NDArray
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.optimize import root_scalar
 import warnings
 import matplotlib.pyplot as plt  # Optional: For plotting example
+from sithom.time import timeit
 
 # --- Constants ---
 # Coefficients for Ck/Cd quadratic fit to Vmax (Chavas et al. 2015)
@@ -51,7 +56,7 @@ else:
 # --- Helper Functions ---
 
 
-def _calculate_cd(V):
+def _calculate_cd(V: Union[float, NDArray]) -> Union[float, NDArray]:
     """
     Calculates the drag coefficient (Cd) based on wind speed (V) using a
     piecewise linear fit to Donelan et al. (2004).
@@ -83,7 +88,14 @@ def _calculate_cd(V):
     return Cd
 
 
-def _e04_outerwind_r0input_nondim_mm0(r0, fcor, Cdvary, C_d_input, w_cool, Nr=100000):
+def _e04_outerwind_r0input_nondim_mm0(
+    r0: float,
+    fcor: float,
+    Cdvary: int,
+    C_d_input: float,
+    w_cool: float,
+    Nr: int = 100000,
+):
     """
     Calculates the Emanuel (2004) non-convecting outer wind profile,
     represented as M/M0 vs. r/r0, given the outer radius r0.
@@ -205,11 +217,23 @@ def _e04_outerwind_r0input_nondim_mm0(r0, fcor, Cdvary, C_d_input, w_cool, Nr=10
     return rrfracr0[valid_mask], MMfracM0[valid_mask]
 
 
-def _er11_rmax_r0_relation(rmax_var, Vmax, r0, fcor, CkCd):
+def _er11_rmax_r0_relation(
+    rmax_var: float, Vmax: float, r0: float, fcor: float, CkCd: float
+):
     """
     Function representing the implicit relationship between rmax and r0
     in the ER11 model (Eq. 37, rearranged to be = 0).
     Used for root finding. Finds rmax given r0.
+
+    Args:
+        rmax_var (float): Variable radius (rmax) to find.
+        Vmax (float): Maximum wind speed (m/s).
+        r0 (float): Fixed outer radius (m).
+        fcor (float): Coriolis parameter (s^-1).
+        CkCd (float): Ratio of surface exchange coefficients Ck/Cd.
+
+    Returns:
+        float: Value of the implicit function (should be zero at solution).
     """
     if rmax_var <= 0 or rmax_var >= r0:  # Constraint for physical solution
         return np.inf  # Return large value outside valid range
@@ -252,11 +276,23 @@ def _er11_rmax_r0_relation(rmax_var, Vmax, r0, fcor, CkCd):
     return lhs - rhs
 
 
-def _er11_r0_rmax_relation(r0_var, Vmax, rmax, fcor, CkCd):
+def _er11_r0_rmax_relation(
+    r0_var: float, Vmax: float, rmax: float, fcor: float, CkCd: float
+):
     """
     Function representing the implicit relationship between rmax and r0
     in the ER11 model (Eq. 37, rearranged to be = 0).
     Used for root finding. Finds r0 given rmax.
+
+    Args:
+        r0_var (float): Variable radius (r0) to find.
+        Vmax (float): Maximum wind speed (m/s).
+        rmax (float): Fixed outer radius (m).
+        fcor (float): Coriolis parameter (s^-1).
+        CkCd (float): Ratio of surface exchange coefficients Ck/Cd.
+
+    Returns:
+        float: Value of the implicit function (should be zero at solution).
     """
     if r0_var <= rmax:  # Constraint for physical solution
         return np.inf
@@ -296,7 +332,14 @@ def _er11_r0_rmax_relation(r0_var, Vmax, rmax, fcor, CkCd):
     return lhs - rhs
 
 
-def _er11_radprof_raw(Vmax, r_in, rmax_or_r0, fcor, CkCd, rr_er11):
+def _er11_radprof_raw(
+    Vmax: float,
+    r_in: float,
+    rmax_or_r0: str,
+    fcor: float,
+    CkCd: float,
+    rr_er11: np.ndarray,
+):
     """
     Calculates the raw Emanuel and Rotunno (2011) theoretical wind profile
     without iterative convergence for Vmax/rmax. Determines rmax from r0
@@ -968,9 +1011,31 @@ def _radprof_eyeadj(rr_in, VV_in, alpha, r_eye_outer=None, V_eye_outer=None):
 # --- Main Function ---
 
 
+@timeit
 def chavas_et_al_2015_profile(
-    Vmax, r0, fcor, Cdvary, C_d, w_cool, CkCdvary, CkCd_input, eye_adj, alpha_eye
-):
+    Vmax: float,
+    r0: float,
+    fcor: float,
+    Cdvary: int,
+    C_d: float,
+    w_cool: float,
+    CkCdvary: int,
+    CkCd_input: float,
+    eye_adj: int,
+    alpha_eye: float,
+) -> Tuple[
+    np.ndarray,
+    np.ndarray,
+    float,
+    float,
+    float,
+    np.ndarray,
+    np.ndarray,
+    float,
+    float,
+    float,
+    float,
+]:
     """
     Calculates the Chavas et al. (2015) merged tropical cyclone wind profile.
 
