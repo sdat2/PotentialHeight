@@ -2,7 +2,7 @@
 tc_profile_reverse.py
 =====================
 
-Inverse Chavas–Lin–Emanuel (2015) radial wind model
+Inverse Chavas-Lin-Emanuel (2015) radial wind model
 --------------------------------------------------
 
 *Input*  : outer calm radius ``r0`` plus physical parameters
@@ -40,7 +40,7 @@ True
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Tuple
+from typing import Callable, Dict, Tuple, Union
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import brentq
@@ -49,58 +49,65 @@ from scipy.interpolate import interp1d
 from math import copysign
 
 
-# ---------------------------------------------------------------------
-# 1. Inner-core (ER11) absolute momentum
-# ---------------------------------------------------------------------
 def m_inner(
-    r: NDArray[np.floating] | float,
-    m_max: float,
-    r_max: float,
+    r: Union[NDArray[np.floating], float],
+    m_m: float,
+    r_m: float,
     ck_over_cd: float,
-) -> NDArray[np.floating] | float:
+) -> Union[NDArray[np.floating], float]:
     """
-    Emanuel–Rotunno (2011) analytic momentum curve.
+    Eyewall / inner-core absolute angular momentum M(r).
 
-    Parameters
-    ----------
-    r : float | ndarray
-        Radius (m).
-    m_max : float
-        Momentum at ``r_max`` (m² s⁻¹).
-    r_max : float
-        Radius of maximum wind (m).
-    ck_over_cd : float
-        ``Ck/Cd`` – must be < 1.
+    Args:
+        r: radius [m] or radii array.
+        m_m: angular momentum at r_m [m^2 s^-1].
+        r_m: radius of maximum wind [m].
+        ck_over_cd: C_k/C_d ratio (<1).
 
-    Returns
-    -------
-    float | ndarray
-        Absolute momentum M(r).
+    Returns:
+        M(r) [m^2 s^-1].
 
-    >>> m_inner(30_000., 3.6e6, 30_000., 0.8)
+    Raises:
+        ValueError: if ck_over_cd >= 1.
+
+    >>> round(m_inner(30000., 3.6e6, 30000., 0.8), 1)
     3600000.0
     """
     if ck_over_cd >= 1.0:
-        raise ValueError("Ck/Cd must be < 1 for the ER11 formula")
-
+        raise ValueError("C_k/C_d must be < 1")
     r_arr = np.asarray(r, float)
-    m_eye = m_max * (r_arr / r_max) ** 2  # solid-body
-    base = (2.0 + ck_over_cd) * ((r_arr / r_max) ** 2 - 1.0)
+    m_eye = m_m * (r_arr / r_m) ** 2
+    base = (2.0 + ck_over_cd) * ((r_arr / r_m) ** 2 - 1.0)
     expo = 1.0 / (2.0 - 2.0 * ck_over_cd)
-    m_ext = m_max * np.maximum(base, 0.0) ** expo
-    out = np.where(r_arr <= r_max, m_eye, m_ext)
+    m_er = m_m * np.maximum(base, 0.0) ** expo
+    out = np.where(r_arr <= r_m, m_eye, m_er)
     return out if np.ndim(r) else float(out)
 
 
-# ---------------------------------------------------------------------
-# 2. Emanuel (2004) outer ODE + integrator
-# ---------------------------------------------------------------------
 def dmdr_outer(
-    r: float, m: float, r0: float, f: float, cd: float, wcool: float
+    r: float,
+    m: float,
+    r0: float,
+    f: float,
+    cd: float,
+    wc: float,
 ) -> float:
-    """dM/dr for the outer solution (→ 0 at r → r0)."""
+    """
+    dM/dr for the Emanuel (2004) outer solution.
+
+    Args:
+        r: radius [m]
+        m: angular momentum at r
+        r0: outer calm radius [m]
+        f: Coriolis parameter [s^-1]
+        cd: drag coefficient
+        wc: subsidence rate [m/s]
+
+    Returns:
+        dM/dr [m^2 s^-1 / m]
+    """
     denom = r0**2 - r**2
-    return 0.0 if denom <= 0 else 2.0 * cd * wcool * (m - 0.5 * f * r**2) ** 2 / denom
+    return 0.0 if denom <= 0.0 else 2 * cd * wc * (m - 0.5 * f * r**2) ** 2 / denom
 
 
 def integrate_outer(
@@ -108,100 +115,122 @@ def integrate_outer(
     r_stop: float,
     f: float,
     cd: float,
-    wcool: float,
-    steps: int = 4000,
+    wc: float,
+    n: int = 4000,
 ) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
-    """Return radii (descending) and M(r) for the outer region."""
+    """
+    Integrate the outer ODE inward via RK4.
+
+    Args:
+        r0: outer calm radius [m]
+        r_stop: endpoint radius (<r0) [m]
+        f: Coriolis [s^-1]
+        cd: drag coefficient
+        wc: subsidence rate [m/s]
+        n: RK4 steps
+
+    Returns:
+        (radii, M(r)) descending from r0 to r_stop
+    """
     r0_in = r0 * (1 - 1e-6)
-    dr = -(r0_in - r_stop) / steps
-    rs = np.linspace(r0_in, r_stop, steps + 1)
+    dr = -(r0_in - r_stop) / n
+    rs = np.linspace(r0_in, r_stop, n + 1)
     Ms = np.empty_like(rs)
     Ms[0] = 0.5 * f * r0**2
-    for i in range(steps):
+    for i in range(n):
         r_c, m_c = rs[i], Ms[i]
-        k1 = dmdr_outer(r_c, m_c, r0, f, cd, wcool)
-        k2 = dmdr_outer(r_c + 0.5 * dr, m_c + 0.5 * dr * k1, r0, f, cd, wcool)
-        k3 = dmdr_outer(r_c + 0.5 * dr, m_c + 0.5 * dr * k2, r0, f, cd, wcool)
-        k4 = dmdr_outer(r_c + dr, m_c + dr * k3, r0, f, cd, wcool)
-        Ms[i + 1] = m_c + (dr / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+        k1 = dmdr_outer(r_c, m_c, r0, f, cd, wc)
+        k2 = dmdr_outer(r_c + 0.5 * dr, m_c + 0.5 * dr * k1, r0, f, cd, wc)
+        k3 = dmdr_outer(r_c + 0.5 * dr, m_c + 0.5 * dr * k2, r0, f, cd, wc)
+        k4 = dmdr_outer(r_c + dr, m_c + dr * k3, r0, f, cd, wc)
+        Ms[i + 1] = m_c + (dr / 6) * (k1 + 2 * k2 + 2 * k3 + k4)
     return rs, Ms
 
 
-# ---------------------------------------------------------------------
-# 3.  Reverse solver (input r0 → rm, V(r))
-# ---------------------------------------------------------------------
 def solve_reverse(
     cfg: Dict[str, float],
     *,
     n_outer: int = 6000,
 ) -> Tuple[
-    Callable[[NDArray[np.floating] | float], NDArray[np.floating] | float],
+    Callable[[Union[NDArray[np.floating], float]], Union[NDArray[np.floating], float]],
     Dict[str, float],
 ]:
     """
-    Solve for ``rm`` and return a continuous wind-speed profile ``V(r)``.
+    Inverse Chavas–Lin–Emanuel solver: given r0, find rm and V(r).
 
-    Expected keys in *cfg*::
+    Args:
+        cfg: dict with keys:
+            r0: outer calm radius [m]
+            Vm_guess: initial max wind guess [m/s]
+            f: Coriolis [s^-1]
+            Ck: enthalpy coeff
+            Cd: drag coeff
+            Wcool: subsidence [m/s]
+        n_outer: RK4 steps for outer
 
-        r0        : float  (m)
-        Vm_guess  : float  (m s⁻¹)
-        f         : float  (s⁻¹)
-        Ck, Cd    : float
-        Wcool     : float  (m s⁻¹)
+    Returns:
+        V: wind-speed function V(r) [m/s]
+        info: dict {'r0','rm','rj','Vm','Va'}
 
-    The solver follows Chavas et al. (2015) MATLAB logic.
+    Raises:
+        ValueError: if Ck/Cd >= 1
 
-    Returns
-    -------
-    V : callable
-        Tangential wind speed V(r) for scalar/array radii.
-    info : dict
-        ``{'r0','rm','rj','Vm','Va'}``
+    >>> cfg = {'r0':180e3,'Vm_guess':45.,'f':5e-5,'Ck':8e-4,'Cd':1e-3,'Wcool':0.002}
+    >>> V, info = solve_reverse(cfg)
+    >>> info['rm'] < info['r0']
+    True
+    >>> abs(V(info['rm']) - cfg['Vm_guess']) < 5.0
+    True
     """
     r0 = cfg["r0"]
     Vm0 = cfg["Vm_guess"]
-    f, Ck, Cd, Wcool = cfg["f"], cfg["Ck"], cfg["Cd"], cfg["Wcool"]
+    f = cfg["f"]
+    Ck = cfg["Ck"]
+    Cd = cfg["Cd"]
+    Wc = cfg["Wcool"]
     ckcd = Ck / Cd
     if ckcd >= 1.0:
-        raise ValueError("Ck/Cd must be < 1 for the ER11 inner solution")
+        raise ValueError("Ck/Cd must be < 1")
 
-    # --- integrate outer solution once --------------------------------
-    r_outer, M_outer = integrate_outer(r0, 0.0, f, Cd, Wcool, n_outer)
-
-    # --- search for rm such that inner & outer M curves just touch -----
     def mismatch(rm_val: float) -> float:
-        M_max = Vm0 * rm_val + 0.5 * f * rm_val**2
-        diff = m_inner(r_outer, M_max, rm_val, ckcd) - M_outer
-        return diff.max() * diff.min()  # zero when sign change collapses
+        M_m = rm_val * Vm0 + 0.5 * f * rm_val**2
+        _, M_out = integrate_outer(r0, rm_val, f, Cd, Wc, max(800, n_outer // 30))
+        return M_out[-1] - M_m
 
-    rm = brentq(mismatch, 1.0e3, 0.9 * r0, maxiter=80)
+    rm = brentq(mismatch, 1e3, 0.9 * r0, maxiter=80)
+    Vm = Vm0
+    M_m = rm * Vm + 0.5 * f * rm**2
+    r_out, M_out = integrate_outer(r0, rm, f, Cd, Wc, n_outer)
 
-    # --- recompute inner & find merge radius ---------------------------
-    M_max = Vm0 * rm + 0.5 * f * rm**2
-    r_eval = np.linspace(0.0, r0, 6000)
-    M_inner = m_inner(r_eval, M_max, rm, ckcd)
-    M_outer_interp = np.interp(r_eval, r_outer, M_outer)
-    diff = M_inner - M_outer_interp
-    idx = np.where(np.sign(diff[:-1]) * np.sign(diff[1:]) < 0)[0][0]
-    r1, r2, d1, d2 = r_eval[idx], r_eval[idx + 1], diff[idx], diff[idx + 1]
-    rj = r1 - d1 * (r2 - r1) / (d2 - d1)
-    M_ra = m_inner(rj, M_max, rm, ckcd)
-    Va = M_ra / rj - 0.5 * f * rj
+    def gap(r_val: float) -> float:
+        M_outer = np.interp(r_val, r_out[::-1], M_out[::-1])
+        return m_inner(r_val, M_m, rm, ckcd) - M_outer
 
-    # --- build combined V(r) ------------------------------------------
-    V_inner = M_inner / np.where(r_eval == 0, 1e-6, r_eval) - 0.5 * f * r_eval
-    V_outer = M_outer / np.where(r_outer == 0, 1e-6, r_outer) - 0.5 * f * r_outer
+    rj = brentq(gap, rm * 1.001, r0 * 0.999, maxiter=80)
+    M_a = m_inner(rj, M_m, rm, ckcd)
 
-    r_comb = np.concatenate([r_eval[r_eval <= rj], r_outer[r_outer > rj]])
-    V_comb = np.concatenate([V_inner[r_eval <= rj], V_outer[r_outer > rj]])
-    order = np.argsort(r_comb)
-    r_sorted, V_sorted = r_comb[order], V_comb[order]
+    r_cache = np.hstack([r_out, rj, r0])
+    M_cache = np.hstack([M_out, M_a, 0.5 * f * r0**2])
 
-    def V(r: NDArray[np.floating] | float) -> NDArray[np.floating] | float:
-        """Interpolated tangential wind speed (m s⁻¹)."""
-        return np.interp(np.asarray(r, float), r_sorted, V_sorted)
+    def V(r: Union[NDArray[np.floating], float]) -> Union[NDArray[np.floating], float]:
+        """
+        Tangential wind speed V(r) [m/s].
 
-    return V, {"r0": r0, "rm": rm, "rj": rj, "Vm": Vm0, "Va": Va}
+        Ranges: 0 <= r <= r0.
+        """
+        R = np.asarray(r, float)
+        Vv = np.zeros_like(R)
+        eye = R < rm
+        inner = (R >= rm) & (R <= rj)
+        outer = (R > rj) & (R <= r0)
+
+        Vv[eye] = Vm * (R[eye] / rm)
+        Vv[inner] = m_inner(R[inner], M_m, rm, ckcd) / R[inner] - 0.5 * f * R[inner]
+        M_interp = np.interp(R[outer], r_cache[::-1], M_cache[::-1])
+        Vv[outer] = M_interp / R[outer] - 0.5 * f * R[outer]
+        return Vv if np.ndim(r) else float(Vv)
+
+    return V, {"r0": r0, "rm": rm, "rj": rj, "Vm": Vm, "Va": M_a / rj - 0.5 * f * rj}
 
 
 def CLE15_profile(r0, Vm_guess, f, Ck, Cd, Wcool):
@@ -377,14 +406,14 @@ if __name__ == "__main__":  # pragma: no cover
         "Cd": 1e-3,
         "Wcool": 0.002,
     }
-    # V_demo, info_demo = solve_reverse(cfg_demo)
-    # print(info_demo)
-    # try:
-    #    quick_plot(V_demo, info_demo)
-    # except ImportError:
-    #    pass
-
+    V_demo, info_demo = solve_reverse(cfg_demo)
     print(info_demo)
+    try:
+        quick_plot(V_demo, info_demo)
+    except ImportError:
+        pass
+
+    # sprint(info_demo)
     V_demo, info_demo = CLE15_profile(
         cfg_demo["r0"],
         cfg_demo["Vm_guess"],
