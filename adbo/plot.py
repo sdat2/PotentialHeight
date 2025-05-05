@@ -1030,7 +1030,7 @@ def make_argmax_table():
     )
     for point in ["new-orleans", "miami", "galverston"]:
         for year in ["2015", "2100"]:
-            for trial in range(11):
+            for trial in range(12):
                 if trial == 0:
                     exp_name = f"{point}-{year}"
                 else:
