@@ -4,6 +4,22 @@ w22 package
 Submodules
 ----------
 
+w22.cle15 module
+----------------
+
+.. automodule:: w22.cle15
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.cle15m module
+-----------------
+
+.. automodule:: w22.cle15m
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 w22.constants module
 --------------------
 

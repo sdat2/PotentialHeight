@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Python translation of MATLAB code for calculating the Chavas et al. (2015)
 tropical cyclone wind profile, merging Emanuel & Rotunno (2011) inner
@@ -27,7 +26,8 @@ References:
     Cambridge University Press.
 """
 
-from typing import Tuple, Union
+from typing import Tuple, Union, Optional, Dict
+import os
 from numpy.typing import NDArray
 import numpy as np
 from scipy.interpolate import interp1d
@@ -35,6 +35,19 @@ from scipy.optimize import root_scalar
 import warnings
 import matplotlib.pyplot as plt  # Optional: For plotting example
 from sithom.time import timeit
+from sithom.plot import plot_defaults
+from .constants import (
+    SRC_PATH,
+    DATA_PATH,
+    TMPS_PATH,
+    FIGURE_PATH,
+    BACKGROUND_PRESSURE,
+    W_COOL_DEFAULT,
+    CK_CD_DEFAULT,
+    CD_DEFAULT,
+    RHO_AIR_DEFAULT,
+)
+from .utils import pressure_from_wind
 
 # --- Constants ---
 # Coefficients for Ck/Cd quadratic fit to Vmax (Chavas et al. 2015)
@@ -1478,6 +1491,158 @@ def chavas_et_al_2015_profile(
         rmerger0,
         MmergeM0,
     )
+
+
+def process_inputs(inputs: dict) -> dict:
+    """Process the input parameters for the CLE15 model.
+
+    Args:
+        inputs (dict): Input parameters.
+
+    Returns:
+        dict: Processed input parameters.
+    """
+    # load default inputs
+    # ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
+    ins = {}
+    # ins["Vmax"] = VMAX_DEFAULT
+    ins["w_cool"] = W_COOL_DEFAULT
+    ins["p0"] = BACKGROUND_PRESSURE / 100  # in hPa instead
+    ins["CkCd"] = CK_CD_DEFAULT
+    ins["Cd"] = CD_DEFAULT
+
+    if "p0" in inputs:
+        assert inputs["p0"] > 900 and inputs["p0"] < 1100  # between 900 and 1100 hPa
+    # ins["CkCd"]
+
+    if inputs is not None:
+        for key in inputs:
+            if key in ins:
+                ins[key] = inputs[key]
+    return ins
+
+
+def run_cle15(
+    plot: bool = False,
+    inputs: Optional[Dict[str, any]] = None,
+    rho0=RHO_AIR_DEFAULT,  # [kg m-3]
+    pressure_assumption: str = "isopycnal",
+) -> Tuple[float, float, float]:  # pm, rmax, vmax, pc
+    """
+    Run the CLE15 model.
+
+    Args:
+        plot (bool, optional): Plot the output. Defaults to False.
+        inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
+
+    Returns:
+        Tuple[float, float, float, float]: pm [Pa], rmax [m], pc [Pa]
+    """
+    ins = process_inputs(inputs)  # find old data.
+    ou = chavas_et_al_2015_profile(
+        ins["Vmax"],
+        ins["r0"],
+        ins["fcor"],
+        ins["Cdvary"],
+        ins["Cd"],
+        ins["w_cool"],
+        ins["CkCdvary"],
+        ins["CkCd"],
+        ins["eye_adj"],
+        ins["alpha_eye"],
+    )
+
+    if plot:
+        # print(ou)
+        # plot the output
+        rr = np.array(ou["rr"]) / 1000
+        rmerge = ou["rmerge"] / 1000
+        vv = np.array(ou["VV"])
+        plt.plot(rr[rr < rmerge], vv[rr < rmerge], "g", label="ER11 inner profile")
+        plt.plot(rr[rr > rmerge], vv[rr > rmerge], "orange", label="E04 outer profile")
+        plt.plot(
+            ou["rmax"] / 1000, ins["Vmax"], "b.", label="$r_{\mathrm{max}}$ (output)"
+        )
+        plt.plot(
+            ou["rmerge"] / 1000,
+            ou["Vmerge"],
+            "kx",
+            label="$r_{\mathrm{merge}}$ (input)",
+        )
+        plt.plot(ins["r0"] / 1000, 0, "r.", label="$r_a$ (input)")
+
+        def _f(x: any) -> float:
+            if isinstance(x, float):
+                return x
+            else:
+                return np.nan
+
+        plt.ylim(
+            [0, np.nanmax([_f(v) for v in vv]) * 1.10]
+        )  # np.nanmax(out["VV"]) * 1.05])
+        plt.legend()
+        plt.xlabel("Radius, $r$, [km]")
+        plt.ylabel("Rotating wind speed, $V$, [m s$^{-1}$]")
+        plt.title("CLE15 Wind Profile")
+        plt.savefig(os.path.join(FIGURE_PATH, "r0_pm.pdf"), format="pdf")
+        plt.clf()
+
+    # integrate the wind profile to get the pressure profile
+    # assume wind-pressure gradient balance
+    p0 = ins["p0"] * 100  # [Pa] [originally in hPa]
+    ou["VV"][-1] = 0  # get rid of None at end of output.
+    assert None not in ou["VV"]
+    rr = np.array(ou["rr"], dtype="float32")  # [m]
+    vv = np.array(ou["VV"], dtype="float32")  # [m/s]
+    # print("rr", rr[:10], rr[-10:])
+    # print("vv", vv[:10], vv[-10:])
+    p = pressure_from_wind(
+        rr,
+        vv,
+        p0=p0,
+        rho0=rho0,
+        fcor=ins["fcor"],
+        assumption=pressure_assumption,
+    )  # [Pa]
+    ou["p"] = p.tolist()
+
+    if plot:
+        plt.plot(rr / 1000, p / 100, "k")
+        plt.xlabel("Radius, $r$, [km]")
+        plt.ylabel("Pressure, $p$, [hPa]")
+        plt.title("CLE15 Pressure Profile")
+        plt.ylim([np.min(p) / 100, np.max(p) * 1.0005 / 100])
+        plt.xlim([0, rr[-1] / 1000])
+        plt.savefig(os.path.join(FIGURE_PATH, "r0_pmp.pdf"), format="pdf")
+        plt.clf()
+
+    # plot the pressure profile
+    return (
+        float(
+            interp1d(rr, p)(ou["rmax"])
+        ),  # find the pressure at the maximum wind speed radius [Pa]
+        ou["rmax"],  # rmax radius [m]
+        p[0],
+    )  # p[0]  # central pressure [Pa]
+
+
+def profile_from_stats(vmax: float, fcor: float, r0: float, p0: float) -> dict:
+    ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
+    out = chavas_et_al_2015_profile(
+        ins["Vmax"],
+        ins["r0"],
+        ins["fcor"],
+        ins["Cdvary"],
+        ins["Cd"],
+        ins["w_cool"],
+        ins["CkCdvary"],
+        ins["CkCd"],
+        ins["eye_adj"],
+        ins["alpha_eye"],
+    )
+    out["VV"][-1] = 0
+    out["p"] = pressure_from_wind(out["rr"], out["VV"], p0=p0 * 100, fcor=fcor) / 100
+    return out
 
 
 # --- Example Usage ---
