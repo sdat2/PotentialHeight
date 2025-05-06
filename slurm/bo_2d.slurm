@@ -12,7 +12,7 @@
 
 # Replace [budget code] below with your project code (e.g. t01)
 
-#SBATCH --account=n01-biopole
+#SBATCH --account=n02-bas
 #SBATCH --partition=standard
 ##########%SBATCH --qos=short
 #SBATCH --qos=standard
@@ -21,15 +21,9 @@
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sdat2@cam.ac.uk
-
-# try to activate micromamba
-#source /work/n02/n02/sdat2/.bashrc
-#which micromamba
-#micromamba --version
-#micromamba activate t1
-source /work/n01/n01/sithom/.bashrc
-which conda
-conda activate base
+source /work/n02/n02/sdat2/.bashrc
+which micromamba
+micromamba activate t1
 
 # make matplotlib cache directory
 mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
@@ -38,10 +32,10 @@ export MPLCONFIGDIR=$(pwd)'/matplotlib'
 # print out the python version
 echo "which python"
 which python
-seed=21
+seed=22
 
 # run python job
-python -m adbo.exp_2d --exp_name=2d-ani-1 --resolution=mid --seed=$seed
+python -m adbo.exp_2d --exp_name=2d-ani-ei --resolution=mid --seed=$seed --daf=ei
 
 # try test version
 # python -m adbo.exp_2d --exp_name test-bo-2d-3 --year 2025 --resolution mid-notide --test=True
