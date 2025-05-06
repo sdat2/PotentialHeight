@@ -95,7 +95,7 @@ def _e04_outerwind_r0input_nondim_mm0(
     C_d_input: float,
     w_cool: float,
     Nr: int = 100000,
-):
+) -> Tuple[NDArray, NDArray]:
     """
     Calculates the Emanuel (2004) non-convecting outer wind profile,
     represented as M/M0 vs. r/r0, given the outer radius r0.
@@ -219,7 +219,7 @@ def _e04_outerwind_r0input_nondim_mm0(
 
 def _er11_rmax_r0_relation(
     rmax_var: float, Vmax: float, r0: float, fcor: float, CkCd: float
-):
+) -> float:
     """
     Function representing the implicit relationship between rmax and r0
     in the ER11 model (Eq. 37, rearranged to be = 0).
@@ -278,7 +278,7 @@ def _er11_rmax_r0_relation(
 
 def _er11_r0_rmax_relation(
     r0_var: float, Vmax: float, rmax: float, fcor: float, CkCd: float
-):
+) -> float:
     """
     Function representing the implicit relationship between rmax and r0
     in the ER11 model (Eq. 37, rearranged to be = 0).
@@ -339,7 +339,7 @@ def _er11_radprof_raw(
     fcor: float,
     CkCd: float,
     rr_er11: np.ndarray,
-):
+) -> Tuple[NDArray, float]:
     """
     Calculates the raw Emanuel and Rotunno (2011) theoretical wind profile
     without iterative convergence for Vmax/rmax. Determines rmax from r0
@@ -583,7 +583,14 @@ def _er11_radprof_raw(
     return V_ER11, r_out
 
 
-def _er11_radprof(Vmax_target, r_in_target, rmax_or_r0, fcor, CkCd, rr_ER11):
+def _er11_radprof(
+    Vmax_target: float,
+    r_in_target: float,
+    rmax_or_r0: str,
+    fcor: float,
+    CkCd: float,
+    rr_ER11: NDArray,
+) -> Tuple[NDArray, float]:
     """
     Calculates the ER11 profile, iteratively adjusting internal Vmax and r_in
     parameters until the resulting profile matches the target Vmax_target
@@ -798,7 +805,9 @@ def _er11_radprof(Vmax_target, r_in_target, rmax_or_r0, fcor, CkCd, rr_ER11):
     return V_ER11, r_out_prof
 
 
-def _curve_intersect(x1, y1, x2, y2, min_points=10):
+def _curve_intersect(
+    x1: NDArray, y1: NDArray, x2: NDArray, y2: NDArray, min_points: int = 10
+) -> Tuple[NDArray, NDArray]:
     """
     Finds intersection points of two curves defined by (x1, y1) and (x2, y2).
 
@@ -931,7 +940,13 @@ def _curve_intersect(x1, y1, x2, y2, min_points=10):
         return np.array([]), np.array([])
 
 
-def _radprof_eyeadj(rr_in, VV_in, alpha, r_eye_outer=None, V_eye_outer=None):
+def _radprof_eyeadj(
+    rr_in: np.ndarray,
+    VV_in: np.ndarray,
+    alpha: float,
+    r_eye_outer: float = None,
+    V_eye_outer: float = None,
+) -> np.ndarray:
     """
     Applies an empirical adjustment to the wind profile within the eye,
     multiplying the wind speed by (r/r_eye_outer)^alpha for r <= r_eye_outer.

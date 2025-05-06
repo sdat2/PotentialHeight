@@ -6,12 +6,12 @@ import numpy as np
 import numpy.ma as ma
 import xarray as xr
 import matplotlib.pyplot as plt
+from uncertainties import ufloat
 from sithom.io import write_json
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
-from uncertainties import ufloat
 from .constants import DATA_PATH, FIGURE_PATH
-from .potential_size import profile_from_stats
+from .cle15m import profile_from_stats
 from .utils import coriolis_parameter_from_lat
 
 

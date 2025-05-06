@@ -26,7 +26,8 @@ from .constants import (
     CD_DEFAULT,
     ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
-from .potential_size import run_cle15, wang_diff, wang_consts
+from .potential_size import wang_diff, wang_consts
+from .cle15m import run_cle15
 from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
