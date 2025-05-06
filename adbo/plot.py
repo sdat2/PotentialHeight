@@ -888,10 +888,10 @@ def plot_bo_comp() -> None:
     plt.close()
     plot_defaults()
     res_lol = []
-    for i, b in [(50, 0), (25, 25)]:  #  (1, 49)
+    for i, b in [(50, 0), (25, 25), (3, 47)]:  #  (1, 49)
         res_lol += [[]]
         for t in [i for i in range(11)]:  # if i not in [4, 5, 9, 10]]:
-            if t == 0:
+            if t == 0 and i in {50, 25}:
                 exp_name = f"i{i}b{b}"
             else:
                 exp_name = f"i{i}b{b}t{t}"
@@ -914,8 +914,12 @@ def plot_bo_comp() -> None:
     # take cumulative maximum over each trial
     cum_max_array = np.maximum.accumulate(res_array, axis=2)
     # take cumulative maximum over each trial
-    trial_label = ["50 LHS points", "25 LHS, 25 BO points"]  # , "10 LHS, 40 BO points"]
-    colors = ["blue", "red"]
+    trial_label = [
+        "50 LHS points",
+        "25 LHS, 25 BO points",
+        "3 LHS, 47 BO Points",
+    ]  # , "10 LHS, 40 BO points"]
+    colors = ["blue", "red", "green"]  # , "orange"]
 
     def plot_ensemble(
         array: np.ndarray, i: int, letter: str, trial_label: str, color: str
@@ -953,6 +957,7 @@ def plot_bo_comp() -> None:
 
     plot_ensemble(res_array, 0, "a", trial_label[0], colors[0])
     plot_ensemble(res_array, 1, "b", trial_label[1], colors[1])
+    plot_ensemble(res_array, 2, "c", trial_label[2], colors[2])
     plt.axvline(25, color="black", linestyle="--")
     plt.xlabel("Samples, $s$ (LHS + BO points) [dimensionless]")
     plt.ylabel("Max SSH for sample, $z$ [m]")
@@ -968,6 +973,8 @@ def plot_bo_comp() -> None:
     plt.close()
     plot_ensemble(cum_max_array, 0, "a", trial_label[0], colors[0])
     plot_ensemble(cum_max_array, 1, "b", trial_label[1], colors[1])
+    plot_ensemble(cum_max_array, 2, "c", trial_label[2], colors[2])
+
     plt.axvline(25, color="black", linestyle="--")
     plt.xlabel("Samples, $s$ (LHS + BO points) [dimensionless]")
     plt.ylabel("Max SSH over experiment, $z^{*}$ [m]")
@@ -983,6 +990,7 @@ def plot_bo_comp() -> None:
     regret_array = global_max - cum_max_array
     plot_ensemble(regret_array, 0, "a", trial_label[0], colors[0])
     plot_ensemble(regret_array, 1, "b", trial_label[1], colors[1])
+    plot_ensemble(regret_array, 2, "c", trial_label[2], colors[2])
     plt.axvline(25, color="black", linestyle="--")
     plt.yscale("log")
     plt.xlabel("Samples, $s$ (LHS + BO points) [dimensionless]")
@@ -1115,7 +1123,7 @@ def make_argmax_table():
 
 
 if __name__ == "__main__":
-    make_argmax_table()
+    # make_argmax_table()
     # python -m adbo.plot
     # for point in ["new-orleans", "miami", "galverston"]:
     #    plot_diff(
@@ -1129,4 +1137,4 @@ if __name__ == "__main__":
     # find_differences()
     # plot_multi_argmax()
     # plot_bo_exp()
-    # plot_bo_comp()
+    plot_bo_comp()
