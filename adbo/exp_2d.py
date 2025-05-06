@@ -27,6 +27,7 @@ def create_2d_ani_run() -> None:
     parser.add_argument("--exp_name", type=str, default="ani-2d-2097")
     parser.add_argument("--seed", type=int, default=10)
     parser.add_argument("--kernel", type=str, default="Matern52")
+    parser.add_argument("--daf", type=str, default="mes")
 
     parser.add_argument(
         "--profile_name", type=str, default="2015_new_orleans_profile_r4i1p1f1"
@@ -44,6 +45,7 @@ def create_2d_ani_run() -> None:
         resolution=args.resolution,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
+        daf=args.daf,
         wrap_test=args.test,
         kernel=args.kernel,
     )
