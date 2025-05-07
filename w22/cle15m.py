@@ -200,7 +200,7 @@ def run_cle15(
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
 
     Returns:
-        Tuple[float, float, float, float]: pm [Pa], rmax [m], pc [Pa]
+        Tuple[float, float, float]: pm [Pa], rmax [m], pc [Pa]
     """
     ins = process_inputs(inputs)  # find old data.
     ou = _run_cle15_octave(inputs)

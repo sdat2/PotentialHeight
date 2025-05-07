@@ -1553,10 +1553,10 @@ def run_cle15(
         inputs (Optional[Dict[str, any]], optional): Input parameters. Defaults to None.
 
     Returns:
-        Tuple[float, float, float, float]: pm [Pa], rmax [m], pc [Pa]
+        Tuple[float, float, float]: pm [Pa], rmax [m], pc [Pa]
     """
     ins = process_inputs(inputs)  # find old data.
-    ou = chavas_et_al_2015_profile(
+    o = chavas_et_al_2015_profile(
         ins["Vmax"],
         ins["r0"],
         ins["fcor"],
@@ -1568,6 +1568,8 @@ def run_cle15(
         ins["eye_adj"],
         ins["alpha_eye"],
     )
+    ou = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
+    print("ou", ou)
 
     if plot:
         # print(ou)
@@ -1607,7 +1609,8 @@ def run_cle15(
     # integrate the wind profile to get the pressure profile
     # assume wind-pressure gradient balance
     p0 = ins["p0"] * 100  # [Pa] [originally in hPa]
-    ou["VV"][-1] = 0  # get rid of None at end of output.
+    ou["VV"][-1] = 0  # get rid of None at end of
+    ou["VV"][np.isnan(ou["VV"])] = 0  # get rid of None at end of
     assert None not in ou["VV"]
     rr = np.array(ou["rr"], dtype="float32")  # [m]
     vv = np.array(ou["VV"], dtype="float32")  # [m/s]
@@ -1660,7 +1663,7 @@ def profile_from_stats(
         dict: Dictionary containing the wind profile and pressure profile.
     """
     ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
-    out = chavas_et_al_2015_profile(
+    o = chavas_et_al_2015_profile(
         ins["Vmax"],
         ins["r0"],
         ins["fcor"],
@@ -1672,6 +1675,7 @@ def profile_from_stats(
         ins["eye_adj"],
         ins["alpha_eye"],
     )
+    out = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
     out["VV"][-1] = 0
     out["p"] = (
         pressure_from_wind(

@@ -8,7 +8,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 import matplotlib.pyplot as plt
-from sithom.plot import plot_defaults
+from sithom.plot import plot_defaults, label_subplots
 from .constants import (
     DATA_PATH,
     FIGURE_PATH,
@@ -530,7 +530,135 @@ def test_figure_5():
     plt.close()
 
 
+def octave_vs_python():
+    from .cle15m import run_cle15 as run_cle15_octave
+    from .cle15 import run_cle15 as run_cle15_python
+    from .constants import (
+        RA_DEFAULT,
+        BACKGROUND_PRESSURE,
+        VMAX_DEFAULT,
+        W_COOL_DEFAULT,
+        CK_CD_DEFAULT,
+        CD_DEFAULT,
+        F_COR_DEFAULT,
+        CDVARY_DEFAULT,
+    )
+    import time
+
+    inputs = {
+        "r0": RA_DEFAULT,
+        "p0": BACKGROUND_PRESSURE / 100,
+        "Vmax": VMAX_DEFAULT,
+        "w_cool": W_COOL_DEFAULT,
+        "fcor": F_COR_DEFAULT,
+        "Cd": CD_DEFAULT,
+        "CkCd": CK_CD_DEFAULT,
+        "Cdvary": CDVARY_DEFAULT,
+    }
+
+    def compare_with_inp(input: dict) -> dict:
+        time_start = time.perf_counter()
+        out_octave = run_cle15_octave(inputs=inputs, pressure_assumption="isothermal")
+        print(f"Octave output, {out_octave}")
+        time_end = time.perf_counter()
+        time_octave = time_end - time_start
+        print(f"Octave time {time_octave:.3f} s")
+        time_start = time.perf_counter()
+
+        out_python = run_cle15_python(inputs=inputs, pressure_assumption="isothermal")
+        time_end = time.perf_counter()
+        time_python = time_end - time_start
+        print(f"Python time {time_python:.3f} s")
+        print("Octave output", out_octave)
+        print("Python output", out_python)
+        return {
+            "time_octave": time_octave,
+            "time_python": time_python,
+            "pm_octave": out_octave[0] / 100,
+            "pm_python": out_python[0] / 100,
+            "rmax_octave": out_octave[1] / 1000,
+            "rmax_python": out_python[1] / 1000,
+            "pc_octave": out_octave[2] / 100,
+            "pc_python": out_python[2] / 100,
+        }
+
+    out_d = {}
+    for r0 in np.linspace(500 * 1000, 5000 * 1000, 20):
+        inputs["r0"] = r0
+        out_d[r0] = compare_with_inp(inputs)
+
+    df = pd.DataFrame.from_dict(out_d, orient="index")
+    df = df.rename_axis("r0").reset_index()
+    os.makedirs(os.path.join(DATA_PATH, "cle15"), exist_ok=True)
+
+    df.to_csv(os.path.join(DATA_PATH, "cle15", "octave-vs-python.csv"), index=False)
+    fig, axs = plt.subplots(1, 3, sharex=True)
+    axs[0].plot(
+        df["r0"] / 1000,
+        df["pm_octave"],
+        label="Octave",
+        color="red",
+    )
+    axs[0].plot(
+        df["r0"] / 1000,
+        df["pm_python"],
+        label="Python",
+        color="blue",
+    )
+    axs[0].set_ylabel("Pressure, $p_m$ [hPa]")
+    axs[0].set_xlabel("Outer Radius, $r_a$ [km]")
+    # axs[0].legend()
+    axs[1].plot(
+        df["r0"] / 1000,
+        df["rmax_octave"],
+        label="Octave",
+        color="red",
+    )
+    axs[1].plot(
+        df["r0"] / 1000,
+        df["rmax_python"],
+        label="Python",
+        color="blue",
+    )
+    axs[1].set_ylabel("Radius of max wind, $r_{\mathrm{max}}$ [m]")
+    axs[1].set_xlabel("Outer Radius, $r_a$ [km]")
+    axs[2].plot(
+        df["r0"] / 1000,
+        df["pc_octave"],
+        label="Octave",
+        color="red",
+    )
+    axs[2].plot(
+        df["r0"] / 1000,
+        df["pc_python"],
+        label="Python",
+        color="blue",
+    )
+    axs[2].set_ylabel("Central pressure, $p_c$ [hPa]")
+    axs[2].set_xlabel("Outer Radius, $r_a$ [km]")
+
+    label_subplots(axs, override="outside")
+    avg_time_octave = df["time_octave"].mean()
+    sem_time_octave = df["time_octave"].std() / np.sqrt(len(df))
+    avg_time_python = df["time_python"].mean()
+    sem_time_python = df["time_python"].std() / np.sqrt(len(df))
+    # plot title over whole figure
+    fig.suptitle(
+        f"Octave (red, {avg_time_octave:.3f} ± {sem_time_octave:.3f} s) vs. Python (blue, {avg_time_python:.3f} ± {sem_time_python:.3f} s)"
+    )
+
+    os.makedirs(os.path.join(FIGURE_PATH, "cle15"), exist_ok=True)
+
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "cle15", "octave-vs-python.pdf"),
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
+
 if __name__ == "__main__":
-    # python -m cle.test
+    # python -m w22.test
     # test_figure_4()
-    test_figure_5()
+    # test_figure_5()
+    octave_vs_python()
