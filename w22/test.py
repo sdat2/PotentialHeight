@@ -583,7 +583,7 @@ def octave_vs_python():
         }
 
     out_d = {}
-    for r0 in np.linspace(500 * 1000, 5000 * 1000, 20):
+    for r0 in np.linspace(500 * 1000, 5000 * 1000, 200):
         inputs["r0"] = r0
         out_d[r0] = compare_with_inp(inputs)
 

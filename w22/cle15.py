@@ -1150,7 +1150,8 @@ def chavas_et_al_2015_profile(
     rmaxr0_final = np.nan
     rmerger0 = np.nan
     MmergeM0 = np.nan
-    VV_ER11_final = None  # Store the ER11 profile at convergence
+    VV_ER11_final = None  # Store the profile associated with this
+    rr_ER11_final = None  # Store the matching radius vector for VV_ER11_final
 
     max_iter_merge = 50  # Max iterations for rmaxr0 search
     drmaxr0_thresh = 1e-6  # Convergence threshold for rmaxr0
@@ -1235,6 +1236,7 @@ def chavas_et_al_2015_profile(
             rmerger0_last = np.mean(x_intersect)
             MmergeM0_last = np.mean(y_intersect)
             VV_ER11_final = V_ER11  # Store the profile associated with this
+            rr_ER11_final = rr_ER11  # Keep the radius vector in sync
 
         # Check for convergence
         if (rmaxr0_high - rmaxr0_low) < drmaxr0_thresh:
@@ -1284,6 +1286,10 @@ def chavas_et_al_2015_profile(
             np.nan,
         )
 
+    # Ensure the radius vector matches the stored profile
+    if rr_ER11_final is None:
+        rr_ER11_final = rr_ER11
+
     # --- Final Profile Calculation & Merging ---
     rmax = rmaxr0_final * r0
     Mm = Vmax * rmax + 0.5 * fcor * rmax**2
@@ -1302,6 +1308,7 @@ def chavas_et_al_2015_profile(
         rrfracrm_ER11 = np.linspace(0, rfracrm_max_er11, num_pts_er11)
         rr_ER11 = rrfracrm_ER11 * rmax
         VV_ER11_final, _ = _er11_radprof(Vmax, rmax, "rmax", fcor, CkCd, rr_ER11)
+        rr_ER11_final = rr_ER11
         if np.all(np.isnan(VV_ER11_final)):
             warnings.warn("Failed to recalculate final ER11 profile. Returning NaNs.")
             nan_arr = np.array([np.nan])
@@ -1329,8 +1336,8 @@ def chavas_et_al_2015_profile(
 
     # Prepare ER11 and E04 data for interpolation onto the final grid
     # ER11: M/Mm vs r/rm
-    valid_er11_mask = ~np.isnan(VV_ER11_final) & (rr_ER11 > 1e-9)
-    rr_ER11_valid = rr_ER11[valid_er11_mask]
+    valid_er11_mask = ~np.isnan(VV_ER11_final) & (rr_ER11_final > 1e-9)
+    rr_ER11_valid = rr_ER11_final[valid_er11_mask]
     V_ER11_valid = VV_ER11_final[valid_er11_mask]
     MM_ER11 = rr_ER11_valid * V_ER11_valid + 0.5 * fcor * rr_ER11_valid**2
     rrfracrm_ER11_interp = rr_ER11_valid / rmax
