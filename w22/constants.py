@@ -25,7 +25,7 @@ GAS_CONSTANT = 287  # [J/kg/K]
 # could probably move some of these to a config file.
 
 # General defaults
-BACKGROUND_PRESSURE = 1015 * 100  # [Pa]
+BACKGROUND_PRESSURE = 1016 * 100  # [Pa]
 F_COR_DEFAULT = 5e-5  # [s-2]
 RHO_AIR_DEFAULT = 1.225  # [kg m-3]
 
@@ -42,6 +42,15 @@ CK_CD_DEFAULT = (
 )
 CD_DEFAULT = 0.0015  # drag coefficient
 W_COOL_DEFAULT = 0.002  # m s-1
+RA_DEFAULT = 734735.8325246028  # outer radius [m].
+VMAX_DEFAULT = 49.45  # [m s-1], maximum wind speed
+ALPHA_EYE_DEFAULT = 0.5  # [dimensionless], influences real ps
+EYE_ADJ_DEFAULT = 0
+# [dimensionless] bool
+# whether to use the eye adjustment
+CDVARY_DEFAULT = 0  # do not vary cd
+CKCDVARY_DEFAULT = 0  # do not vary ck/cd
+
 
 # supergradient
 SUPERGRADIENT_FACTOR = 1.2  # [dimensionless], influences real ps

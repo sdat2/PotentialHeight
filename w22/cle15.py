@@ -20,9 +20,9 @@ References:
     Journal of the Atmospheric Sciences, 72(9), 3403-3428.
   - Emanuel, K., & Rotunno, R. (2011). Self-Stratification of Tropical
     Cyclone Outflow. Part I: Implications for Storm Structure. Journal of
-    the Atmospheric Sciences, 68(10), 2236–2249.
+    the Atmospheric Sciences, 68(10), 2236-2249.
   - Emanuel, K. (2004). Tropical Cyclone Energetics and Structure. In
-    Atmospheric Turbulence and Mesoscale Meteorology (pp. 165–191).
+    Atmospheric Turbulence and Mesoscale Meteorology (pp. 165-191).
     Cambridge University Press.
 """
 
@@ -37,9 +37,6 @@ import matplotlib.pyplot as plt  # Optional: For plotting example
 from sithom.time import timeit
 from sithom.plot import plot_defaults
 from .constants import (
-    SRC_PATH,
-    DATA_PATH,
-    TMPS_PATH,
     FIGURE_PATH,
     BACKGROUND_PRESSURE,
     W_COOL_DEFAULT,
@@ -1504,12 +1501,32 @@ def process_inputs(inputs: dict) -> dict:
     """
     # load default inputs
     # ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
+    from .constants import (
+        CDVARY_DEFAULT,
+        CKCDVARY_DEFAULT,
+        CK_CD_DEFAULT,
+        CD_DEFAULT,
+        VMAX_DEFAULT,
+        RA_DEFAULT,
+        F_COR_DEFAULT,
+        EYE_ADJ_DEFAULT,
+        ALPHA_EYE_DEFAULT,
+        BACKGROUND_PRESSURE,
+    )
+
     ins = {}
     # ins["Vmax"] = VMAX_DEFAULT
     ins["w_cool"] = W_COOL_DEFAULT
     ins["p0"] = BACKGROUND_PRESSURE / 100  # in hPa instead
     ins["CkCd"] = CK_CD_DEFAULT
     ins["Cd"] = CD_DEFAULT
+    ins["Cdvary"] = CDVARY_DEFAULT
+    ins["CkCdvary"] = CKCDVARY_DEFAULT
+    ins["Vmax"] = VMAX_DEFAULT
+    ins["r0"] = RA_DEFAULT
+    ins["fcor"] = F_COR_DEFAULT
+    ins["eye_adj"] = EYE_ADJ_DEFAULT
+    ins["alpha_eye"] = ALPHA_EYE_DEFAULT
 
     if "p0" in inputs:
         assert inputs["p0"] > 900 and inputs["p0"] < 1100  # between 900 and 1100 hPa
