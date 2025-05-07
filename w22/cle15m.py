@@ -279,11 +279,35 @@ def run_cle15(
     )  # p[0]  # central pressure [Pa]
 
 
-def profile_from_stats(vmax: float, fcor: float, r0: float, p0: float) -> dict:
+def profile_from_stats(
+    vmax: float,
+    fcor: float,
+    r0: float,
+    p0: float,
+    pressure_assumption: str = "isothermal",
+) -> dict:
+    """
+    Run the CLE15 model with given parameters and return the wind profile.
+    This function is a wrapper around the _run_cle15_octave function.
+
+    Args:
+        vmax (float): Maximum wind speed [m/s].
+        fcor (float): Coriolis parameter [s-1].
+        r0 (float): Radius of the storm [m].
+        p0 (float): Background pressure [hPa].
+
+    Returns:
+        dict: Dictionary containing the wind profile and pressure profile.
+    """
     ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
     out = _run_cle15_octave(ins)
     out["VV"][-1] = 0
-    out["p"] = pressure_from_wind(out["rr"], out["VV"], p0=p0 * 100, fcor=fcor) / 100
+    out["p"] = (
+        pressure_from_wind(
+            out["rr"], out["VV"], p0=p0 * 100, fcor=fcor, assumption=pressure_assumption
+        )
+        / 100
+    )
     return out
 
 
