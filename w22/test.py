@@ -16,7 +16,8 @@ from .constants import (
     GAS_CONSTANT,
     GAS_CONSTANT_FOR_WATER_VAPOR,
 )
-from .potential_size import run_cle15, wang_consts, wang_diff
+from .cle15m import run_cle15
+from .potential_size import wang_consts, wang_diff
 from .ps import point_solution_ps
 from .utils import buck_sat_vap_pressure
 from .solve import bisection
