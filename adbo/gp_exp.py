@@ -122,6 +122,8 @@ def fit_gp(
         k = gpflow.kernels.Matern52()
     elif kernel == "Matern12":
         k = gpflow.kernels.Matern12()
+    elif kernel == "Matern32":
+        k = gpflow.kernels.Matern32()
     elif kernel == "SE" or kernel == "SquaredExponential" or kernel == "RBF":
         k = gpflow.kernels.SquaredExponential()
     elif kernel == "RationalQuadratic":
@@ -310,8 +312,8 @@ def run_exp(
     """
     results = pd.DataFrame(
         columns=[
-            "norm_x",
-            "norm_y",
+            # "norm_x",
+            # "norm_y",
             "kernel",
             "mean_function",
             "log_likelihood",
@@ -322,62 +324,60 @@ def run_exp(
             "r2_sem",
         ]
     )
-    for norm_x in [True, False]:
-        for norm_y in [True, False]:
-            for kernel in kernels:
-                for mean_function in mean_functions:
-                    # empty tmp dataframe
-                    tmp_results = pd.DataFrame(columns=OUTPUT_COLUMNS)
-                    for seed in range(repeats):
-                        print(
-                            f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}, seed={seed}, n_train={n_train}"
-                        )
-                        tmp_results = pd.concat(
-                            [
-                                tmp_results,
-                                run_single_fit(
-                                    seed=seed,
-                                    norm_x=norm_x,
-                                    norm_y=norm_y,
-                                    kernel=kernel,
-                                    mean_function=mean_function,
-                                    n_train=n_train,
-                                ),
+    norm_x = True
+    norm_y = True
+    for kernel in kernels:
+        for mean_function in mean_functions:
+            # empty tmp dataframe
+            tmp_results = pd.DataFrame(columns=OUTPUT_COLUMNS)
+            for seed in range(repeats):
+                print(
+                    f"Running experiment with norm_x={norm_x}, norm_y={norm_y}, kernel={kernel}, mean_function={mean_function}, seed={seed}, n_train={n_train}"
+                )
+                tmp_results = pd.concat(
+                    [
+                        tmp_results,
+                        run_single_fit(
+                            seed=seed,
+                            norm_x=norm_x,
+                            norm_y=norm_y,
+                            kernel=kernel,
+                            mean_function=mean_function,
+                            n_train=n_train,
+                        ),
+                    ],
+                    ignore_index=True,
+                )
+            # Store mean and SEM for each metric
+            results = pd.concat(
+                [
+                    results,
+                    pd.DataFrame(
+                        {
+                            # "norm_x": [norm_x],
+                            # "norm_y": [norm_y],
+                            "kernel": [kernel],
+                            "mean_function": [mean_function],
+                            "log_likelihood": [tmp_results["log_likelihood"].mean()],
+                            "log_likelihood_sem": [
+                                tmp_results["log_likelihood"].std(ddof=1)
+                                / np.sqrt(len(tmp_results))
                             ],
-                            ignore_index=True,
-                        )
-                    # Store mean and SEM for each metric
-                    results = pd.concat(
-                        [
-                            results,
-                            pd.DataFrame(
-                                {
-                                    "norm_x": [norm_x],
-                                    "norm_y": [norm_y],
-                                    "kernel": [kernel],
-                                    "mean_function": [mean_function],
-                                    "log_likelihood": [
-                                        tmp_results["log_likelihood"].mean()
-                                    ],
-                                    "log_likelihood_sem": [
-                                        tmp_results["log_likelihood"].std(ddof=1)
-                                        / np.sqrt(len(tmp_results))
-                                    ],
-                                    "rmse": [tmp_results["rmse"].mean()],
-                                    "rmse_sem": [
-                                        tmp_results["rmse"].std(ddof=1)
-                                        / np.sqrt(len(tmp_results))
-                                    ],
-                                    "r2": [tmp_results["r2"].mean()],
-                                    "r2_sem": [
-                                        tmp_results["r2"].std(ddof=1)
-                                        / np.sqrt(len(tmp_results))
-                                    ],
-                                }
-                            ),
-                        ],
-                        ignore_index=True,
-                    )
+                            "rmse": [tmp_results["rmse"].mean()],
+                            "rmse_sem": [
+                                tmp_results["rmse"].std(ddof=1)
+                                / np.sqrt(len(tmp_results))
+                            ],
+                            "r2": [tmp_results["r2"].mean()],
+                            "r2_sem": [
+                                tmp_results["r2"].std(ddof=1)
+                                / np.sqrt(len(tmp_results))
+                            ],
+                        }
+                    ),
+                ],
+                ignore_index=True,
+            )
 
     # save results
     results.to_csv(
@@ -436,8 +436,8 @@ def save_results_tex(n_train: int = 25):
             "r2": r"\(r^2\)",
             "kernel": "Kernel",
             "mean_function": "Mean F.",
-            "norm_x": r"Norm. \(x\)",
-            "norm_y": r"Norm. \(y\)",
+            # "norm_x": r"Norm. \(x\)",
+            # "norm_y": r"Norm. \(y\)",
         }
     )
 
@@ -478,5 +478,6 @@ if __name__ == "__main__":
             # "Exponential",
             # "Periodic",
         ),
-        n_train=100,
+        n_train=25,
+        repeats=500,
     )
