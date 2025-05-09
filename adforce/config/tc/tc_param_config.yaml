@@ -10,9 +10,9 @@ translation_speed:
   units: "m/s"
 curvature:
   value: 0
-  description: "Curvature of the track"
+  description: "Curvature of the track (based on Ide et al. 2022)"
 impact_location:
-  value: 
+  value:
    - -89.4715
    -  29.5111
   description: "Location of the TC center at the impact time (x, y)"
@@ -33,6 +33,6 @@ v_reduc:
   description: "Reduction factor for the wind speed from gradient wind to 10m height"
   units: "dimensionless"
 use_lc12:
-  value: true
-  description: "Use the LC12 wind asymmetry"
+  value: false
+  description: "Use the LC12 wind asymmetry (set to false to disable)"
   units: "dimensionless"

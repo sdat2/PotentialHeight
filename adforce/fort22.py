@@ -253,6 +253,7 @@ def moving_rectilinear_square(
     ds.createDimension("time", None)
     ds.createDimension("yi", grid_config["ylen"])
     ds.createDimension("xi", grid_config["xlen"])
+    # I used the same fill value as the original netcdf example, but presumably this could be changed to something more appropriate.
     ds.createVariable("time", "i4", ("time",), fill_value=-2147483647)
     ds.createVariable("clat", "f8", ("time",), fill_value=9.969209968386869e36)
     ds.createVariable("clon", "f8", ("time",), fill_value=9.969209968386869e36)
@@ -296,9 +297,7 @@ def moving_rectilinear_square(
 
 
 def gen_ps_f(
-    profile_path_or_dict: Union[str, dict] = os.path.join(
-        CLE_DATA_PATH, "outputs.json"
-    )  # "/work/n02/n02/sdat2/adcirc-swan/tcpips/cle/data/outputs.json",
+    profile_path_or_dict: Union[str, dict] = os.path.join(CLE_DATA_PATH, "outputs.json")
 ) -> Callable[[np.ndarray], Tuple[np.ndarray, np.ndarray]]:
     """Generate the interpolation function from an azimuthally symetric windprofile. (Gradient winds)
 
@@ -328,7 +327,6 @@ def gen_ps_f(
     radii = profile["radii"].values
     windspeeds = profile["windspeeds"].values
     pressures = profile["pressures"].values
-    # write_json(profile, os.path.join(DATA_PATH, "profile.json"))
 
     def interp_func(distances: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -367,7 +365,7 @@ def add_psfc_u10(
     Returns:
         ds (nc.Dataset): reference to transformed netcdf4 dataset.
 
-    If tc_config['use_lc12']['value'] is True, a uniform background wind following Lin & Chavas (2012) is superposed on the symmetric field using parameters 'translation_speed_factor' and 'rotation_angle'.
+    If tc_config['use_lc12']['value'] is True, a uniform background wind following Lin & Chavas (2012) is superposed on the symmetric field using parameters 'translation_speed_factor' and 'rotation_angle'.
     """
     ds.createVariable("PSFC", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
     ds.createVariable("U10", "f4", ("time", "yi", "xi"), fill_value=9.96921e36)
@@ -438,7 +436,8 @@ def add_psfc_u10(
         )
 
         # ----- Optional Lin & Chavas (2012) translational asymmetry -----
-        if "use_lc12" in tc_config and tc_config["use_lc12"].value:
+        if "use_lc12" in tc_config and tc_config["use_lc12"]["value"]:
+            # simply add some background wind to the domain
             u_bg, v_bg = _lc12_background_wind(tc_config)
             u10 += u_bg
             v10 += v_bg

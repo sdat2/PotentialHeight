@@ -1011,10 +1011,13 @@ def plot_bo_comp() -> None:
 
 
 @timeit
-def make_argmax_table():
+def make_argmax_table(daf: str ="mes") -> None:
     """We want to make a table of the argmax values for each experiment.
 
-    columns:
+    Args:
+        daf (str, optional): DAF name. Defaults to "mes". Also ran an "ei" experiment.
+
+    Columns:
         - Name (e.g New Orleans, Galverston, Miami)
         - Year (e.g 2015, 2100)
         - Trial (e.g 0, 1, 2)
@@ -1039,10 +1042,12 @@ def make_argmax_table():
     for point in ["new-orleans", "miami", "galverston"]:
         for year in ["2015", "2100"]:
             for trial in range(12):
-                if trial == 0:
+                if trial == 0 and daf == "mes":
                     exp_name = f"{point}-{year}"
-                else:
+                elif daf == "mes":
                     exp_name = f"{point}-{year}-{trial}"
+                else:
+                    exp_name = f"{point}-{year}-{trial}-{daf}"
                 if not os.path.exists(os.path.join(EXP_PATH, exp_name)):
                     print(f"Experiment {exp_name} does not exist.")
                     continue
@@ -1078,12 +1083,11 @@ def make_argmax_table():
     # save to csv
     # add 1 to argmax index
     df[r"\(i\)"] = df[r"\(i\)"] + 1
-    df.to_latex(
-        os.path.join(DATA_PATH_ADBO, "argmax_table.tex"), index=False, escape=False
-    )  # decimal=3,
-    # TODO: also trigger animation using adforce.ani to plot the worst case scenario from each trial.
-    # loop through dataframe and reconstruct paths to run the animation script in
-    # something like EXP_PATH/new-orleans-2015/exp_0023/
+    if daf == "mes":
+        tex_out_path = os.path.join(DATA_PATH_ADBO, "argmax_table.tex")
+    else:
+        tex_out_path = os.path.join(DATA_PATH_ADBO, f"argmax_table_{daf}.tex")
+    df.to_latex(tex_out_path, index=False, escape=False)  # decimal=3,
     paths_to_plot = []
     N2ID = {v: k for k, v in stationid_to_names.items()}
     for _, row in df.iterrows():
@@ -1096,9 +1100,14 @@ def make_argmax_table():
         j = int(row[r"\(i\)"]) - 1
         paths_to_plot.append(os.path.join(EXP_PATH, exp_name, f"exp_{j:04}"))
 
+    if daf == "mes":
+        csv_out_path = os.path.join(DATA_PATH_ADBO, "argmax_table.csv")
+    else:
+        csv_out_path = os.path.join(DATA_PATH_ADBO, f"argmax_table_{daf}.csv")
+
     # add to dataframe
     df["Path"] = paths_to_plot
-    df.to_csv(os.path.join(DATA_PATH_ADBO, "argmax_table.csv"), index=False)
+    df.to_csv(csv_out_path, index=False)
 
     figure_path = os.path.join(FIGURE_PATH, "argmax_snapshots")
     os.makedirs(figure_path, exist_ok=True)
@@ -1108,6 +1117,12 @@ def make_argmax_table():
             qk_loc = {"x_pos": 0.5, "y_pos": 1.05}
         else:
             qk_loc = {"x_pos": 1, "y_pos": -0.05}
+        if daf == "mes":
+            file_name = (
+                f"{N2ID[row['Name']]}_{row['Year']}_{int(row['Trial'])}_snapshot.pdf"
+            )
+        else:
+            file_name = f"{N2ID[row['Name']]}_{row['Year']}_{int(row['Trial'])}_{daf}_snapshot.pdf"
         single_wind_and_height_step(
             path_in=row["Path"],
             bbox=stationid_to_bbox[N2ID[row["Name"]]],
@@ -1116,14 +1131,14 @@ def make_argmax_table():
             plot_loc=True,
             figure_name=os.path.join(
                 figure_path,
-                f"{N2ID[row['Name']]}_{row['Year']}_{int(row['Trial'])}_snapshot.pdf",
+                file_name,
             ),
             **qk_loc,
         )
 
 
 if __name__ == "__main__":
-    # make_argmax_table()
+    make_argmax_table("ei")
     # python -m adbo.plot
     # for point in ["new-orleans", "miami", "galverston"]:
     #    plot_diff(
@@ -1137,4 +1152,4 @@ if __name__ == "__main__":
     # find_differences()
     # plot_multi_argmax()
     # plot_bo_exp()
-    plot_bo_comp()
+    # plot_bo_comp()
