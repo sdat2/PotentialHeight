@@ -275,7 +275,10 @@ def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
         "description": "Specific humidity at pressure levels",
     }
     del ds["z"]
-    return ds.rename({"valid_time": "time"})
+    if "valid_time" in ds.dims:
+        return ds.rename({"valid_time": "time"})
+    else:
+        return ds
 
 
 @timeit
@@ -322,11 +325,26 @@ def era5_pi(years: List[str]) -> None:
 def get_era5_coordinates() -> xr.Dataset:
     """
     Get the coordinates of the ERA5 data.
-    This function is a placeholder and should be implemented with the actual calculation logic.
     """
-    return xr.open_dataset(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"))[
-        ["longitude", "latitude", "valid_time"]
-    ]
+    sfp = os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")
+    if os.path.exists(sfp):
+        # open the single level file
+        return xr.open_dataset(sfp)[["longitude", "latitude", "valid_time"]]
+    else:
+        # open the pressure level files for all of the decades using xr.open_mfdataset
+        file_paths = []
+        years = [str(year) for year in range(1980, 2025)]
+        for i in range(0, len(years), 10):
+            j = min(i + 10, len(years))
+            file_paths += [
+                os.path.join(
+                    ERA5_RAW_PATH,
+                    f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc",
+                )
+            ]
+        print(f"Opening pressure level files: {file_paths}")
+        ds = xr.open_mfdataset(file_paths, chunks={"valid_time": 1}, engine="netcdf4")
+        return ds[["longitude", "latitude", "valid_time"]]
 
 
 def get_era5_combined() -> xr.Dataset:

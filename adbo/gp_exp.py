@@ -478,6 +478,6 @@ if __name__ == "__main__":
             # "Exponential",
             # "Periodic",
         ),
-        n_train=25,
+        n_train=50,
         repeats=500,
     )
