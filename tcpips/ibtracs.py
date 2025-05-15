@@ -633,6 +633,24 @@ def plot_era5_processed() -> None:
     plt.close()
 
 
+def calculate_potential_intensity():
+    """Calculate the potential intensity of the cyclone at each timestep using the ERA5 data.
+
+    This function will use the processed ERA5 data to calculate the potential intensity of the cyclone at each timestep.
+    The potential intensity will be saved to a new variable in the ERA5 data.
+    """
+    pass  # TODO: implement this function
+
+
+def calculate_potential_size():
+    """Calculate the size of the cyclone at each timestep using the ERA5 data.
+
+    This function will use the processed ERA5 data to calculate the size of the cyclone at each timestep.
+    The size will be saved to a new variable in the ERA5 data.
+    """
+    pass  # TODO: implement this function
+
+
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     download_ibtracs_data()
