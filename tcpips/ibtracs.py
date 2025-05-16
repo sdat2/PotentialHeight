@@ -11,10 +11,15 @@ import numpy as np
 import xarray as xr
 import ujson
 import matplotlib.pyplot as plt
-from cartopy import crs as ccrs
-from cartopy.feature import NaturalEarthFeature
-import cartopy.feature as cfeature
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+
+try:
+    from cartopy import crs as ccrs
+    from cartopy.feature import NaturalEarthFeature
+    import cartopy.feature as cfeature
+    from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+except ImportError:
+    print("Cartopy not installed. Geographic plotting will not work.")
+
 from sithom.time import timeit
 from sithom.plot import plot_defaults, label_subplots, get_dim
 from .constants import DATA_PATH, PROJECT_PATH
