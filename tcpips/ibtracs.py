@@ -11,8 +11,21 @@ import numpy as np
 import xarray as xr
 import ujson
 from sithom.time import timeit
-from .constants import DATA_PATH
+from sithom.plot import plot_defaults, label_subplots, get_dim
+import matplotlib.pyplot as plt
+import os
+from cartopy import crs as ccrs
+from cartopy.feature import NaturalEarthFeature
+import cartopy.feature as cfeature
+from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from .constants import DATA_PATH, PROJECT_PATH
 from .era5 import get_era5_coordinates, get_era5_combined
+from .pi import calculate_pi
+from .era5 import (
+    preprocess_pressure_level_data,
+    preprocess_single_level_data,
+    get_era5_coordinates,
+)
 
 
 IBTRACS_DATA_PATH = os.path.join(DATA_PATH, "ibtracs")
@@ -145,15 +158,122 @@ def ibtracs_to_era5_map():
     )
 
 
+def calculate_grid_avg_over_unique_points(
+    ds: xr.Dataset, variables=("sst", "msl", "t2m")
+) -> xr.Dataset:
+    """Create for each gridpoints the average over all unique points.
+
+    Args:
+        ds (xr.Dataset): The unique point dataset to average over.
+        variables (tuple): The variables to average over.
+
+    Returns:
+        xr.Dataset: The averaged dataset.
+
+    This function will take the unique points dataset and average over the gridpoints
+    of the ERA5 coordinates.
+    """
+
+    coords_ds = get_era5_coordinates()
+    # get rid of time dimension
+    del coords_ds["valid_time"]
+    del coords_ds["expver"]
+
+    # ---------------------------------------------------------------------
+    # 1.  Handy aliases
+    lon_grid = coords_ds.longitude.values  # (1440,)
+    lat_grid = coords_ds.latitude.values  # (721,)   ─ descending in ERA5
+
+    lon_pt = ds.longitude.values  # (N,)
+    lat_pt = ds.latitude.values  # (N,)
+    # ---------------------------------------------------------------------
+    # 2.  Vectorised mapping (O(log n) each thanks to binary search in C)
+    lon_idx = np.searchsorted(lon_grid, lon_pt)  # 0 … 1439
+    lat_idx = np.searchsorted(lat_grid[::-1], lat_pt)  # 0 … 720   (grid is descending)
+    lat_idx = lat_grid.size - 1 - lat_idx  # flip back so 0 == 90 °N
+    # 3.  Pre-allocate target grids
+    shape = (lon_grid.size, lat_grid.size)
+    cnt = np.zeros(shape, dtype=np.int32)
+    var_sum = {var: np.zeros(shape, dtype=np.float64) for var in variables}
+    # 4.  One pass over the data – all heavy lifting in C
+    np.add.at(cnt, (lon_idx, lat_idx), 1)
+    for var in variables:
+        np.add.at(var_sum[var], (lon_idx, lat_idx), ds[var].values)
+
+    # 5.  Means (avoid /0 warnings)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        var_mean = {var: var_sum[var] / cnt for var in variables}
+    # 6.  Build the Dataset
+    data_vars = {var: (("longitude", "latitude"), var_mean[var]) for var in variables}
+    data_vars["cnt"] = (("longitude", "latitude"), cnt)
+    return xr.Dataset(
+        data_vars=data_vars,
+        coords=dict(longitude=lon_grid, latitude=lat_grid),
+        attrs=ds.attrs,  # keep global metadata
+    )
+
+
+def plot_var_on_map(
+    ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1
+) -> None:
+    """Plot a variable on a map.
+
+    Args:
+        ax (plt.axis): The axis to plot on.
+        da (xr.DataArray): The data array to plot.
+        label (str): The label for the colorbar.
+        cmap (str): The colormap to use.
+        shrink (float): The size of the colorbar.
+    """
+    # add feature at back of plot
+    ax.add_feature(
+        NaturalEarthFeature("physical", "land", "110m"),
+        edgecolor="black",
+        facecolor="green",
+        alpha=0.3,
+        linewidth=0.5,
+    )
+    # add in LATITUDE_FORMATTER and LONGITUDE_FORMATTER
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(),
+        draw_labels=True,
+        linewidth=0.5,
+        color="gray",
+        alpha=0.5,
+        linestyle="--",
+    )
+    gl.xlocator = plt.MaxNLocator(4)
+    gl.ylocator = plt.MaxNLocator(5)
+    gl.xformatter = LongitudeFormatter()
+    gl.yformatter = LatitudeFormatter()
+    # only on bottom and left of plot
+    gl.top_labels = False
+    gl.right_labels = False
+    # set the extent of the plot
+    ax.set_extent([-180, 180, -90, 90], crs=ccrs.PlateCarree())
+    # plot the data
+    da = da.where(da > 0, np.nan)
+    da.plot(
+        ax=ax,
+        x="longitude",
+        y="latitude",
+        cmap=cmap,
+        cbar_kwargs={
+            "label": label,
+            "cmap": cmap,
+            "shrink": shrink,
+        },
+        transform=ccrs.PlateCarree(),
+        add_colorbar=True,
+        add_labels=True,
+        rasterized=True,
+    )
+    ax.set_title("")  # remove title
+
+
 @timeit
 def plot_unique_points():
     # plot geographic distribution of unique points
-    import matplotlib.pyplot as plt
-    import cartopy.crs as ccrs
-    import cartopy.feature as cfeature
-    import os
-    from .constants import PROJECT_PATH
-    from sithom.plot import plot_defaults, get_dim, label_subplots
 
     ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc"))
 
@@ -253,15 +373,6 @@ def era5_unique_points_raw() -> None:
 def example_plot_raw():
     # Let's make a 3 panel plot of the era5_unique_points_raw.nc data
     # plot it on global plattee carree projection with coastlines
-    from sithom.plot import plot_defaults, label_subplots, get_dim
-    import matplotlib.pyplot as plt
-    import os
-    from .constants import PROJECT_PATH
-    from cartopy import crs as ccrs
-    from cartopy.feature import NaturalEarthFeature
-    from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-
-    # from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
     figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
     os.makedirs(figure_path, exist_ok=True)
@@ -269,128 +380,23 @@ def example_plot_raw():
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
     )
 
-    # get era5 coordinates
-    era5_coords_ds = get_era5_coordinates()
-    print("era5_coords", era5_coords_ds)
-    print("era5 unique", era5_unique_data)
-    # get rid of time dimension
-    del era5_coords_ds["valid_time"]
-    del era5_coords_ds["expver"]
-    print("era5_coords", era5_coords_ds)
-
-    # ---------------------------------------------------------------------
-    # 1.  Handy aliases
-    lon_grid = era5_coords_ds.longitude.values  # (1440,)
-    lat_grid = era5_coords_ds.latitude.values  # (721,)   ─ descending in ERA5
-    lon_pt = era5_unique_data.longitude.values  # (N,)
-    lat_pt = era5_unique_data.latitude.values  # (N,)
-    sst_pt = era5_unique_data.sst.values
-    msl_pt = era5_unique_data.msl.values
-    t2m_pt = era5_unique_data.t2m.values
-    # ---------------------------------------------------------------------
-
-    # 2.  Vectorised mapping (O(log n) each thanks to binary search in C)
-    lon_idx = np.searchsorted(lon_grid, lon_pt)  # 0 … 1439
-    lat_idx = np.searchsorted(lat_grid[::-1], lat_pt)  # 0 … 720   (grid is descending)
-    lat_idx = lat_grid.size - 1 - lat_idx  # flip back so 0 == 90 °N
-
-    # 3.  Pre-allocate target grids
-    shape = (lon_grid.size, lat_grid.size)
-    cnt = np.zeros(shape, dtype=np.int32)
-    sst_sum = np.zeros(shape, dtype=np.float64)
-    msl_sum = np.zeros(shape, dtype=np.float64)
-    t2m_sum = np.zeros(shape, dtype=np.float64)
-
-    # 4.  One pass over the data – all heavy lifting in C
-    np.add.at(cnt, (lon_idx, lat_idx), 1)
-    np.add.at(sst_sum, (lon_idx, lat_idx), sst_pt)
-    np.add.at(msl_sum, (lon_idx, lat_idx), msl_pt)
-    np.add.at(t2m_sum, (lon_idx, lat_idx), t2m_pt)
-
-    # 5.  Means (avoid /0 warnings)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        sst_mean = sst_sum / cnt
-        msl_mean = msl_sum / cnt
-        t2m_mean = t2m_sum / cnt
-
-    # 6.  Build the Dataset
-    era5_coords_ds = xr.Dataset(
-        data_vars=dict(
-            cnt=(("longitude", "latitude"), cnt),
-            sst=(("longitude", "latitude"), sst_mean),
-            msl=(("longitude", "latitude"), msl_mean),
-            t2m=(("longitude", "latitude"), t2m_mean),
-        ),
-        coords=dict(longitude=lon_grid, latitude=lat_grid),
-        attrs=era5_coords_ds.attrs,  # keep global metadata if you want
+    era5_coords_ds = calculate_grid_avg_over_unique_points(
+        era5_unique_data, variables=("sst", "msl", "t2m")
     )
 
     # create histogram of unique points back onto the lon/lat grid of ERA5
     # take all of the era5 unique data points
     # and work out if the longitude and latitudes correspond to a point
-
-    # for i in range(era5_unique_data.sst.values):
-    # print("era5 unique", era5_unique_data)
-
     plot_defaults()
-
-    def plot_ax(ax, name, label, cmap, shrink=0.63):
-        ax.set_global()
-        # add feature at back of plot
-        ax.add_feature(
-            NaturalEarthFeature("physical", "land", "110m"),
-            edgecolor="black",
-            facecolor="green",
-            alpha=0.3,
-            linewidth=0.5,
-        )
-        era5_coords_ds[name] = era5_coords_ds[name].where(
-            era5_coords_ds[name] > 0, np.nan
-        )
-
-        era5_coords_ds[name].plot(
-            ax=ax,
-            x="longitude",
-            y="latitude",
-            cmap=cmap,
-            cbar_kwargs={
-                "label": label,
-                "cmap": cmap,
-                "shrink": shrink,
-            },
-            transform=ccrs.PlateCarree(),
-            add_colorbar=True,
-            add_labels=True,
-            rasterized=True,
-        )
-
-        # plt.title("Count of unique points in ERA5 data")
-        plt.title("")
-        ax.set_title("")
-
-        # add in LATITUDE_FORMATTER and LONGITUDE_FORMATTER
-        gl = ax.gridlines(
-            crs=ccrs.PlateCarree(),
-            draw_labels=True,
-            linewidth=0.5,
-            color="gray",
-            alpha=0.5,
-            linestyle="--",
-        )
-        gl.xlocator = plt.MaxNLocator(4)
-        gl.ylocator = plt.MaxNLocator(5)
-        gl.xformatter = LongitudeFormatter()
-        gl.yformatter = LatitudeFormatter()
-        # only on bottom and left of plot
-        gl.top_labels = False
-        gl.right_labels = False
 
     _, ax = plt.subplots(
         1,
         1,
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
-    plot_ax(ax, "cnt", "Number of Unique Gridpoints", "viridis_r")
+    plot_var_on_map(
+        ax, era5_coords_ds["cnt"], "Number of Unique Gridpoints", "viridis_r"
+    )
     plt.savefig(
         os.path.join(figure_path, "era5_unique_points_count.pdf"),
         bbox_inches="tight",
@@ -405,7 +411,7 @@ def example_plot_raw():
         1,
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
-    plot_ax(ax, "sst", "Mean SST [K]", "viridis")
+    plot_var_on_map(ax, era5_coords_ds["sst"], "Mean SST [K]", "viridis")
 
     plt.savefig(
         os.path.join(figure_path, "era5_unique_points_sst.pdf"),
@@ -427,9 +433,15 @@ def example_plot_raw():
     era5_coords_ds["t2m"] -= 273.15  # convert to C
     era5_coords_ds["sst"] -= 273.15  # convert to C
 
-    plot_ax(axs[0], "sst", "Mean SST [$^{\circ}$C]", "viridis", shrink=1)
-    plot_ax(axs[1], "msl", "Mean MSL [hPa]", "viridis_r", shrink=1)
-    plot_ax(axs[2], "t2m", "Mean T2M [$^{\circ}$C]", "viridis", shrink=1)
+    plot_var_on_map(
+        axs[0], era5_coords_ds["sst"], "Mean SST [$^{\circ}$C]", "viridis", shrink=1
+    )
+    plot_var_on_map(
+        axs[1], era5_coords_ds["msl"], "Mean MSL [hPa]", "viridis_r", shrink=1
+    )
+    plot_var_on_map(
+        axs[2], era5_coords_ds["t2m"], "Mean T2M [$^{\circ}$C]", "viridis", shrink=1
+    )
     label_subplots(axs)
 
     plt.savefig(
@@ -459,8 +471,6 @@ def process_era5_raw() -> None:
     """Process the raw ERA5 unique datapoints selected to include the key variables
     for calculating potential intensity and size."""
 
-    from .era5 import preprocess_pressure_level_data, preprocess_single_level_data
-
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
     )
@@ -480,79 +490,15 @@ def plot_era5_processed() -> None:
 
     # lets do a 3 panel (rh, sst, msl) plot of the processed data
     # plot it on global plattee carree projection with coastlines
-    from sithom.plot import plot_defaults, label_subplots, get_dim
-    import matplotlib.pyplot as plt
-    import os
-    from .constants import PROJECT_PATH
-    from cartopy import crs as ccrs
-    from cartopy.feature import NaturalEarthFeature
-    from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-    from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 
     figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
     os.makedirs(figure_path, exist_ok=True)
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
     )
-
-    era5_coords_ds = get_era5_coordinates()
-    print("era5_coords", era5_coords_ds)
-    print("era5 unique", era5_unique_data)
-    # get rid of time dimension
-    del era5_coords_ds["valid_time"]
-    del era5_coords_ds["expver"]
-
-    print("era5_unique_data", era5_unique_data)
-    # get rid of time dimension
-    del era5_unique_data["time"]
-    del era5_unique_data["expver"]
-    print("era5_unique_data", era5_unique_data)
-    # get the data from the era5 data file at the unique points
-    # we want to vector select the era5 data with the unique points which are the indices of the era5 data
-    # this is done by using the isel method of xarray
-    # ---------------------------------------------------------------------
-    # 1.  Handy aliases
-    lon_grid = era5_coords_ds.longitude.values  # (1440,)
-    lat_grid = era5_coords_ds.latitude.values  # (721,)   ─ descending in ERA5
-
-    lon_pt = era5_unique_data.longitude.values  # (N,)
-    lat_pt = era5_unique_data.latitude.values  # (N,)
-    sst_pt = era5_unique_data.sst.values
-    msl_pt = era5_unique_data.msl.values
-    rh_pt = era5_unique_data.rh.values
-    # ---------------------------------------------------------------------
-    # 2.  Vectorised mapping (O(log n) each thanks to binary search in C)
-    lon_idx = np.searchsorted(lon_grid, lon_pt)  # 0 … 1439
-    lat_idx = np.searchsorted(lat_grid[::-1], lat_pt)  # 0 … 720   (grid is descending)
-    lat_idx = lat_grid.size - 1 - lat_idx  # flip back so 0 == 90 °N
-    # 3.  Pre-allocate target grids
-    shape = (lon_grid.size, lat_grid.size)
-    cnt = np.zeros(shape, dtype=np.int32)
-    sst_sum = np.zeros(shape, dtype=np.float64)
-    msl_sum = np.zeros(shape, dtype=np.float64)
-    rh_sum = np.zeros(shape, dtype=np.float64)
-    # 4.  One pass over the data – all heavy lifting in C
-    np.add.at(cnt, (lon_idx, lat_idx), 1)
-    np.add.at(sst_sum, (lon_idx, lat_idx), sst_pt)
-    np.add.at(msl_sum, (lon_idx, lat_idx), msl_pt)
-    np.add.at(rh_sum, (lon_idx, lat_idx), rh_pt)
-    # 5.  Means (avoid /0 warnings)
-    with np.errstate(invalid="ignore", divide="ignore"):
-        sst_mean = sst_sum / cnt
-        msl_mean = msl_sum / cnt
-        rh_mean = rh_sum / cnt
-    # 6.  Build the Dataset
-    era5_ds = xr.Dataset(
-        data_vars=dict(
-            cnt=(("longitude", "latitude"), cnt),
-            sst=(("longitude", "latitude"), sst_mean),
-            msl=(("longitude", "latitude"), msl_mean),
-            rh=(("longitude", "latitude"), rh_mean),
-        ),
-        coords=dict(longitude=lon_grid, latitude=lat_grid),
-        attrs=era5_unique_data.attrs,  # keep global metadata
+    era5_ds = calculate_grid_avg_over_unique_points(
+        era5_unique_data, variables=("sst", "msl", "rh")
     )
-
     # create 3 panel plot of sst, msl, rh
     plot_defaults()
     _, axs = plt.subplots(
@@ -562,65 +508,14 @@ def plot_era5_processed() -> None:
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
 
-    for ax in axs:
-        ax.set_global()
-        # add feature at back of plot
-        ax.add_feature(
-            NaturalEarthFeature("physical", "land", "110m"),
-            edgecolor="black",
-            facecolor="green",
-            alpha=0.3,
-            linewidth=0.5,
-        )
-        # add in LATITUDE_FORMATTER and LONGITUDE_FORMATTER
-        gl = ax.gridlines(
-            crs=ccrs.PlateCarree(),
-            draw_labels=True,
-            linewidth=0.5,
-            color="gray",
-            alpha=0.5,
-            linestyle="--",
-        )
-        gl.xlocator = plt.MaxNLocator(4)
-        gl.ylocator = plt.MaxNLocator(5)
-        gl.xformatter = LongitudeFormatter()
-        gl.yformatter = LatitudeFormatter()
-        # only on bottom and left of plot
-        gl.top_labels = False
-        gl.right_labels = False
-
-    def plot_ax(ax, name, label, cmap, shrink=0.63):
-        # add feature at back of plot
-        era5_ds[name] = era5_ds[name].where(era5_ds[name] > 0, np.nan)
-
-        era5_ds[name].plot(
-            ax=ax,
-            x="longitude",
-            y="latitude",
-            cmap=cmap,
-            cbar_kwargs={
-                "label": label,
-                "cmap": cmap,
-                "shrink": shrink,
-            },
-            transform=ccrs.PlateCarree(),
-            add_colorbar=True,
-            add_labels=True,
-            rasterized=True,
-        )
-
-        # plt.title("Count of unique points in ERA5 data")
-        plt.title("")
-        ax.set_title("")
-
-    plot_ax(
-        axs[0], "sst", "Mean SST [$^{\circ}$C]", "viridis", shrink=0.63
+    plot_var_on_map(
+        axs[0], era5_ds["sst"], "Mean SST [$^{\circ}$C]", "viridis", shrink=1
     )  # plot count of unique points
-    plot_ax(
-        axs[1], "msl", "Mean MSL [hPa]", "viridis_r", shrink=0.63
+    plot_var_on_map(
+        axs[1], era5_ds["msl"], "Mean MSL [hPa]", "viridis_r", shrink=1
     )  # plot count of unique points
-    plot_ax(
-        axs[2], "rh", "Mean RH [fraction]", "viridis", shrink=0.63
+    plot_var_on_map(
+        axs[2], era5_ds["rh"], "Mean RH [fraction]", "viridis", shrink=1
     )  # plot count of unique points
 
     label_subplots(axs)
@@ -634,12 +529,66 @@ def plot_era5_processed() -> None:
 
 
 def calculate_potential_intensity():
-    """Calculate the potential intensity of the cyclone at each timestep using the ERA5 data.
+    """Calculate the potential intensity of the cyclone at each timestep using the ERA5 data."""
+    processed_data = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
+    )
 
-    This function will use the processed ERA5 data to calculate the potential intensity of the cyclone at each timestep.
-    The potential intensity will be saved to a new variable in the ERA5 data.
-    """
-    pass  # TODO: implement this function
+    pi_ds = calculate_pi(processed_data, dim="pressure_level", V_reduc=1.0)
+
+    print(pi_ds)
+    pi_ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_pi.nc"),
+        engine="h5netcdf",
+    )
+
+
+def plot_potential_intensity():
+    """Provide example plots using the potential intensity data."""
+    # plot the potential intensity data
+    # plot it on global plattee carree projection with coastlines
+
+    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
+    os.makedirs(figure_path, exist_ok=True)
+    pi_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_pi.nc"))
+    # get coords
+
+    # create 3 panel plot of avg vmax, avg t0, avg otl
+    grid_avg_ds = calculate_grid_avg_over_unique_points(
+        pi_ds, variables=("vmax", "t0", "otl")
+    )
+
+    plot_defaults()
+
+    _, axs = plt.subplots(
+        3,
+        1,
+        figsize=get_dim(ratio=1.1),
+        sharex=True,
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+    )  # specify 3 rows for the subplots
+
+    plot_var_on_map(
+        axs[0],
+        grid_avg_ds["vmax"],
+        "Mean Potential Intensity [m s$^{-1}$]",
+        "viridis",
+        shrink=1,
+    )  # plot count of unique points
+    plot_var_on_map(
+        axs[1], grid_avg_ds["t0"], "Mean Outflow Temp [K]", "viridis_r", shrink=1
+    )  # plot count of unique points
+    plot_var_on_map(
+        axs[2], grid_avg_ds["otl"], "Mean Outflow Layer [hPa]", "plasma", shrink=1
+    )  # plot count of unique points
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(figure_path, "era5_unique_points_pi.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
 
 
 def calculate_potential_size():
@@ -653,11 +602,13 @@ def calculate_potential_size():
 
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
-    download_ibtracs_data()
+    # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
     # plot_unique_points()
     # era5_unique_points_raw()
-    # example_plot_raw()
+    example_plot_raw()
     # process_era5_raw()
     plot_era5_processed()
+    # calculate_potential_intensity()
+    plot_potential_intensity()
