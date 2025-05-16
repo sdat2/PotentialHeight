@@ -27,9 +27,9 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import os
 
-# Assuming sithom.plot exists and plot_defaults sets matplotlib styles
-# from sithom.plot import plot_defaults
-# plot_defaults() # Uncomment if sithom is installed
+from sithom.plot import plot_defaults
+
+plot_defaults()
 
 # --- Configuration Parameters ---
 # Gaussian PDF parameters for X
@@ -105,7 +105,7 @@ def plot_initial_data(x_samples, y_true, mu, sigma, n_samples, run_id, save_path
         run_id (int): Identifier for the current experimental run.
         save_path (str, optional): Path to save the plot. If empty, plot is not saved.
     """
-    plt.figure(figsize=(8, 5))
+    # plt.figure(figsize=(8, 5))
     plt.scatter(
         x_samples, y_true, alpha=0.5, label=f"Sampled (x, y=f(x)), N={n_samples}"
     )
@@ -127,7 +127,7 @@ def plot_initial_data(x_samples, y_true, mu, sigma, n_samples, run_id, save_path
 def build_relu_nn_model(input_shape, n_hidden_layers, n_neurons):
     """Builds a Keras Sequential model with ReLU hidden layers and a linear output layer."""
     model = keras.Sequential(name="ReLU_Emulator")
-    model.add(layers.InputLayer(input_shape=input_shape))
+    model.add(layers.InputLayer(shape=input_shape))
     for _ in range(n_hidden_layers):
         model.add(layers.Dense(n_neurons, activation="relu"))
     model.add(layers.Dense(1, activation="linear"))  # Linear output for regression
@@ -171,7 +171,7 @@ def train_model(
         print(f"Saved trained model for run {run_id}")
 
         # Plot training history
-        plt.figure(figsize=(8, 5))
+        # plt.figure(figsize=(8, 5))
         plt.plot(history.history["loss"], label="Training Loss (MSE)")
         plt.plot(history.history["val_loss"], label="Validation Loss (MSE)")
         plt.title(f"Run {run_id}: Model Training History")
@@ -201,7 +201,7 @@ def plot_emulator_fit(
     x_samples, y_true, y_pred, mu, sigma, n_samples, run_id, save_path=""
 ):
     """Plots the true function, sample data, and emulator predictions."""
-    plt.figure(figsize=(10, 6))
+    # plt.figure(figsize=(10, 6))
     plt.scatter(
         x_samples,
         y_true,
@@ -221,10 +221,10 @@ def plot_emulator_fit(
     y_dense_true = -ss.norm.pdf(x_dense, loc=mu, scale=sigma)
 
     plt.plot(
-        x_dense, y_dense_true, "b-", label=f"True Function $y = -f_X(x)$", linewidth=2
+        x_dense, y_dense_true, "b-", label=f"True Function $y = -f_X(x)$", linewidth=1
     )
     plt.plot(
-        x_sorted, y_pred_sorted, "r--", label=f"Emulator $\hat{{y}}(x)$", linewidth=2
+        x_sorted, y_pred_sorted, "r--", label=f"Emulator $\hat{{y}}(x)$", linewidth=1
     )
 
     plt.xlabel("Input x")
@@ -311,7 +311,7 @@ def plot_exceedance_probabilities(y_true, y_pred, mu, sigma, run_id, save_path="
     """
     Calculates and plots empirical and true analytical exceedance probabilities.
     """
-    plt.figure(figsize=(10, 6))
+    # plt.figure(figsize=(10, 6))
 
     # Determine a relevant range for t (threshold values)
     # The relevant range for Y is [min_y, 0)
@@ -331,7 +331,7 @@ def plot_exceedance_probabilities(y_true, y_pred, mu, sigma, run_id, save_path="
         t_values,
         true_analytic_exceedance,
         "k-",
-        linewidth=2,
+        linewidth=0.5,
         label="True Analytical $P(Y > t)$",
     )
 
@@ -378,7 +378,7 @@ def plot_all_emulator_exceedance_curves(all_y_pred, mu, sigma, n_runs, save_path
     """
     Plots the true analytical exceedance curve against all empirical emulator curves.
     """
-    plt.figure(figsize=(12, 7))
+    # plt.figure(figsize=(12, 7))
 
     # Determine a relevant range for t (threshold values) across all predictions
     all_pred_flat = np.concatenate(all_y_pred)
@@ -394,7 +394,7 @@ def plot_all_emulator_exceedance_curves(all_y_pred, mu, sigma, n_runs, save_path
         t_values,
         true_analytic_exceedance,
         "k-",
-        linewidth=3,  # Thicker line for reference
+        linewidth=0.5,  # Thicker line for reference
         label="True Analytical $P(Y > t)$",
     )
 
@@ -493,12 +493,12 @@ if __name__ == "__main__":
             save_path_prefix=os.path.join(DATA_PATH, f"model"),
         )
 
-        # 4. Generate Predictions (on the training data x_s)
+        # 4. Generate Predictions (on new test data)
 
-        generate_data(
+        x_s, y_t, x_s_nn, y_t_nn = generate_data(
             MU,
             SIGMA,
-            N_SAMPLES * 1000,
+            N_SAMPLES * 10,
             data_random_seed + 1000,  # Different seed for prediction data
             current_run_id,
             save_path_prefix=os.path.join(DATA_PATH, f"predictions"),
