@@ -672,7 +672,12 @@ def make_plot(add_name: str = ""):
 
 
 if __name__ == "__main__":
-    # python -m w22.test
+    # python -m w22.test --name archer2-slurm
     # test_figure_4()
     # test_figure_5()
-    octave_vs_python("mac1")
+    import argparse
+    parser = argparse.ArgumentParser(description="Process some inputs.")
+    parser.add_argument("--name", type=str, help="Input for octave_vs_python")
+    args = parser.parse_args()
+    octave_vs_python(args.name)
+

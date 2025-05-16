@@ -10,8 +10,6 @@
 # slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
 
-# Replace [budget code] below with your project code (e.g. t01)
-
 #SBATCH --account=n02-bas
 #SBATCH --partition=standard
 #SBATCH --qos=short
@@ -36,13 +34,13 @@ echo "which python"
 which python
 
 # run python job
-python -m cle.potential_size
+#python -m w22.potential_size
 
-# pytest ../cle/ps.py
-# python -m cle.ps
+# pytest ../w22/ps.py
+# python -m w22.ps
 
-
-python -m cle.ps
+python -m w22.test --name archer2-slurm
+#python -m w22.ps
 
 # Time taken by oct2py for 10 loops is 21.8 s
 # Time taken by octave for 10 loops is 7.9 s
