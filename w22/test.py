@@ -530,7 +530,7 @@ def test_figure_5():
     plt.close()
 
 
-def octave_vs_python():
+def octave_vs_python(add_name: str = ""):
     from .cle15m import run_cle15 as run_cle15_octave
     from .cle15 import run_cle15 as run_cle15_python
     from .constants import (
@@ -556,16 +556,16 @@ def octave_vs_python():
         "Cdvary": CDVARY_DEFAULT,
     }
 
-    def compare_with_inp(input: dict) -> dict:
+    def compare_with_inp(inp: dict) -> dict:
         time_start = time.perf_counter()
-        out_octave = run_cle15_octave(inputs=inputs, pressure_assumption="isothermal")
+        out_octave = run_cle15_octave(inputs=inp, pressure_assumption="isothermal")
         print(f"Octave output, {out_octave}")
         time_end = time.perf_counter()
         time_octave = time_end - time_start
         print(f"Octave time {time_octave:.3f} s")
         time_start = time.perf_counter()
 
-        out_python = run_cle15_python(inputs=inputs, pressure_assumption="isothermal")
+        out_python = run_cle15_python(inputs=inp, pressure_assumption="isothermal")
         time_end = time.perf_counter()
         time_python = time_end - time_start
         print(f"Python time {time_python:.3f} s")
@@ -590,8 +590,22 @@ def octave_vs_python():
     df = pd.DataFrame.from_dict(out_d, orient="index")
     df = df.rename_axis("r0").reset_index()
     os.makedirs(os.path.join(DATA_PATH, "cle15"), exist_ok=True)
+    if add_name != "":
+        add_name = f"-{add_name}"
+    df.to_csv(
+        os.path.join(DATA_PATH, "cle15", f"octave-vs-python{add_name}.csv"), index=False
+    )
 
-    df.to_csv(os.path.join(DATA_PATH, "cle15", "octave-vs-python.csv"), index=False)
+    make_plot(add_name=add_name)
+
+
+def make_plot(add_name: str = ""):
+    # read csv test data
+    if add_name != "" and add_name[0] != "-":
+        add_name = f"-{add_name}"
+    df = pd.read_csv(
+        os.path.join(DATA_PATH, "cle15", f"octave-vs-python{add_name}.csv")
+    )
     fig, axs = plt.subplots(1, 3, sharex=True)
     axs[0].plot(
         df["r0"] / 1000,
@@ -650,7 +664,7 @@ def octave_vs_python():
     os.makedirs(os.path.join(FIGURE_PATH, "cle15"), exist_ok=True)
 
     plt.savefig(
-        os.path.join(FIGURE_PATH, "cle15", "octave-vs-python.pdf"),
+        os.path.join(FIGURE_PATH, "cle15", f"octave-vs-python{add_name}.pdf"),
         bbox_inches="tight",
     )
     plt.clf()
@@ -661,4 +675,4 @@ if __name__ == "__main__":
     # python -m w22.test
     # test_figure_4()
     # test_figure_5()
-    octave_vs_python()
+    octave_vs_python("mac1")

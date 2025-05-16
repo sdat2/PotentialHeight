@@ -305,10 +305,10 @@ def parallelized_ps(
             .unstack("stacked_dim")
         )
     output_ds.attrs["potential_size_pressure_assumption"] = pressure_assumption
-    output_ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
+    output_ds.attrs["ps_calculated_at_git_hash"] = get_git_revision_hash(
         path=str(PROJECT_PATH)
     )
-    output_ds.attrs["pi_calculated_at_time"] = time_stamp()
+    output_ds.attrs["ps_calculated_at_time"] = time_stamp()
     return output_ds
 
 
@@ -349,16 +349,35 @@ def multi_point_example_2d() -> None:
                 [[50, 51], [49, 49.5]],
             ),  # m/s, potential intensity
             "rh": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),
-            "rh": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),
             "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
             "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
+            "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # mbar or hPa
+            "Cdvary": (("y", "x"), [[0, 0], [0, 0]]),  # mbar or hPa
+            # "CkCd": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),  # mbar or hPa
+            # "Cd": (("y", "x"), [[1.5e-3, 1.5e-3], [1.5e-3, 1.5e-3]]),  # mbar or hPa
+            "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),  # mbar or hPa
+            "supergradient_factor": (
+                ("y", "x"),
+                [[1.2, 1.2], [1.2, 1.2]],
+            ),  # mbar or hPa
+            "pressure_assumption": (
+                ("y", "x"),
+                [["isothermal", "isothermal"], ["isothermal", "isothermal"]],
+            ),  # mbar or hPa
+            "cd": (("y", "x"), [[0.0015, 0.0015], [0.0015, 0.0015]]),  # mbar or hPa
         },
         coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth
     )
     print(in_ds)
     out_ds = parallelized_ps(in_ds)
     print(out_ds)
+
+    assert np.allclose(
+        out_ds["r0"].values.ravel(),
+        np.array([1.763e06, 1.831e06, 1.199e06, 1.197e06]),
+        rtol=1e-2,
+    )
 
 
 if __name__ == "__main__":
