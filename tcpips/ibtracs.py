@@ -10,14 +10,13 @@ import os
 import numpy as np
 import xarray as xr
 import ujson
-from sithom.time import timeit
-from sithom.plot import plot_defaults, label_subplots, get_dim
 import matplotlib.pyplot as plt
-import os
 from cartopy import crs as ccrs
 from cartopy.feature import NaturalEarthFeature
 import cartopy.feature as cfeature
 from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+from sithom.time import timeit
+from sithom.plot import plot_defaults, label_subplots, get_dim
 from .constants import DATA_PATH, PROJECT_PATH
 from .era5 import get_era5_coordinates, get_era5_combined
 from .pi import calculate_pi
@@ -32,6 +31,8 @@ IBTRACS_DATA_PATH = os.path.join(DATA_PATH, "ibtracs")
 os.makedirs(IBTRACS_DATA_PATH, exist_ok=True)
 IBTRACS_DATA_URL = "https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/netcdf/IBTrACS.since1980.v04r01.nc"
 IBTRACS_DATA_FILE = os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+FIGURE_PATH = os.path.join(PROJECT_PATH, "img", "ibtracs")
+os.makedirs(FIGURE_PATH, exist_ok=True)
 
 
 def download_ibtracs_data() -> None:
@@ -277,8 +278,6 @@ def plot_unique_points():
 
     ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "unique_era5_points.nc"))
 
-    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
-    os.makedirs(figure_path, exist_ok=True)
     plot_defaults()
 
     fig, ax = plt.subplots(
@@ -297,7 +296,7 @@ def plot_unique_points():
     )
     ax.set_title("Unique points from ERA5 that correspond to IBTrACS data since 1980")
     plt.savefig(
-        os.path.join(figure_path, "unique_points_era5_ibtracs.png"),
+        os.path.join(FIGURE_PATH, "unique_points_era5_ibtracs.png"),
         bbox_inches="tight",
     )
     plt.clf()
@@ -324,7 +323,7 @@ def plot_unique_points():
     axs[0].set_ylabel("Count")
     label_subplots(axs)
     plt.savefig(
-        os.path.join(figure_path, "unique_points_era5_ibtracs_hist.pdf"),
+        os.path.join(FIGURE_PATH, "unique_points_era5_ibtracs_hist.pdf"),
         bbox_inches="tight",
     )
 
@@ -374,8 +373,6 @@ def example_plot_raw():
     # Let's make a 3 panel plot of the era5_unique_points_raw.nc data
     # plot it on global plattee carree projection with coastlines
 
-    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
-    os.makedirs(figure_path, exist_ok=True)
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
     )
@@ -395,10 +392,17 @@ def example_plot_raw():
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
     plot_var_on_map(
-        ax, era5_coords_ds["cnt"], "Number of Unique Gridpoints", "viridis_r"
+        ax,
+        era5_coords_ds["cnt"],
+        "Number of Unique Gridpoints",
+        "viridis_r",
+        shrink=0.63,
+    )
+    plt.title(
+        "Number of unique points from ERA5 that correspond to IBTrACS data since 1980"
     )
     plt.savefig(
-        os.path.join(figure_path, "era5_unique_points_count.pdf"),
+        os.path.join(FIGURE_PATH, "era5_unique_points_count.pdf"),
         bbox_inches="tight",
         dpi=400,
     )
@@ -411,10 +415,17 @@ def example_plot_raw():
         1,
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
-    plot_var_on_map(ax, era5_coords_ds["sst"], "Mean SST [K]", "viridis")
+    plot_var_on_map(
+        ax,
+        era5_coords_ds["sst"],
+        "Mean SST [K]",
+        "viridis",
+        shrink=0.63,
+    )
+    plt.title("Mean Sea Surface Temperature from ERA5")
 
     plt.savefig(
-        os.path.join(figure_path, "era5_unique_points_sst.pdf"),
+        os.path.join(FIGURE_PATH, "era5_unique_points_sst.pdf"),
         bbox_inches="tight",
         dpi=400,
     )
@@ -445,7 +456,7 @@ def example_plot_raw():
     label_subplots(axs)
 
     plt.savefig(
-        os.path.join(figure_path, "era5_unique_points_raw.pdf"),
+        os.path.join(FIGURE_PATH, "era5_unique_points_raw.pdf"),
         dpi=300,
         bbox_inches="tight",
     )
@@ -491,8 +502,6 @@ def plot_era5_processed() -> None:
     # lets do a 3 panel (rh, sst, msl) plot of the processed data
     # plot it on global plattee carree projection with coastlines
 
-    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
-    os.makedirs(figure_path, exist_ok=True)
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
     )
@@ -520,7 +529,7 @@ def plot_era5_processed() -> None:
 
     label_subplots(axs)
     plt.savefig(
-        os.path.join(figure_path, "era5_unique_points_processed.pdf"),
+        os.path.join(FIGURE_PATH, "era5_unique_points_processed.pdf"),
         dpi=300,
         bbox_inches="tight",
     )
@@ -548,8 +557,6 @@ def plot_potential_intensity():
     # plot the potential intensity data
     # plot it on global plattee carree projection with coastlines
 
-    figure_path = os.path.join(PROJECT_PATH, "img", "ibtracs")
-    os.makedirs(figure_path, exist_ok=True)
     pi_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_pi.nc"))
     # get coords
 
@@ -576,14 +583,14 @@ def plot_potential_intensity():
         shrink=1,
     )  # plot count of unique points
     plot_var_on_map(
-        axs[1], grid_avg_ds["t0"], "Mean Outflow Temp [K]", "viridis_r", shrink=1
+        axs[1], grid_avg_ds["t0"], "Mean Outflow Temperature [K]", "viridis_r", shrink=1
     )  # plot count of unique points
     plot_var_on_map(
-        axs[2], grid_avg_ds["otl"], "Mean Outflow Layer [hPa]", "plasma", shrink=1
+        axs[2], grid_avg_ds["otl"], "Mean Outflow Level [hPa]", "plasma", shrink=1
     )  # plot count of unique points
     label_subplots(axs)
     plt.savefig(
-        os.path.join(figure_path, "era5_unique_points_pi.pdf"),
+        os.path.join(FIGURE_PATH, "era5_unique_points_pi.pdf"),
         dpi=300,
         bbox_inches="tight",
     )
