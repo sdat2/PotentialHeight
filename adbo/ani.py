@@ -274,7 +274,7 @@ def plot_gps(
 if __name__ == "__main__":
     # python -m adbo.ani
     plot_gps(
-        path_in="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/exp/2d-ani-ei/exp_0049",
+        path_in="/work/n02/n02/sdat2/adcirc-swan/exp/old/2d-ani-new-redo-4",
         add_name="",
         plot_acq=True,
         save_pdf={

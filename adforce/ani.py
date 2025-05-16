@@ -780,6 +780,14 @@ if __name__ == "__main__":
     # python -m adforce.ani
     # run_animation()
     single_wind_and_height_step(
+        path_in="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/exp/2d-ani-ei/exp_0049",
+        bbox=NO_BBOX.pad(1),
+        time_i=300,
+        coarsen=3,
+        plot_loc=True,
+        figure_name="2015_asym_2d_new_orleans_snapshot.pdf",
+    )
+    single_wind_and_height_step(
         path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049",
         bbox=NO_BBOX.pad(1),
         time_i=300,

@@ -21,15 +21,15 @@
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
 # # try to activate micromamba
-# source /work/n02/n02/sdat2/.bashrc
-# which micromamba
-# micromamba --version
-# micromamba activate t1
+source /work/n02/n02/sdat2/.bashrc
+which micromamba
+micromamba --version
+micromamba activate t1
 
-source /work/n01/n01/sithom/.bashrc
-which conda
-conda --version
-conda activate base
+# source /work/n01/n01/sithom/.bashrc
+# which conda
+# conda --version
+# conda activate base
 
 # print out the python version
 echo "which python"
@@ -52,14 +52,21 @@ obs_lat=29.3013
 name=galverston
 
 daf=ei
+# asym=true
 
-seed=95
-exp=3
-python -m adbo.exp_3d --exp_name=${name}-2015-${exp}-${daf} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf
+
+seed=30
+exp=0
+python -m adbo.exp_3d --exp_name=${name}-2015-${exp}-${daf} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf 
 python -m adbo.exp_3d --exp_name=${name}-2100-${exp}-${daf}  --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf
 
 
-seed=100
-exp=4
+seed=35
+exp=1
+python -m adbo.exp_3d --exp_name=${name}-2015-${exp}-${daf} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf
+python -m adbo.exp_3d --exp_name=${name}-2100-${exp}-${daf}  --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf
+
+seed=40
+exp=2
 python -m adbo.exp_3d --exp_name=${name}-2015-${exp}-${daf} --profile_name=$p15 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf
 python -m adbo.exp_3d --exp_name=${name}-2100-${exp}-${daf}  --profile_name=$p100 --resolution=mid --obs_lat=$obs_lat --obs_lon=$obs_lon  --seed=$seed --daf=$daf
