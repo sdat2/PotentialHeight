@@ -27,7 +27,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import os
 
-from sithom.plot import plot_defaults
+from sithom.plot import plot_defaults, label_subplots
 
 plot_defaults()
 
@@ -58,6 +58,56 @@ os.makedirs(FIGURE_PATH, exist_ok=True)
 
 
 # --- Helper Functions ---
+
+
+def plot_problem_setup_explanation(mu, sigma, save_path=""):
+    """
+    Plots the true input PDF f_x(x) and the true target function y = -f_x(x)
+    to explain the experiment setup, sharing the x-axis.
+
+    Args:
+        mu (float): Mean of the Gaussian distribution for X.
+        sigma (float): Standard deviation of the Gaussian distribution for X.
+        save_path (str, optional): Path to save the plot. If empty, plot is not saved.
+    """
+    x_dense = np.linspace(mu - 4 * sigma, mu + 4 * sigma, 500)
+    f_x_dense = ss.norm.pdf(x_dense, loc=mu, scale=sigma)
+    y_dense_true = -f_x_dense
+
+    fig, axes = plt.subplots(2, 1, sharex=True)  # , figsize=(8, 8))
+
+    # Plot the Input PDF f_x(x)
+    axes[0].plot(x_dense, f_x_dense, label=r"True PDF $f_X(x) = N(\mu, \sigma^2)(x)$")
+    axes[0].set_ylabel(r"$f_X(x)$")
+    axes[0].set_title(r"Probability Density Function of Input $f_X(x)$")
+    axes[0].grid(True)
+    # axes[0].legend()
+
+    # Plot the Target Function y = -f_x(x)
+    axes[1].plot(
+        x_dense, y_dense_true, "r-", label=r"True Target Function $y = -f_X(x)$"
+    )
+    axes[1].set_xlabel(r"Input $x$")
+    axes[1].set_ylabel(r"$y = -f_X(x)$")
+    axes[1].set_title(r"True Target Function $y = -f_X(x)$")
+    axes[1].grid(True)
+    # axes[1].legend()
+
+    # Overall title
+    # fig.suptitle(
+    #    "Experiment Problem Setup: Input Distribution and Target Function", y=1.02
+    # )  # Adjust y for title position
+
+    plt.tight_layout()  # Adjust layout to prevent overlap
+
+    label_subplots(axes)
+
+    if save_path:
+        plt.savefig(
+            save_path, bbox_inches="tight"
+        )  # bbox_inches='tight' ensures suptitle is included
+        print(f"Saved problem setup explanation plot to {save_path}")
+    plt.close(fig)  # Close the figure
 
 
 def generate_data(mu, sigma, n_samples, random_seed, run_id, save_path_prefix=""):
@@ -361,7 +411,7 @@ def plot_exceedance_probabilities(y_true, y_pred, mu, sigma, run_id, save_path="
         alpha=0.7,
     )
 
-    plt.xlabel("Threshold t (Function Output Value)")
+    plt.xlabel("Threshold $t$")
     plt.ylabel("Exceedance Probability $P(\\text{Value} > t)$")
     plt.title(f"Run {run_id}: Exceedance Probabilities - Analytical vs. Empirical")
     plt.yscale("log")
@@ -412,11 +462,11 @@ def plot_all_emulator_exceedance_curves(all_y_pred, mu, sigma, n_runs, save_path
             ),  # Limit legend entries
         )
 
-    plt.xlabel("Threshold t (Function Output Value)")
-    plt.ylabel("Exceedance Probability $P(\\text{Value} > t)$")
-    plt.title(
-        f"Variability of Empirical Emulator Exceedance Probabilities ({n_runs} Runs) vs. True Analytical"
-    )
+    plt.xlabel("Threshold $t$")
+    plt.ylabel("Exceedance Probability P$(\\text{Y} > t)$")
+    # plt.title(
+    #    f"Variability of Empirical Emulator Exceedance Probabilities ({n_runs} Runs) vs. True Analytical"
+    # )
     plt.yscale("log")
     plt.ylim(1e-5, 1.1)  # Set reasonable limits for log scale
     plt.grid(True, which="both", ls="--")
@@ -493,6 +543,26 @@ if __name__ == "__main__":
             save_path_prefix=os.path.join(DATA_PATH, f"model"),
         )
 
+        # 4. Plot Emulator Fit for training data
+        y_predicted = predict_with_model(
+            trained_model,
+            x_s_nn,
+            current_run_id,
+            save_path_prefix=os.path.join(DATA_PATH, f"predictions"),
+        )
+        plot_emulator_fit(
+            x_s,
+            y_t,
+            y_predicted,
+            MU,
+            SIGMA,
+            N_SAMPLES,
+            current_run_id,
+            save_path=os.path.join(
+                FIGURE_PATH, f"emulator_fit_plot_run{current_run_id}.pdf"
+            ),
+        )
+
         # 4. Generate Predictions (on new test data)
 
         x_s, y_t, x_s_nn, y_t_nn = generate_data(
@@ -510,20 +580,6 @@ if __name__ == "__main__":
             save_path_prefix=os.path.join(DATA_PATH, f"predictions"),
         )
         all_emulator_predictions.append(y_predicted)
-
-        # 5. Plot Emulator Fit for this run (on x_s range)
-        plot_emulator_fit(
-            x_s,
-            y_t,
-            y_predicted,
-            MU,
-            SIGMA,
-            N_SAMPLES,
-            current_run_id,
-            save_path=os.path.join(
-                FIGURE_PATH, f"emulator_fit_plot_run{current_run_id}.pdf"
-            ),
-        )
 
         # 6. Plot Exceedance Probabilities for this run (comparing Analytical, Empirical True, Empirical Emulator)
         plot_exceedance_probabilities(
@@ -550,3 +606,7 @@ if __name__ == "__main__":
         )
 
     print("\nExperiment finished. Outputs are saved in the specified directories.")
+
+    plot_problem_setup_explanation(
+        MU, SIGMA, save_path=os.path.join(FIGURE_PATH, "problem_setup_explanation.pdf")
+    )
