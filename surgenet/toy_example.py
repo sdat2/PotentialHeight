@@ -1,5 +1,5 @@
 """
-Toy Example: Extrapolation Behavior of ReLU NN Emulators
+Toy Example: Extrapolation Behaviour of ReLU NN Emulators
 
 The Gaussian PDF of x, relates x to y as y = -PDF(x).
 This script compares the empirical exceedance probability of an NN emulator
@@ -55,9 +55,6 @@ FIGURE_PATH = os.path.join(OUTPUT_DIR, "img")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(DATA_PATH, exist_ok=True)
 os.makedirs(FIGURE_PATH, exist_ok=True)
-
-
-# --- Helper Functions ---
 
 
 def plot_problem_setup_explanation(mu, sigma, save_path=""):
@@ -412,7 +409,7 @@ def plot_exceedance_probabilities(y_true, y_pred, mu, sigma, run_id, save_path="
     )
 
     plt.xlabel("Threshold $t$")
-    plt.ylabel("Exceedance Probability $P(\\text{Value} > t)$")
+    plt.ylabel(r"Exceedance Probability $P(\text{Value} > t)$")
     plt.title(f"Run {run_id}: Exceedance Probabilities - Analytical vs. Empirical")
     plt.yscale("log")
     plt.ylim(1e-5, 1.1)  # Set reasonable limits for log scale

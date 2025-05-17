@@ -34,3 +34,11 @@ sphinx-apidoc -f -o . ..
 is a symbolic link to items in the main directory.
 
 This was done to trick sphinx into working, and seems to have worked so far.
+
+## Lang.txt
+
+To recreate the lang.txt count run this command from the main directory:
+
+```bash 
+git ls-files | cloc --report-file=docs/lang.txt --sum-one --exclude-ext=json,csv --list-file -
+```
