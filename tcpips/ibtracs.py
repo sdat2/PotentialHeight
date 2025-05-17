@@ -483,7 +483,7 @@ def example_plot_raw():
 # take this era5 data and calculate the potential intensity and size of the cyclone at each timestep.
 # should scale O(n*t) where n is the number of storms and t is the number of timesteps in each storm.
 
-
+@timeit
 def process_era5_raw() -> None:
     """Process the raw ERA5 unique datapoints selected to include the key variables
     for calculating potential intensity and size."""
@@ -501,6 +501,7 @@ def process_era5_raw() -> None:
     print("ERA5 unique points data processed and saved.")
 
 
+@timeit
 def plot_era5_processed() -> None:
     """Plot the processed ERA5 unique datapoints selected to include the key variables
     for calculating potential intensity and size."""
@@ -543,6 +544,7 @@ def plot_era5_processed() -> None:
     plt.close()
 
 
+@timeit
 def calculate_potential_intensity():
     """Calculate the potential intensity of the cyclone at each timestep using the ERA5 data."""
     processed_data = xr.open_dataset(
@@ -558,6 +560,7 @@ def calculate_potential_intensity():
     )
 
 
+@timeit
 def plot_potential_intensity():
     """Provide example plots using the potential intensity data."""
     # plot the potential intensity data
@@ -604,6 +607,7 @@ def plot_potential_intensity():
     plt.close()
 
 
+@timeit
 def calculate_potential_size():
     """Calculate the size of the cyclone at each timestep using the ERA5 data."""
     proc_ds = xr.open_dataset(
@@ -661,6 +665,7 @@ def calculate_potential_size():
     print("Potential size calculated and saved.")
 
 
+@timeit
 def plot_potential_size() -> None:
     """Plot the potential size data."""
 
@@ -728,6 +733,6 @@ if __name__ == "__main__":
     # example_plot_raw()
     # process_era5_raw()
     # plot_era5_processed()
-    # calculate_potential_intensity()
+    calculate_potential_intensity()
     # plot_potential_intensity()
     calculate_potential_size()
