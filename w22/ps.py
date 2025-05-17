@@ -26,8 +26,8 @@ from .constants import (
     CD_DEFAULT,
     ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
-from .potential_size import wang_diff, wang_consts
-from .cle15m import run_cle15
+from .w22_carnot import wang_diff, wang_consts
+from .cle15 import run_cle15
 from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
@@ -222,14 +222,14 @@ def point_solution_ps(
 
 @timeit
 def parallelized_ps(
-    ds: xr.Dataset, jobs=10, pressure_assumption="isothermal"
+    ds: xr.Dataset, jobs=-1, pressure_assumption="isothermal"
 ) -> xr.Dataset:
     """
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
 
     Args:
         ds (xr.Dataset): contains msl, vmax, sst, t0, rh, and lat.
-        jobs (int, optional): Number of threads, defaults to 10.
+        jobs (int, optional): Number of threads, defaults to -1.
         pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
 
     Returns:
@@ -316,13 +316,24 @@ def single_point_example() -> None:
     in_ds = xr.Dataset(
         data_vars={
             "msl": 1016.7,  # mbar or hPa
+            "rh": 0.9,  # [dimensionless], relative humidity
+            "ck_cd": 0.95,  # [dimensionless], ck_cd
+            "cd": 0.0015,  # [dimensionless], cd
+            "w_cool": 0.002,  # mbar or hPa
             "vmax": 49.5,  # m/s, potential intensity
             "sst": 28,  # degC
             "t0": 200,  # degK
+            "pressure_assumption": "isothermal",  # mbar or hPa
+            "supergradient_factor": 1.2,  # mbar or hPa
         },
-        coords={"lat": 28},  # degNorth
+        coords={"lat": 25},  # degNorth
     )
     out_ds = point_solution_ps(in_ds)
+    assert np.allclose(
+        out_ds["r0"].values,
+        2.005e06,
+        rtol=1e-2,
+    ), f"r0: {out_ds['r0'].values} != 2.005e+06"
     print(out_ds)
 
 
@@ -382,5 +393,5 @@ def multi_point_example_2d() -> None:
 
 if __name__ == "__main__":
     # python -m w22.ps
-    # single_point_example()
-    multi_point_example_2d()
+    single_point_example()
+    # multi_point_example_2d()

@@ -1543,6 +1543,8 @@ def process_inputs(inputs: dict) -> dict:
         for key in inputs:
             if key in ins:
                 ins[key] = inputs[key]
+
+    print("inputs", inputs)
     return ins
 
 
@@ -1643,7 +1645,6 @@ def run_cle15(
         plt.savefig(os.path.join(FIGURE_PATH, "r0_pmp.pdf"), format="pdf")
         plt.clf()
 
-    # plot the pressure profile
     return (
         float(
             interp1d(rr, p)(ou["rmax"])

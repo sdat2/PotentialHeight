@@ -36,14 +36,6 @@ w22.plot module
    :undoc-members:
    :show-inheritance:
 
-w22.potential\_size module
---------------------------
-
-.. automodule:: w22.potential_size
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 w22.ps module
 -------------
 
@@ -80,6 +72,14 @@ w22.utils module
 ----------------
 
 .. automodule:: w22.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+w22.w22\_carnot module
+----------------------
+
+.. automodule:: w22.w22_carnot
    :members:
    :undoc-members:
    :show-inheritance:

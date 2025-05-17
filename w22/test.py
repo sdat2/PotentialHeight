@@ -17,7 +17,7 @@ from .constants import (
     GAS_CONSTANT_FOR_WATER_VAPOR,
 )
 from .cle15m import run_cle15
-from .potential_size import wang_consts, wang_diff
+from .w22_carnot import wang_consts, wang_diff
 from .ps import point_solution_ps
 from .utils import buck_sat_vap_pressure
 from .solve import bisection
@@ -676,8 +676,8 @@ if __name__ == "__main__":
     # test_figure_4()
     # test_figure_5()
     import argparse
+
     parser = argparse.ArgumentParser(description="Process some inputs.")
     parser.add_argument("--name", type=str, help="Input for octave_vs_python")
     args = parser.parse_args()
     octave_vs_python(args.name)
-

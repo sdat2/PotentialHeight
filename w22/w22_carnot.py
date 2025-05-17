@@ -1,4 +1,4 @@
-"""Some functions to help calculate potential size."""
+"""Some functions for the Wang 2022 Carnot engine model."""
 
 from typing import Callable, Tuple
 import numpy as np

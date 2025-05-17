@@ -7,6 +7,7 @@ tcpips
    adbo
    adforce
    setup
+   surgenet
    tcpips
    w22
    worst
