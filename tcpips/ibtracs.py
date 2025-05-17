@@ -605,11 +605,7 @@ def plot_potential_intensity():
 
 
 def calculate_potential_size():
-    """Calculate the size of the cyclone at each timestep using the ERA5 data.
-
-    This function will use the processed ERA5 data to calculate the size of the cyclone at each timestep.
-    The size will be saved to a new variable in the ERA5 data.
-    """
+    """Calculate the size of the cyclone at each timestep using the ERA5 data."""
     proc_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
     )
@@ -717,6 +713,10 @@ def plot_potential_size() -> None:
     plt.close()
     print("Potential size plotted and saved.")
 
+
+# Now that we have calculated potential size and potential intensity, we can compare them to the true size and intensity in the IBTrACS data.
+# In particular, we will initially study the rmax (IBTrACS) / rmax (Potential Size) and vmax (IBTrACS) / vmax (Potential Intensity) relationship.
+# We are initially inspired by the relatively simple study of normalized intensity in Emanuel 2000.
 
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
