@@ -1036,7 +1036,7 @@ def _radprof_eyeadj(
 # --- Main Function ---
 
 
-@timeit
+# @timeit
 def chavas_et_al_2015_profile(
     Vmax: float,
     r0: float,

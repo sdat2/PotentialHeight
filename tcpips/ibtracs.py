@@ -623,12 +623,99 @@ def calculate_potential_size():
     combined_ds["cd"] = 0.0015
     combined_ds = combined_ds.rename({"latitude": "lat", "longitude": "lon"})
 
-    ps_ds = parallelized_ps(combined_ds)
+    # This crashed the computer, so maybe we should do it in bits (say 20 bits), saving after each bit and then stich it together at the end.
+    # we want to divide the unique data along the unique counter dimension "u", into 20 chunks
+    # and then run the parallelized_ps function on each chunk
+    # and save the results to a new netcdf file
+    # this loop is in serial, and within each loop the task is parallelized
+    from tqdm import tqdm
+
+    for i in tqdm(range(0, 20), desc="Calculating potential size in chunks"):
+        # get the start and end index of the chunk
+        file_name = os.path.join(IBTRACS_DATA_PATH, f"era5_unique_points_ps_{i}.nc")
+        if os.path.exists(file_name):
+            print(f"File {file_name} already exists, skipping.")
+            continue
+        start = i * (len(combined_ds.u) // 20)
+        end = min(
+            len(combined_ds.u),
+            (i + 1) * (len(combined_ds.u) // 20),
+        )
+        # get the chunk of data
+        chunk_ds = combined_ds.isel(u=slice(start, end))
+        # calculate the potential size for this chunk
+        ps_chunk = parallelized_ps(chunk_ds)
+        # save the chunk to a netcdf file
+        ps_chunk.to_netcdf(
+            os.path.join(IBTRACS_DATA_PATH, f"era5_unique_points_ps_{i}.nc"),
+            engine="h5netcdf",
+        )
+
+    # load them all together and save them as one file
+    ps_ds = xr.open_mfdataset(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_*.nc"),
+        combine="by_coords",
+        parallel=True,
+    )
+    # save the combined dataset
     ps_ds.to_netcdf(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"),
         engine="h5netcdf",
     )
     print("Potential size calculated and saved.")
+
+
+def plot_potential_size() -> None:
+    """Plot the potential size data."""
+
+    ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
+
+    # calculate averages
+    grid_avg_ds = calculate_grid_avg_over_unique_points(
+        ps_ds,
+        variables=("rmax", "r0", "pm"),
+    )
+
+    plot_defaults()
+    _, axs = plt.subplots(
+        3,
+        1,
+        figsize=get_dim(ratio=1.1),
+        sharex=True,
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+    )  # specify 3 rows for the subplots
+
+    plot_var_on_map(
+        axs[0],
+        grid_avg_ds["rmax"],
+        "Mean Radius of Maximum Wind [km]",
+        "viridis",
+        shrink=1,
+    )
+    plot_var_on_map(
+        axs[1],
+        grid_avg_ds["r0"],
+        "Mean Potential Size [km]",
+        "viridis_r",
+        shrink=1,
+    )
+
+    plot_var_on_map(
+        axs[2],
+        grid_avg_ds["pm"],
+        "Mean Pressure at Maximum Wind [hPa]",
+        "plasma",
+        shrink=1,
+    )
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "era5_unique_points_ps.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+    print("Potential size plotted and saved.")
 
 
 if __name__ == "__main__":
