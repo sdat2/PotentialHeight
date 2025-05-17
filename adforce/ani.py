@@ -7,15 +7,15 @@ TODO: There is a lot of repeated code in the plotting functions. This should be 
 from typing import Optional
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import imageio
 import pandas as pd
 import xarray as xr
+import matplotlib.pyplot as plt
+import imageio
+import argparse
 from sithom.plot import plot_defaults, lim
 from sithom.place import BoundingBox, Point
 from sithom.plot import axis_formatter
 from sithom.time import timeit
-import argparse
 from .mesh import bbox_mesh, xr_loader
 from .fort22datatree import read_fort22
 from .constants import NO_BBOX, NEW_ORLEANS, FIGURE_PATH

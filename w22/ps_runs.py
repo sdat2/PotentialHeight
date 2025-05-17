@@ -73,7 +73,7 @@ def trimmed_cmip6_example(
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"potential_size_gom_august_{pressure_assumption}_trial_{trial}_pi{pi_version}.nc",
+            f"potential_size_gom_august_{pressure_assumption}_trial_{trial}_pi{pi_version}new.nc",
         )
     )
 
@@ -114,7 +114,7 @@ def new_orleans_10year(
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(
-            DATA_PATH, f"new_orleans_10year_pi{pi_version}_{pressure_assumption}.nc"
+            DATA_PATH, f"new_orleans_10year_pi{pi_version}_{pressure_assumption}new.nc"
         )
     )
 
@@ -172,7 +172,7 @@ def global_cmip6(part="nw", year: int = 2015, pi_version=2) -> None:
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(
-            DATA_PATH, f"potential_size_global_{part}_{year}_pi{pi_version}.nc"
+            DATA_PATH, f"potential_size_global_{part}_{year}_pi{pi_version}new.nc"
         )
     )
 
@@ -190,7 +190,7 @@ def load_global(year: int = 2015) -> xr.Dataset:
         [
             xr.concat(
                 [
-                    os.path.join(DATA_PATH, f"potential_size_global_{x}_{year}.nc")
+                    os.path.join(DATA_PATH, f"potential_size_global_{x}_{year}new.nc")
                     for x in y
                 ],
                 dim="lon",
@@ -237,7 +237,7 @@ def point_timeseries(
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"{place}_august_ssp585_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}.nc",
+            f"{place}_august_ssp585_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc",
         )
     )
 

@@ -4,8 +4,8 @@
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:0
-##%%SBATCH --time=00:20:00
+##%%%SBATCH --time=24:00:0
+#SBATCH --time=00:20:00
 
 # slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
@@ -14,8 +14,8 @@
 
 #SBATCH --account=n02-bas
 #SBATCH --partition=standard
-##%%SBATCH --qos=short
-#SBATCH --qos=standard
+#SBATCH --qos=short
+##%%SBATCH --qos=standard
 
 # emailing for start and end.
 #SBATCH --mail-type=BEGIN
@@ -36,21 +36,27 @@ echo "which python"
 which python
 
 # run python job
-python -m cle.potential_size
+# python -m w22.potential_size
 
 # pytest ../cle/ps.py
-# python -m cle.ps
+# python -m w22.ps
 
-python -m cle.ps
+# python -m w22.ps
 
 
-python -c "from cle.ps import trimmed_cmip6_example; trimmed_cmip6_example()"
+python -c "from w22.ps_runs import trimmed_cmip6_example; trimmed_cmip6_example()"
 
-python -c "from cle.ps import global_august_cmip6_example; global_august_cmip6_example()"
+python -c "from w22.ps_runs import trimmed_cmip6_example; trimmed_cmip6_example(pi_version=3)"
+python -c "from w22.ps_runs import trimmed_cmip6_example; trimmed_cmip6_example(pi_version=4)"
 
-python -c "from cle.ps import new_orleans_timeseries; new_orleans_timeseries()"
 
-python -c "from cle.ps import new_orleans_timeseries; new_orleans_timeseries(11)"
+python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
 
-# Time taken by oct2py for 10 loops is 21.8 s
-# Time taken by octave for 10 loops is 7.9 s
+
+python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'new_orleans'); pt(10, 'new_orleans'); pt(11, 'new_orleans')"
+
+
+python  -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
+
+python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'miami'); pt(10, 'miami'); pt(11, 'miami')"
+
