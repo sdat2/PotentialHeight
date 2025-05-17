@@ -726,12 +726,12 @@ def plot_potential_size() -> None:
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
-    # print("IBTrACS data downloaded and ready for processing.")
-    # ibtracs_to_era5_map()
+    print("IBTrACS data downloaded and ready for processing.")
+    ibtracs_to_era5_map()
     # plot_unique_points()
-    # era5_unique_points_raw()
+    era5_unique_points_raw()
     # example_plot_raw()
-    # process_era5_raw()
+    process_era5_raw()
     # plot_era5_processed()
     calculate_potential_intensity()
     # plot_potential_intensity()
