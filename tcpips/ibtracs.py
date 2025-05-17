@@ -22,6 +22,7 @@ except ImportError:
 
 from sithom.time import timeit
 from sithom.plot import plot_defaults, label_subplots, get_dim
+from w22.ps import parallelized_ps
 from .constants import DATA_PATH, PROJECT_PATH
 from .era5 import get_era5_coordinates, get_era5_combined
 from .pi import calculate_pi
@@ -609,7 +610,25 @@ def calculate_potential_size():
     This function will use the processed ERA5 data to calculate the size of the cyclone at each timestep.
     The size will be saved to a new variable in the ERA5 data.
     """
-    pass  # TODO: implement this function
+    proc_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
+    )
+    pi_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_pi.nc"))
+    combined_ds = xr.merge([proc_ds, pi_ds])
+    combined_ds["pressure_assumption"] = "isothermal"
+    combined_ds["ck_cd"] = 0.9
+    combined_ds["w_cool"] = 0.002
+    combined_ds["Cdvary"] = 0
+    combined_ds["cd_vary"] = 0
+    combined_ds["cd"] = 0.0015
+    combined_ds = combined_ds.rename({"latitude": "lat", "longitude": "lon"})
+
+    ps_ds = parallelized_ps(combined_ds)
+    ps_ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"),
+        engine="h5netcdf",
+    )
+    print("Potential size calculated and saved.")
 
 
 if __name__ == "__main__":
@@ -619,8 +638,9 @@ if __name__ == "__main__":
     # ibtracs_to_era5_map()
     # plot_unique_points()
     # era5_unique_points_raw()
-    example_plot_raw()
+    # example_plot_raw()
     # process_era5_raw()
-    plot_era5_processed()
+    # plot_era5_processed()
     # calculate_potential_intensity()
-    plot_potential_intensity()
+    # plot_potential_intensity()
+    calculate_potential_size()

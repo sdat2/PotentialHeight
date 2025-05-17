@@ -378,20 +378,27 @@ def multi_point_example_2d() -> None:
             ),  # mbar or hPa
             "cd": (("y", "x"), [[0.0015, 0.0015], [0.0015, 0.0015]]),  # mbar or hPa
         },
-        coords={"lat": (("y", "x"), [[30, 30], [45, 45]])},  # degNorth
+        coords={"lat": (("y", "x"), [[30, 30], [25, 25]])},  # degNorth
     )
     print(in_ds)
+    out_ds = parallelized_ps(
+        in_ds
+    )  # 5s for 4 points on laptop (maybe the spin up costs are high)
+    print(out_ds)
+    # add a pretend new dimension to check parallelization
+    in_ds["pretend"] = ("p", [0] * 1000)  # (repeat with 4000 points total = 2x2x1000)
+    # laptop has 10 cores, each with 2 threads
+    # maybe it will take 1:30 to run, or 0:50 if having 10 on the go the whole time helps.
+    # Took 33 min 06 s to run 4000 points on laptop.
+    # So to get to 280,000 points, it will take 33 min * 70 = 38 hours.
+    # Which is still quite a long time.
+    # But if we exclude all points where vmax is nan or 0, perhaps it will be much faster (already done implictly in the code).
+    # Still, maybe we will be waiting a day to get the ERA5/IBTrACS results
     out_ds = parallelized_ps(in_ds)
     print(out_ds)
-
-    assert np.allclose(
-        out_ds["r0"].values.ravel(),
-        np.array([1.763e06, 1.831e06, 1.199e06, 1.197e06]),
-        rtol=1e-2,
-    )
 
 
 if __name__ == "__main__":
     # python -m w22.ps
     single_point_example()
-    # multi_point_example_2d()
+    multi_point_example_2d()

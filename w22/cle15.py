@@ -1544,7 +1544,7 @@ def process_inputs(inputs: dict) -> dict:
             if key in ins:
                 ins[key] = inputs[key]
 
-    print("inputs", inputs)
+    # print("inputs", inputs)
     return ins
 
 
@@ -1578,7 +1578,7 @@ def run_cle15(
         ins["alpha_eye"],
     )
     ou = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
-    print("ou", ou)
+    # print("ou", ou)
 
     if plot:
         # print(ou)
