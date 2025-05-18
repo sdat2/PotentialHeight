@@ -483,6 +483,7 @@ def example_plot_raw():
 # take this era5 data and calculate the potential intensity and size of the cyclone at each timestep.
 # should scale O(n*t) where n is the number of storms and t is the number of timesteps in each storm.
 
+
 @timeit
 def process_era5_raw() -> None:
     """Process the raw ERA5 unique datapoints selected to include the key variables
@@ -621,6 +622,9 @@ def calculate_potential_size():
     combined_ds["Cdvary"] = 0
     combined_ds["cd_vary"] = 0
     combined_ds["cd"] = 0.0015
+    del combined_ds["t"]
+    del combined_ds["q"]
+    del combined_ds["pressure_level"]
     combined_ds = combined_ds.rename({"latitude": "lat", "longitude": "lon"})
 
     # This crashed the computer, so maybe we should do it in bits (say 20 bits), saving after each bit and then stich it together at the end.
@@ -644,14 +648,14 @@ def calculate_potential_size():
         # get the chunk of data
         chunk_ds = combined_ds.isel(u=slice(start, end))
         # calculate the potential size for this chunk
-        ps_chunk = parallelized_ps(chunk_ds)
+        ps_chunk = parallelized_ps(chunk_ds, dryrun=False)
         # save the chunk to a netcdf file
         ps_chunk.to_netcdf(
             os.path.join(IBTRACS_DATA_PATH, f"era5_unique_points_ps_{i}.nc"),
             engine="h5netcdf",
         )
 
-    # load them all together and save them as one file
+    # # load them all together and save them as one file
     ps_ds = xr.open_mfdataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_*.nc"),
         combine="by_coords",
@@ -726,13 +730,13 @@ def plot_potential_size() -> None:
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
-    print("IBTrACS data downloaded and ready for processing.")
-    ibtracs_to_era5_map()
-    # plot_unique_points()
-    era5_unique_points_raw()
-    # example_plot_raw()
-    process_era5_raw()
-    # plot_era5_processed()
-    calculate_potential_intensity()
+    # print("IBTrACS data downloaded and ready for processing.")
+    # ibtracs_to_era5_map()
+    # # plot_unique_points()
+    # era5_unique_points_raw()
+    # # example_plot_raw()
+    # process_era5_raw()
+    # # plot_era5_processed()
+    # calculate_potential_intensity()
     # plot_potential_intensity()
     calculate_potential_size()

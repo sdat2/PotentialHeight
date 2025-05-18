@@ -222,7 +222,7 @@ def point_solution_ps(
 
 @timeit
 def parallelized_ps(
-    ds: xr.Dataset, jobs=-1, pressure_assumption="isothermal"
+    ds: xr.Dataset, jobs=-1, pressure_assumption="isothermal", dryrun=False
 ) -> xr.Dataset:
     """
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
@@ -231,6 +231,7 @@ def parallelized_ps(
         ds (xr.Dataset): contains msl, vmax, sst, t0, rh, and lat.
         jobs (int, optional): Number of threads, defaults to -1.
         pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
+        dryrun (bool, optional): If True, perform a dry run without actual calculations. Defaults to False.
 
     Returns:
         xr.Dataset: additionally contains r0, pm, pc, and rmax.
@@ -244,6 +245,16 @@ def parallelized_ps(
     # Step 1: Stack all spatial dimensions into a single dimension
     # ds.dims
     dims = list(ds.dims)
+
+    if dryrun:
+        print("Dry run, not doing anything")
+        print("Dimensions:", ds.dims)
+        print("Data variables:", ds.data_vars)
+        print("Coordinates:", ds.coords)
+        print(
+            "Number of tasks:", np.prod(list(ds.sizes.values()))
+        )  # multiply the dimensions together
+        return ds
 
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
