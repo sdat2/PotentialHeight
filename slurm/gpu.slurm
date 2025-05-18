@@ -17,9 +17,12 @@
 # Common modules for AMD GPU development include:
 # module load PrgEnv-amd # Or PrgEnv-cray, PrgEnv-gnu depending on your compiler suite
 module load rocm       # ROCm is AMD's Radeon Open Compute platform, crucial for their GPUs
-# module load craype-accel-amd-gfx90a # Specifies the GPU target architecture (AMD MI210)
-# module load craype-x86-milan       # Specifies the CPU target architecture
-# (Refer to ARCHER2 documentation for specific modules your application needs [2])
+module load PrgEnv-amd
+module load craype-accel-amd-gfx90a
+module load craype-x86-milan
+
+
+
 
 # Echo some useful job information into the output log
 echo "ARCHER2 GPU Job: $SLURM_JOB_NAME (Job ID: $SLURM_JOB_ID)"
@@ -57,7 +60,8 @@ echo ""
 source /work/n02/n02/sdat2/.bashrc
 which micromamba
 micromamba --version
-micromamba activate t1
+micromamba create -n gpuenv python=3.10 -f /work/n02/n02/sdat2/adcirc-swan/worstsurge/env.yml
+micromamba activate gpuenv
 
 mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
@@ -69,7 +73,6 @@ which python
 echo "Launching GPU application..."
 srun --ntasks=1 --cpus-per-task=8 python -c "import tensorflow as tf
 print('Num GPUs Available: ', len(tf.config.list_physical_devices('GPU'))); gpus = tf.config.experimental.list_physical_devices('GPU'); tf.config.experimental.set_memory_growth(gpus[0], True)"
-                                                 # and resource allocation (see Section V.A)
 
 
 echo "Launching Python/TensorFlow script..."
