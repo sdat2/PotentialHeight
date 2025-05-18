@@ -729,6 +729,86 @@ def plot_potential_size() -> None:
 # In particular, we will initially study the rmax (IBTrACS) / rmax (Potential Size) and vmax (IBTrACS) / vmax (Potential Intensity) relationship.
 # We are initially inspired by the relatively simple study of normalized intensity in Emanuel 2000.
 
+
+def add_pi_ps_back_onto_tracks():
+    """We first need to use the unique counter to
+    map the unique points back onto the IBTrACS data."""
+    # open dataset with the indexing
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.unique.nc")
+    )
+    # open the potential size and intensity datasets
+    ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
+
+    # Get the unique_counter numpy array from the xarray Dataset
+    # This array has dimensions ("storm", "time") and contains integers or np.nan
+    unique_counter_np = ibtracs_ds["unique_counter"].data
+
+    variables_to_map = ["rmax", "vmax", "r0", "pm", "otl", "t0"]
+
+    for var in variables_to_map:
+        if var not in ps_ds:
+            print(f"Warning: Variable '{var}' not found in ps_ds. Skipping.")
+            continue
+
+        source_data = ps_ds[var].data  # This is a 1D numpy array
+
+        if source_data.ndim != 1:
+            raise ValueError(f"Source data for variable '{var}' is not 1-dimensional.")
+
+        # 1. Initialize an output array with NaNs, matching the shape of unique_counter_np
+        #    Ensure the dtype can hold NaNs (float). If source_data is already float, use its dtype.
+        output_dtype = (
+            source_data.dtype
+            if np.issubdtype(source_data.dtype, np.floating)
+            else np.float64
+        )
+        mapped_values = np.full(unique_counter_np.shape, np.nan, dtype=output_dtype)
+
+        # 2. Create a mask for non-NaN values in unique_counter_np
+        #    This mask will have the same shape as unique_counter_np (e.g., ("storm", "time"))
+        non_nan_mask = ~np.isnan(unique_counter_np)
+
+        # 3. Extract the actual integer indices from unique_counter_np where it's not NaN
+        #    These are the values from unique_counter_np that will be used to index source_data.
+        #    This will be a 1D array of integers.
+        valid_indices = unique_counter_np[non_nan_mask].astype(int)
+
+        # Basic check for index bounds.
+        # Assumes valid_indices should be within the bounds of source_data.
+        if source_data.size > 0:  # Proceed only if source_data is not empty
+            if np.any(valid_indices < 0) or np.any(valid_indices >= source_data.size):
+                # This indicates a potential issue with the unique_counter values or ps_ds data.
+                # For instance, a non-NaN value in unique_counter might point outside the bounds of ps_ds[var].
+                # You might want to handle this more gracefully, e.g., by logging a warning,
+                # raising a more specific error, or setting corresponding values to NaN.
+                # For this example, we'll raise an error if out of bounds.
+                problematic_indices = valid_indices[
+                    (valid_indices < 0) | (valid_indices >= source_data.size)
+                ]
+                raise IndexError(
+                    f"Variable '{var}': unique_counter contains out-of-bounds indices: {np.unique(problematic_indices)}. "
+                    f"Max valid index for ps_ds['{var}'] is {source_data.size - 1}."
+                )
+
+            # 4. Fetch data from source_data using the valid integer indices
+            #    This will be a 1D array.
+            fetched_values = source_data[valid_indices]
+
+            # 5. Place the fetched values into the mapped_values array at the non-NaN positions
+            mapped_values[non_nan_mask] = fetched_values
+        # If source_data is empty, mapped_values remains all NaNs, which is likely the correct behavior.
+
+        # Add the new variable (with mapped values) to the ibtracs_ds Dataset
+        ibtracs_ds[var] = (("storm", "time"), mapped_values)
+
+    # Save the updated dataset
+    ibtracs_ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    print("Successfully added PI and PS data back onto tracks and saved the dataset.")
+
+
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
@@ -742,4 +822,5 @@ if __name__ == "__main__":
     # calculate_potential_intensity()
     # plot_potential_intensity()
     # calculate_potential_size()
-    plot_potential_size()
+    # plot_potential_size()
+    add_pi_ps_back_onto_tracks()
