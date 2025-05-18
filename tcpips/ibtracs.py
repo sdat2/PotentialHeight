@@ -675,6 +675,8 @@ def plot_potential_size() -> None:
 
     ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
 
+    ps_ds = ps_ds.rename({"lat": "latitude", "lon": "longitude"})
+
     # calculate averages
     grid_avg_ds = calculate_grid_avg_over_unique_points(
         ps_ds,
@@ -692,23 +694,23 @@ def plot_potential_size() -> None:
 
     plot_var_on_map(
         axs[0],
-        grid_avg_ds["rmax"],
-        "Mean Radius of Maximum Wind [km]",
+        grid_avg_ds["rmax"] / 1000,
+        "Mean $r_{max}$ [km]",
         "viridis",
         shrink=1,
     )
     plot_var_on_map(
         axs[1],
-        grid_avg_ds["r0"],
-        "Mean Potential Size [km]",
+        grid_avg_ds["r0"] / 1000,
+        "Mean $r_a$ [km]",
         "viridis_r",
         shrink=1,
     )
 
     plot_var_on_map(
         axs[2],
-        grid_avg_ds["pm"],
-        "Mean Pressure at Maximum Wind [hPa]",
+        grid_avg_ds["pm"] / 100,
+        "Mean $p_m$ [hPa]",
         "plasma",
         shrink=1,
     )
@@ -739,4 +741,5 @@ if __name__ == "__main__":
     # # plot_era5_processed()
     # calculate_potential_intensity()
     # plot_potential_intensity()
-    calculate_potential_size()
+    # calculate_potential_size()
+    plot_potential_size()
