@@ -809,7 +809,7 @@ def add_pi_ps_back_onto_tracks():
     print("Successfully added PI and PS data back onto tracks and saved the dataset.")
 
 
-def create_normalized_variables():
+def create_normalized_variables(v_reduc: float = 0.8) -> None:
 
     # normalized rmax = rmax(IBTrACS) / rmax(PS)
     # normalized vmax = vmax(IBTrACS) / vmax(PI)
@@ -829,15 +829,17 @@ def create_normalized_variables():
     pi_ps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
     )
+    # set vmax to nan if it is 0
+    pi_ps_ds["vmax"] = pi_ps_ds["vmax"].where(pi_ps_ds["vmax"] > 0)
     print(pi_ps_ds["usa_rmw"])
     print(pi_ps_ds["usa_wind"])
     pi_ps_ds["normalized_rmax"] = (
         ("storm", "time"),
-        pi_ps_ds["usa_rmw"].values / pi_ps_ds["rmax"].values,
+        pi_ps_ds["usa_rmw"].values * 1852 / pi_ps_ds["rmax"].values,
     )
     pi_ps_ds["normalized_vmax"] = (
         ("storm", "time"),
-        pi_ps_ds["usa_wind"].values / pi_ps_ds["vmax"].values,
+        pi_ps_ds["usa_wind"].values * 0.514444 / (pi_ps_ds["vmax"].values * v_reduc),
     )
     print("nanmean vmax:", pi_ps_ds["normalized_vmax"].mean())
     print("nanmean rmax:", pi_ps_ds["normalized_rmax"].mean())
@@ -861,6 +863,41 @@ def plot_normalized_variables() -> None:
     pi_ps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.normalized.nc")
     )
+    # let's plot two histograms of the normalized rmax and vmax
+    # create 2 panel plot of normalized rmax and vmax
+    plot_defaults()
+    _, axs = plt.subplots(1, 2, figsize=get_dim(), sharex=True, sharey=True)
+    axs[0].hist(
+        pi_ps_ds["normalized_rmax"].values[
+            ~np.isnan(pi_ps_ds["normalized_rmax"].values)
+        ],
+        bins=100,
+        range=(0, 5),
+        alpha=0.5,
+        label="Normalized Rmax",
+    )
+    axs[1].hist(
+        pi_ps_ds["normalized_vmax"].values[
+            ~np.isnan(pi_ps_ds["normalized_vmax"].values)
+        ],
+        bins=100,
+        range=(0, 5),
+        alpha=0.5,
+        label="Normalized Vmax",
+    )
+    axs[0].set_xlabel("Normalized Rmax")
+    axs[1].set_xlabel("Normalized Vmax")
+    axs[0].set_ylabel("Count")
+
+    label_subplots(axs)
+
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_rmax_vmax_hist.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
 
     # plot the normalized rmax and vmax
     # create 2 panel plot of normalized rmax and vmax
