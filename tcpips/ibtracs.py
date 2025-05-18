@@ -809,6 +809,95 @@ def add_pi_ps_back_onto_tracks():
     print("Successfully added PI and PS data back onto tracks and saved the dataset.")
 
 
+def create_normalized_variables():
+
+    # normalized rmax = rmax(IBTrACS) / rmax(PS)
+    # normalized vmax = vmax(IBTrACS) / vmax(PI)
+    # we should use the international constants
+    # ibtracs_ds = xr.open_dataset(
+    #    os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+    # )
+    # print([var for var in ibtracs_ds.variables])
+    # vars = ["wmo_wind", "wmo_pres", "storm_speed", "storm_dir"]
+    # for var in vars:
+    #    print(ibtracs_ds[var])
+
+    # ok, we're goint to use usa_rmw for rmax
+    # and usa_wind for vmax
+
+    # open the dataset with the pi and ps data
+    pi_ps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    print(pi_ps_ds["usa_rmw"])
+    print(pi_ps_ds["usa_wind"])
+    pi_ps_ds["normalized_rmax"] = (
+        ("storm", "time"),
+        pi_ps_ds["usa_rmw"].values / pi_ps_ds["rmax"].values,
+    )
+    pi_ps_ds["normalized_vmax"] = (
+        ("storm", "time"),
+        pi_ps_ds["usa_wind"].values / pi_ps_ds["vmax"].values,
+    )
+    print("nanmean vmax:", pi_ps_ds["normalized_vmax"].mean())
+    print("nanmean rmax:", pi_ps_ds["normalized_rmax"].mean())
+    print("nanmax vmax:", pi_ps_ds["normalized_vmax"].max())
+    print("nanmax rmax:", pi_ps_ds["normalized_rmax"].max())
+
+    pi_ps_ds["normalized_rmax"].attrs["units"] = "dimensionless"
+    pi_ps_ds["normalized_vmax"].attrs["units"] = "dimensionless"
+    pi_ps_ds["normalized_rmax"].attrs["description"] = "Normalized Rmax"
+    pi_ps_ds["normalized_vmax"].attrs["description"] = "Normalized Vmax"
+
+    # save the dataset
+    pi_ps_ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.normalized.nc")
+    )
+
+
+def plot_normalized_variables() -> None:
+    """Plot the normalized variables."""
+    # open the dataset with the pi and ps data
+    pi_ps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.normalized.nc")
+    )
+
+    # plot the normalized rmax and vmax
+    # create 2 panel plot of normalized rmax and vmax
+    plot_defaults()
+    _, axs = plt.subplots(
+        2,
+        1,
+        figsize=get_dim(ratio=1.1),
+        sharex=True,
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+    )  # specify 2 rows for the subplots
+    # plot_var_on_map(
+    #     axs[0],
+    #     pi_ps_ds["normalized_rmax"],
+    #     "Normalized Rmax",
+    #     "viridis",
+    #     shrink=1,
+    # )
+    # plot_var_on_map(
+    #     axs[1],
+    #     pi_ps_ds["normalized_vmax"],
+    #     "Normalized Vmax",
+    #     "viridis_r",
+    #     shrink=1,
+    # )
+    plt.tight_layout()
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_rmax_vmax.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+    print("Normalized variables plotted and saved.")
+
+
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
@@ -823,4 +912,6 @@ if __name__ == "__main__":
     # plot_potential_intensity()
     # calculate_potential_size()
     # plot_potential_size()
-    add_pi_ps_back_onto_tracks()
+    # add_pi_ps_back_onto_tracks()
+    # create_normalized_variables()
+    plot_normalized_variables()
