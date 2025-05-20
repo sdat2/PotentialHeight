@@ -857,16 +857,203 @@ def create_normalized_variables(v_reduc: float = 0.8) -> None:
     )
 
 
+def avg_from_ibtracs_to_era5(
+    ibtracs_ds: xr.Dataset,
+    vars: tuple = ("sst", "msl", "t2m"),
+) -> xr.Dataset:
+    """
+    Average the ibtracs data onto the era5 grid.
+
+    Args:
+        ibtracs_ds (xr.Dataset): The IBTrACS dataset to average. Each variable should have dimensions ("storm", "time"). The latitude and longitude coordinates similarly are have dimensions ("storm", "time"). The tracks are of variable lengths, and for those points the lons and lats are nans.
+        vars (tuple, optional): The variables to average. Defaults to ("normalized_rmax", "normalized_vmax"). The variables should be in the ibtracs dataset.
+
+    Returns:
+        xr.Dataset: The averaged dataset with dimensions ("latitude", "longitude"). Will also return the count of points in each grid cell.
+    """
+    print("--- Debugging avg_from_ibtracs_to_era5 ---")
+    print(f"Input ibtracs_ds: {ibtracs_ds}")  # Shows all variables and their dimensions
+
+    lats_ibtracs = ibtracs_ds.lat.values
+    lons_ibtracs = ibtracs_ds.lon.values
+    print(f"Shape of lats_ibtracs (from ibtracs_ds.lat.values): {lats_ibtracs.shape}")
+    print(f"Dimensions of ibtracs_ds.lat: {ibtracs_ds.lat.dims}")
+
+    flat_lats_len = len(lats_ibtracs.flatten())
+    print(f"Length of flattened lats_ibtracs (for valid_indices): {flat_lats_len}")
+
+    for current_var_name in vars:
+        print(f"Inspecting variable: {current_var_name}")
+        if current_var_name not in ibtracs_ds:
+            print(f"ERROR: Variable '{current_var_name}' not found in ibtracs_ds!")
+            continue
+
+        var_data_array = ibtracs_ds[current_var_name]
+        print(f"  Shape of ibtracs_ds['{current_var_name}']: {var_data_array.shape}")
+        print(
+            f"  Dimensions of ibtracs_ds['{current_var_name}']: {var_data_array.dims}"
+        )
+
+        var_values_flat_len = len(var_data_array.values.flatten())
+        print(
+            f"  Length of ibtracs_ds['{current_var_name}'].values.flatten(): {var_values_flat_len}"
+        )
+
+        if var_values_flat_len != flat_lats_len:
+            print(
+                f"  MISMATCH! '{current_var_name}' flattened length ({var_values_flat_len}) "
+                f"!= lat flattened length ({flat_lats_len})"
+            )
+    print("--- End Debugging ---")
+    # average the ibtracs data onto the era5 grid
+    lats_ibtracs = ibtracs_ds.lat.values
+    lons_ibtracs = ibtracs_ds.lon.values
+    # both shape (storm, time), but can be nan
+
+    era5_ds = (
+        get_era5_coordinates()
+    )  # get the ERA5 coordinates so we can get the lon, lat grid
+    lats_era5 = era5_ds["latitude"].values  # shape (Y,)
+    lons_era5 = era5_ds["longitude"].values  # shape (X,)
+
+    # count ibtracs points onto the grid of the era5 data
+    era5_counts = np.zeros((len(lats_era5), len(lons_era5)), dtype=int)
+
+    vars_sum = {
+        var: np.zeros((len(lats_era5), len(lons_era5)), dtype=float) for var in vars
+    }
+    lat_res = (
+        np.abs(lats_era5[1] - lats_era5[0])
+        if len(lats_era5) > 1
+        else 2 * np.abs(90 - lats_era5[0])
+    )  # Handle single latitude case
+    lon_res = (
+        np.abs(lons_era5[1] - lons_era5[0])
+        if len(lons_era5) > 1
+        else 2 * np.abs(180 - lons_era5[0])
+    )  # Handle single longitude case
+
+    # Edges will be halfway between the centers.
+    # For latitudes (Y axis):
+    lat_edges = np.zeros(len(lats_era5) + 1)
+    lat_edges[1:-1] = (lats_era5[:-1] + lats_era5[1:]) / 2.0
+    lat_edges[0] = lats_era5[0] + lat_res / 2.0  # Upper edge of the first cell
+    lat_edges[-1] = lats_era5[-1] - lat_res / 2.0  # Lower edge of the last cell
+    # Ensure descending order for latitudes if lats_era5 is descending (typical for ERA5)
+    if lats_era5[0] > lats_era5[-1]:  # If latitudes are decreasing (e.g., 90 to -90)
+        lat_edges = np.sort(lat_edges)[::-1]
+    else:  # If latitudes are increasing
+        lat_edges = np.sort(lat_edges)
+
+    # For longitudes (X axis):
+    lon_edges = np.zeros(len(lons_era5) + 1)
+    lon_edges[1:-1] = (lons_era5[:-1] + lons_era5[1:]) / 2.0
+    lon_edges[0] = lons_era5[0] - lon_res / 2.0  # Left edge of the first cell
+    lon_edges[-1] = lons_era5[-1] + lon_res / 2.0  # Right edge of the last cell
+    # Ensure ascending order for longitudes
+    if (
+        lons_era5[0] > lons_era5[-1]
+    ):  # If longitudes are decreasing (e.g. for some specific datasets)
+        lon_edges = np.sort(lon_edges)[::-1]
+    else:
+        lon_edges = np.sort(lon_edges)
+
+    # Handle longitude wrapping if your lons_era5 go from e.g. 0 to 360 and
+    if np.min(lons_era5) >= 0 and np.max(lons_era5) <= 360:
+        lons_ibtracs_processed = np.where(
+            lons_ibtracs < 0, lons_ibtracs + 360, lons_ibtracs
+        )
+    else:
+        lons_ibtracs_processed = lons_ibtracs
+
+    # 3. Flatten the IBTrACS data and remove NaNs
+    flat_lats_ibtracs = lats_ibtracs.flatten()
+    flat_lons_ibtracs = lons_ibtracs_processed.flatten()
+
+    valid_indices = ~np.isnan(flat_lats_ibtracs) & ~np.isnan(flat_lons_ibtracs)
+    valid_lats = flat_lats_ibtracs[valid_indices]
+    valid_lons = flat_lons_ibtracs[valid_indices]
+    vars_valid = {var: ibtracs_ds[var].values.flatten()[valid_indices] for var in vars}
+
+    if lat_edges[0] > lat_edges[-1]:
+        # We reverse the edges and search for -valid_lats.
+
+        lat_indices = np.digitize(valid_lats, lat_edges[::-1], right=True)
+        lat_bin_indices = np.digitize(
+            valid_lats, lat_edges[::-1], right=False
+        )  # right=False: bins[i-1] <= x < bins[i]
+        lat_indices = len(lats_era5) - lat_bin_indices
+
+    else:  # lats_era5 is ascending (e.g., -90 to 90)
+        # lat_edges is already ascending.
+        # lat_indices = np.digitize(valid_lats, lat_edges, right=False) -1 # gives 0 to N-1 if point is within first to last bin
+        lat_bin_indices = np.digitize(valid_lats, lat_edges, right=False)
+        lat_indices = (
+            lat_bin_indices - 1
+        )  # Convert 1-based bin index to 0-based array index
+
+    # For longitudes (assuming lons_era5 is 0 to 360, ascending)
+    # lon_edges will be ascending.
+    # lon_indices = np.digitize(valid_lons, lon_edges, right=False) -1
+    lon_bin_indices = np.digitize(valid_lons, lon_edges, right=False)
+    lon_indices = (
+        lon_bin_indices - 1
+    )  # Convert 1-based bin index to 0-based array index
+
+    # Filter out points that fall outside the grid
+    # np.digitize returns 0 if x < bins[0] and len(bins) if x >= bins[-1] (for 1-based from digitize)
+    # So, for 0-based indices, we'd check for -1 and len(lats_era5) / len(lons_era5)
+    valid_lat_idx = (lat_indices >= 0) & (lat_indices < len(lats_era5))
+    valid_lon_idx = (lon_indices >= 0) & (lon_indices < len(lons_era5))
+    valid_overall_idx = valid_lat_idx & valid_lon_idx
+
+    final_lat_indices = lat_indices[valid_overall_idx]
+    final_lon_indices = lon_indices[valid_overall_idx]
+
+    # 5. Increment the counts in the era5_counts grid
+    # np.add.at is useful for adding values to specific indices.
+    # It handles cases where multiple points fall into the same cell by summing them up.
+    np.add.at(era5_counts, (final_lat_indices, final_lon_indices), 1)
+
+    for var in vars:
+        np.add.at(
+            vars_sum[var],
+            (final_lat_indices, final_lon_indices),
+            vars_valid[var][valid_overall_idx],
+        )
+
+    data_vars = {"count": (("latitude", "longitude"), era5_counts)}
+    with np.errstate(invalid="ignore", divide="ignore"):
+        for var in vars:
+            data_vars[var] = (
+                ("latitude", "longitude"),
+                vars_sum[var] / era5_counts,
+            )
+
+    return xr.Dataset(
+        data_vars=data_vars, coords={"latitude": lats_era5, "longitude": lons_era5}
+    )
+
+
 def plot_normalized_variables() -> None:
     """Plot the normalized variables."""
     # open the dataset with the pi and ps data
     pi_ps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.normalized.nc")
     )
+    avg_ds = avg_from_ibtracs_to_era5(
+        pi_ps_ds, vars=("normalized_rmax", "normalized_vmax")
+    )
+
     # let's plot two histograms of the normalized rmax and vmax
     # create 2 panel plot of normalized rmax and vmax
     plot_defaults()
     _, axs = plt.subplots(1, 2, figsize=get_dim(), sharex=True, sharey=True)
+    # select nature as "TC"
+    print(pi_ps_ds["nature"])
+    print(pi_ps_ds["nature"].attrs)
+
+    pi_ps_ds = pi_ps_ds.where(pi_ps_ds["nature"] == b"TS")
     axs[0].hist(
         pi_ps_ds["normalized_rmax"].values[
             ~np.isnan(pi_ps_ds["normalized_rmax"].values)
@@ -900,29 +1087,37 @@ def plot_normalized_variables() -> None:
     plt.close()
 
     # plot the normalized rmax and vmax
-    # create 2 panel plot of normalized rmax and vmax
+    # create 2 panel plot of averaged normalized rmax and vmax on a map
+    # first we need to calculate the average over the unique points
+
     plot_defaults()
     _, axs = plt.subplots(
-        2,
+        3,
         1,
         figsize=get_dim(ratio=1.1),
         sharex=True,
+        sharey=True,
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )  # specify 2 rows for the subplots
-    # plot_var_on_map(
-    #     axs[0],
-    #     pi_ps_ds["normalized_rmax"],
-    #     "Normalized Rmax",
-    #     "viridis",
-    #     shrink=1,
-    # )
-    # plot_var_on_map(
-    #     axs[1],
-    #     pi_ps_ds["normalized_vmax"],
-    #     "Normalized Vmax",
-    #     "viridis_r",
-    #     shrink=1,
-    # )
+
+    plot_var_on_map(
+        axs[0],
+        avg_ds["count"],
+        "Count of TC Points",
+        "viridis_r",
+        shrink=1,
+    )
+
+    plot_var_on_map(
+        axs[1], avg_ds["normalized_rmax"], "Mean Normalized Size", "viridis", shrink=1
+    )
+    plot_var_on_map(
+        axs[2],
+        avg_ds["normalized_vmax"],
+        "Mean Normalized Intensity",
+        "viridis_r",
+        shrink=1,
+    )
     plt.tight_layout()
     label_subplots(axs)
     plt.savefig(
