@@ -129,7 +129,7 @@ def ibtracs_to_era5_map():
             else:
                 u_lol[-1].append(np.nan)
 
-    ibtracs_ds["unique_counter"] = (("storm", "time"), u_lol)
+    ibtracs_ds["unique_counter"] = (("storm", "date_time"), u_lol)
     # save the ibtracs data with the unique counter
     ibtracs_ds.to_netcdf(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.unique.nc")
@@ -741,7 +741,7 @@ def add_pi_ps_back_onto_tracks():
     ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
 
     # Get the unique_counter numpy array from the xarray Dataset
-    # This array has dimensions ("storm", "time") and contains integers or np.nan
+    # This array has dimensions ("storm", "date_time") and contains integers or np.nan
     unique_counter_np = ibtracs_ds["unique_counter"].data
 
     variables_to_map = ["rmax", "vmax", "r0", "pm", "otl", "t0"]
@@ -766,7 +766,7 @@ def add_pi_ps_back_onto_tracks():
         mapped_values = np.full(unique_counter_np.shape, np.nan, dtype=output_dtype)
 
         # 2. Create a mask for non-NaN values in unique_counter_np
-        #    This mask will have the same shape as unique_counter_np (e.g., ("storm", "time"))
+        #    This mask will have the same shape as unique_counter_np (e.g., ("storm", "date_time"))
         non_nan_mask = ~np.isnan(unique_counter_np)
 
         # 3. Extract the actual integer indices from unique_counter_np where it's not NaN
@@ -800,7 +800,7 @@ def add_pi_ps_back_onto_tracks():
         # If source_data is empty, mapped_values remains all NaNs, which is likely the correct behavior.
 
         # Add the new variable (with mapped values) to the ibtracs_ds Dataset
-        ibtracs_ds[var] = (("storm", "time"), mapped_values)
+        ibtracs_ds[var] = (("storm", "date_time"), mapped_values)
 
     # Save the updated dataset
     ibtracs_ds.to_netcdf(
@@ -810,20 +810,11 @@ def add_pi_ps_back_onto_tracks():
 
 
 def create_normalized_variables(v_reduc: float = 0.8) -> None:
+    """Create normalized variables for rmax and vmax.
 
-    # normalized rmax = rmax(IBTrACS) / rmax(PS)
-    # normalized vmax = vmax(IBTrACS) / vmax(PI)
-    # we should use the international constants
-    # ibtracs_ds = xr.open_dataset(
-    #    os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
-    # )
-    # print([var for var in ibtracs_ds.variables])
-    # vars = ["wmo_wind", "wmo_pres", "storm_speed", "storm_dir"]
-    # for var in vars:
-    #    print(ibtracs_ds[var])
-
-    # ok, we're goint to use usa_rmw for rmax
-    # and usa_wind for vmax
+    Args:
+        v_reduc (float, optional): The reduction factor for vmax to go from potential intensity at the gradient wind to potential intensity and the 10m wind. Defaults to 0.8.
+    """
 
     # open the dataset with the pi and ps data
     pi_ps_ds = xr.open_dataset(
@@ -834,13 +825,14 @@ def create_normalized_variables(v_reduc: float = 0.8) -> None:
     print(pi_ps_ds["usa_rmw"])
     print(pi_ps_ds["usa_wind"])
     pi_ps_ds["normalized_rmax"] = (
-        ("storm", "time"),
+        ("storm", "date_time"),
         pi_ps_ds["usa_rmw"].values * 1852 / pi_ps_ds["rmax"].values,
-    )
+    )  # Asume usa_rmw is in nautical miles, rmax is in m
+
     pi_ps_ds["normalized_vmax"] = (
-        ("storm", "time"),
+        ("storm", "date_time"),
         pi_ps_ds["usa_wind"].values * 0.514444 / (pi_ps_ds["vmax"].values * v_reduc),
-    )
+    )  # Assume usa_wind is in knots at u10, vmax is in m/s at gradient wind
     print("nanmean vmax:", pi_ps_ds["normalized_vmax"].mean())
     print("nanmean rmax:", pi_ps_ds["normalized_rmax"].mean())
     print("nanmax vmax:", pi_ps_ds["normalized_vmax"].max())
@@ -864,47 +856,16 @@ def avg_from_ibtracs_to_era5(
     """
     Average the ibtracs data onto the era5 grid.
 
+    Similar to the calculate_grid_avg_over_unique_points function, but
+    not assuming the latitude and longitudes given are era5 grid points.
+
     Args:
-        ibtracs_ds (xr.Dataset): The IBTrACS dataset to average. Each variable should have dimensions ("storm", "time"). The latitude and longitude coordinates similarly are have dimensions ("storm", "time"). The tracks are of variable lengths, and for those points the lons and lats are nans.
+        ibtracs_ds (xr.Dataset): The IBTrACS dataset to average. Each variable should have dimensions ("storm", "date_time"). The latitude and longitude coordinates similarly are have dimensions ("storm", "date_time"). The tracks are of variable lengths, and for those points the lons and lats are nans.
         vars (tuple, optional): The variables to average. Defaults to ("normalized_rmax", "normalized_vmax"). The variables should be in the ibtracs dataset.
 
     Returns:
         xr.Dataset: The averaged dataset with dimensions ("latitude", "longitude"). Will also return the count of points in each grid cell.
     """
-    print("--- Debugging avg_from_ibtracs_to_era5 ---")
-    print(f"Input ibtracs_ds: {ibtracs_ds}")  # Shows all variables and their dimensions
-
-    lats_ibtracs = ibtracs_ds.lat.values
-    lons_ibtracs = ibtracs_ds.lon.values
-    print(f"Shape of lats_ibtracs (from ibtracs_ds.lat.values): {lats_ibtracs.shape}")
-    print(f"Dimensions of ibtracs_ds.lat: {ibtracs_ds.lat.dims}")
-
-    flat_lats_len = len(lats_ibtracs.flatten())
-    print(f"Length of flattened lats_ibtracs (for valid_indices): {flat_lats_len}")
-
-    for current_var_name in vars:
-        print(f"Inspecting variable: {current_var_name}")
-        if current_var_name not in ibtracs_ds:
-            print(f"ERROR: Variable '{current_var_name}' not found in ibtracs_ds!")
-            continue
-
-        var_data_array = ibtracs_ds[current_var_name]
-        print(f"  Shape of ibtracs_ds['{current_var_name}']: {var_data_array.shape}")
-        print(
-            f"  Dimensions of ibtracs_ds['{current_var_name}']: {var_data_array.dims}"
-        )
-
-        var_values_flat_len = len(var_data_array.values.flatten())
-        print(
-            f"  Length of ibtracs_ds['{current_var_name}'].values.flatten(): {var_values_flat_len}"
-        )
-
-        if var_values_flat_len != flat_lats_len:
-            print(
-                f"  MISMATCH! '{current_var_name}' flattened length ({var_values_flat_len}) "
-                f"!= lat flattened length ({flat_lats_len})"
-            )
-    print("--- End Debugging ---")
     # average the ibtracs data onto the era5 grid
     lats_ibtracs = ibtracs_ds.lat.values
     lons_ibtracs = ibtracs_ds.lon.values
@@ -1129,20 +1090,42 @@ def plot_normalized_variables() -> None:
     plt.close()
     print("Normalized variables plotted and saved.")
 
+    # now let's remake the count histograms with this point data from the avg_ds
+    # I just want to plot histograms of occurences of TCs in each latitude and longitude
+    fig, axs = plt.subplots(1, 2, figsize=get_dim())
+    axs[0].plot(avg_ds["latitude"], avg_ds["count"].sum(dim="longitude"))
+
+    axs[1].plot(avg_ds["longitude"], avg_ds["count"].sum(dim="latitude"))
+
+    axs[0].set_xlabel(r"Latitude [$^{\circ}$N]")
+    axs[1].set_xlabel(r"Longitude [$^{\circ}$E]")
+    axs[0].set_xlim(-80, 80)
+    axs[1].set_xlim(0, 360)
+    axs[0].set_ylabel("Count of IBTrACS Points per 1/4$^{\circ}$")
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "ibtracs_hist.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+    print(avg_ds)
+
 
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
-    # # plot_unique_points()
+    # plot_unique_points()
     # era5_unique_points_raw()
-    # # example_plot_raw()
+    # example_plot_raw()
     # process_era5_raw()
-    # # plot_era5_processed()
-    # calculate_potential_intensity()
+    # plot_era5_processed()
+    # # calculate_potential_intensity()
     # plot_potential_intensity()
-    # calculate_potential_size()
+    # # calculate_potential_size()
     # plot_potential_size()
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
