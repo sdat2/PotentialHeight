@@ -548,10 +548,11 @@ def plot_era5_processed() -> None:
 @timeit
 def calculate_potential_intensity():
     """Calculate the potential intensity of the cyclone at each timestep using the ERA5 data."""
+    # open the processed data
     processed_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
     )
-
+    # calculate the potential intensity at the gradient wind level
     pi_ds = calculate_pi(processed_data, dim="pressure_level", V_reduc=1.0)
 
     print(pi_ds)
@@ -1011,13 +1012,13 @@ def plot_normalized_variables() -> None:
     plot_defaults()
     _, axs = plt.subplots(1, 2, figsize=get_dim(), sharex=True, sharey=True)
     # select nature as "TC"
-    print(pi_ps_ds["nature"])
-    print(pi_ps_ds["nature"].attrs)
-
+    # print(pi_ps_ds["nature"])
+    # print(pi_ps_ds["nature"].attrs)
     pi_ps_ds = pi_ps_ds.where(pi_ps_ds["nature"] == b"TS")
+
     axs[0].hist(
-        pi_ps_ds["normalized_rmax"].values[
-            ~np.isnan(pi_ps_ds["normalized_rmax"].values)
+        pi_ps_ds["normalized_rmax"].values.ravel()[
+            ~np.isnan(pi_ps_ds["normalized_rmax"].values.ravel())
         ],
         bins=100,
         range=(0, 5),
@@ -1025,16 +1026,16 @@ def plot_normalized_variables() -> None:
         label="Normalized Rmax",
     )
     axs[1].hist(
-        pi_ps_ds["normalized_vmax"].values[
-            ~np.isnan(pi_ps_ds["normalized_vmax"].values)
+        pi_ps_ds["normalized_vmax"].values.ravel()[
+            ~np.isnan(pi_ps_ds["normalized_vmax"].values.ravel())
         ],
         bins=100,
         range=(0, 5),
         alpha=0.5,
         label="Normalized Vmax",
     )
-    axs[0].set_xlabel("Normalized Rmax")
-    axs[1].set_xlabel("Normalized Vmax")
+    axs[0].set_xlabel(r"Normalized $r_{\mathrm{max}}/r'_{\mathrm{max}}$")
+    axs[1].set_xlabel(r"Normalized ${V_{\mathrm{max}}}/{V_{p}}$")
     axs[0].set_ylabel("Count")
 
     label_subplots(axs)
@@ -1070,12 +1071,16 @@ def plot_normalized_variables() -> None:
     )
 
     plot_var_on_map(
-        axs[1], avg_ds["normalized_rmax"], "Mean Normalized Size", "viridis", shrink=1
+        axs[1],
+        avg_ds["normalized_rmax"],
+        r"Mean Normalized Size, $\frac{r_{\mathrm{max}}}{r'_{\mathrm{max}}}$",
+        "viridis",
+        shrink=1,
     )
     plot_var_on_map(
         axs[2],
         avg_ds["normalized_vmax"],
-        "Mean Normalized Intensity",
+        r"Mean Normalized Intensity, $\frac{V_\mathrm{{max}}}{V_{p}}$",
         "viridis_r",
         shrink=1,
     )
@@ -1111,6 +1116,7 @@ def plot_normalized_variables() -> None:
     plt.clf()
     plt.close()
     print(avg_ds)
+    print(pi_ps_ds)
 
 
 if __name__ == "__main__":
