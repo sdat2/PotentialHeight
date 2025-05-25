@@ -6,6 +6,7 @@ wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate
 
 """
 
+from typing import Optional, Tuple, Union
 import os
 import numpy as np
 import xarray as xr
@@ -878,21 +879,27 @@ def plot_potential_size() -> None:
 # We are initially inspired by the relatively simple study of normalized intensity in Emanuel 2000.
 
 
-def add_pi_ps_back_onto_tracks():
+def add_pi_ps_back_onto_tracks(
+    variables_to_map: Tuple[str] = ("rmax", "vmax", "r0", "pm", "otl", "t0"),
+    input_name: str = "IBTrACS.since1980.v04r01.unique.nc",
+    output_name: str = "IBTrACS.since1980.v04r01.pi_ps.nc",
+):
     """We first need to use the unique counter to
-    map the unique points back onto the IBTrACS data."""
+    map the unique points back onto the IBTrACS data.
+
+    Args:
+        variables_to_map (Tuple[str], optional): The variables to map back onto the IBTrACS data. Defaults to ("rmax", "vmax", "r0", "pm", "otl", "t0").
+        input_name (str, optional): The name of the input IBTrACS dataset with unique counter. Defaults to "IBTrACS.since1980.v04r01.unique.nc".
+        output_name (str, optional): The name of the output IBTrACS dataset with potential intensity and size data added. Defaults to "IBTrACS.since1980.v04r01.pi_ps.nc".
+    """
     # open dataset with the indexing
-    ibtracs_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.unique.nc")
-    )
+    ibtracs_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, input_name))
     # open the potential size and intensity datasets
     ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
 
     # Get the unique_counter numpy array from the xarray Dataset
     # This array has dimensions ("storm", "date_time") and contains integers or np.nan
     unique_counter_np = ibtracs_ds["unique_counter"].data
-
-    variables_to_map = ["rmax", "vmax", "r0", "pm", "otl", "t0"]
 
     for var in variables_to_map:
         if var not in ps_ds:
@@ -951,9 +958,7 @@ def add_pi_ps_back_onto_tracks():
         ibtracs_ds[var] = (("storm", "date_time"), mapped_values)
 
     # Save the updated dataset
-    ibtracs_ds.to_netcdf(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
-    )
+    ibtracs_ds.to_netcdf(os.path.join(IBTRACS_DATA_PATH, output_name))
     print("Successfully added PI and PS data back onto tracks and saved the dataset.")
 
 
@@ -1122,8 +1127,13 @@ def plot_normalized_variables() -> None:
 def calculate_cps(v_reduc: float = 0.8) -> None:
     """Calculate the corresponding potential size, assuming the windspeed from usa_wind/V_reduc instead of the potential intensity. This will mean that we have to do many more potential size calculations"""
 
+    add_pi_ps_back_onto_tracks(
+        output_name="IBTrACS.since1980.v04r01.cps_inputs.nc",
+        variables_to_map=("vmax", "t0", "sst", "msl", "rh"),
+    )
+
     ibtracs_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps_inputs.nc")
     )
     print(ibtracs_ds)
     print(ibtracs_ds.variables)
@@ -1133,10 +1143,21 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
         "units": "m/s",
         "description": "Vmax at gradient wind, converted from usa_wind",
     }
-    del ibtracs_ds["rmax"]
-    del ibtracs_ds["r0"]
+    if "rmax" in ibtracs_ds:
+        del ibtracs_ds["rmax"]
+    if "r0" in ibtracs_ds:
+        del ibtracs_ds["r0"]
     print(ibtracs_ds["vmax"])
     print("non-nan count:", np.sum(~np.isnan(ibtracs_ds["vmax"])))
+    for var in ["sst", "msl", "rh", "vmax"]:
+        if var not in ibtracs_ds:
+            print(f"Warning: Variable '{var}' not found in ibtracs_ds. Skipping.")
+            continue
+        else:
+            print(f"Variable '{var}' found in ibtracs_ds.")
+            print(
+                f"Variable '{var}' has shape {ibtracs_ds[var].shape} and dtype {ibtracs_ds[var].dtype}"
+            )
     return None
 
 
