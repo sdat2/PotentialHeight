@@ -66,6 +66,21 @@ def point_solution_ps(
         ...     coords={"lat":28})
         >>> out_ds = point_solution_ps(in_ds)
     """
+    assert (
+        "msl" in ds
+    ), "Dataset must contain 'msl' variable (ambient surface pressure in mbar)"
+    assert (
+        "vmax" in ds
+    ), "Dataset must contain 'vmax' variable (potential intensity in m/s)"
+    assert (
+        "sst" in ds
+    ), "Dataset must contain 'sst' variable (sea surface temperature in degC)"
+    assert (
+        "t0" in ds
+    ), "Dataset must contain 't0' variable (outflow temperature in degK)"
+    assert (
+        "lat" in ds
+    ), "Dataset must contain 'lat' coordinate (latitude in degrees North)"
 
     # read compuslory parameters
     p_a = float(ds["msl"].values)  # ambient surface pressure in mbars

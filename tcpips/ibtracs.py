@@ -1135,29 +1135,60 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
     ibtracs_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps_inputs.nc")
     )
-    print(ibtracs_ds)
-    print(ibtracs_ds.variables)
+    ds = ibtracs_ds
+
+    ds["pressure_assumption"] = "isothermal"
+    ds["ck_cd"] = 0.9
+    ds["w_cool"] = 0.002
+    ds["cd_vary"] = 0
+    ds["cd"] = 0.0015
+    print(ds)
+    print(ds.variables)
     # knots to m/s, then divide by v_reduc to get gradient wind speed
-    ibtracs_ds["vmax"] = ibtracs_ds["usa_wind"] * 0.514444 / v_reduc  # convert to m/s
-    ibtracs_ds["vmax"].attrs = {
+    ds["vmax"] = ds["usa_wind"] * 0.514444 / v_reduc  # convert to m/s
+    ds["vmax"].attrs = {
         "units": "m/s",
         "description": "Vmax at gradient wind, converted from usa_wind",
     }
-    if "rmax" in ibtracs_ds:
-        del ibtracs_ds["rmax"]
-    if "r0" in ibtracs_ds:
-        del ibtracs_ds["r0"]
-    print(ibtracs_ds["vmax"])
-    print("non-nan count:", np.sum(~np.isnan(ibtracs_ds["vmax"])))
+    if "rmax" in ds:
+        del ds["rmax"]
+    if "r0" in ds:
+        del ds["r0"]
+    print(ds["vmax"])
+    print("non-nan count:", np.sum(~np.isnan(ds["vmax"])))
     for var in ["sst", "msl", "rh", "vmax"]:
-        if var not in ibtracs_ds:
-            print(f"Warning: Variable '{var}' not found in ibtracs_ds. Skipping.")
+        if var not in ds:
+            print(f"Warning: Variable '{var}' not found in ds. Skipping.")
             continue
         else:
-            print(f"Variable '{var}' found in ibtracs_ds.")
+            print(f"Variable '{var}' found in ds.")
             print(
-                f"Variable '{var}' has shape {ibtracs_ds[var].shape} and dtype {ibtracs_ds[var].dtype}"
+                f"Variable '{var}' has shape {ds[var].shape} and dtype {ds[var].dtype}"
             )
+
+    # let's flatten the dataset, and move all values where vmax is nan.
+    ds = parallelized_ps(
+        ds[
+            [
+                "sst",
+                "msl",
+                "rh",
+                "vmax",
+                "t0",
+                "pressure_assumption",
+                "ck_cd",
+                "w_cool",
+                "cd_vary",
+                "cd",
+            ]
+        ],
+        dryrun=True,
+    )
+    ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc"),
+        engine="h5netcdf",
+    )
+
     return None
 
 
