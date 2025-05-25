@@ -220,6 +220,153 @@ def calculate_grid_avg_over_unique_points(
     )
 
 
+def avg_from_ibtracs_to_era5(
+    ibtracs_ds: xr.Dataset,
+    vars: tuple = ("normalized_rmax", "normalized_vmax"),
+) -> xr.Dataset:
+    """
+    Average the ibtracs data onto the era5 grid.
+
+    Similar to the calculate_grid_avg_over_unique_points function, but
+    not assuming the latitude and longitudes given are era5 grid points.
+
+    Args:
+        ibtracs_ds (xr.Dataset): The IBTrACS dataset to average. Each variable should have dimensions ("storm", "date_time"). The latitude and longitude coordinates similarly are have dimensions ("storm", "date_time"). The tracks are of variable lengths, and for those points the lons and lats are nans.
+        vars (tuple, optional): The variables to average. Defaults to ("normalized_rmax", "normalized_vmax"). The variables should be in the ibtracs dataset.
+
+    Returns:
+        xr.Dataset: The averaged dataset with dimensions ("latitude", "longitude"). Will also return the count of points in each grid cell.
+    """
+    # average the ibtracs data onto the era5 grid
+    lats_ibtracs = ibtracs_ds.lat.values
+    lons_ibtracs = ibtracs_ds.lon.values
+    # both shape (storm, time), but can be nan
+
+    era5_ds = (
+        get_era5_coordinates()
+    )  # get the ERA5 coordinates so we can get the lon, lat grid
+    lats_era5 = era5_ds["latitude"].values  # shape (Y,)
+    lons_era5 = era5_ds["longitude"].values  # shape (X,)
+
+    # count ibtracs points onto the grid of the era5 data
+    era5_counts = np.zeros((len(lats_era5), len(lons_era5)), dtype=int)
+
+    vars_sum = {
+        var: np.zeros((len(lats_era5), len(lons_era5)), dtype=float) for var in vars
+    }
+    lat_res = (
+        np.abs(lats_era5[1] - lats_era5[0])
+        if len(lats_era5) > 1
+        else 2 * np.abs(90 - lats_era5[0])
+    )  # Handle single latitude case
+    lon_res = (
+        np.abs(lons_era5[1] - lons_era5[0])
+        if len(lons_era5) > 1
+        else 2 * np.abs(180 - lons_era5[0])
+    )  # Handle single longitude case
+
+    # Edges will be halfway between the centers.
+    # For latitudes (Y axis):
+    lat_edges = np.zeros(len(lats_era5) + 1)
+    lat_edges[1:-1] = (lats_era5[:-1] + lats_era5[1:]) / 2.0
+    lat_edges[0] = lats_era5[0] + lat_res / 2.0  # Upper edge of the first cell
+    lat_edges[-1] = lats_era5[-1] - lat_res / 2.0  # Lower edge of the last cell
+    # Ensure descending order for latitudes if lats_era5 is descending (typical for ERA5)
+    if lats_era5[0] > lats_era5[-1]:  # If latitudes are decreasing (e.g., 90 to -90)
+        lat_edges = np.sort(lat_edges)[::-1]
+    else:  # If latitudes are increasing
+        lat_edges = np.sort(lat_edges)
+
+    # For longitudes (X axis):
+    lon_edges = np.zeros(len(lons_era5) + 1)
+    lon_edges[1:-1] = (lons_era5[:-1] + lons_era5[1:]) / 2.0
+    lon_edges[0] = lons_era5[0] - lon_res / 2.0  # Left edge of the first cell
+    lon_edges[-1] = lons_era5[-1] + lon_res / 2.0  # Right edge of the last cell
+    # Ensure ascending order for longitudes
+    if (
+        lons_era5[0] > lons_era5[-1]
+    ):  # If longitudes are decreasing (e.g. for some specific datasets)
+        lon_edges = np.sort(lon_edges)[::-1]
+    else:
+        lon_edges = np.sort(lon_edges)
+
+    # Handle longitude wrapping if your lons_era5 go from e.g. 0 to 360 and
+    if np.min(lons_era5) >= 0 and np.max(lons_era5) <= 360:
+        lons_ibtracs_processed = np.where(
+            lons_ibtracs < 0, lons_ibtracs + 360, lons_ibtracs
+        )
+    else:
+        lons_ibtracs_processed = lons_ibtracs
+
+    # 3. Flatten the IBTrACS data and remove NaNs
+    flat_lats_ibtracs = lats_ibtracs.flatten()
+    flat_lons_ibtracs = lons_ibtracs_processed.flatten()
+
+    valid_indices = ~np.isnan(flat_lats_ibtracs) & ~np.isnan(flat_lons_ibtracs)
+    valid_lats = flat_lats_ibtracs[valid_indices]
+    valid_lons = flat_lons_ibtracs[valid_indices]
+    vars_valid = {var: ibtracs_ds[var].values.flatten()[valid_indices] for var in vars}
+
+    if lat_edges[0] > lat_edges[-1]:
+        # We reverse the edges and search for -valid_lats.
+
+        lat_indices = np.digitize(valid_lats, lat_edges[::-1], right=True)
+        lat_bin_indices = np.digitize(
+            valid_lats, lat_edges[::-1], right=False
+        )  # right=False: bins[i-1] <= x < bins[i]
+        lat_indices = len(lats_era5) - lat_bin_indices
+
+    else:  # lats_era5 is ascending (e.g., -90 to 90)
+        # lat_edges is already ascending.
+        # lat_indices = np.digitize(valid_lats, lat_edges, right=False) -1 # gives 0 to N-1 if point is within first to last bin
+        lat_bin_indices = np.digitize(valid_lats, lat_edges, right=False)
+        lat_indices = (
+            lat_bin_indices - 1
+        )  # Convert 1-based bin index to 0-based array index
+
+    # For longitudes (assuming lons_era5 is 0 to 360, ascending)
+    # lon_edges will be ascending.
+    # lon_indices = np.digitize(valid_lons, lon_edges, right=False) -1
+    lon_bin_indices = np.digitize(valid_lons, lon_edges, right=False)
+    lon_indices = (
+        lon_bin_indices - 1
+    )  # Convert 1-based bin index to 0-based array index
+
+    # Filter out points that fall outside the grid
+    # np.digitize returns 0 if x < bins[0] and len(bins) if x >= bins[-1] (for 1-based from digitize)
+    # So, for 0-based indices, we'd check for -1 and len(lats_era5) / len(lons_era5)
+    valid_lat_idx = (lat_indices >= 0) & (lat_indices < len(lats_era5))
+    valid_lon_idx = (lon_indices >= 0) & (lon_indices < len(lons_era5))
+    valid_overall_idx = valid_lat_idx & valid_lon_idx
+
+    final_lat_indices = lat_indices[valid_overall_idx]
+    final_lon_indices = lon_indices[valid_overall_idx]
+
+    # 5. Increment the counts in the era5_counts grid
+    # np.add.at is useful for adding values to specific indices.
+    # It handles cases where multiple points fall into the same cell by summing them up.
+    np.add.at(era5_counts, (final_lat_indices, final_lon_indices), 1)
+
+    for var in vars:
+        np.add.at(
+            vars_sum[var],
+            (final_lat_indices, final_lon_indices),
+            vars_valid[var][valid_overall_idx],
+        )
+
+    data_vars = {"count": (("latitude", "longitude"), era5_counts)}
+    with np.errstate(invalid="ignore", divide="ignore"):
+        for var in vars:
+            data_vars[var] = (
+                ("latitude", "longitude"),
+                vars_sum[var] / era5_counts,
+            )
+
+    return xr.Dataset(
+        data_vars=data_vars, coords={"latitude": lats_era5, "longitude": lons_era5}
+    )
+
+
 def plot_var_on_map(
     ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1
 ) -> None:
@@ -850,153 +997,6 @@ def create_normalized_variables(v_reduc: float = 0.8) -> None:
     )
 
 
-def avg_from_ibtracs_to_era5(
-    ibtracs_ds: xr.Dataset,
-    vars: tuple = ("sst", "msl", "t2m"),
-) -> xr.Dataset:
-    """
-    Average the ibtracs data onto the era5 grid.
-
-    Similar to the calculate_grid_avg_over_unique_points function, but
-    not assuming the latitude and longitudes given are era5 grid points.
-
-    Args:
-        ibtracs_ds (xr.Dataset): The IBTrACS dataset to average. Each variable should have dimensions ("storm", "date_time"). The latitude and longitude coordinates similarly are have dimensions ("storm", "date_time"). The tracks are of variable lengths, and for those points the lons and lats are nans.
-        vars (tuple, optional): The variables to average. Defaults to ("normalized_rmax", "normalized_vmax"). The variables should be in the ibtracs dataset.
-
-    Returns:
-        xr.Dataset: The averaged dataset with dimensions ("latitude", "longitude"). Will also return the count of points in each grid cell.
-    """
-    # average the ibtracs data onto the era5 grid
-    lats_ibtracs = ibtracs_ds.lat.values
-    lons_ibtracs = ibtracs_ds.lon.values
-    # both shape (storm, time), but can be nan
-
-    era5_ds = (
-        get_era5_coordinates()
-    )  # get the ERA5 coordinates so we can get the lon, lat grid
-    lats_era5 = era5_ds["latitude"].values  # shape (Y,)
-    lons_era5 = era5_ds["longitude"].values  # shape (X,)
-
-    # count ibtracs points onto the grid of the era5 data
-    era5_counts = np.zeros((len(lats_era5), len(lons_era5)), dtype=int)
-
-    vars_sum = {
-        var: np.zeros((len(lats_era5), len(lons_era5)), dtype=float) for var in vars
-    }
-    lat_res = (
-        np.abs(lats_era5[1] - lats_era5[0])
-        if len(lats_era5) > 1
-        else 2 * np.abs(90 - lats_era5[0])
-    )  # Handle single latitude case
-    lon_res = (
-        np.abs(lons_era5[1] - lons_era5[0])
-        if len(lons_era5) > 1
-        else 2 * np.abs(180 - lons_era5[0])
-    )  # Handle single longitude case
-
-    # Edges will be halfway between the centers.
-    # For latitudes (Y axis):
-    lat_edges = np.zeros(len(lats_era5) + 1)
-    lat_edges[1:-1] = (lats_era5[:-1] + lats_era5[1:]) / 2.0
-    lat_edges[0] = lats_era5[0] + lat_res / 2.0  # Upper edge of the first cell
-    lat_edges[-1] = lats_era5[-1] - lat_res / 2.0  # Lower edge of the last cell
-    # Ensure descending order for latitudes if lats_era5 is descending (typical for ERA5)
-    if lats_era5[0] > lats_era5[-1]:  # If latitudes are decreasing (e.g., 90 to -90)
-        lat_edges = np.sort(lat_edges)[::-1]
-    else:  # If latitudes are increasing
-        lat_edges = np.sort(lat_edges)
-
-    # For longitudes (X axis):
-    lon_edges = np.zeros(len(lons_era5) + 1)
-    lon_edges[1:-1] = (lons_era5[:-1] + lons_era5[1:]) / 2.0
-    lon_edges[0] = lons_era5[0] - lon_res / 2.0  # Left edge of the first cell
-    lon_edges[-1] = lons_era5[-1] + lon_res / 2.0  # Right edge of the last cell
-    # Ensure ascending order for longitudes
-    if (
-        lons_era5[0] > lons_era5[-1]
-    ):  # If longitudes are decreasing (e.g. for some specific datasets)
-        lon_edges = np.sort(lon_edges)[::-1]
-    else:
-        lon_edges = np.sort(lon_edges)
-
-    # Handle longitude wrapping if your lons_era5 go from e.g. 0 to 360 and
-    if np.min(lons_era5) >= 0 and np.max(lons_era5) <= 360:
-        lons_ibtracs_processed = np.where(
-            lons_ibtracs < 0, lons_ibtracs + 360, lons_ibtracs
-        )
-    else:
-        lons_ibtracs_processed = lons_ibtracs
-
-    # 3. Flatten the IBTrACS data and remove NaNs
-    flat_lats_ibtracs = lats_ibtracs.flatten()
-    flat_lons_ibtracs = lons_ibtracs_processed.flatten()
-
-    valid_indices = ~np.isnan(flat_lats_ibtracs) & ~np.isnan(flat_lons_ibtracs)
-    valid_lats = flat_lats_ibtracs[valid_indices]
-    valid_lons = flat_lons_ibtracs[valid_indices]
-    vars_valid = {var: ibtracs_ds[var].values.flatten()[valid_indices] for var in vars}
-
-    if lat_edges[0] > lat_edges[-1]:
-        # We reverse the edges and search for -valid_lats.
-
-        lat_indices = np.digitize(valid_lats, lat_edges[::-1], right=True)
-        lat_bin_indices = np.digitize(
-            valid_lats, lat_edges[::-1], right=False
-        )  # right=False: bins[i-1] <= x < bins[i]
-        lat_indices = len(lats_era5) - lat_bin_indices
-
-    else:  # lats_era5 is ascending (e.g., -90 to 90)
-        # lat_edges is already ascending.
-        # lat_indices = np.digitize(valid_lats, lat_edges, right=False) -1 # gives 0 to N-1 if point is within first to last bin
-        lat_bin_indices = np.digitize(valid_lats, lat_edges, right=False)
-        lat_indices = (
-            lat_bin_indices - 1
-        )  # Convert 1-based bin index to 0-based array index
-
-    # For longitudes (assuming lons_era5 is 0 to 360, ascending)
-    # lon_edges will be ascending.
-    # lon_indices = np.digitize(valid_lons, lon_edges, right=False) -1
-    lon_bin_indices = np.digitize(valid_lons, lon_edges, right=False)
-    lon_indices = (
-        lon_bin_indices - 1
-    )  # Convert 1-based bin index to 0-based array index
-
-    # Filter out points that fall outside the grid
-    # np.digitize returns 0 if x < bins[0] and len(bins) if x >= bins[-1] (for 1-based from digitize)
-    # So, for 0-based indices, we'd check for -1 and len(lats_era5) / len(lons_era5)
-    valid_lat_idx = (lat_indices >= 0) & (lat_indices < len(lats_era5))
-    valid_lon_idx = (lon_indices >= 0) & (lon_indices < len(lons_era5))
-    valid_overall_idx = valid_lat_idx & valid_lon_idx
-
-    final_lat_indices = lat_indices[valid_overall_idx]
-    final_lon_indices = lon_indices[valid_overall_idx]
-
-    # 5. Increment the counts in the era5_counts grid
-    # np.add.at is useful for adding values to specific indices.
-    # It handles cases where multiple points fall into the same cell by summing them up.
-    np.add.at(era5_counts, (final_lat_indices, final_lon_indices), 1)
-
-    for var in vars:
-        np.add.at(
-            vars_sum[var],
-            (final_lat_indices, final_lon_indices),
-            vars_valid[var][valid_overall_idx],
-        )
-
-    data_vars = {"count": (("latitude", "longitude"), era5_counts)}
-    with np.errstate(invalid="ignore", divide="ignore"):
-        for var in vars:
-            data_vars[var] = (
-                ("latitude", "longitude"),
-                vars_sum[var] / era5_counts,
-            )
-
-    return xr.Dataset(
-        data_vars=data_vars, coords={"latitude": lats_era5, "longitude": lons_era5}
-    )
-
-
 def plot_normalized_variables() -> None:
     """Plot the normalized variables."""
     # open the dataset with the pi and ps data
@@ -1119,6 +1119,27 @@ def plot_normalized_variables() -> None:
     print(pi_ps_ds)
 
 
+def calculate_cps(v_reduc: float = 0.8) -> None:
+    """Calculate the corresponding potential size, assuming the windspeed from usa_wind/V_reduc instead of the potential intensity. This will mean that we have to do many more potential size calculations"""
+
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    print(ibtracs_ds)
+    print(ibtracs_ds.variables)
+    # knots to m/s, then divide by v_reduc to get gradient wind speed
+    ibtracs_ds["vmax"] = ibtracs_ds["usa_wind"] * 0.514444 / v_reduc  # convert to m/s
+    ibtracs_ds["vmax"].attrs = {
+        "units": "m/s",
+        "description": "Vmax at gradient wind, converted from usa_wind",
+    }
+    del ibtracs_ds["rmax"]
+    del ibtracs_ds["r0"]
+    print(ibtracs_ds["vmax"])
+    print("non-nan count:", np.sum(~np.isnan(ibtracs_ds["vmax"])))
+    return None
+
+
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
@@ -1135,4 +1156,5 @@ if __name__ == "__main__":
     # plot_potential_size()
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
-    plot_normalized_variables()
+    # plot_normalized_variables()
+    calculate_cps(v_reduc=0.8)
