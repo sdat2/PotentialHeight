@@ -881,7 +881,8 @@ def plot_potential_size() -> None:
 
 def add_pi_ps_back_onto_tracks(
     variables_to_map: Tuple[str] = ("rmax", "vmax", "r0", "pm", "otl", "t0"),
-    input_name: str = "IBTrACS.since1980.v04r01.unique.nc",
+    input_name: Union[str, tuple, list] = "IBTrACS.since1980.v04r01.unique.nc",
+    era5_name: str = "era5_unique_points_ps.nc",
     output_name: str = "IBTrACS.since1980.v04r01.pi_ps.nc",
 ):
     """We first need to use the unique counter to
@@ -895,7 +896,18 @@ def add_pi_ps_back_onto_tracks(
     # open dataset with the indexing
     ibtracs_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, input_name))
     # open the potential size and intensity datasets
-    ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
+    if isinstance(era5_name, str):
+        ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, era5_name))
+    elif isinstance(era5_name, Union[list, tuple]):
+        # If era5_name is a list or tuple, open all datasets and concatenate them
+        ps_ds = xr.open_mfdataset(
+            [os.path.join(IBTRACS_DATA_PATH, name) for name in era5_name],
+            parallel=True,
+        )
+    else:
+        raise ValueError(
+            "era5_name must be a string or a list/tuple of strings representing file names."
+        )
 
     # Get the unique_counter numpy array from the xarray Dataset
     # This array has dimensions ("storm", "date_time") and contains integers or np.nan
@@ -1128,8 +1140,9 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
     """Calculate the corresponding potential size, assuming the windspeed from usa_wind/V_reduc instead of the potential intensity. This will mean that we have to do many more potential size calculations"""
 
     add_pi_ps_back_onto_tracks(
+        era5_name=("era5_unique_points_pi.nc", "era5_unique_points_processed.nc"),
         output_name="IBTrACS.since1980.v04r01.cps_inputs.nc",
-        variables_to_map=("vmax", "t0", "sst", "msl", "rh"),
+        variables_to_map=("t0", "sst", "msl", "rh"),
     )
 
     ibtracs_ds = xr.open_dataset(
@@ -1182,7 +1195,7 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
                 "cd",
             ]
         ],
-        dryrun=True,
+        dryrun=False,
     )
     ds.to_netcdf(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc"),
