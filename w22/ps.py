@@ -239,7 +239,11 @@ def point_solution_ps(
 
 @timeit
 def parallelized_ps(
-    ds: xr.Dataset, jobs=-1, pressure_assumption="isothermal", dryrun=False
+    ds: xr.Dataset,
+    jobs=-1,
+    pressure_assumption="isothermal",
+    dryrun=False,
+    autofail=False,
 ) -> xr.Dataset:
     """
     Apply point solution to all of the points in the dataset, using joblib to paralelize.
@@ -252,6 +256,36 @@ def parallelized_ps(
 
     Returns:
         xr.Dataset: additionally contains r0, pm, pc, and rmax.
+
+
+    Example:
+
+        >>> in_ds = xr.Dataset(data_vars={
+        ...     "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
+        ...     "vmax": (("y", "x"), [[50, 51], [49, 49.5]]),  # m/s, potential intensity
+        ...     "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
+        ...     "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
+        ...     "rh": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),  # [dimensionless], relative humidity
+        ...     "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),  # [dimensionless], ck_cd
+        ...     "cd": (("y", "x"), [[0.0015, 0.0015], [0.0015, 0.0015]]),  # [dimensionless], cd
+        ...     "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # mbar or hPa
+        ...     "supergradient_factor": (("y", "x"), [[1.2, 1.2], [1.2, 1.2]]),  # mbar or hPa
+        ...     "pressure_assumption": (("y", "x"), [["isothermal", "isothermal"], ["isothermal", "isothermal"]]),  # mbar or hPa
+        ...     },
+        ...     coords={"lat": (("y", "x"), [[30, 30], [25, 25]])},  # degNorth
+        ... )
+        >>> out_ds = parallelized_ps(in_ds, jobs=1, autofail=True)  # doctest: +ELLIPSIS
+        About to conduct 4 jobs in parallel
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        Automatically failed in autofail mode.
+        'parallelized_ps' ... s
+
     """
     # the dataset might have a series of dimensions: time, lat, lon, member, etc.
     # it must have variables msl, vmax, sst, and t0, and coordinate lat for each point
@@ -292,6 +326,7 @@ def parallelized_ps(
 
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
+            assert not autofail, "Automatically failed in autofail mode."
             assert not np.isnan(ids.vmax.values), "Did not converge"
             assert ids["vmax"].values > 0.01, "Vmax is not positive"
             assert not np.isnan(ids.sst.values), "SST is not valid"
