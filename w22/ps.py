@@ -452,7 +452,32 @@ def multi_point_example_1d() -> None:
     print(out_ds)
 
 
-def multi_point_example_2d() -> None:
+def multi_point_example_2d(autofail=True) -> None:
+    """
+    Example of a multi-point solution for potential size.
+    This function creates a dataset with multiple points and applies the parallelized_ps function to it.
+
+    Args:
+        autofail (bool, optional): If True, will fail on any error. Defaults to True.
+
+    Example:
+    >>> multi_point_example_2d() # doctest: +ELLIPSIS
+    About to conduct 4 jobs in parallel
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    Automatically failed in autofail mode.
+    'parallelized_ps'  ... s
+    <BLANKLINE>
+    About to conduct 4000 jobs in parallel
+    'parallelized_ps'  ... s
+    <BLANKLINE>
+    """
+
     in_ds = xr.Dataset(
         data_vars={
             "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
@@ -466,8 +491,6 @@ def multi_point_example_2d() -> None:
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
             "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # mbar or hPa
             "Cdvary": (("y", "x"), [[0, 0], [0, 0]]),  # mbar or hPa
-            # "CkCd": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),  # mbar or hPa
-            # "Cd": (("y", "x"), [[1.5e-3, 1.5e-3], [1.5e-3, 1.5e-3]]),  # mbar or hPa
             "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),  # mbar or hPa
             "supergradient_factor": (
                 ("y", "x"),
@@ -481,11 +504,13 @@ def multi_point_example_2d() -> None:
         },
         coords={"lat": (("y", "x"), [[30, 30], [25, 25]])},  # degNorth
     )
-    print(in_ds)
+    # print(in_ds)
     out_ds = parallelized_ps(
-        in_ds
+        in_ds,
+        jobs=1,
+        autofail=autofail,
     )  # 5s for 4 points on laptop (maybe the spin up costs are high)
-    print(out_ds)
+    # print(out_ds)
     # add a pretend new dimension to check parallelization
     in_ds["pretend"] = ("p", [0] * 1000)  # (repeat with 4000 points total = 2x2x1000)
     # laptop has 10 cores, each with 2 threads
@@ -495,8 +520,8 @@ def multi_point_example_2d() -> None:
     # Which is still quite a long time.
     # But if we exclude all points where vmax is nan or 0, perhaps it will be much faster (already done implictly in the code).
     # Still, maybe we will be waiting a day to get the ERA5/IBTrACS results
-    out_ds = parallelized_ps(in_ds)
-    print(out_ds)
+    out_ds = parallelized_ps(in_ds, jobs=10, autofail=autofail)
+    # print(out_ds)
 
 
 if __name__ == "__main__":
