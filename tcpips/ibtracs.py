@@ -221,7 +221,7 @@ def calculate_grid_avg_over_unique_points(
     )
 
 
-def avg_from_ibtracs_to_era5(
+def calculate_grid_avg_over_ibtracs_points(
     ibtracs_ds: xr.Dataset,
     vars: tuple = ("normalized_rmax", "normalized_vmax"),
 ) -> xr.Dataset:
@@ -1020,7 +1020,7 @@ def plot_normalized_variables() -> None:
     pi_ps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.normalized.nc")
     )
-    avg_ds = avg_from_ibtracs_to_era5(
+    avg_ds = calculate_grid_avg_over_ibtracs_points(
         pi_ps_ds, vars=("normalized_rmax", "normalized_vmax")
     )
 
@@ -1205,6 +1205,138 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
     return None
 
 
+def plot_cps():
+    """Plot the corresponding potential size, assuming the windspeed from usa_wind/V_reduc instead of the potential intensity."""
+    # open the dataset with the cps data
+    cps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
+    )
+    avg_ds = calculate_grid_avg_over_ibtracs_points(
+        cps_ds, vars=("rmax", "vmax", "r0", "pm", "t0")
+    )
+
+    # let's plot two histograms of the normalized rmax and vmax
+    # create 2 panel plot of normalized rmax and vmax
+    plot_defaults()
+    _, axs = plt.subplots(1, 2, figsize=get_dim(), sharey=True)
+    axs[0].hist(
+        avg_ds["rmax"].values.ravel()[~np.isnan(avg_ds["rmax"].values.ravel())] / 1000,
+        bins=100,
+        alpha=0.5,
+        label="Rmax",
+    )
+    axs[1].hist(
+        avg_ds["vmax"].values.ravel()[~np.isnan(avg_ds["vmax"].values.ravel())],
+        bins=100,
+        alpha=0.5,
+        label="Vmax",
+    )
+    axs[0].set_xlabel(r"$r_{\mathrm{max}}$ [km]")
+    axs[1].set_xlabel(r"$V_{\mathrm{max}}$ [m/s]")
+    axs[0].set_ylabel("Count")
+
+    label_subplots(axs)
+
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "cps_rmax_vmax_hist.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
+    # plot the rmax and vmax
+    # create 2 panel plot of averaged rmax and vmax on a map
+    # first we need to calculate the average over the unique points
+
+    plot_defaults()
+    _, axs = plt.subplots(
+        3,
+        1,
+        figsize=get_dim(ratio=1.1),
+        sharex=True,
+        sharey=True,
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+    )  # specify 2 rows for the subplots
+
+    plot_var_on_map(
+        axs[0],
+        avg_ds["count"],
+        "Count of TC Points",
+        "viridis_r",
+        shrink=1,
+    )
+    plot_var_on_map(
+        axs[1],
+        avg_ds["rmax"] / 1000,
+        r"Mean $r_{\mathrm{max}}$ [km]",
+        "viridis",
+        shrink=1,
+    )
+    plot_var_on_map(
+        axs[2],
+        avg_ds["vmax"],
+        r"Mean $V_{\mathrm{max}}$ [m/s]",
+        "viridis_r",
+        shrink=1,
+    )
+    plt.tight_layout()
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "cps_rmax_vmax.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+    print("CPS variables plotted and saved.")
+
+
+def plot_normalized_cps():
+    """Plot the normalized rmax for the CPS data."""
+    cps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
+    )
+    print("cps_ds", cps_ds.sizes)
+
+    # load usa_rmw data
+    ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+    )[
+        "usa_rmw"
+    ]  # this has the usa_rmw data
+    print("ds", ds.sizes)
+    print(ds.values.shape)
+    cps_ds["usa_rmw"] = (("storm", "date_time"), ds.values)
+
+    # let's now calculate the normalized rmax for cps
+    cps_ds["normalized_rmax"] = (
+        ("storm", "date_time"),
+        cps_ds["usa_rmw"].values * 1852 / cps_ds["rmax"].values,
+    )  # Asume usa_rmw is in nautical miles, rmax is in m
+
+    # let's plot the histogram of the normalized rmax
+    fig, ax = plt.subplots(figsize=get_dim())
+    ax.hist(
+        cps_ds["normalized_rmax"].values.ravel()[
+            ~np.isnan(cps_ds["normalized_rmax"].values.ravel())
+        ],
+        bins=100,
+        range=(0, 5),
+        alpha=0.5,
+        label="Normalized Rmax",
+    )
+    ax.set_xlabel(r"Normalized $r_{\mathrm{max}}/r''_{\mathrm{max}}$")
+    ax.set_ylabel("Count")
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "cps_normalized_rmax_hist.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
+
 if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
@@ -1222,4 +1354,6 @@ if __name__ == "__main__":
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
     # plot_normalized_variables()
-    calculate_cps(v_reduc=0.8)
+    # calculate_cps(v_reduc=0.8)
+    # plot_cps()
+    plot_normalized_cps()
