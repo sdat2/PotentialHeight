@@ -64,7 +64,9 @@ def point_solution_ps(
         ...     "rh": 0.9, # [dimensionless], relative humidity
         ...     },
         ...     coords={"lat":28})
-        >>> out_ds = point_solution_ps(in_ds)
+        >>> out_ds = point_solution_ps(in_ds) # doctest: +ELLIPSIS
+            'point_solution_ps' ... s
+
     """
     assert (
         "msl" in ds
