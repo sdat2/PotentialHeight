@@ -261,6 +261,23 @@ def parallelized_ps(
     # ds.dims
     dims = list(ds.dims)
 
+    # sst, vmax, msl, t0, rh, lat must be in the dataset
+    assert (
+        "msl" in ds
+    ), "Dataset must contain 'msl' variable (ambient surface pressure in mbar)"
+    assert (
+        "vmax" in ds
+    ), "Dataset must contain 'vmax' variable (potential intensity in m/s)"
+    assert (
+        "sst" in ds
+    ), "Dataset must contain 'sst' variable (sea surface temperature in degC)"
+    assert (
+        "t0" in ds
+    ), "Dataset must contain 't0' variable (outflow temperature in degK)"
+    assert (
+        "lat" in ds
+    ), "Dataset must contain 'lat' coordinate (latitude in degrees North)"
+
     if dryrun:
         print("Dry run, not doing anything")
         print("Dimensions:", ds.dims)
@@ -273,9 +290,17 @@ def parallelized_ps(
 
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
-            assert not np.isnan(ids.vmax.values)  # did not converge
-            assert ids["vmax"].values > 0.01  # is positive
-            assert not np.isnan(ids.sst.values)  # is sea surface
+            assert not np.isnan(ids.vmax.values), "Did not converge"
+            assert ids["vmax"].values > 0.01, "Vmax is not positive"
+            assert not np.isnan(ids.sst.values), "SST is not valid"
+            assert ids["rh"].values >= 0, "Relative humidity is negative"
+            assert ids["rh"].values <= 1, "Relative humidity is greater than 1"
+            assert (
+                ids["t0"].values > 100
+            ), "Outflow temperature is not greater than 100K"
+            assert (
+                ids["msl"].values > 950
+            ), "Ambient surface pressure is not greater than 0 mbar"
             return point_solution_ps(
                 ids, include_profile=False, pressure_assumption=pressure_assumption
             )
