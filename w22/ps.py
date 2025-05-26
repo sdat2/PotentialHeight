@@ -253,6 +253,7 @@ def parallelized_ps(
         jobs (int, optional): Number of threads, defaults to -1.
         pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
         dryrun (bool, optional): If True, perform a dry run without actual calculations. Defaults to False.
+        autofail (bool, optional): If True, fail on any error. Defaults to False.
 
     Returns:
         xr.Dataset: additionally contains r0, pm, pc, and rmax.
@@ -397,10 +398,22 @@ def parallelized_ps(
         path=str(PROJECT_PATH)
     )
     output_ds.attrs["ps_calculated_at_time"] = time_stamp()
+
+    assert (
+        output_ds.sizes == ds.sizes
+    ), "Output dataset sizes do not match input dataset sizes."
     return output_ds
 
 
 def single_point_example() -> None:
+    """
+    Example of a single point solution for potential size.
+    This function creates a dataset with a single point and applies the point_solution_ps function to it.
+
+    Example:
+    >>> single_point_example() # doctest: +ELLIPSIS
+    'point_solution_ps' ... s
+    """
     in_ds = xr.Dataset(
         data_vars={
             "msl": 1016.7,  # mbar or hPa
@@ -411,7 +424,7 @@ def single_point_example() -> None:
             "vmax": 49.5,  # m/s, potential intensity
             "sst": 28,  # degC
             "t0": 200,  # degK
-            "pressure_assumption": "isothermal",  # mbar or hPa
+            "pressure_assumption": "isothermal",  # isothermal or isopycnal
             "supergradient_factor": 1.2,  # mbar or hPa
         },
         coords={"lat": 25},  # degNorth
@@ -422,7 +435,7 @@ def single_point_example() -> None:
         2.005e06,
         rtol=1e-2,
     ), f"r0: {out_ds['r0'].values} != 2.005e+06"
-    print(out_ds)
+    # print(out_ds)
 
 
 def multi_point_example_1d() -> None:
