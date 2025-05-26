@@ -1026,7 +1026,6 @@ def plot_normalized_variables() -> None:
         bins=100,
         range=(0, 5),
         alpha=0.5,
-        label="Normalized Rmax",
     )
     axs[1].hist(
         pi_ps_ds["normalized_vmax"].values.ravel()[
@@ -1035,7 +1034,6 @@ def plot_normalized_variables() -> None:
         bins=100,
         range=(0, 5),
         alpha=0.5,
-        label="Normalized Vmax",
     )
     axs[0].set_xlabel(r"Normalized $r_{\mathrm{max}}/r'_{\mathrm{max}}$")
     axs[1].set_xlabel(r"Normalized ${V_{\mathrm{max}}}/{V_{p}}$")
@@ -1122,8 +1120,13 @@ def plot_normalized_variables() -> None:
     print(pi_ps_ds)
 
 
-def calculate_cps(v_reduc: float = 0.8) -> None:
-    """Calculate the corresponding potential size, assuming the windspeed from usa_wind/V_reduc instead of the potential intensity. This will mean that we have to do many more potential size calculations"""
+def calculate_cps(v_reduc: float = 0.8, test=False) -> None:
+    """Calculate the corresponding potential size, assuming the windspeed from usa_wind/V_reduc instead of the potential intensity. This will mean that we have to do many more potential size calculations.
+
+    Args:
+        v_reduc (float, optional): The reduction factor for vmax to go from potential intensity at the gradient wind to potential intensity and the 10m wind. Defaults to 0.8.
+        test (bool, optional): If True, will run an autofail run to check dimensions match etc.
+    """
 
     add_pi_ps_back_onto_tracks(
         era5_name=("era5_unique_points_pi.nc", "era5_unique_points_processed.nc"),
@@ -1165,7 +1168,7 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
                 f"Variable '{var}' has shape {ds[var].shape} and dtype {ds[var].dtype}"
             )
 
-    # let's flatten the dataset, and move all values where vmax is nan.
+    # let's process the dataset.
     ds = parallelized_ps(
         ds[
             [
@@ -1182,11 +1185,13 @@ def calculate_cps(v_reduc: float = 0.8) -> None:
             ]
         ],
         dryrun=False,
+        autofail=test,  # if test is True, will run an autofail run to check dimensions match etc.
     )
-    ds.to_netcdf(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc"),
-        engine="h5netcdf",
-    )
+    if not test:  # save the dataset if not in test mode
+        ds.to_netcdf(
+            os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc"),
+            engine="h5netcdf",
+        )
 
     return None
 
@@ -1354,7 +1359,7 @@ if __name__ == "__main__":
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
     # plot_normalized_variables()
-    # calculate_cps(v_reduc=0.8)
+    calculate_cps(v_reduc=0.8, test=True)
     # plot_cps()
     # plot_normalized_cps()
-    check_sizes()
+    # check_sizes()
