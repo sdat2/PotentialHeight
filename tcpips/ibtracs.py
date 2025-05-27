@@ -1337,6 +1337,10 @@ def check_sizes():
         "IBTrACS.since1980.v04r01.normalized.nc",
         "IBTrACS.since1980.v04r01.cps_inputs.nc",
         "IBTrACS.since1980.v04r01.cps.nc",
+        "era5_unique_points_raw.nc",
+        "era5_unique_points_processed.nc",
+        "era5_unique_points_pi.nc",
+        "era5_unique_points_ps.nc",
     ]
     for ds in datasets:
         print(f"{ds}: {xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, ds)).sizes}")
@@ -1359,7 +1363,7 @@ if __name__ == "__main__":
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
     # plot_normalized_variables()
-    calculate_cps(v_reduc=0.8, test=False)
+    # calculate_cps(v_reduc=0.8, test=True)
     # plot_cps()
     # plot_normalized_cps()
-    # check_sizes()
+    check_sizes()
