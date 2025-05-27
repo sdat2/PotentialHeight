@@ -1389,6 +1389,26 @@ def filter_by_labels(
     return ds.sel(storm=storm_list)
 
 
+def landings_only(ds: xr.Dataset) -> Optional[xr.Dataset]:
+    """
+    Extract a reduced dataset based on those points at which a landing occurs.
+
+    Args:
+        ds (xr.Dataset): Individual storm.
+
+    Returns:
+        Optional[xr.Dataset]: Clipped storm. If there are no tropical cyclones
+            hitting the coatline the coastline then None is returned.
+    """
+    date_times = np.all(
+        [(ds["usa_record"].values == b"L"), (ds["usa_sshs"].values > 0)], axis=0
+    ).ravel()
+    if np.any(date_times):
+        return ds.isel(date_time=date_times)
+    else:
+        return None
+
+
 def plot_katrina_example():
     """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
     # Load the IBTrACS dataset with potential intensity and size data
@@ -1417,9 +1437,12 @@ def plot_katrina_example():
     )
     ax.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
 
-    times = katrina_ds["time"].values.astype("int") - np.nanmin(
-        katrina_ds["time"].values.astype("int")
-    )
+    kat_impact = landings_only(katrina_ds).isel(date_time=2)
+    print(katrina_ds["time"].values)
+    print(kat_impact["time"])
+    times = (
+        (katrina_ds["time"].values - kat_impact["time"].values) / 1e9 / 60 / 60
+    )  # nanoseconds to hours
 
     ig = ax.scatter(
         katrina_ds["lon"],
@@ -1430,7 +1453,7 @@ def plot_katrina_example():
         # color="blue",
         transform=ccrs.PlateCarree(),
     )
-    plt.colorbar(ig, ax=ax, shrink=1)
+    plt.colorbar(ig, ax=ax, shrink=0.8, label="Time since impact [hours]")
     # let's add the coastline in
     ax.coastlines(resolution="50m", color="grey", linewidth=0.5)
     # add rivers
