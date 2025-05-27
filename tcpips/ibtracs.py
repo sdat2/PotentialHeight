@@ -6,7 +6,7 @@ wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate
 
 """
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 import os
 import numpy as np
 import xarray as xr
@@ -1329,6 +1329,132 @@ def plot_normalized_cps():
     plt.close()
 
 
+def _union(lst1: list, lst2: list) -> list:
+    """
+    Union of lists.
+    """
+    return list(set(lst1) | set(lst2))
+
+
+def _intersection(lst1: list, lst2: list) -> list:
+    """
+    Intersection of lists.
+    """
+    return list(set(lst1).intersection(set(lst2)))
+
+
+def filter_by_labels(
+    ds: xr.Dataset,
+    filter: List[Tuple[str, List[str]]] = [
+        ("basin", [b"NA"]),
+        ("subbasin", [b"GM"]),
+        ("nature", [b"TS"]),
+        ("usa_record", [b"L"]),
+    ],
+) -> xr.Dataset:
+    """
+    Filter by labels for IBTrACS.
+
+    Args:
+        ds (xr.DataArray): Input ibtracs datarray.
+        filter (List[Tuple[str,List[str]]], optional): Filters to apply.
+            Defaults to [("basin", [b"NA"]), ("nature", [b"SS", b"TS"])].
+
+    Returns:
+        xr.Dataset: Filtered dataset.
+    """
+    storm_list = None
+    for filter_part in filter:
+        # print(filter_part)
+        storm_list_part = None
+        for value in filter_part[1]:
+            truth_array = ds[filter_part[0]] == value
+            # print(truth_array.values.shape)
+            if len(truth_array.shape) != 1:
+                compressed_array = np.any(truth_array, axis=1)
+            else:
+                compressed_array = truth_array
+            # print(compressed_array.shape)
+            storm_list_temp = ds.storm.values[compressed_array]
+            if storm_list_part is None:
+                storm_list_part = storm_list_temp
+            else:
+                storm_list_part = _union(storm_list_temp, storm_list_part)
+            # print(len(storm_list_part))
+        if storm_list is None:
+            storm_list = storm_list_part
+        else:
+            storm_list = _intersection(storm_list_part, storm_list)
+    # print(len(storm_list))
+    return ds.sel(storm=storm_list)
+
+
+def plot_katrina_example():
+    """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
+    # Load the IBTrACS dataset with potential intensity and size data
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+
+    # Select Katrina's data
+    katrina_ds = filter_by_labels(
+        ibtracs_ds,
+        filter=[
+            ("name", [b"KATRINA"]),
+            ("basin", [b"NA"]),
+            ("subbasin", [b"GM"]),
+            ("nature", [b"TS"]),
+            ("usa_record", [b"L"]),
+        ],
+    )
+    print(katrina_ds)
+
+    # Plotting
+    plot_defaults()
+    _, ax = plt.subplots(
+        figsize=get_dim(),
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=-80)},
+    )
+    ax.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
+
+    ax.scatter(
+        katrina_ds["lon"],
+        katrina_ds["lat"],
+        # c=katrina_ds["time"],
+        s=1,
+        marker="x",
+        color="blue",
+        transform=ccrs.PlateCarree(),
+    )
+    # let's add the coastline in
+    ax.coastlines(resolution="50m", color="grey", linewidth=0.5)
+    # add rivers
+    ax.add_feature(cfeature.RIVERS, linewidth=0.5)  # , edgecolor="blue", linewidth=0.5)
+    # add lakes
+    ax.add_feature(cfeature.LAKES, linewidth=0.5)  # , edgecolor="blue", linewidth=0.5)
+    # ax.set_title("Hurricane Katrina Track with Potential Intensity and Size Data")
+    # add grid lines
+    gl = ax.gridlines(
+        crs=ccrs.PlateCarree(),
+        draw_labels=True,
+        linewidth=0.5,
+        color="gray",
+        alpha=0.5,
+        linestyle="--",
+    )
+    # get rid of the top and right labels
+    gl.top_labels = False
+    gl.right_labels = False
+    ax.set_xlabel("Longitude [°E]")
+    ax.set_ylabel("Latitude [°N]")
+
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "katrina_track.pdf"), dpi=300, bbox_inches="tight"
+    )
+    plt.clf()
+    plt.close()
+
+
 def check_sizes():
     """Loop through all of the IBTrACS datasets used as inputs and outputs and print their sizes."""
     datasets = [
@@ -1368,5 +1494,6 @@ if __name__ == "__main__":
     # calculate_cps(v_reduc=0.8, test=True)
     # calculate_cps(v_reduc=0.8, test=False)
     # plot_cps()
-    plot_normalized_cps()
+    # plot_normalized_cps()
     # check_sizes()
+    plot_katrina_example()
