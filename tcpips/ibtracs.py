@@ -12,6 +12,7 @@ import numpy as np
 import xarray as xr
 import ujson
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec  # Import GridSpec
 
 try:
     from cartopy import crs as ccrs
@@ -1409,16 +1410,18 @@ def landings_only(ds: xr.Dataset) -> Optional[xr.Dataset]:
         return None
 
 
-def plot_katrina_example():
-    """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
-    # Load the IBTrACS dataset with potential intensity and size data
-    ibtracs_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
-    )
+def select_katrina_from_ds(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Select Katrina from the dataset.
 
-    # Select Katrina's data
-    katrina_ds = filter_by_labels(
-        ibtracs_ds,
+    Args:
+        ds (xr.Dataset): Input dataset.
+
+    Returns:
+        xr.Dataset: Dataset containing only Katrina's data.
+    """
+    return filter_by_labels(
+        ds,
         filter=[
             ("name", [b"KATRINA"]),
             ("basin", [b"NA"]),
@@ -1427,15 +1430,47 @@ def plot_katrina_example():
             ("usa_record", [b"L"]),
         ],
     )
-    print(katrina_ds)
+
+
+def plot_katrina_example():
+    """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
+    # Load the IBTrACS dataset with potential intensity and size data
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    ibtracs_orig = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+    )
+    cps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
+    )
+    # add name, basin, subbasin, nature, and usa_record to the cps_ds
+
+    for var in ["name", "basin", "subbasin", "nature", "usa_record"]:
+        cps_ds[var] = ibtracs_orig[var]
+    # Select Katrina's data
+    katrina_ds = select_katrina_from_ds(ibtracs_ds)
+    katrina_cps_ds = select_katrina_from_ds(cps_ds)
 
     # Plotting
     plot_defaults()
-    _, ax = plt.subplots(
-        figsize=get_dim(),
-        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=-80)},
+    fig = plt.figure(figsize=get_dim(ratio=1.1))
+
+    gs = gridspec.GridSpec(
+        3, 2, figure=fig, height_ratios=[3, 1, 1], width_ratios=[48, 1]
     )
-    ax.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
+
+    # --- Top Subplot: Geographic Map ---
+    # The projection was in subplot_kw, now specified directly for this subplot
+    ax_map = fig.add_subplot(
+        gs[0, :], projection=ccrs.PlateCarree(central_longitude=-80)
+    )
+
+    # _, ax = plt.subplots(
+    #     figsize=get_dim(),
+    #     subplot_kw={"projection": ccrs.PlateCarree(central_longitude=-80)},
+    # )
+    ax_map.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
 
     kat_impact = landings_only(katrina_ds).isel(date_time=2)
     print(katrina_ds["time"].values)
@@ -1444,7 +1479,7 @@ def plot_katrina_example():
         (katrina_ds["time"].values - kat_impact["time"].values) / 1e9 / 60 / 60
     )  # nanoseconds to hours
 
-    ig = ax.scatter(
+    ig = ax_map.scatter(
         katrina_ds["lon"],
         katrina_ds["lat"],
         c=times,
@@ -1453,15 +1488,15 @@ def plot_katrina_example():
         # color="blue",
         transform=ccrs.PlateCarree(),
     )
-    plt.colorbar(ig, ax=ax, shrink=0.8, label="Time since impact [hours]")
+    plt.colorbar(ig, ax=ax_map, shrink=0.94, label="Time since impact [hours]")
     # let's add the coastline in
-    ax.coastlines(resolution="50m", color="grey", linewidth=0.5)
+    ax_map.coastlines(resolution="50m", color="grey", linewidth=0.5)
     # add rivers
-    ax.add_feature(cfeature.RIVERS, linewidth=0.5)
+    ax_map.add_feature(cfeature.RIVERS, linewidth=0.5)
     # add lakes
-    ax.add_feature(cfeature.LAKES, linewidth=0.5)
+    ax_map.add_feature(cfeature.LAKES, linewidth=0.5)
     # add grid lines
-    gl = ax.gridlines(
+    gl = ax_map.gridlines(
         crs=ccrs.PlateCarree(),
         draw_labels=True,
         linewidth=0.5,
@@ -1472,9 +1507,60 @@ def plot_katrina_example():
     # get rid of the top and right labels
     gl.top_labels = False
     gl.right_labels = False
+
+    ax_line1 = fig.add_subplot(gs[1, 0])
+    ax_line1.plot(
+        times.ravel(),
+        katrina_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
+        label=r"$V_{\mathrm{max}}$ [m/s]",
+        color="blue",
+    )
+    ax_line1.plot(
+        times.ravel(),
+        katrina_ds["vmax"].values.ravel(),  # already in m/s
+        label=r"$V_{\mathrm{p}}$ [m/s]",
+        color="green",
+    )
+    ax_line1.set_ylabel(r"$V_{\mathrm{max}}$ [m/s]")
+    # ax_line1.set_xlabel("Time since impact [hours]")
+    ax_line1.set_xlim(np.nanmin(times), np.nanmax(times))
+    ax_line1.legend(loc="upper left", bbox_to_anchor=(1.05, 1), borderaxespad=0.0)
+    ax_line2 = fig.add_subplot(gs[2, 0])
+    ax_line2.plot(
+        times.ravel(),
+        katrina_ds["usa_rmw"].values.ravel()
+        * 1852
+        / 1000,  # convert nautical miles to km
+        label=r"$r_{\mathrm{max}}$ [km]",
+        color="blue",
+    )
+    ax_line2.plot(
+        times.ravel(),
+        katrina_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        label=r"$r_{\mathrm{max}}$ CPS [km]",
+        color="orange",
+    )
+    ax_line2.plot(
+        times.ravel(),
+        katrina_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        label=r"$r_{\mathrm{max}}$ PS [km]",
+        color="green",
+    )
+    ax_line2.set_ylabel(r"$r_{\mathrm{max}}$ [km]")
+    ax_line2.set_xlabel("Time since impact [hours]")
+    # expand legend to the right of the plot
+    ax_line2.legend(loc="upper left", bbox_to_anchor=(1.05, 1), borderaxespad=0.0)
+    ax_line2.set_xlim(np.nanmin(times), np.nanmax(times))
+
+    label_subplots([ax_map])
+
+    label_subplots([ax_line1, ax_line2], override="outside", start_from=1)
+    plt.tight_layout()
+
     plt.savefig(
         os.path.join(FIGURE_PATH, "katrina_track.pdf"), dpi=300, bbox_inches="tight"
     )
+
     plt.clf()
     plt.close()
 
