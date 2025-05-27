@@ -1417,22 +1417,26 @@ def plot_katrina_example():
     )
     ax.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
 
-    ax.scatter(
+    times = katrina_ds["time"].values.astype("int") - np.nanmin(
+        katrina_ds["time"].values.astype("int")
+    )
+
+    ig = ax.scatter(
         katrina_ds["lon"],
         katrina_ds["lat"],
-        # c=katrina_ds["time"],
+        c=times,
         s=1,
         marker="x",
-        color="blue",
+        # color="blue",
         transform=ccrs.PlateCarree(),
     )
+    plt.colorbar(ig, ax=ax, shrink=1)
     # let's add the coastline in
     ax.coastlines(resolution="50m", color="grey", linewidth=0.5)
     # add rivers
-    ax.add_feature(cfeature.RIVERS, linewidth=0.5)  # , edgecolor="blue", linewidth=0.5)
+    ax.add_feature(cfeature.RIVERS, linewidth=0.5)
     # add lakes
-    ax.add_feature(cfeature.LAKES, linewidth=0.5)  # , edgecolor="blue", linewidth=0.5)
-    # ax.set_title("Hurricane Katrina Track with Potential Intensity and Size Data")
+    ax.add_feature(cfeature.LAKES, linewidth=0.5)
     # add grid lines
     gl = ax.gridlines(
         crs=ccrs.PlateCarree(),
@@ -1445,9 +1449,6 @@ def plot_katrina_example():
     # get rid of the top and right labels
     gl.top_labels = False
     gl.right_labels = False
-    ax.set_xlabel("Longitude [°E]")
-    ax.set_ylabel("Latitude [°N]")
-
     plt.savefig(
         os.path.join(FIGURE_PATH, "katrina_track.pdf"), dpi=300, bbox_inches="tight"
     )
