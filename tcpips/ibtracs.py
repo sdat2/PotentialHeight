@@ -1359,7 +1359,7 @@ if __name__ == "__main__":
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
     # plot_normalized_variables()
-    calculate_cps(v_reduc=0.8, test=True)
+    calculate_cps(v_reduc=0.8, test=False)
     # plot_cps()
     # plot_normalized_cps()
     # check_sizes()
