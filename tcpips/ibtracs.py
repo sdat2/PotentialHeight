@@ -1343,7 +1343,8 @@ def check_sizes():
         "era5_unique_points_ps.nc",
     ]
     for ds in datasets:
-        print(f"{ds}: {xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, ds)).sizes}")
+        if os.path.exists(os.path.join(IBTRACS_DATA_PATH, ds)):
+            print(f"{ds}: {xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, ds)).sizes}")
 
 
 if __name__ == "__main__":
@@ -1364,6 +1365,7 @@ if __name__ == "__main__":
     # create_normalized_variables()
     # plot_normalized_variables()
     # calculate_cps(v_reduc=0.8, test=True)
+    # calculate_cps(v_reduc=0.8, test=False)
     # plot_cps()
     # plot_normalized_cps()
     check_sizes()
