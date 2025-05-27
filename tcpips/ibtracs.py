@@ -1285,6 +1285,7 @@ def plot_cps():
 
 def plot_normalized_cps():
     """Plot the normalized rmax for the CPS data."""
+    plot_defaults()
     cps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
     )
@@ -1367,5 +1368,5 @@ if __name__ == "__main__":
     # calculate_cps(v_reduc=0.8, test=True)
     # calculate_cps(v_reduc=0.8, test=False)
     # plot_cps()
-    # plot_normalized_cps()
-    check_sizes()
+    plot_normalized_cps()
+    # check_sizes()
