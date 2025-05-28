@@ -1457,7 +1457,7 @@ def plot_katrina_example():
     fig = plt.figure(figsize=get_dim(ratio=1.1))
 
     gs = gridspec.GridSpec(
-        3, 2, figure=fig, height_ratios=[3, 1, 1], width_ratios=[48, 1]
+        3, 2, figure=fig, height_ratios=[3, 1, 1], width_ratios=[100, 1]
     )
 
     # --- Top Subplot: Geographic Map ---
@@ -1512,16 +1512,17 @@ def plot_katrina_example():
     ax_line1.plot(
         times.ravel(),
         katrina_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
-        label=r"$V_{\mathrm{max}}$ [m/s]",
+        label=r"$V_{\mathrm{max}}$ Obs. [m s$^{-1}$]",
         color="blue",
     )
     ax_line1.plot(
         times.ravel(),
-        katrina_ds["vmax"].values.ravel(),  # already in m/s
-        label=r"$V_{\mathrm{p}}$ [m/s]",
+        katrina_ds["vmax"].values.ravel()
+        * 0.8,  # already in m/s, but at gradient wind not 10m, so need to reduce by v_reduc
+        label=r"$V_{\mathrm{p}}$@10m [m s$^{-1}$]",
         color="green",
     )
-    ax_line1.set_ylabel(r"$V_{\mathrm{max}}$ [m/s]")
+    ax_line1.set_ylabel(r"$V_{\mathrm{max}}$ [m s$^{-1}$]")
     # ax_line1.set_xlabel("Time since impact [hours]")
     ax_line1.set_xlim(np.nanmin(times), np.nanmax(times))
     ax_line1.legend(loc="upper left", bbox_to_anchor=(1.05, 1), borderaxespad=0.0)
@@ -1531,20 +1532,24 @@ def plot_katrina_example():
         katrina_ds["usa_rmw"].values.ravel()
         * 1852
         / 1000,  # convert nautical miles to km
-        label=r"$r_{\mathrm{max}}$ [km]",
+        label=r"$r_{\mathrm{max}}$ Obs. [km]",
         color="blue",
     )
     ax_line2.plot(
         times.ravel(),
-        katrina_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_{\mathrm{max}}$ CPS [km]",
-        color="orange",
+        katrina_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        label=r"$r_{\mathrm{max}}$ PS [km]"
+        + "\n"
+        + r"($V_{\mathrm{max}}=V_{\mathrm{p}}$)",
+        color="green",
     )
     ax_line2.plot(
         times.ravel(),
-        katrina_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_{\mathrm{max}}$ PS [km]",
-        color="green",
+        katrina_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        label=r"$r_{\mathrm{max}}$ CPS [km]"
+        + "\n"
+        + r"($V_{\mathrm{max}}=V_{\mathrm{max}} \text{ Obs.}$)",
+        color="orange",
     )
     ax_line2.set_ylabel(r"$r_{\mathrm{max}}$ [km]")
     ax_line2.set_xlabel("Time since impact [hours]")
