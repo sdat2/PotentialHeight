@@ -9,6 +9,7 @@ wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate
 from typing import Optional, Tuple, Union, List
 import os
 import numpy as np
+from numpy.typing import ArrayLike
 import xarray as xr
 import ujson
 import matplotlib.pyplot as plt
@@ -1488,15 +1489,15 @@ def add_saffir_simpson_boundaries(
 
 
 def highlight_rapid_intensification(
-    ax,
-    times,
-    wind_speeds,
-    ri_threshold_knots=30,
-    ri_period_hours=24,
+    ax: plt.Axes,
+    times: ArrayLike,
+    wind_speeds: ArrayLike,
+    ri_threshold_knots: float = 30,
+    ri_period_hours: float = 24,
     color="red",
     alpha=0.3,
     zorder=0,
-):
+) -> None:
     """
     Highlights periods of rapid intensification (RI) on a Matplotlib Axes object.
 
@@ -1595,7 +1596,7 @@ def highlight_rapid_intensification(
         )
 
 
-def plot_katrina_example():
+def plot_katrina_example() -> None:
     """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
     # Load the IBTrACS dataset with potential intensity and size data
     ibtracs_ds = xr.open_dataset(
@@ -1641,17 +1642,34 @@ def plot_katrina_example():
     times = (
         (katrina_ds["time"].values - kat_impact["time"].values) / 1e9 / 60 / 60
     )  # nanoseconds to hours
+    ax_map.plot(
+        katrina_ds["lon"].values.ravel(),
+        katrina_ds["lat"].values.ravel(),
+        color="grey",
+        linewidth=0.5,
+        alpha=0.5,
+        transform=ccrs.PlateCarree(),
+    )
+    ax_map.scatter(
+        kat_impact["lon"].values,
+        kat_impact["lat"].values,
+        color="green",
+        marker="+",
+        s=20,
+        transform=ccrs.PlateCarree(),
+    )
 
-    ig = ax_map.scatter(
+    img = ax_map.scatter(
         katrina_ds["lon"],
         katrina_ds["lat"],
         c=times,
-        s=1,
+        s=4,
         marker="x",
+        cmap="cmo.balance",
         # color="blue",
         transform=ccrs.PlateCarree(),
     )
-    plt.colorbar(ig, ax=ax_map, shrink=0.94, label="Time since impact [hours]")
+    plt.colorbar(img, ax=ax_map, shrink=0.94, label="Time since impact [hours]")
     # let's add the coastline in
     ax_map.coastlines(resolution="50m", color="grey", linewidth=0.5)
     # add rivers
