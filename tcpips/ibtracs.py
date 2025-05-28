@@ -1432,6 +1432,61 @@ def select_katrina_from_ds(ds: xr.Dataset) -> xr.Dataset:
     )
 
 
+def add_saffir_simpson_boundaries(
+    ax, color="gray", linestyle="--", linewidth=0.8, alpha=0.7, zorder=1
+):
+    """
+    Adds dashed horizontal lines to a Matplotlib Axes object at the
+    Saffir-Simpson hurricane category boundaries (wind speeds in m/s).
+
+    Args:
+        ax (matplotlib.axes.Axes): The Axes object to draw on.
+        color (str, optional): Color of the lines. Defaults to 'gray'.
+        linestyle (str, optional): Style of the lines. Defaults to '--'.
+        linewidth (float, optional): Width of the lines. Defaults to 0.8.
+        alpha (float, optional): Transparency of the lines. Defaults to 0.7.
+        zorder (int, optional): The zorder for drawing the lines. Lines with lower
+                               zorder are drawn first. Defaults to 1 (typically
+                               behind most plotted data).
+    """
+    saffir_simpson_boundaries_ms = {
+        "Cat 1": 33,
+        "Cat 2": 43,
+        "Cat 3": 50,
+        "Cat 4": 58,
+        "Cat 5": 70,
+        "Cat 6": 86,  # This is not an official category, but used for illustration, https://www.pnas.org/doi/epub/10.1073/pnas.2322597121
+    }
+
+    # Get the current y-axis limits to decide where to place text labels
+    ymin, ymax = ax.get_ylim()
+
+    for category, wind_speed_ms in saffir_simpson_boundaries_ms.items():
+        ax.axhline(
+            y=wind_speed_ms,
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            alpha=alpha,
+            zorder=zorder,
+        )
+
+        if ymin < wind_speed_ms < ymax:
+            ax.text(
+                ax.get_xlim()[0]
+                + (ax.get_xlim()[1] - ax.get_xlim()[0])
+                * 0.05,  # x-position (slightly inside right edge)
+                wind_speed_ms,
+                # + (ymax - ymin) * 0.01,  # y-position (slightly above the line)
+                f"{category}",
+                color=color,
+                fontsize=6,
+                verticalalignment="bottom",
+                horizontalalignment="left",
+                # transform=ax,  # Use Axes coordinates for text placement
+            )
+
+
 def plot_katrina_example():
     """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
     # Load the IBTrACS dataset with potential intensity and size data
@@ -1523,6 +1578,9 @@ def plot_katrina_example():
         color="green",
     )
     ax_line1.set_ylabel(r"$V_{\mathrm{max}}$ [m s$^{-1}$]")
+    add_saffir_simpson_boundaries(
+        ax_line1,
+    )
     # ax_line1.set_xlabel("Time since impact [hours]")
     ax_line1.set_xlim(np.nanmin(times), np.nanmax(times))
     ax_line1.legend(loc="upper left", bbox_to_anchor=(1.05, 1), borderaxespad=0.0)
