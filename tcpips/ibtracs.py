@@ -1553,36 +1553,42 @@ def highlight_rapid_intensification(
 
         t_lookback = t_current - ri_period_hours
 
-        # Only proceed if the lookback time is within the data range
         if t_lookback >= times_np[0]:
-            # Interpolate wind speed at the lookback time
+
             ws_at_lookback = np.interp(t_lookback, times_np, wind_speeds_np)
 
             wind_increase = ws_current - ws_at_lookback
 
             if wind_increase >= ri_threshold_ms:
-                # RI criteria met, period is (t_lookback, t_current)
-                identified_ri_periods.append((t_lookback, t_current))
+                # Additional check: Ensure not actively weakening at the current time step
+                actively_weakening_at_current_step = False
+                if (
+                    j > 0
+                ):  # Check against previous step if not the first point considered for RI
+                    if wind_speeds_np[j] < wind_speeds_np[j - 1]:
+                        actively_weakening_at_current_step = True
+                # If j == 0, this specific check for weakening is not applicable,
+                # but the t_lookback >= times_np[0] condition usually means j > 0
+                # by the time we can evaluate a full ri_period_hours.
+
+                if not actively_weakening_at_current_step:
+                    identified_ri_periods.append((t_lookback, t_current))
 
     if not identified_ri_periods:
-        return  # No RI periods found
+        return
 
-    # Merge overlapping or contiguous RI periods
-    # Sort periods by start time
     identified_ri_periods.sort(key=lambda x: x[0])
-
     merged_ri_periods = []
     if identified_ri_periods:
         current_start, current_end = identified_ri_periods[0]
-
         for i in range(1, len(identified_ri_periods)):
             next_start, next_end = identified_ri_periods[i]
-            if next_start <= current_end:  # Overlap or contiguous
+            if next_start <= current_end:
                 current_end = max(current_end, next_end)
-            else:  # Gap, finalize current merged period
+            else:
                 merged_ri_periods.append((current_start, current_end))
                 current_start, current_end = next_start, next_end
-        merged_ri_periods.append((current_start, current_end))  # Add the last period
+        merged_ri_periods.append((current_start, current_end))
 
     # Draw the merged RI periods
     for i, (start_time, end_time) in enumerate(merged_ri_periods):
@@ -1630,10 +1636,6 @@ def plot_katrina_example() -> None:
         gs[0, :], projection=ccrs.PlateCarree(central_longitude=-80)
     )
 
-    # _, ax = plt.subplots(
-    #     figsize=get_dim(),
-    #     subplot_kw={"projection": ccrs.PlateCarree(central_longitude=-80)},
-    # )
     ax_map.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
 
     kat_impact = landings_only(katrina_ds).isel(date_time=2)
