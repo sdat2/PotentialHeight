@@ -1476,15 +1476,123 @@ def add_saffir_simpson_boundaries(
                 ax.get_xlim()[0]
                 + (ax.get_xlim()[1] - ax.get_xlim()[0])
                 * 0.05,  # x-position (slightly inside right edge)
-                wind_speed_ms,
-                # + (ymax - ymin) * 0.01,  # y-position (slightly above the line)
+                wind_speed_ms
+                - (ymax - ymin) * 0.01,  # y-position (slightly above the line)
                 f"{category}",
                 color=color,
-                fontsize=6,
+                fontsize=5,
                 verticalalignment="bottom",
                 horizontalalignment="left",
                 # transform=ax,  # Use Axes coordinates for text placement
             )
+
+
+def highlight_rapid_intensification(
+    ax,
+    times,
+    wind_speeds,
+    ri_threshold_knots=30,
+    ri_period_hours=24,
+    color="red",
+    alpha=0.3,
+    zorder=0,
+):
+    """
+    Highlights periods of rapid intensification (RI) on a Matplotlib Axes object.
+
+    RI is defined as an increase in wind speed by at least `ri_threshold_knots`
+    over a `ri_period_hours` duration. The highlighted period on the graph
+    will be from (t - ri_period_hours) to t, where t is the time RI is achieved.
+
+    Args:
+        ax (matplotlib.axes.Axes): The Axes object to draw on.
+        times (array-like): 1D array of time values (e.g., in hours).
+                           Must be sorted in ascending order.
+        wind_speeds (array-like): 1D array of wind speeds (e.g., in m/s),
+                                  corresponding to `times`.
+        ri_threshold_knots (float, optional): The wind speed increase threshold
+                                             for RI in knots. Defaults to 30 knots.
+        ri_period_hours (float, optional): The time period over which the
+                                          intensification is measured, in hours.
+                                          Defaults to 24 hours.
+        color (str, optional): Color for the highlighted regions. Defaults to 'gold'.
+        alpha (float, optional): Transparency for the highlighted regions. Defaults to 0.3.
+        zorder (int, optional): The zorder for drawing the highlighted regions.
+                                Lower zorder is drawn first. Defaults to 0 (behind grid/plots).
+    """
+    if not len(times) == len(wind_speeds):
+        raise ValueError("times and wind_speeds must have the same length.")
+    if len(times) < 2:
+        return  # Not enough data to calculate RI
+
+    # Ensure times is a numpy array for interpolation and calculations
+    times_np = np.asarray(times).astype(float)
+    wind_speeds_np = np.asarray(wind_speeds)
+    # strip out nans from times
+    valid_indices = ~np.isnan(times_np) & ~np.isnan(wind_speeds_np)
+    times_np = times_np[valid_indices]
+    wind_speeds_np = wind_speeds_np[valid_indices]
+
+    if not np.all(np.diff(times_np) >= 0):
+        # np.interp requires monotonically increasing x-values.
+        # If diff is 0 for some, interp still works but it's good practice for time to be strictly increasing.
+        # For simplicity, we'll allow non-decreasing. If strictly increasing is needed, use > 0.
+        print(
+            "Warning: 'times' array should ideally be strictly increasing for reliable interpolation."
+        )
+
+    knots_to_ms = 0.514444  # Conversion factor
+    ri_threshold_ms = ri_threshold_knots * knots_to_ms
+
+    identified_ri_periods = []
+
+    for j in range(len(times_np)):
+        t_current = times_np[j]
+        ws_current = wind_speeds_np[j]
+
+        t_lookback = t_current - ri_period_hours
+
+        # Only proceed if the lookback time is within the data range
+        if t_lookback >= times_np[0]:
+            # Interpolate wind speed at the lookback time
+            ws_at_lookback = np.interp(t_lookback, times_np, wind_speeds_np)
+
+            wind_increase = ws_current - ws_at_lookback
+
+            if wind_increase >= ri_threshold_ms:
+                # RI criteria met, period is (t_lookback, t_current)
+                identified_ri_periods.append((t_lookback, t_current))
+
+    if not identified_ri_periods:
+        return  # No RI periods found
+
+    # Merge overlapping or contiguous RI periods
+    # Sort periods by start time
+    identified_ri_periods.sort(key=lambda x: x[0])
+
+    merged_ri_periods = []
+    if identified_ri_periods:
+        current_start, current_end = identified_ri_periods[0]
+
+        for i in range(1, len(identified_ri_periods)):
+            next_start, next_end = identified_ri_periods[i]
+            if next_start <= current_end:  # Overlap or contiguous
+                current_end = max(current_end, next_end)
+            else:  # Gap, finalize current merged period
+                merged_ri_periods.append((current_start, current_end))
+                current_start, current_end = next_start, next_end
+        merged_ri_periods.append((current_start, current_end))  # Add the last period
+
+    # Draw the merged RI periods
+    for i, (start_time, end_time) in enumerate(merged_ri_periods):
+        ax.axvspan(
+            start_time,
+            end_time,
+            color=color,
+            alpha=alpha,
+            zorder=zorder,
+            label="Rapid Intensification" if i == 0 else "_nolegend_",
+        )
 
 
 def plot_katrina_example():
@@ -1580,6 +1688,15 @@ def plot_katrina_example():
     ax_line1.set_ylabel(r"$V_{\mathrm{max}}$ [m s$^{-1}$]")
     add_saffir_simpson_boundaries(
         ax_line1,
+    )
+    highlight_rapid_intensification(
+        ax_line1,
+        times.ravel(),
+        katrina_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
+        ri_threshold_knots=30,
+        ri_period_hours=24,
+        color="red",
+        alpha=0.2,
     )
     # ax_line1.set_xlabel("Time since impact [hours]")
     ax_line1.set_xlim(np.nanmin(times), np.nanmax(times))

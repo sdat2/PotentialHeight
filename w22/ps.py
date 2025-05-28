@@ -439,6 +439,9 @@ def single_point_example() -> None:
 
 
 def multi_point_example_1d() -> None:
+    """
+    Example of a multi-point solution for potential size.
+    """
     in_ds = xr.Dataset(
         data_vars={
             "msl": ("y", [1016.7, 1016.7]),  # mbar or hPa
