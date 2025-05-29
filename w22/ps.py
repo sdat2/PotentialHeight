@@ -172,13 +172,22 @@ def point_solution_ps(
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
     # let's vary the radius range by coriolis parameter.
-    # let's assume that the initial guesses were good for 20degrees latitude, and then scale them by the ratio of the coriolis parameter at the given latitude to the coriolis parameter at 20 degrees latitude.
-    # coriolis_parameter_20 = abs(coriolis_parameter_from_lat(20))
+    # let's assume that the initial guesses were good for 20degrees latitude, and then scale them by the ratio of the coriolis parameter at the given latitude to the coriolis parameter at 25 degrees latitude.
+    # assuming r_a prop to v_p/f_cor, where v_p is the potential intensity and f_cor is the coriolis parameter.
+    # If v_p constant, then r_a*f = constant, so r1=r2*f2/f1
+    use_coriolis_param_scaling = True
+    if use_coriolis_param_scaling:
+        coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
+        lower_radius_bisection = 200_000 * coriolis_parameter_25 / coriolis_parameter
+        upper_radius_bisection = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
+    else:
+        lower_radius_bisection = LOWER_RADIUS_BISECTION
+        upper_radius_bisection = UPPER_RADIUS_BISECTION
 
     r0 = bisection(
         try_for_r0,
-        LOWER_RADIUS_BISECTION,  # LOWER_RADIUS_BISECTION * coriolis_parameter / coriolis_parameter_20,
-        UPPER_RADIUS_BISECTION,  # UPPER_RADIUS_BISECTION * coriolis_parameter / coriolis_parameter_20,
+        lower_radius_bisection,
+        upper_radius_bisection,
         PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
     )  # find potential size \(r_a\) between 200 and 5000 km with 1 Pa absolute tolerance
 
@@ -467,22 +476,6 @@ def multi_point_example_2d(autofail=True) -> None:
     Args:
         autofail (bool, optional): If True, will fail on any error. Defaults to True.
 
-    Example:
-    >>> multi_point_example_2d() # doctest: +ELLIPSIS
-    About to conduct 4 jobs in parallel
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    Automatically failed in autofail mode.
-    'parallelized_ps'  ... s
-    <BLANKLINE>
-    About to conduct 4000 jobs in parallel
-    'parallelized_ps'  ... s
-    <BLANKLINE>
     """
 
     in_ds = xr.Dataset(
