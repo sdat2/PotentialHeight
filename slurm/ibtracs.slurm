@@ -23,6 +23,7 @@ which micromamba
 micromamba --version
 micromamba activate t1
 
+export CARTOPY_DIR=/work/n02/n02/sdat2/cartopy_data
 mkdir $(pwd)'/matplotlib' # create matplotlib cache directory
 export MPLCONFIGDIR=$(pwd)'/matplotlib'
 
