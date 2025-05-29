@@ -1,9 +1,10 @@
+"""Model implementation of mSWE-GNN (Multiscale Shallow Water Equations Graph Neural Network). May not work with older versions of TensorFlow/Keras due to API changes. Initially based on Gemini 2.5 Pro's implementation. Need to further assess the faithfullness of this implementation."""
+
 import tensorflow as tf
 from tensorflow import keras
 from keras import layers
 
 
-# Helper function to create MLPs (no changes needed from your previous version)
 def create_mlp(hidden_units, activation="relu", final_activation=None, name=None):
     """Creates a Multi-Layer Perceptron (MLP)."""
     mlp_layers = []
