@@ -1733,7 +1733,7 @@ def plot_katrina_example() -> None:
     ax_line2.plot(
         times.ravel(),
         katrina_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_{\mathrm{max}}$ PS [km]"
+        label=r"$r'_{\mathrm{max}}$ PS [km]"
         + "\n"
         + r"($V_{\mathrm{max}}=V_{\mathrm{p}}$)",
         color="green",
@@ -1741,7 +1741,7 @@ def plot_katrina_example() -> None:
     ax_line2.plot(
         times.ravel(),
         katrina_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_{\mathrm{max}}$ CPS [km]"
+        label=r"$r''_{\mathrm{max}}$ CPS [km]"
         + "\n"
         + r"($V_{\mathrm{max}}=V_{\mathrm{max}} \text{ Obs.}$)",
         color="orange",
