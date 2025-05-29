@@ -171,10 +171,14 @@ def point_solution_ps(
         return pm_cle - pm_car
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
+    # let's vary the radius range by coriolis parameter.
+    # let's assume that the initial guesses were good for 20degrees latitude, and then scale them by the ratio of the coriolis parameter at the given latitude to the coriolis parameter at 20 degrees latitude.
+    # coriolis_parameter_20 = abs(coriolis_parameter_from_lat(20))
+
     r0 = bisection(
         try_for_r0,
-        LOWER_RADIUS_BISECTION,
-        UPPER_RADIUS_BISECTION,
+        LOWER_RADIUS_BISECTION,  # LOWER_RADIUS_BISECTION * coriolis_parameter / coriolis_parameter_20,
+        UPPER_RADIUS_BISECTION,  # UPPER_RADIUS_BISECTION * coriolis_parameter / coriolis_parameter_20,
         PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
     )  # find potential size \(r_a\) between 200 and 5000 km with 1 Pa absolute tolerance
 

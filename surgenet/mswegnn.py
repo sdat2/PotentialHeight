@@ -1,88 +1,138 @@
-"""Model implementation of mSWE-GNN (Multiscale Shallow Water Equations Graph Neural Network). May not work with older versions of TensorFlow/Keras due to API changes. Initially based on Gemini 2.5 Pro's implementation. Need to further assess the faithfullness of this implementation."""
+"""Model implementation of mSWE-GNN (Multiscale Shallow Water Equations Graph Neural Network).
+May not work with older versions of TensorFlow/Keras due to API changes.
+Initially based on Gemini 2.5 Pro's implementation.
+Need to further assess the faithfullness of this implementation."""
 
 import tensorflow as tf
 from tensorflow import keras
-from keras import layers
+from keras import (
+    layers,
+)  # Keep this for now, but tf.keras.layers is preferred for type hints
+from typing import List, Optional, Tuple, Dict, Any, Union
 
-
-def create_mlp(hidden_units, activation="relu", final_activation=None, name=None):
+def create_mlp(
+    hidden_units: List[int],
+    activation: str = "relu",
+    final_activation: Optional[str] = None,
+    name: Optional[str] = None,
+) -> keras.Sequential:  # Or tf.keras.Sequential
     """Creates a Multi-Layer Perceptron (MLP)."""
-    mlp_layers = []
+    mlp_layers: List[tf.keras.layers.Dense] = []
     for i, units in enumerate(hidden_units):
-        if units is None:
+        if units is None:  # Should not happen if hidden_units is List[int]
             raise ValueError(
                 f"MLP layer units cannot be None. Problem in MLP: {name}, layer {i}"
             )
         mlp_layers.append(
-            layers.Dense(
+            layers.Dense(  # Or tf.keras.layers.Dense
                 units,
                 activation=activation,
                 name=(f"{name}_dense_{i}" if name else f"dense_{i}"),
             )
         )
     if final_activation is not None and mlp_layers:
-        last_layer_activation = keras.activations.get(final_activation)
+        last_layer_activation = keras.activations.get(
+            final_activation
+        )  # Or tf.keras.activations.get
         mlp_layers[-1].activation = last_layer_activation
-    return keras.Sequential(mlp_layers, name=name)
+    return keras.Sequential(mlp_layers, name=name)  # Or tf.keras.Sequential
 
 
-class StaticNodeEncoder(layers.Layer):
+class StaticNodeEncoder(layers.Layer):  # Or tf.keras.layers.Layer
     """Encodes static node features. Shared across all scales. (phi_s)"""
 
+    mlp: keras.Sequential  # Or tf.keras.Sequential
+
     def __init__(
-        self, embedding_dim, mlp_hidden_units, name="static_node_encoder", **kwargs
+        self,
+        embedding_dim: int,
+        mlp_hidden_units: List[int],
+        name: str = "static_node_encoder",
+        **kwargs: Any,
     ):
         super().__init__(name=name, **kwargs)
         self.mlp = create_mlp(
             list(mlp_hidden_units) + [embedding_dim], name=f"{name}_phi_s_mlp"
         )
 
-    def call(self, static_node_features, training=False):
+    def call(
+        self, static_node_features: tf.Tensor, training: bool = False
+    ) -> tf.Tensor:
         return self.mlp(static_node_features, training=training)
 
 
-class DynamicNodeEncoder(layers.Layer):
+class DynamicNodeEncoder(layers.Layer):  # Or tf.keras.layers.Layer
     """Encodes initial dynamic node features. Applied at finest scale. (phi_d)"""
 
+    mlp: keras.Sequential  # Or tf.keras.Sequential
+
     def __init__(
-        self, embedding_dim, mlp_hidden_units, name="dynamic_node_encoder", **kwargs
+        self,
+        embedding_dim: int,
+        mlp_hidden_units: List[int],
+        name: str = "dynamic_node_encoder",
+        **kwargs: Any,
     ):
         super().__init__(name=name, **kwargs)
         self.mlp = create_mlp(
             list(mlp_hidden_units) + [embedding_dim], name=f"{name}_phi_d_mlp"
         )
 
-    def call(self, dynamic_node_features_current_t, training=False):
+    def call(
+        self, dynamic_node_features_current_t: tf.Tensor, training: bool = False
+    ) -> tf.Tensor:
         return self.mlp(dynamic_node_features_current_t, training=training)
 
 
-class EdgeEncoder(layers.Layer):
+class EdgeEncoder(layers.Layer):  # Or tf.keras.layers.Layer
     """Encodes edge features. Shared across all edges. (phi_epsilon)"""
 
-    def __init__(self, embedding_dim, mlp_hidden_units, name="edge_encoder", **kwargs):
+    mlp: keras.Sequential  # Or tf.keras.Sequential
+
+    def __init__(
+        self,
+        embedding_dim: int,
+        mlp_hidden_units: List[int],
+        name: str = "edge_encoder",
+        **kwargs: Any,
+    ):
         super().__init__(name=name, **kwargs)
         self.mlp = create_mlp(
             list(mlp_hidden_units) + [embedding_dim], name=f"{name}_phi_epsilon_mlp"
         )
 
-    def call(self, edge_features, training=False):
+    def call(self, edge_features: tf.Tensor, training: bool = False) -> tf.Tensor:
         return self.mlp(edge_features, training=training)
 
 
-class mSWEGNNLayer(layers.Layer):
+class mSWEGNNLayer(layers.Layer):  # Or tf.keras.layers.Layer
     """Implements a single GNN message passing layer from mSWE-GNN. (Eq. 3, 4)"""
 
+    output_dim: int
+    psi_mlp: keras.Sequential  # Or tf.keras.Sequential
+    W: layers.Dense  # Or tf.keras.layers.Dense
+
     def __init__(
-        self, output_dim, mlp_psi_hidden_units, name="mswegnn_layer", **kwargs
+        self,
+        output_dim: int,
+        mlp_psi_hidden_units: List[int],
+        name: str = "mswegnn_layer",
+        **kwargs: Any,
     ):
         super().__init__(name=name, **kwargs)
         self.output_dim = output_dim
         self.psi_mlp = create_mlp(
             list(mlp_psi_hidden_units) + [output_dim], name=f"{self.name}_psi_mlp"
         )
-        self.W = layers.Dense(output_dim, use_bias=False, name=f"{self.name}_W_matrix")
+        self.W = layers.Dense(  # Or tf.keras.layers.Dense
+            output_dim, use_bias=False, name=f"{self.name}_W_matrix"
+        )
 
-    def call(self, inputs, training=False):
+    def call(
+        self,
+        inputs: Tuple[tf.Tensor, tf.Tensor, tf.Tensor, Tuple[tf.Tensor, tf.Tensor]],
+        training: bool = False,
+    ) -> tf.Tensor:
         h_d_prev, h_s, edge_features_embedded, adjacency_info = inputs
         sender_indices, receiver_indices = adjacency_info
 
@@ -109,34 +159,41 @@ class mSWEGNNLayer(layers.Layer):
         return h_d_new
 
 
-class MeanPoolDownsample(layers.Layer):
+class MeanPoolDownsample(layers.Layer):  # Or tf.keras.layers.Layer
     """Downsamples node features using mean pooling. (Eq. 5)"""
 
-    def __init__(self, target_num_segments, name="mean_pool_downsample", **kwargs):
+    target_num_segments: tf.Tensor
+
+    def __init__(
+        self,
+        target_num_segments: int,
+        name: str = "mean_pool_downsample",
+        **kwargs: Any,
+    ):
         super().__init__(name=name, **kwargs)
         self.target_num_segments = tf.constant(
             target_num_segments, dtype=tf.int32
         )  # Store as tensor
 
-    def call(self, inputs):
+    def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]) -> tf.Tensor:
         fine_scale_h_d, prolongation_map_fine_to_coarse = inputs
 
         num_fine_nodes = tf.shape(fine_scale_h_d)[0]
         num_features = tf.shape(fine_scale_h_d)[1]
 
         # Function to return if the target number of segments is 0
-        def empty_coarse_output():
+        def empty_coarse_output() -> tf.Tensor:
             return tf.zeros([0, num_features], dtype=fine_scale_h_d.dtype)
 
         # Function to return if the input (fine_scale_h_d) is empty
-        def if_fine_empty():
+        def if_fine_empty() -> tf.Tensor:
             # Output should be zeros, shaped by target_num_segments
             return tf.zeros(
                 [self.target_num_segments, num_features], dtype=fine_scale_h_d.dtype
             )
 
         # Function to process normally if inputs are not empty and target segments > 0
-        def if_fine_not_empty():
+        def if_fine_not_empty() -> tf.Tensor:
             # Sort segment IDs and gather data accordingly for segment_mean
             sorted_indices = tf.argsort(prolongation_map_fine_to_coarse)
 
@@ -148,7 +205,7 @@ class MeanPoolDownsample(layers.Layer):
             return tf.math.segment_mean(
                 data=sorted_fine_scale_h_d,
                 segment_ids=sorted_prolongation_map,
-                num_segments=self.target_num_segments,  # Use the stored target_num_segments
+                num_segments=self.target_num_segments,
             )
 
         # Main control flow using tf.cond
@@ -163,15 +220,17 @@ class MeanPoolDownsample(layers.Layer):
         )
 
 
-class LearnableUpsample(layers.Layer):
+class LearnableUpsample(layers.Layer):  # Or tf.keras.layers.Layer
     """Upsamples node features using a learnable mechanism. (Eq. 6)"""
+
+    psi_up_mlp: keras.Sequential  # Or tf.keras.Sequential
 
     def __init__(
         self,
-        output_dim_psi_mlp,
-        mlp_psi_up_hidden_units,
-        name="learnable_upsample",
-        **kwargs,
+        output_dim_psi_mlp: int,
+        mlp_psi_up_hidden_units: List[int],
+        name: str = "learnable_upsample",
+        **kwargs: Any,
     ):
         super().__init__(name=name, **kwargs)
         self.psi_up_mlp = create_mlp(
@@ -179,7 +238,13 @@ class LearnableUpsample(layers.Layer):
             name=f"{self.name}_psi_up_mlp",
         )
 
-    def call(self, inputs, training=False):
+    def call(
+        self,
+        inputs: Tuple[
+            tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, Tuple[tf.Tensor, tf.Tensor]
+        ],
+        training: bool = False,
+    ) -> tf.Tensor:
         (
             h_dk_coarse,
             h_si_fine,
@@ -215,20 +280,27 @@ class LearnableUpsample(layers.Layer):
         return h_di_fine_upsampled
 
 
-class OutputDecoder(layers.Layer):
+class OutputDecoder(layers.Layer):  # Or tf.keras.layers.Layer
     """Decodes final embeddings to hydraulic variables. (Eq. 8)"""
+
+    output_dynamic_features: int
+    temporal_weighting: layers.Dense  # Or tf.keras.layers.Dense
+    phi_mlp: keras.Sequential  # Or tf.keras.Sequential
+    projection_U_history_layer: Optional[
+        layers.Dense
+    ]  # Or Optional[tf.keras.layers.Dense]
 
     def __init__(
         self,
-        output_dynamic_features,
-        mlp_phi_hidden_units,
-        history_length,
-        name="output_decoder",
-        **kwargs,
+        output_dynamic_features: int,
+        mlp_phi_hidden_units: List[int],
+        history_length: int,  # history_length is not directly used in this version of __init__
+        name: str = "output_decoder",
+        **kwargs: Any,
     ):
         super().__init__(name=name, **kwargs)
         self.output_dynamic_features = output_dynamic_features
-        self.temporal_weighting = layers.Dense(
+        self.temporal_weighting = layers.Dense(  # Or tf.keras.layers.Dense
             1, use_bias=False, name=f"{self.name}_w_p_temporal_weights"
         )
         self.phi_mlp = create_mlp(
@@ -237,7 +309,9 @@ class OutputDecoder(layers.Layer):
         )
         self.projection_U_history_layer = None
 
-    def call(self, inputs, training=False):
+    def call(
+        self, inputs: Tuple[tf.Tensor, tf.Tensor], training: bool = False
+    ) -> tf.Tensor:
         final_h_d_fine, U_history_fine = inputs
 
         permuted_U_history = tf.transpose(U_history_fine, perm=[0, 2, 1])
@@ -249,9 +323,11 @@ class OutputDecoder(layers.Layer):
         projected_weighted_U = weighted_U_squeezed
         if weighted_U_squeezed.shape[-1] != self.output_dynamic_features:
             if self.projection_U_history_layer is None:
-                self.projection_U_history_layer = layers.Dense(
-                    self.output_dynamic_features,
-                    name=f"{self.name}_projection_U_history",
+                self.projection_U_history_layer = (
+                    layers.Dense(  # Or tf.keras.layers.Dense
+                        self.output_dynamic_features,
+                        name=f"{self.name}_projection_U_history",
+                    )
                 )
             projected_weighted_U = self.projection_U_history_layer(weighted_U_squeezed)
 
@@ -260,21 +336,45 @@ class OutputDecoder(layers.Layer):
         return predictions
 
 
-class mSWEGNNModel(keras.Model):
+InputDictType = Dict[
+    str,
+    Union[
+        List[tf.Tensor],  # For _per_scale lists of Tensors
+        tf.Tensor,  # For _finest Tensor
+        List[
+            Tuple[tf.Tensor, tf.Tensor]
+        ],  # For adjacencies_per_scale, prolongation_maps_up
+    ],
+]
+
+
+class mSWEGNNModel(keras.Model):  # Or tf.keras.Model
+    num_scales: int
+    h_d_dim: int
+    mlp_hidden_units: List[int]
+    static_node_encoder: StaticNodeEncoder
+    dynamic_node_encoder: DynamicNodeEncoder
+    edge_encoder: EdgeEncoder
+    encoder_gnn_blocks: List[List[mSWEGNNLayer]]
+    downsamplers: List[MeanPoolDownsample]
+    bottleneck_gnn_block: List[mSWEGNNLayer]
+    decoder_gnn_blocks: List[List[mSWEGNNLayer]]
+    upsamplers: List[LearnableUpsample]
+    output_decoder: OutputDecoder
+
     def __init__(
         self,
-        num_scales,
-        gnn_layers_per_block,
-        h_s_dim,
-        h_d_dim,
-        h_edge_dim,
-        mlp_hidden_units,
-        output_dynamic_features,
-        history_length,
-        # Added num_nodes_per_scale_list to pass to MeanPoolDownsample
-        num_nodes_per_scale_list,
-        name="mswegnn_model",
-        **kwargs,
+        num_scales: int,
+        gnn_layers_per_block: int,
+        h_s_dim: int,
+        h_d_dim: int,
+        h_edge_dim: int,
+        mlp_hidden_units: List[int],
+        output_dynamic_features: int,
+        history_length: int,
+        num_nodes_per_scale_list: List[int],
+        name: str = "mswegnn_model",
+        **kwargs: Any,
     ):
         super().__init__(name=name, **kwargs)
         self.num_scales = num_scales
@@ -294,7 +394,7 @@ class mSWEGNNModel(keras.Model):
         self.encoder_gnn_blocks = []
         self.downsamplers = []
         for i in range(num_scales - 1):
-            block_layers = [
+            block_layers: List[mSWEGNNLayer] = [
                 mSWEGNNLayer(
                     self.h_d_dim,
                     self.mlp_hidden_units,
@@ -304,7 +404,6 @@ class mSWEGNNModel(keras.Model):
             ]
             self.encoder_gnn_blocks.append(block_layers)
 
-            # Pass the number of nodes for the coarser scale (i+1) as target_num_segments
             coarse_nodes_count_for_downsampler = num_nodes_per_scale_list[i + 1]
             self.downsamplers.append(
                 MeanPoolDownsample(
@@ -327,12 +426,12 @@ class mSWEGNNModel(keras.Model):
         for i in range(num_scales - 1):
             self.upsamplers.append(
                 LearnableUpsample(
-                    self.h_d_dim,
-                    self.mlp_hidden_units,
+                    self.h_d_dim,  # output_dim_psi_mlp for upsampler
+                    self.mlp_hidden_units,  # mlp_psi_up_hidden_units
                     name=f"{self.name}_upsampler_scale{i}",
                 )
             )
-            block_layers = [
+            block_layers_dec: List[mSWEGNNLayer] = [
                 mSWEGNNLayer(
                     self.h_d_dim,
                     self.mlp_hidden_units,
@@ -340,7 +439,7 @@ class mSWEGNNModel(keras.Model):
                 )
                 for j in range(gnn_layers_per_block)
             ]
-            self.decoder_gnn_blocks.append(block_layers)
+            self.decoder_gnn_blocks.append(block_layers_dec)
 
         self.output_decoder = OutputDecoder(
             output_dynamic_features,
@@ -349,37 +448,38 @@ class mSWEGNNModel(keras.Model):
             name=f"{self.name}_output_decoder",
         )
 
-    def call(self, inputs, training=False):
-        static_node_features_ps = inputs["static_node_features_per_scale"]
-        dynamic_node_features_hist_finest = inputs[
-            "dynamic_node_features_history_finest"
-        ]
-        edge_features_ps = inputs["edge_features_per_scale"]
-        adjacencies_ps = inputs["adjacencies_per_scale"]
-        prolong_maps_down = inputs["prolongation_maps_down"]
-        prolong_maps_up = inputs["prolongation_maps_up"]
+    def call(self, inputs: InputDictType, training: bool = False) -> tf.Tensor:
+        static_node_features_ps: List[tf.Tensor] = inputs["static_node_features_per_scale"]  # type: ignore
+        dynamic_node_features_hist_finest: tf.Tensor = inputs["dynamic_node_features_history_finest"]  # type: ignore
+        edge_features_ps: List[tf.Tensor] = inputs["edge_features_per_scale"]  # type: ignore
+        adjacencies_ps: List[Tuple[tf.Tensor, tf.Tensor]] = inputs["adjacencies_per_scale"]  # type: ignore
+        prolong_maps_down: List[tf.Tensor] = inputs["prolongation_maps_down"]  # type: ignore
+        prolong_maps_up: List[Tuple[tf.Tensor, tf.Tensor]] = inputs["prolongation_maps_up"]  # type: ignore
 
-        h_s_all_scales = [
+        h_s_all_scales: List[tf.Tensor] = [
             self.static_node_encoder(s_feat, training=training)
             for s_feat in static_node_features_ps
         ]
-        h_edge_all_scales = [
+        h_edge_all_scales: List[tf.Tensor] = [
             self.edge_encoder(e_feat, training=training) for e_feat in edge_features_ps
         ]
 
-        current_dynamic_features_finest = dynamic_node_features_hist_finest[:, -1, :]
-        h_d_current_scale = self.dynamic_node_encoder(
+        current_dynamic_features_finest: tf.Tensor = dynamic_node_features_hist_finest[
+            :, -1, :
+        ]
+        h_d_current_scale: tf.Tensor = self.dynamic_node_encoder(
             current_dynamic_features_finest, training=training
         )
 
-        skip_connections_data = []
+        skip_connections_data: List[tf.Tensor] = []
 
+        # Encoder path
         for i in range(self.num_scales - 1):
-            h_s_scale = h_s_all_scales[i]
-            h_edge_scale = h_edge_all_scales[i]
-            adj_scale = adjacencies_ps[i]
+            h_s_scale: tf.Tensor = h_s_all_scales[i]
+            h_edge_scale: tf.Tensor = h_edge_all_scales[i]
+            adj_scale: Tuple[tf.Tensor, tf.Tensor] = adjacencies_ps[i]
 
-            current_block_h_d = h_d_current_scale
+            current_block_h_d: tf.Tensor = h_d_current_scale
             for gnn_layer in self.encoder_gnn_blocks[i]:
                 current_block_h_d = gnn_layer(
                     (current_block_h_d, h_s_scale, h_edge_scale, adj_scale),
@@ -392,12 +492,13 @@ class mSWEGNNModel(keras.Model):
                 (h_d_current_scale, prolong_maps_down[i])
             )
 
-        coarsest_scale_idx = self.num_scales - 1
-        h_s_coarsest = h_s_all_scales[coarsest_scale_idx]
-        h_edge_coarsest = h_edge_all_scales[coarsest_scale_idx]
-        adj_coarsest = adjacencies_ps[coarsest_scale_idx]
+        # Bottleneck
+        coarsest_scale_idx: int = self.num_scales - 1
+        h_s_coarsest: tf.Tensor = h_s_all_scales[coarsest_scale_idx]
+        h_edge_coarsest: tf.Tensor = h_edge_all_scales[coarsest_scale_idx]
+        adj_coarsest: Tuple[tf.Tensor, tf.Tensor] = adjacencies_ps[coarsest_scale_idx]
 
-        current_bottleneck_h_d = h_d_current_scale
+        current_bottleneck_h_d: tf.Tensor = h_d_current_scale
         for gnn_layer in self.bottleneck_gnn_block:
             current_bottleneck_h_d = gnn_layer(
                 (current_bottleneck_h_d, h_s_coarsest, h_edge_coarsest, adj_coarsest),
@@ -405,63 +506,61 @@ class mSWEGNNModel(keras.Model):
             )
         h_d_current_scale = current_bottleneck_h_d
 
+        # Decoder path
         for i in range(self.num_scales - 1):
-            scale_idx_fine = self.num_scales - 2 - i
-            scale_idx_coarse = self.num_scales - 1 - i
+            scale_idx_fine: int = self.num_scales - 2 - i
+            scale_idx_coarse: int = self.num_scales - 1 - i
 
-            h_s_fine_scale_for_up = h_s_all_scales[scale_idx_fine]
-            h_s_coarse_scale_for_up = h_s_all_scales[scale_idx_coarse]
-            skip_data_fine_scale = skip_connections_data[scale_idx_fine]
-            prolong_map_c_to_f_edges = prolong_maps_up[i]
+            h_s_fine_scale_for_up: tf.Tensor = h_s_all_scales[scale_idx_fine]
+            h_s_coarse_scale_for_up: tf.Tensor = h_s_all_scales[scale_idx_coarse]
+            skip_data_fine_scale: tf.Tensor = skip_connections_data[scale_idx_fine]
+            prolong_map_c_to_f_edges: Tuple[tf.Tensor, tf.Tensor] = prolong_maps_up[i]
 
-            h_d_upsampled = self.upsamplers[i](
+            h_d_upsampled: tf.Tensor = self.upsamplers[i](
                 (
-                    h_d_current_scale,
-                    h_s_fine_scale_for_up,
-                    h_s_coarse_scale_for_up,
-                    skip_data_fine_scale,
+                    h_d_current_scale,  # h_dk_coarse
+                    h_s_fine_scale_for_up,  # h_si_fine
+                    h_s_coarse_scale_for_up,  # h_sk_coarse
+                    skip_data_fine_scale,  # h_di_fine_current (from skip connection)
                     prolong_map_c_to_f_edges,
                 ),
                 training=training,
             )
 
-            h_d_current_scale = layers.Add(
+            h_d_current_scale = layers.Add(  # Or tf.keras.layers.Add
                 name=f"{self.name}_decoder_add_skip_{scale_idx_fine}"
             )([h_d_upsampled, skip_data_fine_scale])
 
-            h_s_scale_decoder = h_s_all_scales[scale_idx_fine]
-            h_edge_scale_decoder = h_edge_all_scales[scale_idx_fine]
-            adj_scale_decoder = adjacencies_ps[scale_idx_fine]
+            h_s_scale_decoder: tf.Tensor = h_s_all_scales[scale_idx_fine]
+            h_edge_scale_decoder: tf.Tensor = h_edge_all_scales[scale_idx_fine]
+            adj_scale_decoder: Tuple[tf.Tensor, tf.Tensor] = adjacencies_ps[
+                scale_idx_fine
+            ]
 
-            current_block_h_d = h_d_current_scale
+            current_block_h_d_dec: tf.Tensor = h_d_current_scale
             for gnn_layer in self.decoder_gnn_blocks[i]:
-                current_block_h_d = gnn_layer(
+                current_block_h_d_dec = gnn_layer(
                     (
-                        current_block_h_d,
+                        current_block_h_d_dec,
                         h_s_scale_decoder,
                         h_edge_scale_decoder,
                         adj_scale_decoder,
                     ),
                     training=training,
                 )
-            h_d_current_scale = current_block_h_d
+            h_d_current_scale = current_block_h_d_dec
 
-        predictions = self.output_decoder(
+        predictions: tf.Tensor = self.output_decoder(
             (h_d_current_scale, dynamic_node_features_hist_finest), training=training
         )
         return predictions
 
 
 if __name__ == "__main__":
-    num_nodes_per_scale_list = [200, 100, 50]
-    # Example with a scale having 0 nodes to test MeanPoolDownsample robustness
-    # num_nodes_per_scale_list = [200, 0, 50] # This would be problematic for subsequent layers if not handled
-    # num_nodes_per_scale_list = [200, 100, 0] # Test 0 nodes at coarsest trainable scale
+    num_nodes_per_scale_list_ex: List[int] = [200, 100, 50]
+    num_edges_per_scale_list_ex: List[int] = [300, 150, 70]
 
-    num_edges_per_scale_list = [300, 150, 70]
-    # if num_nodes_per_scale_list = [200, 0, 50], then num_edges_per_scale_list should reflect this, e.g. [300, 0, 70]
-
-    model_params = {
+    model_params_ex: Dict[str, Any] = {
         "num_scales": 3,
         "gnn_layers_per_block": 2,
         "h_s_dim": 32,
@@ -470,133 +569,138 @@ if __name__ == "__main__":
         "mlp_hidden_units": [64, 32],
         "output_dynamic_features": 2,
         "history_length": 3,
-        "num_nodes_per_scale_list": num_nodes_per_scale_list,  # Add this
+        "num_nodes_per_scale_list": num_nodes_per_scale_list_ex,
     }
 
-    static_feature_dim_example = 3
-    dynamic_feature_dim_initial_example = 2
-    edge_feature_dim_example = 1
+    static_feature_dim_example: int = 3
+    dynamic_feature_dim_initial_example: int = 2
+    edge_feature_dim_example: int = 1
 
-    mswe_gnn_model = mSWEGNNModel(**model_params)
+    mswe_gnn_model_ex = mSWEGNNModel(**model_params_ex)
 
-    dummy_static_feats_ps = [
+    dummy_static_feats_ps_ex: List[tf.Tensor] = [
         (
             tf.random.normal(
-                (num_nodes_per_scale_list[i], static_feature_dim_example),
+                (num_nodes_per_scale_list_ex[i], static_feature_dim_example),
                 dtype=tf.float32,
             )
-            if num_nodes_per_scale_list[i] > 0
+            if num_nodes_per_scale_list_ex[i] > 0
             else tf.zeros((0, static_feature_dim_example), dtype=tf.float32)
         )
-        for i in range(model_params["num_scales"])
+        for i in range(model_params_ex["num_scales"])
     ]
-    dummy_dyn_hist_finest = (
+    dummy_dyn_hist_finest_ex: tf.Tensor = (
         tf.random.normal(
             (
-                num_nodes_per_scale_list[0],
-                model_params["history_length"],
+                num_nodes_per_scale_list_ex[0],
+                model_params_ex["history_length"],
                 dynamic_feature_dim_initial_example,
             ),
             dtype=tf.float32,
         )
-        if num_nodes_per_scale_list[0] > 0
+        if num_nodes_per_scale_list_ex[0] > 0
         else tf.zeros(
-            (0, model_params["history_length"], dynamic_feature_dim_initial_example),
+            (0, model_params_ex["history_length"], dynamic_feature_dim_initial_example),
             dtype=tf.float32,
         )
     )
 
-    dummy_edge_feats_ps = [
+    dummy_edge_feats_ps_ex: List[tf.Tensor] = [
         (
             tf.random.normal(
-                (num_edges_per_scale_list[i], edge_feature_dim_example),
+                (num_edges_per_scale_list_ex[i], edge_feature_dim_example),
                 dtype=tf.float32,
             )
-            if num_edges_per_scale_list[i] > 0
+            if num_edges_per_scale_list_ex[i] > 0
             else tf.zeros((0, edge_feature_dim_example), dtype=tf.float32)
         )
-        for i in range(model_params["num_scales"])
+        for i in range(model_params_ex["num_scales"])
     ]
 
-    dummy_adj_ps = []
-    for i in range(model_params["num_scales"]):
-        if num_nodes_per_scale_list[i] > 0 and num_edges_per_scale_list[i] > 0:
-            senders = tf.random.uniform(
-                (num_edges_per_scale_list[i],),
-                maxval=num_nodes_per_scale_list[i],
+    dummy_adj_ps_ex: List[Tuple[tf.Tensor, tf.Tensor]] = []
+    for i in range(model_params_ex["num_scales"]):
+        senders_ex: tf.Tensor
+        receivers_ex: tf.Tensor
+        if num_nodes_per_scale_list_ex[i] > 0 and num_edges_per_scale_list_ex[i] > 0:
+            senders_ex = tf.random.uniform(
+                (num_edges_per_scale_list_ex[i],),
+                maxval=num_nodes_per_scale_list_ex[i],
                 dtype=tf.int32,
             )
-            receivers = tf.random.uniform(
-                (num_edges_per_scale_list[i],),
-                maxval=num_nodes_per_scale_list[i],
+            receivers_ex = tf.random.uniform(
+                (num_edges_per_scale_list_ex[i],),
+                maxval=num_nodes_per_scale_list_ex[i],
                 dtype=tf.int32,
             )
-        else:  # Handle cases with zero nodes or edges
-            senders = tf.zeros((0,), dtype=tf.int32)
-            receivers = tf.zeros((0,), dtype=tf.int32)
-        dummy_adj_ps.append((senders, receivers))
+        else:
+            senders_ex = tf.zeros((0,), dtype=tf.int32)
+            receivers_ex = tf.zeros((0,), dtype=tf.int32)
+        dummy_adj_ps_ex.append((senders_ex, receivers_ex))
 
-    dummy_prolong_down = []
-    for i in range(model_params["num_scales"] - 1):
-        fine_nodes_count = num_nodes_per_scale_list[i]
-        coarse_nodes_count = num_nodes_per_scale_list[i + 1]
-        if fine_nodes_count > 0 and coarse_nodes_count > 0:
-            # prolongation map must have fine_nodes_count entries
-            # each entry is an index into the coarse_nodes_count nodes
-            dummy_prolong_down.append(
+    dummy_prolong_down_ex: List[tf.Tensor] = []
+    for i in range(model_params_ex["num_scales"] - 1):
+        fine_nodes_count_ex: int = num_nodes_per_scale_list_ex[i]
+        coarse_nodes_count_ex: int = num_nodes_per_scale_list_ex[i + 1]
+        if fine_nodes_count_ex > 0 and coarse_nodes_count_ex > 0:
+            dummy_prolong_down_ex.append(
                 tf.random.uniform(
-                    (fine_nodes_count,), maxval=coarse_nodes_count, dtype=tf.int32
+                    (fine_nodes_count_ex,), maxval=coarse_nodes_count_ex, dtype=tf.int32
                 )
             )
         else:
-            # If fine_nodes_count is 0, map is empty.
-            # If coarse_nodes_count is 0 (but fine_nodes_count > 0), all fine nodes map to "non-existent" coarse nodes.
-            # The MeanPoolDownsample layer handles target_num_segments=0 by returning empty.
-            # The prolongation map itself just needs to be a placeholder of correct shape if fine_nodes_count > 0.
-            # For tf.argsort to not error on this map if it's used by MeanPoolDownsample when target_num_segments=0
-            # (though it shouldn't be), providing a map of zeros is okay.
-            dummy_prolong_down.append(tf.zeros((fine_nodes_count,), dtype=tf.int32))
+            dummy_prolong_down_ex.append(
+                tf.zeros((fine_nodes_count_ex,), dtype=tf.int32)
+            )
 
-    dummy_prolong_up = []
-    for i in range(model_params["num_scales"] - 1):
-        idx_coarse = model_params["num_scales"] - 1 - i
-        idx_fine = model_params["num_scales"] - 2 - i
+    dummy_prolong_up_ex: List[Tuple[tf.Tensor, tf.Tensor]] = []
+    for i in range(model_params_ex["num_scales"] - 1):
+        idx_coarse_ex: int = model_params_ex["num_scales"] - 1 - i
+        idx_fine_ex: int = model_params_ex["num_scales"] - 2 - i
 
-        num_nodes_at_fine_scale_for_up = num_nodes_per_scale_list[idx_fine]
-        num_nodes_at_coarse_scale_for_up = num_nodes_per_scale_list[idx_coarse]
+        num_nodes_at_fine_scale_for_up_ex: int = num_nodes_per_scale_list_ex[
+            idx_fine_ex
+        ]
+        num_nodes_at_coarse_scale_for_up_ex: int = num_nodes_per_scale_list_ex[
+            idx_coarse_ex
+        ]
 
-        num_inter_edges = (
-            num_nodes_at_fine_scale_for_up  # Example: one "up-edge" per fine node
-        )
+        num_inter_edges_ex: int = num_nodes_at_fine_scale_for_up_ex
 
-        if num_nodes_at_fine_scale_for_up > 0 and num_nodes_at_coarse_scale_for_up > 0:
-            fine_indices = tf.range(num_nodes_at_fine_scale_for_up, dtype=tf.int32)
-            coarse_indices = tf.random.uniform(
-                (num_inter_edges,),
-                maxval=num_nodes_at_coarse_scale_for_up,
+        fine_indices_ex: tf.Tensor
+        coarse_indices_ex: tf.Tensor
+        if (
+            num_nodes_at_fine_scale_for_up_ex > 0
+            and num_nodes_at_coarse_scale_for_up_ex > 0
+        ):
+            fine_indices_ex = tf.range(
+                num_nodes_at_fine_scale_for_up_ex, dtype=tf.int32
+            )
+            coarse_indices_ex = tf.random.uniform(
+                (num_inter_edges_ex,),
+                maxval=num_nodes_at_coarse_scale_for_up_ex,
                 dtype=tf.int32,
             )
-            dummy_prolong_up.append((fine_indices, coarse_indices))
-        else:  # If either scale has 0 nodes, no upsampling edges.
-            dummy_prolong_up.append(
+            dummy_prolong_up_ex.append((fine_indices_ex, coarse_indices_ex))
+        else:
+            dummy_prolong_up_ex.append(
                 (tf.zeros((0,), dtype=tf.int32), tf.zeros((0,), dtype=tf.int32))
             )
 
-    dummy_inputs = {
-        "static_node_features_per_scale": dummy_static_feats_ps,
-        "dynamic_node_features_history_finest": dummy_dyn_hist_finest,
-        "edge_features_per_scale": dummy_edge_feats_ps,
-        "adjacencies_per_scale": dummy_adj_ps,
-        "prolongation_maps_down": dummy_prolong_down,
-        "prolongation_maps_up": dummy_prolong_up,
+    dummy_inputs_ex: InputDictType = {
+        "static_node_features_per_scale": dummy_static_feats_ps_ex,
+        "dynamic_node_features_history_finest": dummy_dyn_hist_finest_ex,
+        "edge_features_per_scale": dummy_edge_feats_ps_ex,
+        "adjacencies_per_scale": dummy_adj_ps_ex,
+        "prolongation_maps_down": dummy_prolong_down_ex,
+        "prolongation_maps_up": dummy_prolong_up_ex,
     }
 
     print("Building model with dummy inputs...")
     try:
-        _ = mswe_gnn_model(dummy_inputs, training=False)
-        mswe_gnn_model.summary()
+        _ = mswe_gnn_model_ex(dummy_inputs_ex, training=False)
+        mswe_gnn_model_ex.summary()
         print(
-            f"mSWE-GNN Model with {model_params['num_scales']} scales instantiated and built."
+            f"mSWE-GNN Model with {model_params_ex['num_scales']} scales instantiated and built."
         )
     except Exception as e:
         print(f"Error during model build or summary: {e}")
