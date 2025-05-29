@@ -12,8 +12,11 @@ import numpy as np
 from numpy.typing import ArrayLike
 import xarray as xr
 import ujson
+#try:
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec  # Import GridSpec
+#except ImportError:
+#    print("Matplotlib not installed. Plotting will not work.")
 
 try:
     from cartopy import crs as ccrs
@@ -525,7 +528,7 @@ def era5_unique_points_raw() -> None:
 
 
 @timeit
-def example_plot_raw():
+def plot_example_raw():
     # Let's make a 3 panel plot of the era5_unique_points_raw.nc data
     # plot it on global plattee carree projection with coastlines
 
@@ -1788,22 +1791,22 @@ if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
-    # ibtracs_to_era5_map()
-    # plot_unique_points()
-    # era5_unique_points_raw()
-    # example_plot_raw()
-    # process_era5_raw()
-    # plot_era5_processed()
-    # # calculate_potential_intensity()
-    # plot_potential_intensity()
-    # # calculate_potential_size()
-    # plot_potential_size()
-    # add_pi_ps_back_onto_tracks()
-    # create_normalized_variables()
-    # plot_normalized_variables()
+    ibtracs_to_era5_map()
+    #plot_unique_points()
+    era5_unique_points_raw()
+    # plot_example_raw()
+    process_era5_raw()
+    #plot_era5_processed()
+    calculate_potential_intensity()
+    #plot_potential_intensity()
+    calculate_potential_size()
+    #plot_potential_size()
+    add_pi_ps_back_onto_tracks()
+    create_normalized_variables()
+    #plot_normalized_variables()
     # calculate_cps(v_reduc=0.8, test=True)
-    # calculate_cps(v_reduc=0.8, test=False)
-    # plot_cps()
-    # plot_normalized_cps()
+    calculate_cps(v_reduc=0.8, test=False)
+    #plot_cps()
+    #plot_normalized_cps()
     # check_sizes()
-    plot_katrina_example()
+    #plot_katrina_example()
