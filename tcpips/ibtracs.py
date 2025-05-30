@@ -1,6 +1,6 @@
 """Process IBTrACS data to calculate along-track potential intensity and size from ERA5.
 
-We only want tracks from 1980-2024 (inclusive).
+We only want tracks from 1980-2024 (inclusive). We currently calculate the potential intensity and size using monthly ERA5 data.
 
 wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/netcdf/IBTrACS.since1980.v04r01.nc
 
@@ -12,6 +12,8 @@ import numpy as np
 from numpy.typing import ArrayLike
 import xarray as xr
 import ujson
+from tqdm import tqdm
+
 #try:
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec  # Import GridSpec
@@ -67,9 +69,9 @@ def ibtracs_to_era5_map():
     that corresponds to an IBTrACS storm. The unique counter will be added to the IBTrACS data
     as a new variable. The unique points will be saved to a JSON file.
 
-    Currenty takes around 36 seconds to run on laptop.
+    Currently takes around 36 seconds to run on laptop.
 
-    Paralelization could be implemented if we ignored having a unique counter for each point, however this is not the rate limting step.
+    Parallelization could be implemented if we ignored having a unique counter for each point, however this is not the rate limting step.
     """
     # load ibtracs
     ibtracs_ds = xr.open_dataset(IBTRACS_DATA_FILE)
@@ -749,7 +751,7 @@ def plot_potential_intensity():
 
 
 @timeit
-def calculate_potential_size():
+def calculate_potential_size(chunks=20) -> None:
     """Calculate the size of the cyclone at each timestep using the ERA5 data."""
     proc_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
@@ -772,19 +774,18 @@ def calculate_potential_size():
     # and then run the parallelized_ps function on each chunk
     # and save the results to a new netcdf file
     # this loop is in serial, and within each loop the task is parallelized
-    from tqdm import tqdm
-
-    for i in tqdm(range(0, 20), desc="Calculating potential size in chunks"):
+    chunk_size = len(combined_ds.u) // chunks
+    for i in tqdm(range(0, chunks), desc="Calculating potential size in chunks"):
         # get the start and end index of the chunk
         file_name = os.path.join(IBTRACS_DATA_PATH, f"era5_unique_points_ps_{i}.nc")
         if os.path.exists(file_name):
             print(f"File {file_name} already exists, skipping.")
             continue
-        start = i * (len(combined_ds.u) // 20)
-        end = min(
-            len(combined_ds.u),
-            (i + 1) * (len(combined_ds.u) // 20),
-        )
+        start = i * chunk_size
+        end = (i + 1) * chunk_size
+
+        if i == chunks - 1:
+            end = len(combined_ds.u)
         # get the chunk of data
         chunk_ds = combined_ds.isel(u=slice(start, end))
         # calculate the potential size for this chunk
@@ -1791,13 +1792,13 @@ if __name__ == "__main__":
     # python -m tcpips.ibtracs
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
-    ibtracs_to_era5_map()
+    # ibtracs_to_era5_map()
     # plot_unique_points()
-    era5_unique_points_raw()
+    # era5_unique_points_raw()
     # # plot_example_raw()
-    process_era5_raw()
+    # process_era5_raw()
     # #plot_era5_processed()
-    calculate_potential_intensity()
+    # calculate_potential_intensity()
     # #plot_potential_intensity()
     calculate_potential_size()
     # #plot_potential_size()
@@ -1807,6 +1808,6 @@ if __name__ == "__main__":
     # ## calculate_cps(v_reduc=0.8, test=True)
     calculate_cps(v_reduc=0.8, test=False)
     # #plot_cps()
-    #plot_normalized_cps()
-    ## check_sizes()
-    plot_katrina_example()
+    # plot_normalized_cps()
+    check_sizes()
+    # plot_katrina_example()

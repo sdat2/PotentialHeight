@@ -271,7 +271,6 @@ def parallelized_ps(
     Returns:
         xr.Dataset: additionally contains r0, pm, pc, and rmax.
 
-
     Example:
 
         >>> in_ds = xr.Dataset(data_vars={
