@@ -821,7 +821,9 @@ def calculate_potential_size(chunks=20) -> None:
 def plot_potential_size() -> None:
     """Plot the potential size data."""
 
-    ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
+    ps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc")
+        )
 
     ps_ds = ps_ds.rename({"lat": "latitude", "lon": "longitude"})
 
@@ -843,7 +845,7 @@ def plot_potential_size() -> None:
     plot_var_on_map(
         axs[0],
         grid_avg_ds["rmax"] / 1000,
-        "Mean $r_{max}$ [km]",
+        "Mean $r'_{max}$ [km]",
         "viridis",
         shrink=1,
         vmin=10,
@@ -853,7 +855,7 @@ def plot_potential_size() -> None:
         axs[1],
         grid_avg_ds["r0"] / 1000,
         "Mean $r_a$ [km]",
-        "viridis_r",
+        "viridis",
         shrink=1,
         vmin=500,
         vmax=5000,
@@ -882,16 +884,16 @@ def plot_potential_size() -> None:
         grid_avg_ds["rmax"].values.ravel()[~np.isnan(grid_avg_ds["rmax"].values.ravel())] / 1000,  # convert to km
         bins=100,
         alpha=0.5,
-        label="$r_{\mathrm{max}}$ [km]",
+        label=r"$r_{\mathrm{max}}$ [km]",
     )
     axs[1].hist(
         grid_avg_ds["r0"].values.ravel()[~np.isnan(grid_avg_ds["r0"].values.ravel())] / 1000,  # convert to km
         bins=100,
         alpha=0.5,
-        label="$r_a$ [km]",
+        label=r"$r_a$ [km]",
     )
     axs[0].set_xlabel(r"$r_{\mathrm{max}}$ [km]")
-    axs[1].set_xlabel("$r_a$ [km]")
+    axs[1].set_xlabel(r"$r_a$ [km]")
     axs[0].set_ylabel("Count")
     label_subplots(axs)
     plt.savefig(
@@ -1909,7 +1911,7 @@ if __name__ == "__main__":
     # calculate_potential_intensity()
     # plot_potential_intensity()
     # calculate_potential_size()
-    # plot_potential_size()
+    plot_potential_size()
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
     # plot_normalized_variables()
