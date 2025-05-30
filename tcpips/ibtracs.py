@@ -13,18 +13,22 @@ from numpy.typing import ArrayLike
 import xarray as xr
 import ujson
 from tqdm import tqdm
-
-#try:
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec  # Import GridSpec
-#except ImportError:
-#    print("Matplotlib not installed. Plotting will not work.")
+import matplotlib.gridspec as gridspec
 
 try:
+    import cartopy
     from cartopy import crs as ccrs
     from cartopy.feature import NaturalEarthFeature
     import cartopy.feature as cfeature
     from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
+    CARTOPY_DIR = os.getenv('CARTOPY_DIR')
+    if CARTOPY_DIR is not None and CARTOPY_DIR != '':
+        print(f"Using Cartopy with CARTOPY_DIR: {CARTOPY_DIR}")
+        cartopy.config['data_dir'] = CARTOPY_DIR
+        os.makedirs(CARTOPY_DIR, exist_ok=True) # Ensure the directory exists
+    else:
+        print("CARTOPY_DIR not set. Using default Cartopy data directory.")
 except ImportError:
     print("Cartopy not installed. Geographic plotting will not work.")
 
@@ -376,7 +380,8 @@ def calculate_grid_avg_over_ibtracs_points(
 
 
 def plot_var_on_map(
-    ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1
+    ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1,
+    **kwargs
 ) -> None:
     """Plot a variable on a map.
 
@@ -429,6 +434,7 @@ def plot_var_on_map(
         add_colorbar=True,
         add_labels=True,
         rasterized=True,
+        **kwargs,
     )
     ax.set_title("")  # remove title
 
@@ -839,6 +845,8 @@ def plot_potential_size() -> None:
         "Mean $r_{max}$ [km]",
         "viridis",
         shrink=1,
+        vmin=10,
+        vmax=150,
     )
     plot_var_on_map(
         axs[1],
@@ -846,6 +854,8 @@ def plot_potential_size() -> None:
         "Mean $r_a$ [km]",
         "viridis_r",
         shrink=1,
+        vmin=500,
+        vmax=5000,
     )
 
     plot_var_on_map(
@@ -864,6 +874,33 @@ def plot_potential_size() -> None:
     plt.clf()
     plt.close()
     print("Potential size plotted and saved.")
+
+    # let's make a histogram of rmax and r0
+    fig, axs = plt.subplots(1, 2, figsize=get_dim())
+    axs[0].hist(
+        grid_avg_ds["rmax"].values / 1000,  # convert to km
+        bins=100,
+        alpha=0.5,
+        label="$r_{\mathrm{max}}$ [km]",
+    )
+    axs[1].hist(
+        grid_avg_ds["r0"].values / 1000,  # convert to km
+        bins=100,
+        alpha=0.5,
+        label="$r_a$ [km]",
+    )
+    axs[0].set_xlabel(r"$r_{\mathrm{max}}$ [km]")
+    axs[1].set_xlabel("$r_a$ [km]")
+    axs[0].set_ylabel("Count")
+    label_subplots(axs)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "era5_unique_points_ps_hist.pdf"),
+        bbox_inches="tight",
+        dpi=300,
+    )
+    plt.close()
+    plt.clf()
+
 
 
 # Now that we have calculated potential size and potential intensity, we can compare them to the true size and intensity in the IBTrACS data.
@@ -1640,7 +1677,7 @@ def plot_katrina_example() -> None:
         gs[0, :], projection=ccrs.PlateCarree(central_longitude=-80)
     )
 
-    ax_map.set_extent([-100, -70, 20, 40], crs=ccrs.PlateCarree())
+    ax_map.set_extent([-92.5, -72.5, 22.5, 37.5], crs=ccrs.PlateCarree())
 
     kat_impact = landings_only(katrina_ds).isel(date_time=2)
     print(katrina_ds["time"].values)
@@ -1682,6 +1719,14 @@ def plot_katrina_example() -> None:
     ax_map.add_feature(cfeature.RIVERS, linewidth=0.5)
     # add lakes
     ax_map.add_feature(cfeature.LAKES, linewidth=0.5)
+    # make the land green again
+    ax_map.add_feature(
+        NaturalEarthFeature("physical", "land", "50m"),
+        edgecolor="black",
+        facecolor="green",
+        alpha=0.3,
+        linewidth=0.5,
+    )
     # add grid lines
     gl = ax_map.gridlines(
         crs=ccrs.PlateCarree(),
@@ -1793,21 +1838,21 @@ if __name__ == "__main__":
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
-    # plot_unique_points()
+    plot_unique_points()
     # era5_unique_points_raw()
-    # # plot_example_raw()
+    plot_example_raw()
     # process_era5_raw()
-    # #plot_era5_processed()
+    plot_era5_processed()
     # calculate_potential_intensity()
-    # #plot_potential_intensity()
-    calculate_potential_size()
-    # #plot_potential_size()
-    add_pi_ps_back_onto_tracks()
-    create_normalized_variables()
-    # plot_normalized_variables()
+    plot_potential_intensity()
+    #calculate_potential_size()
+    plot_potential_size()
+    #add_pi_ps_back_onto_tracks()
+    #create_normalized_variables()
+    plot_normalized_variables()
     # ## calculate_cps(v_reduc=0.8, test=True)
-    calculate_cps(v_reduc=0.8, test=False)
-    # #plot_cps()
-    # plot_normalized_cps()
-    check_sizes()
-    # plot_katrina_example()
+    #calculate_cps(v_reduc=0.8, test=False)
+    plot_cps()
+    plot_normalized_cps()
+    #check_sizes()
+    plot_katrina_example()
