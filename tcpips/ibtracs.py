@@ -15,6 +15,7 @@ import ujson
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.colors as mcolors
 
 try:
     import cartopy
@@ -878,13 +879,13 @@ def plot_potential_size() -> None:
     # let's make a histogram of rmax and r0
     fig, axs = plt.subplots(1, 2, figsize=get_dim())
     axs[0].hist(
-        grid_avg_ds["rmax"].values / 1000,  # convert to km
+        grid_avg_ds["rmax"].values.ravel()[~np.isnan(grid_avg_ds["rmax"].values.ravel())] / 1000,  # convert to km
         bins=100,
         alpha=0.5,
         label="$r_{\mathrm{max}}$ [km]",
     )
     axs[1].hist(
-        grid_avg_ds["r0"].values / 1000,  # convert to km
+        grid_avg_ds["r0"].values.ravel()[~np.isnan(grid_avg_ds["r0"].values.ravel())] / 1000,  # convert to km
         bins=100,
         alpha=0.5,
         label="$r_a$ [km]",
@@ -900,7 +901,6 @@ def plot_potential_size() -> None:
     )
     plt.close()
     plt.clf()
-
 
 
 # Now that we have calculated potential size and potential intensity, we can compare them to the true size and intensity in the IBTrACS data.
@@ -1452,22 +1452,22 @@ def landings_only(ds: xr.Dataset) -> Optional[xr.Dataset]:
         return None
 
 
-def select_katrina_from_ds(ds: xr.Dataset) -> xr.Dataset:
+def select_tc_from_ds(ds: xr.Dataset, name: str =b"KATRINA", basin: str =b"NA", subbasin: str =b"GM") -> xr.Dataset:
     """
-    Select Katrina from the dataset.
+    Select a tropical cyclone from the dataset.
 
     Args:
         ds (xr.Dataset): Input dataset.
 
     Returns:
-        xr.Dataset: Dataset containing only Katrina's data.
+        xr.Dataset: Dataset containing only a particular tropical cyclone's data.
     """
     return filter_by_labels(
         ds,
         filter=[
-            ("name", [b"KATRINA"]),
-            ("basin", [b"NA"]),
-            ("subbasin", [b"GM"]),
+            ("name", [name]),
+            ("basin", [basin]),
+            ("subbasin", [subbasin]),
             ("nature", [b"TS"]),
             ("usa_record", [b"L"]),
         ],
@@ -1643,7 +1643,11 @@ def highlight_rapid_intensification(
         )
 
 
-def plot_katrina_example() -> None:
+def plot_katrina_example(
+    name=b"KATRINA",
+    landing=2,
+    bbox=(-92.5, -72.5, 22.5, 37.5)
+) -> None:
     """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
     # Load the IBTrACS dataset with potential intensity and size data
     ibtracs_ds = xr.open_dataset(
@@ -1660,8 +1664,8 @@ def plot_katrina_example() -> None:
     for var in ["name", "basin", "subbasin", "nature", "usa_record"]:
         cps_ds[var] = ibtracs_orig[var]
     # Select Katrina's data
-    katrina_ds = select_katrina_from_ds(ibtracs_ds)
-    katrina_cps_ds = select_katrina_from_ds(cps_ds)
+    tc_ds = select_tc_from_ds(ibtracs_ds)
+    tc_cps_ds = select_tc_from_ds(cps_ds)
 
     # Plotting
     plot_defaults()
@@ -1677,17 +1681,17 @@ def plot_katrina_example() -> None:
         gs[0, :], projection=ccrs.PlateCarree(central_longitude=-80)
     )
 
-    ax_map.set_extent([-92.5, -72.5, 22.5, 37.5], crs=ccrs.PlateCarree())
+    ax_map.set_extent(list(bbox), crs=ccrs.PlateCarree())
 
-    kat_impact = landings_only(katrina_ds).isel(date_time=2)
-    print(katrina_ds["time"].values)
+    kat_impact = landings_only(tc_ds).isel(date_time=2)
+    print(tc_ds["time"].values)
     print(kat_impact["time"])
     times = (
-        (katrina_ds["time"].values - kat_impact["time"].values) / 1e9 / 60 / 60
+        (tc_ds["time"].values - kat_impact["time"].values) / 1e9 / 60 / 60
     )  # nanoseconds to hours
     ax_map.plot(
-        katrina_ds["lon"].values.ravel(),
-        katrina_ds["lat"].values.ravel(),
+        tc_ds["lon"].values.ravel(),
+        tc_ds["lat"].values.ravel(),
         color="grey",
         linewidth=0.5,
         alpha=0.5,
@@ -1701,18 +1705,77 @@ def plot_katrina_example() -> None:
         s=20,
         transform=ccrs.PlateCarree(),
     )
+    norm = mcolors.TwoSlopeNorm(vcenter=0, vmin=np.nanmin(times), vmax=np.nanmax(times))
 
     img = ax_map.scatter(
-        katrina_ds["lon"],
-        katrina_ds["lat"],
+        tc_ds["lon"],
+        tc_ds["lat"],
         c=times,
         s=4,
         marker="x",
         cmap="cmo.balance",
+        norm=norm,
         # color="blue",
         transform=ccrs.PlateCarree(),
     )
     plt.colorbar(img, ax=ax_map, shrink=0.94, label="Time since impact [hours]")
+
+    # let's plot the times on the track
+    flat_times = times.ravel().astype(float)
+    flat_lons = tc_ds["lon"].values.ravel()
+    flat_lats = tc_ds["lat"].values.ravel()
+
+    # Remove NaN values from flat_times, flat_lons, and flat_lats
+    flat_lons = flat_lons[~np.isnan(flat_times)]
+    flat_lats = flat_lats[~np.isnan(flat_times)]
+    flat_times = flat_times[~np.isnan(flat_times)]
+
+    flat_lons = flat_lons[~np.isnan(flat_lats)]
+    flat_times = flat_times[~np.isnan(flat_lats)]
+    flat_lats = flat_lats[~np.isnan(flat_lats)]
+    # print("flat_times", flat_times)
+
+    pre_impact_indices = np.where(flat_times < 0)[0]
+
+    if len(pre_impact_indices) > 0:
+        num_annotations = min(5, len(pre_impact_indices))
+        # Select evenly spaced indices from the pre-impact track portion
+        # Ensure at least one point if num_annotations is 1 to avoid empty array in linspace
+        if num_annotations == 1:
+            annotation_indices_in_pre_impact = np.array([0], dtype=int) # Take the first pre-impact point
+        elif num_annotations > 1:
+            annotation_indices_in_pre_impact = np.linspace(
+                0, len(pre_impact_indices) - 1, num_annotations, dtype=int
+            )
+        else: # num_annotations is 0
+            annotation_indices_in_pre_impact = np.array([], dtype=int)
+
+        if annotation_indices_in_pre_impact.size > 0:
+            selected_track_indices = pre_impact_indices[annotation_indices_in_pre_impact]
+
+            for i in selected_track_indices:
+                lon_point = flat_lons[i]
+                lat_point = flat_lats[i]
+                time_val = flat_times[i]
+
+                if np.isnan(lon_point) or np.isnan(lat_point) or np.isnan(time_val):
+                    continue
+
+                ax_map.text(
+                    lon_point,
+                    lat_point,
+                    f"{time_val:.0f}h",
+                    color="black",
+                    fontsize=7, # Adjusted fontsize slightly
+                    transform=ccrs.PlateCarree(),
+                    ha='right', # Horizontal alignment (right of the point)
+                    va='bottom', # Vertical alignment (text bottom is at point's y, then offset)
+                    # xytext=(lon_point - 0.1, lat_point + 0.1), # Small offset
+                    # For more robust offsetting independent of data coordinates:
+                    # textcoords="offset points",
+                    # xytext=(-5, 5), # Offset in points (x, y)
+                    # bbox=dict(facecolor='white', alpha=0.6, pad=0.1, edgecolor='none') # Add background
+                )
     # let's add the coastline in
     ax_map.coastlines(resolution="50m", color="grey", linewidth=0.5)
     # add rivers
@@ -1743,13 +1806,13 @@ def plot_katrina_example() -> None:
     ax_line1 = fig.add_subplot(gs[1, 0])
     ax_line1.plot(
         times.ravel(),
-        katrina_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
+        tc_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
         label=r"$V_{\mathrm{max}}$ Obs. [m s$^{-1}$]",
         color="blue",
     )
     ax_line1.plot(
         times.ravel(),
-        katrina_ds["vmax"].values.ravel()
+        tc_ds["vmax"].values.ravel()
         * 0.8,  # already in m/s, but at gradient wind not 10m, so need to reduce by v_reduc
         label=r"$V_{\mathrm{p}}$@10m [m s$^{-1}$]",
         color="green",
@@ -1761,7 +1824,7 @@ def plot_katrina_example() -> None:
     highlight_rapid_intensification(
         ax_line1,
         times.ravel(),
-        katrina_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
+        tc_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
         ri_threshold_knots=30,
         ri_period_hours=24,
         color="red",
@@ -1773,7 +1836,7 @@ def plot_katrina_example() -> None:
     ax_line2 = fig.add_subplot(gs[2, 0])
     ax_line2.plot(
         times.ravel(),
-        katrina_ds["usa_rmw"].values.ravel()
+        tc_ds["usa_rmw"].values.ravel()
         * 1852
         / 1000,  # convert nautical miles to km
         label=r"$r_{\mathrm{max}}$ Obs. [km]",
@@ -1781,7 +1844,7 @@ def plot_katrina_example() -> None:
     )
     ax_line2.plot(
         times.ravel(),
-        katrina_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        tc_ds["rmax"].values.ravel() / 1000,  # convert m to km
         label=r"$r'_{\mathrm{max}}$ PS [km]"
         + "\n"
         + r"($V_{\mathrm{max}}=V_{\mathrm{p}}$)",
@@ -1789,7 +1852,7 @@ def plot_katrina_example() -> None:
     )
     ax_line2.plot(
         times.ravel(),
-        katrina_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        tc_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
         label=r"$r''_{\mathrm{max}}$ CPS [km]"
         + "\n"
         + r"($V_{\mathrm{max}}=V_{\mathrm{max}} \text{ Obs.}$)",
@@ -1838,21 +1901,21 @@ if __name__ == "__main__":
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
-    plot_unique_points()
+    # plot_unique_points()
     # era5_unique_points_raw()
-    plot_example_raw()
+    # plot_example_raw()
     # process_era5_raw()
-    plot_era5_processed()
+    # plot_era5_processed()
     # calculate_potential_intensity()
-    plot_potential_intensity()
-    #calculate_potential_size()
-    plot_potential_size()
-    #add_pi_ps_back_onto_tracks()
-    #create_normalized_variables()
-    plot_normalized_variables()
+    # plot_potential_intensity()
+    # calculate_potential_size()
+    # plot_potential_size()
+    # add_pi_ps_back_onto_tracks()
+    # create_normalized_variables()
+    # plot_normalized_variables()
     # ## calculate_cps(v_reduc=0.8, test=True)
-    #calculate_cps(v_reduc=0.8, test=False)
-    plot_cps()
-    plot_normalized_cps()
-    #check_sizes()
+    # #calculate_cps(v_reduc=0.8, test=False)
+    # plot_cps()
+    # plot_normalized_cps()
+    # check_sizes()
     plot_katrina_example()
