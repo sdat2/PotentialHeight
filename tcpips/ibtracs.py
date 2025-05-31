@@ -758,8 +758,12 @@ def plot_potential_intensity():
 
 
 @timeit
-def calculate_potential_size(chunks=20) -> None:
-    """Calculate the size of the cyclone at each timestep using the ERA5 data."""
+def calculate_potential_size(chunks: int = 20) -> None:
+    """Calculate the size of the cyclone at each timestep using the ERA5 data.
+
+    Args:
+        chunks (int): The number of chunks to divide the unique points into for checkpointing.
+    """
     proc_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
     )
@@ -781,17 +785,20 @@ def calculate_potential_size(chunks=20) -> None:
     # and then run the parallelized_ps function on each chunk
     # and save the results to a new netcdf file
     # this loop is in serial, and within each loop the task is parallelized
+
+    os.makedirs(os.path.join(IBTRACS_DATA_PATH, "tmp"), exist_ok=True)
     chunk_size = len(combined_ds.u) // chunks
+
     for i in tqdm(range(0, chunks), desc="Calculating potential size in chunks"):
         # get the start and end index of the chunk
-        file_name = os.path.join(IBTRACS_DATA_PATH, f"era5_unique_points_ps_{i}.nc")
+        file_name = os.path.join(IBTRACS_DATA_PATH, "tmp", f"era5_unique_points_ps_{i}.nc")
         if os.path.exists(file_name):
             print(f"File {file_name} already exists, skipping.")
             continue
         start = i * chunk_size
         end = (i + 1) * chunk_size
 
-        if i == chunks - 1:
+        if i == chunks - 1: # at end include all remaining data
             end = len(combined_ds.u)
         # get the chunk of data
         chunk_ds = combined_ds.isel(u=slice(start, end))
@@ -799,13 +806,13 @@ def calculate_potential_size(chunks=20) -> None:
         ps_chunk = parallelized_ps(chunk_ds, dryrun=False)
         # save the chunk to a netcdf file
         ps_chunk.to_netcdf(
-            os.path.join(IBTRACS_DATA_PATH, f"era5_unique_points_ps_{i}.nc"),
+            file_name,
             engine="h5netcdf",
         )
 
     # # load them all together and save them as one file
     ps_ds = xr.open_mfdataset(
-        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_*.nc"),
+        os.path.join(IBTRACS_DATA_PATH, "tmp", "era5_unique_points_ps_*.nc"),
         combine="by_coords",
         parallel=True,
     )
@@ -1179,10 +1186,9 @@ def calculate_cps(v_reduc: float = 0.8, test=False) -> None:
         variables_to_map=("t0", "sst", "msl", "rh"),
     )
 
-    ibtracs_ds = xr.open_dataset(
+    ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps_inputs.nc")
     )
-    ds = ibtracs_ds
 
     ds["pressure_assumption"] = "isothermal"
     ds["ck_cd"] = 0.9
@@ -1454,17 +1460,23 @@ def landings_only(ds: xr.Dataset) -> Optional[xr.Dataset]:
         return None
 
 
-def select_tc_from_ds(ds: xr.Dataset, name: str =b"KATRINA", basin: str =b"NA", subbasin: str =b"GM") -> xr.Dataset:
+def select_tc_from_ds(ds: xr.Dataset,
+                      name: str =b"KATRINA",
+                      basin: str = b"NA",
+                      subbasin: str = b"GM") -> Optional[xr.Dataset]:
     """
     Select a tropical cyclone from the dataset.
 
     Args:
         ds (xr.Dataset): Input dataset.
+        name (str, optional): Name of the tropical cyclone. Defaults to "KATRINA".
+        basin (str, optional): Basin of the tropical cyclone. Defaults to "NA".
+        subbasin (str, optional): Subbasin of the tropical cyclone. Defaults to "GM".
 
     Returns:
         xr.Dataset: Dataset containing only a particular tropical cyclone's data.
     """
-    return filter_by_labels(
+    out_ds =  filter_by_labels(
         ds,
         filter=[
             ("name", [name]),
@@ -1474,6 +1486,18 @@ def select_tc_from_ds(ds: xr.Dataset, name: str =b"KATRINA", basin: str =b"NA", 
             ("usa_record", [b"L"]),
         ],
     )
+    if len(out_ds.storm) == 0:
+        print(f"No tropical cyclone found with name {name} in basin {basin} and subbasin {subbasin}.")
+        return out_ds # will return None
+    elif len(out_ds.storm) == 1:
+        print(f"Found tropical cyclone {name} in basin {basin} and subbasin {subbasin}.")
+        return out_ds
+    else:
+        print(f"Multiple tropical cyclones found with name {name} in basin {basin} and subbasin {subbasin}. Found {len(out_ds.storm)} storms.")
+        print("selecting last storm, as assumed most important.")
+
+        return out_ds.isel(storm=-1)  # Select the last storm, assuming it's the most important one
+
 
 
 def add_saffir_simpson_boundaries(
@@ -1537,9 +1561,9 @@ def highlight_rapid_intensification(
     wind_speeds: ArrayLike,
     ri_threshold_knots: float = 30,
     ri_period_hours: float = 24,
-    color="red",
-    alpha=0.3,
-    zorder=0,
+    color: str = "red",
+    alpha: float = 0.3,
+    zorder: int = 0,
 ) -> None:
     """
     Highlights periods of rapid intensification (RI) on a Matplotlib Axes object.
@@ -1645,12 +1669,18 @@ def highlight_rapid_intensification(
         )
 
 
-def plot_katrina_example(
-    name=b"KATRINA",
-    landing=2,
-    bbox=(-92.5, -72.5, 22.5, 37.5)
+@timeit
+def plot_tc_example(
+    name: str = b"KATRINA",
+    bbox: Tuple[float, float, float, float] = (-92.5, -72.5, 22.5, 37.5)
 ) -> None:
-    """Plot an example of Katrina's track with the potential intensity and potential size, and corresponding potential size."""
+    """Plot an example of a TC's track with the potential intensity
+    and potential size, and corresponding potential size.
+
+    Args:
+        name (bytes, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
+        bbox (tuple, optional): Bounding box for the map. Defaults to (-92.5, -72.5, 22.5, 37.5).
+    """
     # Load the IBTrACS dataset with potential intensity and size data
     ibtracs_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
@@ -1665,9 +1695,12 @@ def plot_katrina_example(
 
     for var in ["name", "basin", "subbasin", "nature", "usa_record"]:
         cps_ds[var] = ibtracs_orig[var]
+
     # Select Katrina's data
-    tc_ds = select_tc_from_ds(ibtracs_ds)
-    tc_cps_ds = select_tc_from_ds(cps_ds)
+    tc_ds = select_tc_from_ds(ibtracs_ds, name=name)
+    print("tc_ds", tc_ds)
+    tc_cps_ds = select_tc_from_ds(cps_ds, name=name)
+    print("tc_cps_ds", tc_cps_ds)
 
     # Plotting
     plot_defaults()
@@ -1684,12 +1717,17 @@ def plot_katrina_example(
     )
 
     ax_map.set_extent(list(bbox), crs=ccrs.PlateCarree())
-
-    kat_impact = landings_only(tc_ds).isel(date_time=2)
-    print(tc_ds["time"].values)
-    print(kat_impact["time"])
+    landings = landings_only(tc_ds)
+    if landings is not None:
+        tc_impact = landings.isel(date_time=-1) # Get the last impact point
+    else:
+        # find last time that is not nan
+        non_nan_times = ~np.isnan(tc_ds["usa_wind"].values.ravel())
+        # last true value in non_nan_times
+        last_true_index = np.where(non_nan_times)[0][-1]
+        tc_impact = tc_ds.isel(date_time=last_true_index)
     times = (
-        (tc_ds["time"].values - kat_impact["time"].values) / 1e9 / 60 / 60
+        (tc_ds["time"].values - tc_impact["time"].values) / 1e9 / 60 / 60
     )  # nanoseconds to hours
     ax_map.plot(
         tc_ds["lon"].values.ravel(),
@@ -1700,14 +1738,20 @@ def plot_katrina_example(
         transform=ccrs.PlateCarree(),
     )
     ax_map.scatter(
-        kat_impact["lon"].values,
-        kat_impact["lat"].values,
+        tc_impact["lon"].values,
+        tc_impact["lat"].values,
         color="green",
         marker="+",
         s=20,
         transform=ccrs.PlateCarree(),
     )
-    norm = mcolors.TwoSlopeNorm(vcenter=0, vmin=np.nanmin(times), vmax=np.nanmax(times))
+    vmin = np.nanmin(times)
+    vmax = np.nanmax(times)
+    if vmin >= 0:
+        vmin = -1
+    if vmax <= 0:
+        vmax = 1
+    norm = mcolors.TwoSlopeNorm(vcenter=0, vmin=vmin, vmax=vmax)
 
     img = ax_map.scatter(
         tc_ds["lon"],
@@ -1717,7 +1761,6 @@ def plot_katrina_example(
         marker="x",
         cmap="cmo.balance",
         norm=norm,
-        # color="blue",
         transform=ccrs.PlateCarree(),
     )
     plt.colorbar(img, ax=ax_map, shrink=0.94, label="Time since impact [hours]")
@@ -1728,14 +1771,10 @@ def plot_katrina_example(
     flat_lats = tc_ds["lat"].values.ravel()
 
     # Remove NaN values from flat_times, flat_lons, and flat_lats
-    flat_lons = flat_lons[~np.isnan(flat_times)]
-    flat_lats = flat_lats[~np.isnan(flat_times)]
-    flat_times = flat_times[~np.isnan(flat_times)]
-
-    flat_lons = flat_lons[~np.isnan(flat_lats)]
-    flat_times = flat_times[~np.isnan(flat_lats)]
-    flat_lats = flat_lats[~np.isnan(flat_lats)]
-    # print("flat_times", flat_times)
+    valid_indices = ~np.isnan(flat_times) & ~np.isnan(flat_lons) & ~np.isnan(flat_lats)
+    flat_times = flat_times[valid_indices]
+    flat_lons = flat_lons[valid_indices]
+    flat_lats = flat_lats[valid_indices]
 
     pre_impact_indices = np.where(flat_times < 0)[0]
 
@@ -1772,11 +1811,6 @@ def plot_katrina_example(
                     transform=ccrs.PlateCarree(),
                     ha='right', # Horizontal alignment (right of the point)
                     va='bottom', # Vertical alignment (text bottom is at point's y, then offset)
-                    # xytext=(lon_point - 0.1, lat_point + 0.1), # Small offset
-                    # For more robust offsetting independent of data coordinates:
-                    # textcoords="offset points",
-                    # xytext=(-5, 5), # Offset in points (x, y)
-                    # bbox=dict(facecolor='white', alpha=0.6, pad=0.1, edgecolor='none') # Add background
                 )
     # let's add the coastline in
     ax_map.coastlines(resolution="50m", color="grey", linewidth=0.5)
@@ -1872,11 +1906,12 @@ def plot_katrina_example(
     plt.tight_layout()
 
     plt.savefig(
-        os.path.join(FIGURE_PATH, "katrina_track.pdf"), dpi=300, bbox_inches="tight"
+        os.path.join(FIGURE_PATH, f"{name.decode().lower()}_track.pdf"), dpi=300, bbox_inches="tight"
     )
 
     plt.clf()
     plt.close()
+    plt.clf()
 
 
 def check_sizes():
@@ -1899,7 +1934,7 @@ def check_sizes():
 
 
 if __name__ == "__main__":
-    # python -m tcpips.ibtracs
+    # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
@@ -1911,7 +1946,7 @@ if __name__ == "__main__":
     # calculate_potential_intensity()
     # plot_potential_intensity()
     # calculate_potential_size()
-    plot_potential_size()
+    # plot_potential_size()
     # add_pi_ps_back_onto_tracks()
     # create_normalized_variables()
     # plot_normalized_variables()
@@ -1920,4 +1955,15 @@ if __name__ == "__main__":
     # plot_cps()
     # plot_normalized_cps()
     # check_sizes()
-    plot_katrina_example()
+    # plot_tc_example()
+    plot_tc_example(
+         name=b"IDA",
+         bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
+    )  # Ida's landfall in Louisiana
+    plot_tc_example(
+        name=b"HELENE",
+        bbox=(-92.5, -72.5, 22.5, 37.5) # bbox=(-90, -80, 25, 35)
+    )
+    plot_tc_example(name=b"IAN", bbox=(-92.5, -72.5, 22.5, 37.5))  # Ian's landfall in Florida
+
+
