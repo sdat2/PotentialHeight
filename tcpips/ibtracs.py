@@ -1962,8 +1962,9 @@ if __name__ == "__main__":
     )  # Ida's landfall in Louisiana
     plot_tc_example(
         name=b"HELENE",
-        bbox=(-92.5, -72.5, 22.5, 37.5) # bbox=(-90, -80, 25, 35)
+        bbox=(-92.5+4.5, -72.5+20, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
     )
-    plot_tc_example(name=b"IAN", bbox=(-92.5, -72.5, 22.5, 37.5))  # Ian's landfall in Florida
+    plot_tc_example(name=b"IAN", bbox=(-92.5+7.5, -72.5+10, 22.5-10, 37.5-5) # bbox=(-90, -80, 25, 35)
+    )  # Ian's landfall in Florida
 
 
