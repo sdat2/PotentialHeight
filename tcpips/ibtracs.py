@@ -1495,9 +1495,18 @@ def select_tc_from_ds(ds: xr.Dataset,
     else:
         print(f"Multiple tropical cyclones found with name {name} in basin {basin} and subbasin {subbasin}. Found {len(out_ds.storm)} storms.")
         print("selecting last storm, as assumed most important.")
+        # start dates of the three storms
+        for i in range(len(out_ds.storm)):
+            print(f"Storm {i}: {out_ds.storm.values[i]} starts at {out_ds.isel(storm=i).time.values[0]}")
 
-        return out_ds.isel(storm=-1)  # Select the last storm, assuming it's the most important one
+        # for some reason they are not ordered by time, so to select the last storm we form list
+        start_list = [
+            out_ds.isel(storm=i).time.values[0] for i in range(len(out_ds.storm))
+        ]
+        # find argmax of start_list
+        max_index = np.argmax(start_list)
 
+        return out_ds.isel(storm=max_index)  # Select the storm with the latest start time
 
 
 def add_saffir_simpson_boundaries(
@@ -1672,7 +1681,8 @@ def highlight_rapid_intensification(
 @timeit
 def plot_tc_example(
     name: str = b"KATRINA",
-    bbox: Tuple[float, float, float, float] = (-92.5, -72.5, 22.5, 37.5)
+    bbox: Tuple[float, float, float, float] = (-92.5, -72.5, 22.5, 37.5),
+    landing_no: int = -1, # -1 means last landing
 ) -> None:
     """Plot an example of a TC's track with the potential intensity
     and potential size, and corresponding potential size.
@@ -1710,6 +1720,21 @@ def plot_tc_example(
         3, 2, figure=fig, height_ratios=[3, 1, 1], width_ratios=[100, 1]
     )
 
+    landings = landings_only(tc_ds)
+    if landings is not None:
+        tc_impact = landings.isel(date_time=landing_no)
+    else:
+        # find last time that is not nan
+        non_nan_times = ~np.isnan(tc_ds["usa_wind"].values.ravel())
+        # last true value in non_nan_times
+        last_true_index = np.where(non_nan_times)[0][-1]
+        tc_impact = tc_ds.isel(date_time=last_true_index)
+    print("time at start:", tc_ds["time"].values.ravel()[-1])
+    print("time of landfall:", tc_impact["time"].values)
+
+    times = (
+        (tc_ds["time"].values - tc_impact["time"].values) / 1e9 / 60 / 60
+    )  # nanoseconds to hours
     # --- Top Subplot: Geographic Map ---
     # The projection was in subplot_kw, now specified directly for this subplot
     ax_map = fig.add_subplot(
@@ -1717,18 +1742,7 @@ def plot_tc_example(
     )
 
     ax_map.set_extent(list(bbox), crs=ccrs.PlateCarree())
-    landings = landings_only(tc_ds)
-    if landings is not None:
-        tc_impact = landings.isel(date_time=-1) # Get the last impact point
-    else:
-        # find last time that is not nan
-        non_nan_times = ~np.isnan(tc_ds["usa_wind"].values.ravel())
-        # last true value in non_nan_times
-        last_true_index = np.where(non_nan_times)[0][-1]
-        tc_impact = tc_ds.isel(date_time=last_true_index)
-    times = (
-        (tc_ds["time"].values - tc_impact["time"].values) / 1e9 / 60 / 60
-    )  # nanoseconds to hours
+
     ax_map.plot(
         tc_ds["lon"].values.ravel(),
         tc_ds["lat"].values.ravel(),
@@ -1962,7 +1976,7 @@ if __name__ == "__main__":
     )  # Ida's landfall in Louisiana
     plot_tc_example(
         name=b"HELENE",
-        bbox=(-92.5+4.5, -72.5+20, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
+         bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
     )
     plot_tc_example(name=b"IAN", bbox=(-92.5+7.5, -72.5+10, 22.5-10, 37.5-5) # bbox=(-90, -80, 25, 35)
     )  # Ian's landfall in Florida
