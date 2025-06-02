@@ -1681,7 +1681,7 @@ def highlight_rapid_intensification(
 @timeit
 def plot_tc_example(
     name: str = b"KATRINA",
-    bbox: Tuple[float, float, float, float] = (-92.5, -72.5, 22.5, 37.5),
+    bbox: Optional[Tuple[float, float, float, float]] = (-92.5, -72.5, 22.5, 37.5),
     landing_no: int = -1, # -1 means last landing
 ) -> None:
     """Plot an example of a TC's track with the potential intensity
@@ -1689,7 +1689,8 @@ def plot_tc_example(
 
     Args:
         name (bytes, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
-        bbox (tuple, optional): Bounding box for the map. Defaults to (-92.5, -72.5, 22.5, 37.5).
+        bbox (Optional[Tuple[float, float, float, float]], optional): Bounding box for the map. Defaults to (-92.5, -72.5, 22.5, 37.5).
+        landing_no (int, optional): Index of the landing to plot. Defaults to -1 (last landing).
     """
     # Load the IBTrACS dataset with potential intensity and size data
     ibtracs_ds = xr.open_dataset(
@@ -1711,6 +1712,13 @@ def plot_tc_example(
     print("tc_ds", tc_ds)
     tc_cps_ds = select_tc_from_ds(cps_ds, name=name)
     print("tc_cps_ds", tc_cps_ds)
+
+    if bbox is None:
+        min_lon = np.nanmin(tc_ds["lon"].values)
+        max_lon = np.nanmax(tc_ds["lon"].values)
+        min_lat = np.nanmin(tc_ds["lat"].values)
+        max_lat = np.nanmax(tc_ds["lat"].values)
+        bbox = (min_lon, max_lon, min_lat, max_lat)
 
     # Plotting
     plot_defaults()
@@ -1793,7 +1801,7 @@ def plot_tc_example(
     pre_impact_indices = np.where(flat_times < 0)[0]
 
     if len(pre_impact_indices) > 0:
-        num_annotations = min(5, len(pre_impact_indices))
+        num_annotations = min(6, len(pre_impact_indices))
         # Select evenly spaced indices from the pre-impact track portion
         # Ensure at least one point if num_annotations is 1 to avoid empty array in linspace
         if num_annotations == 1:
@@ -1808,7 +1816,7 @@ def plot_tc_example(
         if annotation_indices_in_pre_impact.size > 0:
             selected_track_indices = pre_impact_indices[annotation_indices_in_pre_impact]
 
-            for i in selected_track_indices:
+            for j, i in enumerate(selected_track_indices):
                 lon_point = flat_lons[i]
                 lat_point = flat_lats[i]
                 time_val = flat_times[i]
@@ -1816,16 +1824,18 @@ def plot_tc_example(
                 if np.isnan(lon_point) or np.isnan(lat_point) or np.isnan(time_val):
                     continue
 
-                ax_map.text(
-                    lon_point,
-                    lat_point,
-                    f"{time_val:.0f}h",
-                    color="black",
-                    fontsize=7, # Adjusted fontsize slightly
-                    transform=ccrs.PlateCarree(),
-                    ha='right', # Horizontal alignment (right of the point)
-                    va='bottom', # Vertical alignment (text bottom is at point's y, then offset)
-                )
+                # we're getting rid of the first and last label
+                if j != annotation_indices_in_pre_impact.size - 1 and j != 0:
+                    ax_map.text(
+                        lon_point,
+                        lat_point,
+                        f"{time_val:.0f}h",
+                        color="black",
+                        fontsize=7, # Adjusted fontsize slightly
+                        transform=ccrs.PlateCarree(),
+                        ha='right', # Horizontal alignment (right of the point)
+                        va='bottom', # Vertical alignment (text bottom is at point's y, then offset)
+                    )
     # let's add the coastline in
     ax_map.coastlines(resolution="50m", color="grey", linewidth=0.5)
     # add rivers
@@ -1918,9 +1928,10 @@ def plot_tc_example(
 
     label_subplots([ax_line1, ax_line2], override="outside", start_from=1)
     plt.tight_layout()
-
+    track_dir = os.path.join(IBTRACS_DATA_PATH, "tracks")
+    os.makedirs(track_dir, exist_ok=True)
     plt.savefig(
-        os.path.join(FIGURE_PATH, f"{name.decode().lower()}_track.pdf"), dpi=300, bbox_inches="tight"
+        os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"), dpi=300, bbox_inches="tight"
     )
 
     plt.clf()
@@ -1971,14 +1982,27 @@ if __name__ == "__main__":
     # check_sizes()
     # plot_tc_example()
     plot_tc_example(
-         name=b"IDA",
-         bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
+        name=b"KATRINA",
+        bbox=(-92.5, -72.5, 22.5, 37.5)
+    )  # Katrina's landfall in Louisiana
+    plot_tc_example(
+        name=b"IDA",
+        bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
     )  # Ida's landfall in Louisiana
     plot_tc_example(
         name=b"HELENE",
-         bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
+        bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
     )
-    plot_tc_example(name=b"IAN", bbox=(-92.5+7.5, -72.5+10, 22.5-10, 37.5-5) # bbox=(-90, -80, 25, 35)
-    )  # Ian's landfall in Florida
+    plot_tc_example(name=b"IAN", bbox=(-92.5+7.5, -72.5+10, 22.5-10, 37.5-5))
+    plot_tc_example(name=b"HARVEY", bbox=(-92.5-7.5, -72.5 + 20, 22.5-10, 37.5+5))
+    plot_tc_example(
+        name=b"FIONA",
+        bbox=None,
+    )
+    #plot_tc_example(
+    #    name=b"SAOLA",
+    #    bbox=None,
+    #)
+
 
 
