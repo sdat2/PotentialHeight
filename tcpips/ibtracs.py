@@ -1481,13 +1481,14 @@ def select_tc_from_ds(ds: xr.Dataset,
         filter=[
             ("name", [name]),
             ("basin", [basin]),
-            ("subbasin", [subbasin]),
+            # ("subbasin", [subbasin]),
             ("nature", [b"TS"]),
-            ("usa_record", [b"L"]),
+            # ("usa_record", [b"L"]),
         ],
     )
     if len(out_ds.storm) == 0:
         print(f"No tropical cyclone found with name {name} in basin {basin} and subbasin {subbasin}.")
+        print()
         return out_ds # will return None
     elif len(out_ds.storm) == 1:
         print(f"Found tropical cyclone {name} in basin {basin} and subbasin {subbasin}.")
@@ -1681,6 +1682,8 @@ def highlight_rapid_intensification(
 @timeit
 def plot_tc_example(
     name: str = b"KATRINA",
+    basin: str = b"NA",
+    subbasin: str = b"GM",
     bbox: Optional[Tuple[float, float, float, float]] = (-92.5, -72.5, 22.5, 37.5),
     landing_no: int = -1, # -1 means last landing
 ) -> None:
@@ -1689,6 +1692,8 @@ def plot_tc_example(
 
     Args:
         name (bytes, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
+        basin (bytes, optional): Basin of the tropical cyclone to plot. Defaults to b"NA".
+        subbasin (bytes, optional): Subbasin of the tropical cyclone to plot. Defaults to b"GM".
         bbox (Optional[Tuple[float, float, float, float]], optional): Bounding box for the map. Defaults to (-92.5, -72.5, 22.5, 37.5).
         landing_no (int, optional): Index of the landing to plot. Defaults to -1 (last landing).
     """
@@ -1708,9 +1713,9 @@ def plot_tc_example(
         cps_ds[var] = ibtracs_orig[var]
 
     # Select Katrina's data
-    tc_ds = select_tc_from_ds(ibtracs_ds, name=name)
+    tc_ds = select_tc_from_ds(ibtracs_ds, name=name, basin=basin, subbasin=subbasin)
     print("tc_ds", tc_ds)
-    tc_cps_ds = select_tc_from_ds(cps_ds, name=name)
+    tc_cps_ds = select_tc_from_ds(cps_ds, name=name, basin=basin, subbasin=subbasin)
     print("tc_cps_ds", tc_cps_ds)
 
     if bbox is None:
@@ -1718,6 +1723,10 @@ def plot_tc_example(
         max_lon = np.nanmax(tc_ds["lon"].values)
         min_lat = np.nanmin(tc_ds["lat"].values)
         max_lat = np.nanmax(tc_ds["lat"].values)
+        min_lon = min_lon - 0.05 * (max_lon - min_lon)
+        max_lon = max_lon + 0.05 * (max_lon - min_lon) / 1.05
+        min_lat = min_lat - 0.05 * (max_lat - min_lat)
+        max_lat = max_lat + 0.05 * (max_lat - min_lat) / 1.05
         bbox = (min_lon, max_lon, min_lat, max_lat)
 
     # Plotting
@@ -1928,20 +1937,20 @@ def plot_tc_example(
 
     label_subplots([ax_line1, ax_line2], override="outside", start_from=1)
     plt.tight_layout()
-    track_dir = os.path.join(IBTRACS_DATA_PATH, "tracks")
+    track_dir = os.path.join(FIGURE_PATH, "tracks")
     os.makedirs(track_dir, exist_ok=True)
+    print(os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"))
     plt.savefig(
         os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"), dpi=300, bbox_inches="tight"
     )
 
     plt.clf()
     plt.close()
-    plt.clf()
 
 
 def check_sizes():
     """Loop through all of the IBTrACS datasets used as inputs and outputs and print their sizes."""
-    datasets = [
+    datasets: List[str] = [
         "IBTrACS.since1980.v04r01.nc",
         "IBTrACS.since1980.v04r01.unique.nc",
         "IBTrACS.since1980.v04r01.pi_ps.nc",
@@ -1999,10 +2008,9 @@ if __name__ == "__main__":
         name=b"FIONA",
         bbox=None,
     )
-    #plot_tc_example(
-    #    name=b"SAOLA",
-    #    bbox=None,
-    #)
-
-
-
+    plot_tc_example(
+        name=b"SAOLA",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=(108, 130, 15, 30),
+    )
