@@ -23,11 +23,12 @@ try:
     from cartopy.feature import NaturalEarthFeature
     import cartopy.feature as cfeature
     from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
-    CARTOPY_DIR = os.getenv('CARTOPY_DIR')
-    if CARTOPY_DIR is not None and CARTOPY_DIR != '':
+
+    CARTOPY_DIR = os.getenv("CARTOPY_DIR")
+    if CARTOPY_DIR is not None and CARTOPY_DIR != "":
         print(f"Using Cartopy with CARTOPY_DIR: {CARTOPY_DIR}")
-        cartopy.config['data_dir'] = CARTOPY_DIR
-        os.makedirs(CARTOPY_DIR, exist_ok=True) # Ensure the directory exists
+        cartopy.config["data_dir"] = CARTOPY_DIR
+        os.makedirs(CARTOPY_DIR, exist_ok=True)  # Ensure the directory exists
     else:
         print("CARTOPY_DIR not set. Using default Cartopy data directory.")
 except ImportError:
@@ -381,8 +382,7 @@ def calculate_grid_avg_over_ibtracs_points(
 
 
 def plot_var_on_map(
-    ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1,
-    **kwargs
+    ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1, **kwargs
 ) -> None:
     """Plot a variable on a map.
 
@@ -791,14 +791,16 @@ def calculate_potential_size(chunks: int = 20) -> None:
 
     for i in tqdm(range(0, chunks), desc="Calculating potential size in chunks"):
         # get the start and end index of the chunk
-        file_name = os.path.join(IBTRACS_DATA_PATH, "tmp", f"era5_unique_points_ps_{i}.nc")
+        file_name = os.path.join(
+            IBTRACS_DATA_PATH, "tmp", f"era5_unique_points_ps_{i}.nc"
+        )
         if os.path.exists(file_name):
             print(f"File {file_name} already exists, skipping.")
             continue
         start = i * chunk_size
         end = (i + 1) * chunk_size
 
-        if i == chunks - 1: # at end include all remaining data
+        if i == chunks - 1:  # at end include all remaining data
             end = len(combined_ds.u)
         # get the chunk of data
         chunk_ds = combined_ds.isel(u=slice(start, end))
@@ -828,9 +830,7 @@ def calculate_potential_size(chunks: int = 20) -> None:
 def plot_potential_size() -> None:
     """Plot the potential size data."""
 
-    ps_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc")
-        )
+    ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
 
     ps_ds = ps_ds.rename({"lat": "latitude", "lon": "longitude"})
 
@@ -888,13 +888,17 @@ def plot_potential_size() -> None:
     # let's make a histogram of rmax and r0
     fig, axs = plt.subplots(1, 2, figsize=get_dim())
     axs[0].hist(
-        grid_avg_ds["rmax"].values.ravel()[~np.isnan(grid_avg_ds["rmax"].values.ravel())] / 1000,  # convert to km
+        grid_avg_ds["rmax"].values.ravel()[
+            ~np.isnan(grid_avg_ds["rmax"].values.ravel())
+        ]
+        / 1000,  # convert to km
         bins=100,
         alpha=0.5,
         label=r"$r_{\mathrm{max}}$ [km]",
     )
     axs[1].hist(
-        grid_avg_ds["r0"].values.ravel()[~np.isnan(grid_avg_ds["r0"].values.ravel())] / 1000,  # convert to km
+        grid_avg_ds["r0"].values.ravel()[~np.isnan(grid_avg_ds["r0"].values.ravel())]
+        / 1000,  # convert to km
         bins=100,
         alpha=0.5,
         label=r"$r_a$ [km]",
@@ -1460,10 +1464,9 @@ def landings_only(ds: xr.Dataset) -> Optional[xr.Dataset]:
         return None
 
 
-def select_tc_from_ds(ds: xr.Dataset,
-                      name: str =b"KATRINA",
-                      basin: str = b"NA",
-                      subbasin: str = b"GM") -> Optional[xr.Dataset]:
+def select_tc_from_ds(
+    ds: xr.Dataset, name: str = b"KATRINA", basin: str = b"NA", subbasin: str = b"GM"
+) -> Optional[xr.Dataset]:
     """
     Select a tropical cyclone from the dataset.
 
@@ -1476,7 +1479,7 @@ def select_tc_from_ds(ds: xr.Dataset,
     Returns:
         xr.Dataset: Dataset containing only a particular tropical cyclone's data.
     """
-    out_ds =  filter_by_labels(
+    out_ds = filter_by_labels(
         ds,
         filter=[
             ("name", [name]),
@@ -1487,18 +1490,26 @@ def select_tc_from_ds(ds: xr.Dataset,
         ],
     )
     if len(out_ds.storm) == 0:
-        print(f"No tropical cyclone found with name {name} in basin {basin} and subbasin {subbasin}.")
+        print(
+            f"No tropical cyclone found with name {name} in basin {basin} and subbasin {subbasin}."
+        )
         print()
-        return out_ds # will return None
+        return out_ds  # will return None
     elif len(out_ds.storm) == 1:
-        print(f"Found tropical cyclone {name} in basin {basin} and subbasin {subbasin}.")
+        print(
+            f"Found tropical cyclone {name} in basin {basin} and subbasin {subbasin}."
+        )
         return out_ds
     else:
-        print(f"Multiple tropical cyclones found with name {name} in basin {basin} and subbasin {subbasin}. Found {len(out_ds.storm)} storms.")
+        print(
+            f"Multiple tropical cyclones found with name {name} in basin {basin} and subbasin {subbasin}. Found {len(out_ds.storm)} storms."
+        )
         print("selecting last storm, as assumed most important.")
         # start dates of the three storms
         for i in range(len(out_ds.storm)):
-            print(f"Storm {i}: {out_ds.storm.values[i]} starts at {out_ds.isel(storm=i).time.values[0]}")
+            print(
+                f"Storm {i}: {out_ds.storm.values[i]} starts at {out_ds.isel(storm=i).time.values[0]}"
+            )
 
         # for some reason they are not ordered by time, so to select the last storm we form list
         start_list = [
@@ -1507,7 +1518,9 @@ def select_tc_from_ds(ds: xr.Dataset,
         # find argmax of start_list
         max_index = np.argmax(start_list)
 
-        return out_ds.isel(storm=max_index)  # Select the storm with the latest start time
+        return out_ds.isel(
+            storm=max_index
+        )  # Select the storm with the latest start time
 
 
 def add_saffir_simpson_boundaries(
@@ -1685,7 +1698,7 @@ def plot_tc_example(
     basin: str = b"NA",
     subbasin: str = b"GM",
     bbox: Optional[Tuple[float, float, float, float]] = (-92.5, -72.5, 22.5, 37.5),
-    landing_no: int = -1, # -1 means last landing
+    landing_no: int = -1,  # -1 means last landing
 ) -> None:
     """Plot an example of a TC's track with the potential intensity
     and potential size, and corresponding potential size.
@@ -1719,14 +1732,15 @@ def plot_tc_example(
     print("tc_cps_ds", tc_cps_ds)
 
     if bbox is None:
+        perc = 0.1
         min_lon = np.nanmin(tc_ds["lon"].values)
         max_lon = np.nanmax(tc_ds["lon"].values)
         min_lat = np.nanmin(tc_ds["lat"].values)
         max_lat = np.nanmax(tc_ds["lat"].values)
-        min_lon = min_lon - 0.05 * (max_lon - min_lon)
-        max_lon = max_lon + 0.05 * (max_lon - min_lon) / 1.05
-        min_lat = min_lat - 0.05 * (max_lat - min_lat)
-        max_lat = max_lat + 0.05 * (max_lat - min_lat) / 1.05
+        min_lon = min_lon - perc * (max_lon - min_lon)
+        max_lon = max_lon + perc * (max_lon - min_lon) / (1 + perc)
+        min_lat = min_lat - perc * (max_lat - min_lat)
+        max_lat = max_lat + perc * (max_lat - min_lat) / (1 + perc)
         bbox = (min_lon, max_lon, min_lat, max_lat)
 
     # Plotting
@@ -1755,7 +1769,7 @@ def plot_tc_example(
     # --- Top Subplot: Geographic Map ---
     # The projection was in subplot_kw, now specified directly for this subplot
     ax_map = fig.add_subplot(
-        gs[0, :], projection=ccrs.PlateCarree(central_longitude=-80)
+        gs[0, :], projection=ccrs.PlateCarree(central_longitude=(bbox[0] + bbox[1]) / 2)
     )
 
     ax_map.set_extent(list(bbox), crs=ccrs.PlateCarree())
@@ -1814,16 +1828,20 @@ def plot_tc_example(
         # Select evenly spaced indices from the pre-impact track portion
         # Ensure at least one point if num_annotations is 1 to avoid empty array in linspace
         if num_annotations == 1:
-            annotation_indices_in_pre_impact = np.array([0], dtype=int) # Take the first pre-impact point
+            annotation_indices_in_pre_impact = np.array(
+                [0], dtype=int
+            )  # Take the first pre-impact point
         elif num_annotations > 1:
             annotation_indices_in_pre_impact = np.linspace(
                 0, len(pre_impact_indices) - 1, num_annotations, dtype=int
             )
-        else: # num_annotations is 0
+        else:  # num_annotations is 0
             annotation_indices_in_pre_impact = np.array([], dtype=int)
 
         if annotation_indices_in_pre_impact.size > 0:
-            selected_track_indices = pre_impact_indices[annotation_indices_in_pre_impact]
+            selected_track_indices = pre_impact_indices[
+                annotation_indices_in_pre_impact
+            ]
 
             for j, i in enumerate(selected_track_indices):
                 lon_point = flat_lons[i]
@@ -1840,10 +1858,10 @@ def plot_tc_example(
                         lat_point,
                         f"{time_val:.0f}h",
                         color="black",
-                        fontsize=7, # Adjusted fontsize slightly
+                        fontsize=7,  # Adjusted fontsize slightly
                         transform=ccrs.PlateCarree(),
-                        ha='right', # Horizontal alignment (right of the point)
-                        va='bottom', # Vertical alignment (text bottom is at point's y, then offset)
+                        ha="right",  # Horizontal alignment (right of the point)
+                        va="bottom",  # Vertical alignment (text bottom is at point's y, then offset)
                     )
     # let's add the coastline in
     ax_map.coastlines(resolution="50m", color="grey", linewidth=0.5)
@@ -1905,9 +1923,7 @@ def plot_tc_example(
     ax_line2 = fig.add_subplot(gs[2, 0])
     ax_line2.plot(
         times.ravel(),
-        tc_ds["usa_rmw"].values.ravel()
-        * 1852
-        / 1000,  # convert nautical miles to km
+        tc_ds["usa_rmw"].values.ravel() * 1852 / 1000,  # convert nautical miles to km
         label=r"$r_{\mathrm{max}}$ Obs. [km]",
         color="blue",
     )
@@ -1941,11 +1957,41 @@ def plot_tc_example(
     os.makedirs(track_dir, exist_ok=True)
     print(os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"))
     plt.savefig(
-        os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"), dpi=300, bbox_inches="tight"
+        os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"),
+        dpi=300,
+        bbox_inches="tight",
     )
 
     plt.clf()
     plt.close()
+
+
+def vary_v_cps(
+    v_reduc: float = 0.8,
+    name: str = b"KATRINA",
+    basin=b"NA",
+    subbasin=b"GM",
+    timestep: int = 20,
+):
+    """
+    I want to vary the velocity input to the potential size calculation from the
+    threshold for category 1 hurricane to the potential intensity, and plot the corresponding potential size in terms of rmax.
+    """
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    ibtracs_orig = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+    )
+    cps_inputs = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps_inputs.nc")
+    )
+    # add name, basin, subbasin, nature, and usa_record to the cps_inputs
+    for var in ["name", "basin", "subbasin", "nature", "usa_record"]:
+        cps_inputs[var] = ibtracs_orig[var]
+        ibtracs_ds[var] = ibtracs_orig[var]
+    # Select Katrina's data
+    tc_ds = select_tc_from_ds(ibtracs_ds, name=name, basin=basin, subbasin=subbasin)
 
 
 def check_sizes():
@@ -1990,27 +2036,95 @@ if __name__ == "__main__":
     # plot_normalized_cps()
     # check_sizes()
     # plot_tc_example()
+    # plot_tc_example(
+    #     name=b"KATRINA", bbox=(-92.5, -72.5, 22.5, 37.5)
+    # )  # Katrina's landfall in Louisiana
+    # plot_tc_example(
+    #     name=b"IDA", bbox=(-92.5 - 5, -72.5, 22.5 - 5, 37.5)  # bbox=(-90, -80, 25, 35)
+    # )  # Ida's landfall in Louisiana
+    # plot_tc_example(
+    #     name=b"HELENE",
+    #     bbox=(-92.5 - 5, -72.5, 22.5 - 5, 37.5),  # bbox=(-90, -80, 25, 35)
+    # )
+    # plot_tc_example(name=b"IAN", bbox=(-92.5 + 7.5, -72.5 + 10, 22.5 - 10, 37.5 - 5))
+    # plot_tc_example(name=b"HARVEY", bbox=(-92.5 - 7.5, -72.5 + 20, 22.5 - 10, 37.5 + 5))
+    # plot_tc_example(
+    #     name=b"FIONA",
+    #     bbox=None,
+    # )
+    # plot_tc_example(
+    #     name=b"SAOLA",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     bbox=(108, 130, 15, 30),
+    # )
     plot_tc_example(
-        name=b"KATRINA",
-        bbox=(-92.5, -72.5, 22.5, 37.5)
-    )  # Katrina's landfall in Louisiana
-    plot_tc_example(
-        name=b"IDA",
-        bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
-    )  # Ida's landfall in Louisiana
-    plot_tc_example(
-        name=b"HELENE",
-        bbox=(-92.5-5, -72.5, 22.5-5, 37.5) # bbox=(-90, -80, 25, 35)
+        name=b"MANGKHUT",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        # bbox=None,
+        # bbox=None,
+        bbox=(100, 170, 10, 30),
     )
-    plot_tc_example(name=b"IAN", bbox=(-92.5+7.5, -72.5+10, 22.5-10, 37.5-5))
-    plot_tc_example(name=b"HARVEY", bbox=(-92.5-7.5, -72.5 + 20, 22.5-10, 37.5+5))
     plot_tc_example(
-        name=b"FIONA",
+        name=b"HATO",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        # bbox=None,
+        bbox=(90, 135, 10, 30),
+    )
+    plot_tc_example(
+        name=b"VICENTE",
+        basin=b"WP",
+        subbasin=b"WPAC",
         bbox=None,
     )
     plot_tc_example(
-        name=b"SAOLA",
+        name=b"YORK",
         basin=b"WP",
         subbasin=b"WPAC",
-        bbox=(108, 130, 15, 30),
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"ELLEN",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+
+    plot_tc_example(
+        name=b"BEBINCA",  # Bebinca
+        basin=b"WP",
+        subbasin=b"WPAC",
+        # bbox=(100, 170, 10, 30),
+        bbox=None,
+    )
+
+    plot_tc_example(
+        name=b"JEBI",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"MERANTI",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    # plot_tc_example(
+    #     name=b"FREDDY",
+    #     basin=b"SP",
+    #     bbox=None,
+    # )
+
+    print(
+        list(
+            filter_by_labels(
+                xr.open_dataset(
+                    os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+                ),
+                filter=[("basin", [b"WP"]), ("nature", [b"TS"])],
+            ).name.values
+        )
     )
