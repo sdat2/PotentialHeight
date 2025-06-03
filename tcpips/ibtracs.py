@@ -10,6 +10,7 @@ from typing import Optional, Tuple, Union, List
 import os
 import numpy as np
 from numpy.typing import ArrayLike
+import scipy
 import xarray as xr
 import ujson
 import yaml
@@ -2043,6 +2044,82 @@ def vary_v_cps(
         linewidth=0.8,
         alpha=0.7,
     )  # convert knots to m/s
+
+    plt.plot(
+        tc_pi_ps_ds.vmax.values * v_reduc,
+        tc_pi_ps_ds.rmax.values / 1000,  # convert m to km
+        marker="o",
+        color="green",
+        label=r"$r'_{\mathrm{max}}$ PS [km]",
+    )
+    plt.plot(
+        tc_inputs_ds.usa_wind.values * 0.514444,
+        tc_inputs_ds.usa_rmw.values * 1852 / 1000,  # convert nautical miles to km
+        marker="+",
+        color="blue",
+        label=r"$V_{\mathrm{max}}, $r_{\mathrm{max}}$ Obs. [km]",
+    )
+    plt.plot(
+        tc_inputs_ds.usa_wind.values * 0.514444,
+        scipy.interpolate.interp1d(
+            ps_ds.vmax.values * v_reduc,
+            ps_ds.rmax.values / 1000,  # convert m to km
+        )(
+            tc_inputs_ds.usa_wind.values * 0.514444
+        ),  # convert knots to m/s
+        marker="o",
+        color="blue",
+        label=r"$r''_{\mathrm{max}}$ CPS [km]",
+    )
+    plt.plot(
+        ps_ds.vmax.values[0] * v_reduc,
+        ps_ds.rmax.values[0] / 1000,  # convert m to km
+        marker="o",
+        color="orange",
+        label=r"$r'''_{\mathrm{max}}$ PS @cat1 [km]",
+    )
+    # I want to grey out the area above the v curve.
+    plt.fill_between(
+        vs * v_reduc,
+        ps_ds["rmax"].values / 1000,  # upper bound
+        np.nanmax(ps_ds["rmax"].values) / 1000,  # shade until here
+        color="gray",
+        alpha=0.3,
+        hatch="///",
+        label="Impossible Area",
+    )
+    plt.ylim(
+        max(
+            [
+                min(
+                    [
+                        np.nanmin(ps_ds["rmax"].values / 1000),
+                        tc_inputs_ds.usa_rmw.values * 1852 / 1000 - 50,
+                    ],
+                ),
+                0,
+            ]
+        ),
+        np.nanmax(ps_ds["rmax"].values / 1000),
+    )
+    plt.xlim(np.nanmin(vs * v_reduc), np.nanmax(vs * v_reduc))
+    # xticks at 33 m/s, V_max Obs, and V_p
+    plt.xticks(
+        [
+            33,
+            tc_inputs_ds.usa_wind.values * 0.514444,  # convert knots to m/s
+            tc_pi_ps_ds.vmax.values * v_reduc,
+        ],
+        labels=[
+            r"$V_{\mathrm{max}} \mathrm{cat1}$" + f"={33:.1f}" + r" m s$^{-1}$",
+            r"$V_{\mathrm{max}}$ Obs."
+            + f"={tc_inputs_ds.usa_wind.values * 0.514444:.1f}"
+            + r" m s$^{-1}$",
+            r"$V_{\mathrm{p}}$ @10m"
+            + f"={tc_pi_ps_ds.vmax.values * v_reduc:.1f}"
+            + r" m s$^{-1}$",
+        ],
+    )
 
     plt.xlabel(r"$V_{\mathrm{max}}$ @ 10m [m s$^{-1}$]")
     plt.ylabel(r"$r_{\mathrm{max}} \left(V_{\mathrm{max}}\right)$ [km]")
