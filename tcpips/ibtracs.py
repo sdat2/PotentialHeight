@@ -2153,16 +2153,20 @@ def save_basin_names():
     """
     Save the tropical cyclones in each basin to a file.
     """
+    # NI - North Indian
+    # SI - South Indian
+    # WP - Western Pacific
+    # SP - Southern Pacific
+    # EP - Eastern Pacific
+    # NA - North Atlantic
     basin_names = [
         b"NA",  # North Atlantic
         b"EP",  # Eastern Pacific
         b"WP",  # Western Pacific
         b"SP",  # South Pacific
-        b"IO",  # Indian Ocean
+        b"SI",  # Indian Ocean
+        b"NI",  # North Indian
         b"SA",  # South Atlantic
-        b"AU",  # Australian region
-        b"BO",  # Bay of Bengal
-        b"AR",  # Arabian Sea
     ]
     basin_names_d = {}
     for i, basin in enumerate(basin_names):
@@ -2190,6 +2194,74 @@ def save_basin_names():
 
     with open(os.path.join(IBTRACS_DATA_PATH, "basin_names.yaml"), "w") as f:
         yaml.dump(basin_names_d, f, default_flow_style=False, allow_unicode=True)
+
+
+def plot_normalized_triple(lower_wind: float = 33.0):
+    """
+    Plot the normalized variables from the IBTrACS dataset:
+
+    Args:
+        lower_wind (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
+    """
+
+    # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
+    plot_defaults()
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+    )
+    pi_ps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    cps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
+    )
+    # only count where vp > 33
+    cps_ds = cps_ds.where(pi_ps_ds.vmax > lower_wind, drop=False)
+    ibtracs_ds = ibtracs_ds.where(pi_ps_ds.vmax > lower_wind, drop=False)
+    pi_ps_ds = pi_ps_ds.where(pi_ps_ds.vmax > lower_wind, drop=False)
+    pi_ps_ds["normalized_intensity"] = (
+        ("storm", "date_time"),
+        ibtracs_ds["usa_wind"].values * 0.514444 / pi_ps_ds.vmax.values / 0.8,
+    )  # normalized intensity
+    pi_ps_ds["normalized_size"] = (
+        ("storm", "date_time"),
+        ibtracs_ds["usa_rmw"].values * 1852 / pi_ps_ds.rmax.values,
+    )
+    cps_ds["normalized_size"] = (
+        ("storm", "date_time"),
+        ibtracs_ds["usa_rmw"].values * 1852 / cps_ds.rmax.values,
+    )
+
+    def perc_gt_1(x: np.ndarray) -> float:
+        """Calculate the percentage of values greater than 1."""
+        x = x.ravel()  # Flatten the array to 1D
+        x = x[~np.isnan(x)]  # Remove NaN values
+        return np.sum(x > 1) / len(x) * 100
+
+    fig, axs = plt.subplots(1, 3, figsize=get_dim(), sharey=True, sharex=True)
+    axs[0].hist(pi_ps_ds["normalized_intensity"].values.ravel(), bins=100)
+    axs[0].set_xlabel(r"$V_{\mathrm{max}} / V_{\mathrm{p}}$")
+    axs[0].set_ylabel("Count")
+    axs[0].set_title(
+        f"{perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
+    )
+    axs[1].hist(pi_ps_ds["normalized_size"].values.ravel(), bins=400)
+    axs[1].set_xlabel(r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$")
+    axs[1].set_title(
+        f"{perc_gt_1(pi_ps_ds['normalized_size'].values):.1f} % exceedance"
+    )
+    axs[2].hist(cps_ds["normalized_size"].values.ravel(), bins=600)
+    axs[2].set_title(f"{perc_gt_1(cps_ds['normalized_size'].values):.1f} % exceedance")
+    axs[2].set_xlabel(r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$")
+    label_subplots(axs)
+    plt.xlim(0, 3)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_triple.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
@@ -2293,8 +2365,9 @@ if __name__ == "__main__":
     # )
     # plot_tc_example(
     #     name=b"FREDDY",
-    #     basin=b"SP",
+    #     basin=b"SI",
     #     bbox=None,
     # )
-    save_basin_names()
-    vary_v_cps()
+    # save_basin_names()
+    # vary_v_cps()
+    plot_normalized_triple(lower_wind=33.0)
