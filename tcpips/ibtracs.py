@@ -2263,6 +2263,51 @@ def plot_normalized_triple(lower_wind: float = 33.0):
     plt.clf()
     plt.close()
 
+    # let's get the highest normalized intenisity and size for each storm
+    max_normalized_intensity = pi_ps_ds["normalized_intensity"].max(dim="date_time")
+    max_normalized_ps = pi_ps_ds["normalized_size"].max(dim="date_time")
+    max_normalized_cps = cps_ds["normalized_size"].max(dim="date_time")
+    # let's plot the CDFs for these arrays
+    fig, axs = plt.subplots(1, 3, figsize=get_dim(), sharey=True, sharex=True)
+
+    def length_of_array(x: np.ndarray) -> int:
+        """Return the length of the array, ignoring NaNs."""
+        return np.sum(~np.isnan(x.ravel()))
+
+    def processed_array(x: np.ndarray) -> np.ndarray:
+        """Return the array with NaNs removed."""
+        return x[~np.isnan(x.ravel())]
+
+    axs[0].plot(
+        np.sort(processed_array(max_normalized_intensity.values)),
+        np.arange(1, length_of_array(max_normalized_intensity.values) + 1)
+        / length_of_array(max_normalized_intensity.values),
+    )
+    axs[0].set_xlabel(r"$V_{\mathrm{max}} / V_{\mathrm{p}}$")
+    axs[0].set_ylabel("CDF")
+
+    axs[1].plot(
+        np.sort(processed_array(max_normalized_ps.values)),
+        np.arange(1, length_of_array(max_normalized_ps.values) + 1)
+        / length_of_array(max_normalized_ps.values),
+    )
+    axs[1].set_xlabel(r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$")
+    axs[2].plot(
+        np.sort(processed_array(max_normalized_cps.values)),
+        np.arange(1, length_of_array(max_normalized_cps.values) + 1)
+        / length_of_array(max_normalized_cps.values),
+    )
+    axs[2].set_xlabel(r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$")
+    label_subplots(axs)
+    plt.xlim(0, 3)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_triple_cdf.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
 
 if __name__ == "__main__":
     # python -m tcpips.ibtracs &> helene_debug.txt
