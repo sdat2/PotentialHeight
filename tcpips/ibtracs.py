@@ -12,6 +12,7 @@ import numpy as np
 from numpy.typing import ArrayLike
 import xarray as xr
 import ujson
+import yaml
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -1971,11 +1972,18 @@ def vary_v_cps(
     name: str = b"KATRINA",
     basin=b"NA",
     subbasin=b"GM",
-    timestep: int = 20,
+    timestep: int = 30,
 ):
     """
     I want to vary the velocity input to the potential size calculation from the
     threshold for category 1 hurricane to the potential intensity, and plot the corresponding potential size in terms of rmax.
+
+    Args:
+        v_reduc (float, optional): Reduction factor for the velocity. Defaults to 0.8.
+        name (str, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
+        basin (str, optional): Basin of the tropical cyclone to plot. Defaults to b"NA".
+        subbasin (str, optional): Subbasin of the tropical cyclone to plot. Defaults to b"GM".
+        timestep (int, optional): Timestep to select for the potential intensity and size calculation. Defaults to 20.
     """
     ibtracs_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
@@ -1991,7 +1999,58 @@ def vary_v_cps(
         cps_inputs[var] = ibtracs_orig[var]
         ibtracs_ds[var] = ibtracs_orig[var]
     # Select Katrina's data
-    tc_ds = select_tc_from_ds(ibtracs_ds, name=name, basin=basin, subbasin=subbasin)
+    tc_pi_ps_ds = select_tc_from_ds(
+        ibtracs_ds, name=name, basin=basin, subbasin=subbasin
+    ).isel(date_time=timestep)
+    print("tc_pi_ps_ds", tc_pi_ps_ds)
+    tc_inputs_ds = select_tc_from_ds(
+        cps_inputs, name=name, basin=basin, subbasin=subbasin
+    ).isel(date_time=timestep)
+    print("tc_inputs_ds", tc_inputs_ds)
+    # category 1 to potential intensity
+    vs = np.linspace(33 / v_reduc, tc_pi_ps_ds.vmax.values, num=20)
+    tc_inputs_ds["vmax"] = ("v", vs)
+
+    trimmed_ds = tc_inputs_ds[["vmax", "msl", "rh", "sst", "t0"]]
+
+    # add in default param values
+
+    print("trimmed_ds", trimmed_ds)
+
+    plot_defaults()
+    ps_ds = parallelized_ps(
+        trimmed_ds,
+    )
+    plt.plot(
+        vs * v_reduc,
+        ps_ds["rmax"].values / 1000,  # convert m to km
+        label=f"v_reduc={v_reduc} (CPS)",
+        color="orange",
+    )
+    # plot vertical dashed lines as 33 m/s, usa_wind, and  v_p
+    plt.axvline(33, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
+    plt.axvline(
+        tc_pi_ps_ds.vmax.values * v_reduc,
+        color="green",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.7,
+    )
+    plt.axvline(
+        tc_inputs_ds.usa_wind.values * 0.514444,
+        linestyle="--",
+        color="blue",
+        linewidth=0.8,
+        alpha=0.7,
+    )  # convert knots to m/s
+
+    plt.xlabel(r"$V_{\mathrm{max}}$ @ 10m [m s$^{-1}$]")
+    plt.ylabel(r"$r_{\mathrm{max}} \left(V_{\mathrm{max}}\right)$ [km]")
+    plt.savefig(
+        os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
 
 
 def check_sizes():
@@ -2011,6 +2070,49 @@ def check_sizes():
     for ds in datasets:
         if os.path.exists(os.path.join(IBTRACS_DATA_PATH, ds)):
             print(f"{ds}: {xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, ds)).sizes}")
+
+
+def save_basin_names():
+    """
+    Save the tropical cyclones in each basin to a file.
+    """
+    basin_names = [
+        b"NA",  # North Atlantic
+        b"EP",  # Eastern Pacific
+        b"WP",  # Western Pacific
+        b"SP",  # South Pacific
+        b"IO",  # Indian Ocean
+        b"SA",  # South Atlantic
+        b"AU",  # Australian region
+        b"BO",  # Bay of Bengal
+        b"AR",  # Arabian Sea
+    ]
+    basin_names_d = {}
+    for i, basin in enumerate(basin_names):
+        tc_ds = filter_by_labels(
+            xr.open_dataset(
+                os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+            ),
+            filter=[("basin", [basin]), ("nature", [b"TS"])],
+        )
+        names = [x.decode() for x in tc_ds.name.values]
+        start_dates = (
+            tc_ds.time.values[:, 0].astype("datetime64[ns]").astype("str").tolist()
+        )
+        max_winds = (np.nanmax(tc_ds["wmo_wind"].values, axis=1) * 0.514444).tolist()
+        # convert knots to m/s
+        basin_names_d[basin.decode()] = [
+            {name: {"start_date": start_date, "max_wind": max_wind}}
+            for name, start_date, max_wind in zip(names, start_dates, max_winds)
+        ]
+
+    # Save the basin names to a file
+    if not os.path.exists(IBTRACS_DATA_PATH):
+        os.makedirs(IBTRACS_DATA_PATH, exist_ok=True)
+    # Write the basin names to a yaml file
+
+    with open(os.path.join(IBTRACS_DATA_PATH, "basin_names.yaml"), "w") as f:
+        yaml.dump(basin_names_d, f, default_flow_style=False, allow_unicode=True)
 
 
 if __name__ == "__main__":
@@ -2058,73 +2160,64 @@ if __name__ == "__main__":
     #     subbasin=b"WPAC",
     #     bbox=(108, 130, 15, 30),
     # )
-    plot_tc_example(
-        name=b"MANGKHUT",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        # bbox=None,
-        # bbox=None,
-        bbox=(100, 170, 10, 30),
-    )
-    plot_tc_example(
-        name=b"HATO",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        # bbox=None,
-        bbox=(90, 135, 10, 30),
-    )
-    plot_tc_example(
-        name=b"VICENTE",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        bbox=None,
-    )
-    plot_tc_example(
-        name=b"YORK",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        bbox=None,
-    )
-    plot_tc_example(
-        name=b"ELLEN",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        bbox=None,
-    )
+    # plot_tc_example(
+    #     name=b"MANGKHUT",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     # bbox=None,
+    #     # bbox=None,
+    #     bbox=(100, 170, 10, 30),
+    # )
+    # plot_tc_example(
+    #     name=b"HATO",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     # bbox=None,
+    #     bbox=(90, 135, 10, 30),
+    # )
+    # plot_tc_example(
+    #     name=b"VICENTE",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     bbox=None,
+    # )
+    # plot_tc_example(
+    #     name=b"YORK",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     bbox=None,
+    # )
+    # plot_tc_example(
+    #     name=b"ELLEN",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     bbox=None,
+    # )
 
-    plot_tc_example(
-        name=b"BEBINCA",  # Bebinca
-        basin=b"WP",
-        subbasin=b"WPAC",
-        # bbox=(100, 170, 10, 30),
-        bbox=None,
-    )
+    # plot_tc_example(
+    #     name=b"BEBINCA",  # Bebinca
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     # bbox=(100, 170, 10, 30),
+    #     bbox=None,
+    # )
 
-    plot_tc_example(
-        name=b"JEBI",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        bbox=None,
-    )
-    plot_tc_example(
-        name=b"MERANTI",
-        basin=b"WP",
-        subbasin=b"WPAC",
-        bbox=None,
-    )
+    # plot_tc_example(
+    #     name=b"JEBI",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     bbox=None,
+    # )
+    # plot_tc_example(
+    #     name=b"MERANTI",
+    #     basin=b"WP",
+    #     subbasin=b"WPAC",
+    #     bbox=None,
+    # )
     # plot_tc_example(
     #     name=b"FREDDY",
     #     basin=b"SP",
     #     bbox=None,
     # )
-
-    print(
-        list(
-            filter_by_labels(
-                xr.open_dataset(
-                    os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
-                ),
-                filter=[("basin", [b"WP"]), ("nature", [b"TS"])],
-            ).name.values
-        )
-    )
+    save_basin_names()
+    vary_v_cps()
