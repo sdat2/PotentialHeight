@@ -11,6 +11,7 @@ import os
 import numpy as np
 from numpy.typing import ArrayLike
 import scipy
+import scipy.interpolate
 import xarray as xr
 import ujson
 import yaml
@@ -2283,7 +2284,9 @@ def plot_normalized_triple(lower_wind: float = 33.0):
         np.arange(1, length_of_array(max_normalized_intensity.values) + 1)
         / length_of_array(max_normalized_intensity.values),
     )
-    axs[0].set_xlabel(r"$V_{\mathrm{max}} / V_{\mathrm{p}}$")
+    axs[0].set_xlabel(
+        r"$\max_{\mathrm{storm}}\left(V_{\mathrm{max}} / V_{\mathrm{p}}\right)$"
+    )
     axs[0].set_ylabel("CDF")
 
     axs[1].plot(
@@ -2291,15 +2294,43 @@ def plot_normalized_triple(lower_wind: float = 33.0):
         np.arange(1, length_of_array(max_normalized_ps.values) + 1)
         / length_of_array(max_normalized_ps.values),
     )
-    axs[1].set_xlabel(r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$")
+    axs[1].set_xlabel(
+        r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r'_{\mathrm{max}}\right)$"
+    )
     axs[2].plot(
         np.sort(processed_array(max_normalized_cps.values)),
         np.arange(1, length_of_array(max_normalized_cps.values) + 1)
         / length_of_array(max_normalized_cps.values),
     )
-    axs[2].set_xlabel(r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$")
+    axs[2].set_xlabel(
+        r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r''_{\mathrm{max}}\right)$"
+    )
     label_subplots(axs)
     plt.xlim(0, 3)
+
+    def calcuate_survival_function(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Calculate the survival function."""
+        x = processed_array(x)
+        sorted_x = np.sort(x)
+        survival_function = 1 - np.arange(1, len(sorted_x) + 1) / len(sorted_x)
+        return sorted_x, survival_function
+
+    def find_survival_value_at_norm(x: np.ndarray, threshold: float = 1.0) -> float:
+        """Find the value at which the survival function is equal to 1."""
+        sorted_x, survival_function = calcuate_survival_function(x)
+        return scipy.interpolate.interp1d(
+            sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
+        )(threshold)
+
+    axs[0].set_title(
+        f"{find_survival_value_at_norm(max_normalized_intensity.values)*100:.1f} % exceedance"
+    )
+    axs[1].set_title(
+        f"{find_survival_value_at_norm(max_normalized_ps.values)*100:.1f} % exceedance"
+    )
+    axs[2].set_title(
+        f"{find_survival_value_at_norm(max_normalized_cps.values)*100:.1f} % exceedance"
+    )
     plt.savefig(
         os.path.join(FIGURE_PATH, "normalized_triple_cdf.pdf"),
         dpi=300,
