@@ -862,12 +862,12 @@ def calculate_potential_size_cat1(vmin=33, v_reduc=0.8) -> None:
 
     ps_ds = parallelized_ps(
         combined_ds,
-        dryrun=True,
+        dryrun=False,
     )
-    # ps_ds.to_netcdf(
-    #     os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_cat1.nc"),
-    #     engine="h5netcdf",
-    # )
+    ps_ds.to_netcdf(
+         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_cat1.nc"),
+         engine="h5netcdf",
+    )
 
 
 @timeit
