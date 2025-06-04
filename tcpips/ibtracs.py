@@ -829,6 +829,47 @@ def calculate_potential_size(chunks: int = 20) -> None:
     print("Potential size calculated and saved.")
 
 
+def calculate_potential_size_cat1(vmin=33, v_reduc=0.8) -> None:
+    """Calculate potential size, assuming vmax@10m is 33 m/s, the minimum for a category 1 cyclone. Only calculate the potential size where the potential intensity is above this threshold.
+
+    Args:
+        vmin (float): The minimum potential intensity to consider a cyclone as category 1. Defaults to 33 m/s.
+        v_reduc (float): The reduction factor for the potential size. Defaults to 0.8.
+    """
+    pi_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_pi.nc"))
+    proc_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
+    )
+    combined_ds = xr.merge([pi_ds, proc_ds])
+    combined_ds["pressure_assumption"] = "isothermal"
+    combined_ds["ck_cd"] = 0.9
+    combined_ds["w_cool"] = 0.002
+    combined_ds["Cdvary"] = 0
+    combined_ds["cd_vary"] = 0
+    combined_ds["cd"] = 0.0015
+    del combined_ds["t"]
+    del combined_ds["q"]
+    del combined_ds["pressure_level"]
+    combined_ds = combined_ds.rename({"latitude": "lat", "longitude": "lon"})
+    # if vmax < vmin/v_reduc then set to np.nan
+    # if vmax > vmin/v_reduc, set to vmin/v_reduc
+    combined_ds["vmax"] = combined_ds["vmax"].where(
+        combined_ds["vmax"] >= vmin / v_reduc, np.nan
+    )  # set to nan if below vmin
+    combined_ds["vmax"] = combined_ds["vmax"].where(
+        combined_ds["vmax"] < vmin / v_reduc, vmin / v_reduc
+    )  # set to vmin/v_reduc if above vmin
+
+    ps_ds = parallelized_ps(
+        combined_ds,
+        dryrun=True,
+    )
+    # ps_ds.to_netcdf(
+    #     os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_cat1.nc"),
+    #     engine="h5netcdf",
+    # )
+
+
 @timeit
 def plot_potential_size() -> None:
     """Plot the potential size data."""
@@ -2348,7 +2389,7 @@ if __name__ == "__main__":
     # plot_unique_points()
     # era5_unique_points_raw()
     # plot_example_raw()
-    # process_era5_raw()
+    process_era5_raw()
     # plot_era5_processed()
     # calculate_potential_intensity()
     # plot_potential_intensity()
@@ -2446,4 +2487,5 @@ if __name__ == "__main__":
     # )
     # save_basin_names()
     # vary_v_cps()
-    plot_normalized_triple(lower_wind=33.0)
+    # plot_normalized_triple(lower_wind=33.0)
+    calculate_potential_size_cat1()
