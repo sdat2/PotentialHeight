@@ -865,8 +865,8 @@ def calculate_potential_size_cat1(vmin=33, v_reduc=0.8) -> None:
         dryrun=False,
     )
     ps_ds.to_netcdf(
-         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_cat1.nc"),
-         engine="h5netcdf",
+        os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps_cat1.nc"),
+        engine="h5netcdf",
     )
 
 
@@ -2238,12 +2238,12 @@ def save_basin_names():
         yaml.dump(basin_names_d, f, default_flow_style=False, allow_unicode=True)
 
 
-def plot_normalized_triple(lower_wind: float = 33.0):
+def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18.0):
     """
     Plot the normalized variables from the IBTrACS dataset:
 
     Args:
-        lower_wind (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
+        lower_wind_vp (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
     """
 
     # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
@@ -2257,10 +2257,26 @@ def plot_normalized_triple(lower_wind: float = 33.0):
     cps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
     )
+    ps_cat1_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.ps_cat1.nc")
+    )
     # only count where vp > 33
-    cps_ds = cps_ds.where(pi_ps_ds.vmax > lower_wind, drop=False)
-    ibtracs_ds = ibtracs_ds.where(pi_ps_ds.vmax > lower_wind, drop=False)
-    pi_ps_ds = pi_ps_ds.where(pi_ps_ds.vmax > lower_wind, drop=False)
+    cps_ds = cps_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
+    ibtracs_ds = ibtracs_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
+    pi_ps_ds = pi_ps_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
+    ps_cat1_ds = ps_cat1_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
+    ibtracs_ds = ibtracs_ds.where(
+        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
+    )
+    pi_ps_ds = pi_ps_ds.where(
+        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
+    )
+    cps_ds = cps_ds.where(
+        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
+    )
+    ps_cat1_ds = ps_cat1_ds.where(
+        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
+    )
     pi_ps_ds["normalized_intensity"] = (
         ("storm", "date_time"),
         ibtracs_ds["usa_wind"].values * 0.514444 / pi_ps_ds.vmax.values / 0.8,
@@ -2273,6 +2289,10 @@ def plot_normalized_triple(lower_wind: float = 33.0):
         ("storm", "date_time"),
         ibtracs_ds["usa_rmw"].values * 1852 / cps_ds.rmax.values,
     )
+    ps_cat1_ds["normalized_size"] = (
+        ("storm", "date_time"),
+        ibtracs_ds["usa_rmw"].values * 1852 / ps_cat1_ds.rmax.values,
+    )
 
     def perc_gt_1(x: np.ndarray) -> float:
         """Calculate the percentage of values greater than 1."""
@@ -2280,7 +2300,9 @@ def plot_normalized_triple(lower_wind: float = 33.0):
         x = x[~np.isnan(x)]  # Remove NaN values
         return np.sum(x > 1) / len(x) * 100
 
-    fig, axs = plt.subplots(1, 3, figsize=get_dim(), sharey=True, sharex=True)
+    fig, axs = plt.subplots(
+        1, 4, figsize=get_dim(fraction_of_line_width=4 / 3), sharey=True, sharex=True
+    )
     axs[0].hist(pi_ps_ds["normalized_intensity"].values.ravel(), bins=100)
     axs[0].set_xlabel(r"$V_{\mathrm{max}} / V_{\mathrm{p}}$")
     axs[0].set_ylabel("Count")
@@ -2295,10 +2317,15 @@ def plot_normalized_triple(lower_wind: float = 33.0):
     axs[2].hist(cps_ds["normalized_size"].values.ravel(), bins=600)
     axs[2].set_title(f"{perc_gt_1(cps_ds['normalized_size'].values):.1f} % exceedance")
     axs[2].set_xlabel(r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$")
+    axs[3].hist(ps_cat1_ds["normalized_size"].values.ravel(), bins=600)
+    axs[3].set_title(
+        f"{perc_gt_1(ps_cat1_ds['normalized_size'].values):.1f} % exceedance"
+    )
+    axs[3].set_xlabel(r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$")
     label_subplots(axs)
     plt.xlim(0, 3)
     plt.savefig(
-        os.path.join(FIGURE_PATH, "normalized_triple.pdf"),
+        os.path.join(FIGURE_PATH, "normalized_quad.pdf"),
         dpi=300,
         bbox_inches="tight",
     )
@@ -2309,8 +2336,11 @@ def plot_normalized_triple(lower_wind: float = 33.0):
     max_normalized_intensity = pi_ps_ds["normalized_intensity"].max(dim="date_time")
     max_normalized_ps = pi_ps_ds["normalized_size"].max(dim="date_time")
     max_normalized_cps = cps_ds["normalized_size"].max(dim="date_time")
+    max_normalized_ps_cat1 = ps_cat1_ds["normalized_size"].max(dim="date_time")
     # let's plot the CDFs for these arrays
-    fig, axs = plt.subplots(1, 3, figsize=get_dim(), sharey=True, sharex=True)
+    fig, axs = plt.subplots(
+        1, 4, figsize=get_dim(fraction_of_line_width=4 / 3), sharey=True, sharex=True
+    )
 
     def length_of_array(x: np.ndarray) -> int:
         """Return the length of the array, ignoring NaNs."""
@@ -2322,17 +2352,19 @@ def plot_normalized_triple(lower_wind: float = 33.0):
 
     axs[0].plot(
         np.sort(processed_array(max_normalized_intensity.values)),
-        np.arange(1, length_of_array(max_normalized_intensity.values) + 1)
+        1
+        - np.arange(1, length_of_array(max_normalized_intensity.values) + 1)
         / length_of_array(max_normalized_intensity.values),
     )
     axs[0].set_xlabel(
         r"$\max_{\mathrm{storm}}\left(V_{\mathrm{max}} / V_{\mathrm{p}}\right)$"
     )
-    axs[0].set_ylabel("CDF")
+    axs[0].set_ylabel("Survival Function (1 - CDF)")
 
     axs[1].plot(
         np.sort(processed_array(max_normalized_ps.values)),
-        np.arange(1, length_of_array(max_normalized_ps.values) + 1)
+        1
+        - np.arange(1, length_of_array(max_normalized_ps.values) + 1)
         / length_of_array(max_normalized_ps.values),
     )
     axs[1].set_xlabel(
@@ -2340,14 +2372,28 @@ def plot_normalized_triple(lower_wind: float = 33.0):
     )
     axs[2].plot(
         np.sort(processed_array(max_normalized_cps.values)),
-        np.arange(1, length_of_array(max_normalized_cps.values) + 1)
+        1
+        - np.arange(1, length_of_array(max_normalized_cps.values) + 1)
         / length_of_array(max_normalized_cps.values),
     )
     axs[2].set_xlabel(
         r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r''_{\mathrm{max}}\right)$"
     )
-    label_subplots(axs)
+    axs[3].plot(
+        np.sort(processed_array(max_normalized_ps_cat1.values)),
+        1
+        - np.arange(1, length_of_array(max_normalized_ps_cat1.values) + 1)
+        / length_of_array(max_normalized_ps_cat1.values),
+    )
+    axs[3].set_xlabel(
+        r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r'''_{\mathrm{max}}\right)$"
+    )
+    axs[3].set_title(
+        f"{perc_gt_1(max_normalized_ps_cat1.values):.1f} % exceedance"
+    )  # add the percentage of exceedance
+    label_subplots(axs, override="outside")
     plt.xlim(0, 3)
+    plt.ylim(0, 1)
 
     def calcuate_survival_function(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Calculate the survival function."""
@@ -2373,7 +2419,7 @@ def plot_normalized_triple(lower_wind: float = 33.0):
         f"{find_survival_value_at_norm(max_normalized_cps.values)*100:.1f} % exceedance"
     )
     plt.savefig(
-        os.path.join(FIGURE_PATH, "normalized_triple_cdf.pdf"),
+        os.path.join(FIGURE_PATH, "normalized_quad_cdf.pdf"),
         dpi=300,
         bbox_inches="tight",
     )
@@ -2389,7 +2435,7 @@ if __name__ == "__main__":
     # plot_unique_points()
     # era5_unique_points_raw()
     # plot_example_raw()
-    process_era5_raw()
+    # process_era5_raw()
     # plot_era5_processed()
     # calculate_potential_intensity()
     # plot_potential_intensity()
@@ -2487,5 +2533,11 @@ if __name__ == "__main__":
     # )
     # save_basin_names()
     # vary_v_cps()
-    # plot_normalized_triple(lower_wind=33.0)
-    calculate_potential_size_cat1()
+    plot_normalized_quad(lower_wind_vp=33.0, lower_wind_obs=33.0)
+    # calculate_potential_size_cat1()
+    # add_pi_ps_back_onto_tracks(
+    #     variables_to_map=("rmax", "vmax", "r0", "pm", "otl", "t0"),
+    #     input_name="IBTrACS.since1980.v04r01.unique.nc",
+    #     era5_name="era5_unique_points_ps_cat1.nc",
+    #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
+    # )
