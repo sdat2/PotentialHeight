@@ -2238,16 +2238,21 @@ def save_basin_names():
         yaml.dump(basin_names_d, f, default_flow_style=False, allow_unicode=True)
 
 
-def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18.0):
+@timeit
+def get_normalized_data(
+    lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0
+) -> xr.Dataset:
     """
-    Plot the normalized variables from the IBTrACS dataset:
+    Get the normalized data from the IBTrACS dataset.
 
     Args:
-        lower_wind_vp (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
+        lower_wind_vp (float, optional): Lower wind speed threshold for potential intensity. Defaults to 33.0 m/s.
+        lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed. Defaults to 33.0 m/s.
+
+    Returns:
+        xr.Dataset: The normalized dataset.
     """
 
-    # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
-    plot_defaults()
     ibtracs_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
     )
@@ -2285,13 +2290,30 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18
         ("storm", "date_time"),
         ibtracs_ds["usa_rmw"].values * 1852 / pi_ps_ds.rmax.values,
     )
-    cps_ds["normalized_size"] = (
+    pi_ps_ds["normalized_size_obs"] = (
         ("storm", "date_time"),
         ibtracs_ds["usa_rmw"].values * 1852 / cps_ds.rmax.values,
     )
-    ps_cat1_ds["normalized_size"] = (
+    pi_ps_ds["normalized_size_cat1"] = (
         ("storm", "date_time"),
         ibtracs_ds["usa_rmw"].values * 1852 / ps_cat1_ds.rmax.values,
+    )
+    return pi_ps_ds
+
+
+def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0):
+    """
+    Plot the normalized variables from the IBTrACS dataset:
+
+    Args:
+        lower_wind_vp (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
+        lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed filtering. Defaults to 33.0 m/s.
+    """
+
+    # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
+    plot_defaults()
+    pi_ps_ds = get_normalized_data(
+        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs
     )
 
     def perc_gt_1(x: np.ndarray) -> float:
@@ -2318,12 +2340,14 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18
     axs[1].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_size'].values):.1f} % exceedance"
     )
-    axs[2].hist(cps_ds["normalized_size"].values.ravel(), bins=600)
-    axs[2].set_title(f"{perc_gt_1(cps_ds['normalized_size'].values):.1f} % exceedance")
+    axs[2].hist(pi_ps_ds["normalized_size_obs"].values.ravel(), bins=600)
+    axs[2].set_title(
+        f"{perc_gt_1(pi_ps_ds['normalized_size_obs'].values):.1f} % exceedance"
+    )
     axs[2].set_xlabel(r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$")
-    axs[3].hist(ps_cat1_ds["normalized_size"].values.ravel(), bins=600)
+    axs[3].hist(pi_ps_ds["normalized_size_cat1"].values.ravel(), bins=600)
     axs[3].set_title(
-        f"{perc_gt_1(ps_cat1_ds['normalized_size'].values):.1f} % exceedance"
+        f"{perc_gt_1(pi_ps_ds['normalized_size_cat1'].values):.1f} % exceedance"
     )
     axs[3].set_xlabel(r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$")
     label_subplots(axs)
@@ -2339,8 +2363,8 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18
     # let's get the highest normalized intenisity and size for each storm
     max_normalized_intensity = pi_ps_ds["normalized_intensity"].max(dim="date_time")
     max_normalized_ps = pi_ps_ds["normalized_size"].max(dim="date_time")
-    max_normalized_cps = cps_ds["normalized_size"].max(dim="date_time")
-    max_normalized_ps_cat1 = ps_cat1_ds["normalized_size"].max(dim="date_time")
+    max_normalized_cps = pi_ps_ds["normalized_size_obs"].max(dim="date_time")
+    max_normalized_ps_cat1 = pi_ps_ds["normalized_size_cat1"].max(dim="date_time")
     # let's plot the CDFs for these arrays
     fig, axs = plt.subplots(
         1,
@@ -2433,11 +2457,184 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18
     )
     plt.clf()
     plt.close()
+    # I want to plot a 2d histogram of the normalized intensity and normalized size
+    # using category 1 potential size
+    fig, ax = plt.subplots(1, 1, figsize=get_dim())
+    plt.hexbin(
+        pi_ps_ds["normalized_intensity"].values.ravel(),
+        pi_ps_ds["normalized_size_cat1"].values.ravel(),
+        gridsize=100,
+        cmap="cmo.thermal",
+        mincnt=1,
+        bins="log",
+    )
+    plt.colorbar(label="Log Count")
+    plt.xlabel(r"Normalized intensity, $V_{\mathrm{max}} / V_{\mathrm{p}}$")
+    plt.ylabel(r"Normalized size, $r_{\mathrm{max}} / r'''_{\mathrm{max}}$")
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_2d_hist.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+
+def vary_limits(num=6):
+    """Vary the lower limits for the normalized variables, and see how exceedance changes.
+
+    Args:
+        num (int, optional): Number of points to plot. Defaults to 6.
+    """
+
+    def perc_gt_1(x: np.ndarray) -> float:
+        """Calculate the percentage of values greater than 1."""
+        x = x.ravel()  # Flatten the array to 1D
+        x = x[~np.isnan(x)]  # Remove NaN values
+        return np.sum(x > 1) / len(x) * 100
+
+    vp_lower_array = np.linspace(33, 83, num=num)
+    ps_exceedance = np.zeros(num)
+    ps_cat1_exceedance = np.zeros(num)
+    ps_obs_exceedance = np.zeros(num)
+    intensity_exceedance = np.zeros(num)
+
+    for i, vp_lower in tqdm(enumerate(vp_lower_array)):
+        pi_ps_ds = get_normalized_data(lower_wind_vp=vp_lower, lower_wind_obs=33.0)
+        ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
+        ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
+        ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
+        intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+
+    # save the data to a xarray dataset
+    vp_lower_ds = xr.Dataset(
+        {
+            "vp_lower": (("vp_lower"), vp_lower_array),
+            "ps_exceedance": (("vp_lower"), ps_exceedance),
+            "ps_cat1_exceedance": (("vp_lower"), ps_cat1_exceedance),
+            "ps_obs_exceedance": (("vp_lower"), ps_obs_exceedance),
+            "intensity_exceedance": (("vp_lower"), intensity_exceedance),
+        }
+    )
+    vp_lower_ds.attrs["description"] = (
+        "Exceedance of normalized variables for varying lower limits of potential intensity wind speed."
+    )
+    vp_lower_ds.attrs["lower_wind_vp"] = 33.0
+    vp_lower_ds.attrs["lower_wind_obs"] = 18.0
+    vp_lower_ds.attrs["units"] = "m/s"
+    vp_lower_ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "vary_vp_lower_exceedance.nc"),
+        mode="w",
+        format="NETCDF4",
+    )
+
+    fig, ax = plt.subplots(1, 1, figsize=get_dim())
+    ax.plot(
+        vp_lower_array,
+        ps_exceedance,
+        label=r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$",
+        color="green",
+    )
+    ax.plot(
+        vp_lower_array,
+        ps_obs_exceedance,
+        label=r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$",
+        color="blue",
+    )
+    ax.plot(
+        vp_lower_array,
+        ps_cat1_exceedance,
+        label=r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$",
+        color="orange",
+    )
+    ax.plot(
+        vp_lower_array,
+        intensity_exceedance,
+        label=r"$V_{\mathrm{max}} / V_{\mathrm{p}}$",
+        color="red",
+    )
+    ax.set_xlabel(r"$V_{\mathrm{p}}$ lower limit [m s$^{-1}$]")
+    ax.set_ylabel("Exceedance [%]")
+    ax.legend()
+    ax.set_xlim(np.nanmin(vp_lower_array), np.nanmax(vp_lower_array))
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "vary_vp_lower_exceedance.pdf"),
+    )
+    plt.clf()
+    plt.close()
+
+    vobs_lower_array = np.linspace(18, 83, num=num)
+    ps_exceedance = np.zeros(num)
+    ps_cat1_exceedance = np.zeros(num)
+    ps_obs_exceedance = np.zeros(num)
+    intensity_exceedance = np.zeros(num)
+    for i, vobs_lower in tqdm(enumerate(vobs_lower_array)):
+        pi_ps_ds = get_normalized_data(lower_wind_vp=33.0, lower_wind_obs=vobs_lower)
+        ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
+        ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
+        ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
+        intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+
+    # save the data to a xarray dataset
+    vobs_lower_ds = xr.Dataset(
+        {
+            "vobs_lower": (("vobs_lower"), vobs_lower_array),
+            "ps_exceedance": (("vobs_lower"), ps_exceedance),
+            "ps_cat1_exceedance": (("vobs_lower"), ps_cat1_exceedance),
+            "ps_obs_exceedance": (("vobs_lower"), ps_obs_exceedance),
+            "intensity_exceedance": (("vobs_lower"), intensity_exceedance),
+        }
+    )
+    vobs_lower_ds.attrs["description"] = (
+        "Exceedance of normalized variables for varying lower limits of observed wind speed."
+    )
+    vobs_lower_ds.attrs["lower_wind_vp"] = 33.0
+    vobs_lower_ds.attrs["lower_wind_obs"] = 18.0
+    vobs_lower_ds.attrs["units"] = "m/s"
+    vobs_lower_ds.to_netcdf(
+        os.path.join(IBTRACS_DATA_PATH, "vary_vobs_lower_exceedance.nc"),
+        mode="w",
+        format="NETCDF4",
+    )
+    fig, ax = plt.subplots(1, 1, figsize=get_dim())
+    ax.plot(
+        vobs_lower_array,
+        ps_exceedance,
+        label=r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$",
+        color="green",
+    )
+    ax.plot(
+        vobs_lower_array,
+        ps_obs_exceedance,
+        label=r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$",
+        color="blue",
+    )
+    ax.plot(
+        vobs_lower_array,
+        ps_cat1_exceedance,
+        label=r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$",
+        color="orange",
+    )
+
+    ax.plot(
+        vobs_lower_array,
+        intensity_exceedance,
+        label=r"$V_{\mathrm{max}} / V_{\mathrm{p}}$",
+        color="red",
+    )
+    ax.set_xlabel(r"$V_{\mathrm{max}}$ Obs. lower limit [m s$^{-1}$]")
+    ax.set_ylabel("Exceedance [%]")
+    ax.legend()
+    ax.set_xlim(np.nanmin(vobs_lower_array), np.nanmax(vobs_lower_array))
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "vary_vobs_lower_exceedance.pdf"),
+    )
+    plt.clf()
+    plt.close()
 
 
 if __name__ == "__main__":
     # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
+    plot_defaults()
     # print("IBTrACS data downloaded and ready for processing.")
     # ibtracs_to_era5_map()
     # plot_unique_points()
@@ -2541,7 +2738,7 @@ if __name__ == "__main__":
     # )
     # save_basin_names()
     # vary_v_cps()
-    plot_normalized_quad(lower_wind_vp=33.0, lower_wind_obs=33.0)
+    # plot_normalized_quad(lower_wind_vp=60, lower_wind_obs=33.0)
     # calculate_potential_size_cat1()
     # add_pi_ps_back_onto_tracks(
     #     variables_to_map=("rmax", "vmax", "r0", "pm", "otl", "t0"),
@@ -2549,3 +2746,4 @@ if __name__ == "__main__":
     #     era5_name="era5_unique_points_ps_cat1.nc",
     #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
     # )
+    vary_limits(num=50)
