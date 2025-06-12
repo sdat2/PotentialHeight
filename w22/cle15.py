@@ -1655,7 +1655,12 @@ def run_cle15(
 
 
 def profile_from_stats(
-    vmax: float, fcor: float, r0: float, p0: float, pressure_assumption="isothermal"
+    vmax: float,
+    fcor: float,
+    r0: float,
+    p0: float,
+    rho0: float = RHO_AIR_DEFAULT,
+    pressure_assumption="isothermal",
 ) -> dict:
     """
     Run the CLE15 model with given parameters and return the wind profile.
@@ -1666,9 +1671,19 @@ def profile_from_stats(
         fcor (float): Coriolis parameter [s-1].
         r0 (float): Radius of the storm [m].
         p0 (float): Background pressure [hPa].
+        rho0 (float, optional): Density of air [kg/m^3]. Defaults to RHO_AIR_DEFAULT.
+        pressure_assumption (str, optional): Assumption for pressure calculation.
+            Defaults to "isothermal".
 
     Returns:
         dict: Dictionary containing the wind profile and pressure profile.
+        The dictionary contains the following keys:
+            - "rr": Radius vector [m].
+            - "VV": Wind speed vector [m/s].
+            - "rmax": Radius of maximum wind [m].
+            - "rmerge": Radius of merge point [m].
+            - "Vmerge": Wind speed at merge point [m/s].
+            - "p": Pressure profile [hPa].
     """
     ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
     o = chavas_et_al_2015_profile(
@@ -1685,9 +1700,15 @@ def profile_from_stats(
     )
     out = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
     out["VV"][-1] = 0
+    out["VV"][np.isnan(out["VV"])] = 0  # no nans out.
     out["p"] = (
         pressure_from_wind(
-            out["rr"], out["VV"], p0=p0 * 100, fcor=fcor, assumption=pressure_assumption
+            out["rr"],
+            out["VV"],
+            p0=p0 * 100,
+            fcor=fcor,
+            rho0=rho0,
+            assumption=pressure_assumption,
         )
         / 100
     )
@@ -1696,6 +1717,8 @@ def profile_from_stats(
 
 # --- Example Usage ---
 if __name__ == "__main__":
+    from sithom.plot import plot_defaults, get_dim, label_subplots
+
     # python -m w22.cle15
     print("Running Chavas et al. (2015) TC Profile Calculation Example...")
 
@@ -1753,40 +1776,129 @@ if __name__ == "__main__":
         print(f"Merge wind speed: {Vmerge:.1f} m/s (Non-dim M/M0: {MmergeM0:.3f})")
         print(f"M/M0 at rmax:     {MmM0:.3f}")
 
+        assert np.all(~np.isnan(rr)), "rr contains NaNs, check calculation."
+        VV[np.isnan(VV)] = 0  # Ensure no NaNs in VV
+        assert np.all(~np.isnan(VV)), "VV contains NaNs, check calculation."
+
+        pp = (
+            pressure_from_wind(
+                rr, VV, p0=1000 * 100, fcor=fcor_in, rho0=RHO_AIR_DEFAULT
+            )
+            / 100
+        )
+        pc = pp[0]  # Central pressure [hPa]
+        pm = interp1d(rr, pp)(rmax)  # Pressure at rmax [hPa]
+
         # --- Optional Plotting ---
         try:
-            plt.figure(figsize=(10, 6))
+            plot_defaults()
+            fig, axs = plt.subplots(
+                2, 1, sharex=True, figsize=get_dim(ratio=0.8)
+            )  # figsize=(10, 6))
             # Plot dimensional profile
-            plt.plot(rr / 1000, VV, "b-", linewidth=2, label="Merged Profile (V vs r)")
-            plt.plot(
+            axs[0].plot(
+                rr[rr < rmerge] / 1000,
+                VV[rr < rmerge],
+                # "b-",
+                color="green",
+                linewidth=1,
+                label="ER11 profile",
+            )
+            axs[0].plot(
+                rr[rr >= rmerge] / 1000,
+                VV[rr >= rmerge],
+                # "y-",
+                color="orange",
+                linewidth=1,
+                label="E04 profile",
+            )
+            axs[0].plot(
                 rmax / 1000,
                 Vmax_prof,
                 "bx",
                 markersize=10,
                 mew=2,
-                label=f"Rmax ({rmax/1000:.1f} km)",
+                label=r"$r_{\mathrm{max}}$"
+                + f" ({rmax/1000:.1f} km)"
+                + r" $V_{\mathrm{max}}$ "
+                + f"({Vmax_prof:.1f}"
+                r" m s$^{-1}$)",
             )
-            plt.plot(
-                r0_in / 1000, 0, "r.", markersize=15, label=f"R0 ({r0_in/1000:.0f} km)"
+            axs[0].plot(
+                r0_in / 1000,
+                0,
+                "r.",
+                markersize=15,
+                label=r"$r_a$" + f" ({r0_in/1000:.0f} km)," + r" $V_a$ (0 m s$^{-1}$)",
             )
-            plt.plot(
+            axs[0].plot(
                 rmerge / 1000,
                 Vmerge,
                 ".",
                 color="grey",
                 markersize=12,
-                label=f"Merge ({rmerge/1000:.1f} km)",
+                label=r"$r_{\mathrm{merge}}$"
+                + f" ({rmerge/1000:.1f} km), "
+                + r"$V_{\mathrm{merge}}$ "
+                + f"({Vmerge:.1f}"
+                r" m s$^{-1}$)",
             )
+            axs[0].legend(loc="best")  # is this correct?
 
-            plt.xlabel("Radius (km)")
-            plt.ylabel("Wind Speed (m/s)")
-            plt.title("Chavas et al. (2015) TC Wind Profile")
-            plt.legend(loc="best")
-            plt.grid(True)
+            axs[1].set_xlabel("Radius, $r$ [km]")
+            axs[0].set_ylabel("Wind Speed, $V$ [m s$^{-1}$]")
+            axs[1].set_ylabel("Pressure, $p$ [hPa]")
+
+            axs[1].plot(
+                rr[rr < rmerge] / 1000,
+                pp[rr < rmerge],
+                color="green",
+                linewidth=1,
+                label="ER11 profile",
+            )
+            axs[1].plot(
+                rr[rr >= rmerge] / 1000,
+                pp[rr >= rmerge],
+                color="orange",
+                linewidth=1,
+                label="E04 profile",
+            )
+            axs[1].plot(
+                rmax / 1000,
+                interp1d(rr, pp)(rmax),
+                "bx",
+                markersize=10,
+                mew=2,
+                label=r"Pressure at $r_{\mathrm{max}}$"
+                + f" ({interp1d(rr, pp)(rmax):.1f} hPa)",
+            )
+            axs[1].plot(
+                r0_in / 1000,
+                interp1d(rr, pp)(r0_in),
+                "r.",
+                markersize=15,
+                label=f"Pressure at $r_a$ ({interp1d(rr, pp)(r0_in):.1f} hPa)",
+            )
+            axs[1].plot(
+                rmerge / 1000,
+                interp1d(rr, pp)(rmerge),
+                ".",
+                color="grey",
+                markersize=12,
+                label=r"Pressure at $r_{\mathrm{merge}}$ "
+                + f" ({interp1d(rr, pp)(rmerge):.1f} hPa)",
+            )
+            axs[1].plot(
+                0, pc, "k.", markersize=15, label=f"Central Pressure ({pc:.1f} hPa)"
+            )
+            axs[1].legend(loc="best")
+
+            axs[0].set_title("Chavas et al. (2015) TC Wind Profile")
+            # plt.grid(True)
             plt.xlim(
                 0, max(1.1 * r0_in / 1000, 5 * rmax / 1000)
             )  # Adjust xlim dynamically
-            plt.ylim(
+            axs[0].set_ylim(
                 0,
                 (
                     max(Vmax_in * 1.1, Vmax_prof * 1.1)
@@ -1794,17 +1906,29 @@ if __name__ == "__main__":
                     else Vmax_in * 1.1
                 ),
             )
+            label_subplots(axs, override="outside")
             plt.tight_layout()
-            plt.show()
+            plt.savefig(
+                os.path.join(FIGURE_PATH, "cle15_example_profile_dimensional.pdf"),
+            )
+            plt.clf()
+            plt.close()
 
             # Plot non-dimensional profile
-            plt.figure(figsize=(10, 6))
+            plt.figure(figsize=get_dim())  # figsize=(10, 6))
             plt.plot(
-                rrfracr0,
-                MMfracM0,
-                "g-",
-                linewidth=2,
-                label="Merged Profile (M/M0 vs r/r0)",
+                rrfracr0[rr < rmerge],
+                MMfracM0[rr < rmerge],
+                color="green",
+                linewidth=1,
+                label="Merged Profile ($M/ M_a$ vs $r/r_a$)",
+            )
+            plt.plot(
+                rrfracr0[rr >= rmerge],
+                MMfracM0[rr >= rmerge],
+                color="orange",
+                linewidth=1,
+                # label="Merged Profile (M/M0 vs r/r0)",
             )
             plt.plot(
                 rmaxr0,
@@ -1812,30 +1936,34 @@ if __name__ == "__main__":
                 "gx",
                 markersize=10,
                 mew=2,
-                label=f"Rmax/R0 ({rmaxr0:.3f})",
+                label=r"$R_{\mathrm{max}}/{R_a}$" f"({rmaxr0:.3f})",
             )
-            plt.plot(1, 1, "r.", markersize=15, label="R0/R0 (1,1)")  # E04 boundary
+            plt.plot(
+                1, 1, "r.", markersize=15, label="$R_a$/$R_a$ (1,1)"
+            )  # E04 boundary
             plt.plot(
                 rmerger0,
                 MmergeM0,
                 ".",
                 color="grey",
                 markersize=12,
-                label=f"Merge/R0 ({rmerger0:.3f})",
+                label=r"$r_{\mathrm{merge}}/r_a$" + f"({rmerger0:.3f})",
             )
 
             # Optionally overlay the individual E04 and ER11 profiles used in merge
             # (Requires recalculating them for plotting)
 
-            plt.xlabel("r / r0")
-            plt.ylabel("M / M0")
+            plt.xlabel("$r$ / $r_a$")
+            plt.ylabel("$M$ / $M_a$")
             plt.title("Non-Dimensional Angular Momentum Profile")
             plt.legend(loc="best")
             plt.grid(True)
             plt.xlim(0, 1.1)
             plt.ylim(0, max(1.1, MmM0 * 1.1) if not np.isnan(MmM0) else 1.1)
             plt.tight_layout()
-            plt.show()
+            plt.savefig(
+                os.path.join(FIGURE_PATH, "cle15_example_profile_nondimensional.pdf"),
+            )
 
         except ImportError:
             print("\nMatplotlib not found. Skipping plots.")

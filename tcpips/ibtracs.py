@@ -2301,7 +2301,11 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18
         return np.sum(x > 1) / len(x) * 100
 
     fig, axs = plt.subplots(
-        1, 4, figsize=get_dim(fraction_of_line_width=4 / 3), sharey=True, sharex=True
+        1,
+        4,
+        figsize=get_dim(fraction_of_line_width=4 / 3, ratio=(5**0.5 - 1) / 2 * 3 / 4),
+        sharey=True,
+        sharex=True,
     )
     axs[0].hist(pi_ps_ds["normalized_intensity"].values.ravel(), bins=100)
     axs[0].set_xlabel(r"$V_{\mathrm{max}} / V_{\mathrm{p}}$")
@@ -2339,7 +2343,11 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 18
     max_normalized_ps_cat1 = ps_cat1_ds["normalized_size"].max(dim="date_time")
     # let's plot the CDFs for these arrays
     fig, axs = plt.subplots(
-        1, 4, figsize=get_dim(fraction_of_line_width=4 / 3), sharey=True, sharex=True
+        1,
+        4,
+        figsize=get_dim(fraction_of_line_width=4 / 3, ratio=(5**0.5 - 1) / 2 * 3 / 4),
+        sharey=True,
+        sharex=True,
     )
 
     def length_of_array(x: np.ndarray) -> int:
