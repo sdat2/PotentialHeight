@@ -2477,6 +2477,53 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33
         bbox_inches="tight",
     )
 
+    # let's find the most extreme values in this normalized space.
+    super_storms = np.any(
+        (pi_ps_ds["normalized_intensity"].values > 1)
+        & (pi_ps_ds["normalized_size_cat1"].values > 1),
+        axis=1,
+    )
+    print(
+        f"Number of storms with normalized intensity > 1 and normalized size > 1: {np.sum(super_storms)}"
+    )
+
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
+    )
+    # get the names of the storms which have these
+    storm_names = [x.decode() for x in ibtracs_ds.name.values[super_storms]]
+    print(
+        f"Storms with normalized intensity > 1 and normalized size > 1: {', '.join(storm_names)}"
+    )
+
+    # get top 10 storms by normalized intensity
+    top_intensity_storms = np.argsort(
+        -pi_ps_ds["normalized_intensity"].max(dim="date_time").values
+    )[:10]
+    # Get indices of top 10 storms
+    top_intensity_names = [
+        ibtracs_ds.name.values[i].decode() for i in top_intensity_storms
+    ]
+    print(f"Top 10 storms by normalized intensity: {', '.join(top_intensity_names)}")
+    print(
+        f"Top 10 storms normalized intensities: {', '.join([str(x) for x in pi_ps_ds['normalized_intensity'].max(dim='date_time').values[top_intensity_storms]])}"
+    )
+
+    top_size_storms = np.argsort(
+        -pi_ps_ds["normalized_size_cat1"].max(dim="date_time").values
+    )[:10]
+    # Get indices of top 10 storms
+    top_size_names = [ibtracs_ds.name.values[i].decode() for i in top_size_storms]
+    print(f"Top 10 storms by normalized size: {', '.join(top_size_names)}")
+    print(
+        f"Top 10 storms normalized sizes: {', '.join([str(x) for x in pi_ps_ds['normalized_size_cat1'].max(dim='date_time').values[top_size_storms]])}"
+    )
+
+    # print the names of the storms which have these
+
+
+# Question: does the velocity size tradeoff look the same shape for all storms in this normalized space?
+
 
 def perc_gt_1(x: np.ndarray) -> float:
     """Calculate the percentage of values greater than 1.
@@ -2808,7 +2855,7 @@ if __name__ == "__main__":
     # )
     # save_basin_names()
     # vary_v_cps()
-    # plot_normalized_quad(lower_wind_vp=60, lower_wind_obs=33.0)
+    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33)
     # calculate_potential_size_cat1()
     # add_pi_ps_back_onto_tracks(
     #     variables_to_map=("rmax", "vmax", "r0", "pm", "otl", "t0"),
@@ -2816,4 +2863,4 @@ if __name__ == "__main__":
     #     era5_name="era5_unique_points_ps_cat1.nc",
     #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
     # )
-    vary_limits(num=50)
+    # vary_limits(num=50)
