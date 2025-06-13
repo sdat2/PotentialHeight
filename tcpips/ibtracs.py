@@ -2478,152 +2478,222 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33
     )
 
 
+def perc_gt_1(x: np.ndarray) -> float:
+    """Calculate the percentage of values greater than 1.
+    Args:
+        x (np.ndarray): Input array to calculate the percentage from.
+
+    Returns:
+        float: Percentage of non nanvalues greater than 1.
+    """
+    x = x.ravel()  # Flatten the array to 1D
+    x = x[~np.isnan(x)]  # Remove NaN values
+    return np.sum(x > 1) / len(x) * 100
+
+
+def get_vary_vp_lower_data(
+    num: int = 6,
+    lower_vp_min: float = 33,
+    lower_vp_max: float = 83,
+    lower_wind_obs: float = 33,
+) -> xr.Dataset:
+    """Vary the lower limits for the normalized variables, and see how exceedance changes.
+
+    Args:
+        num (int, optional): Number of points to plot. Defaults to 6.
+        lower_vp_min (float, optional): Minimum lower limit for potential intensity. Defaults to 33.
+        lower_vp_max (float, optional): Maximum lower limit for potential intensity. Defaults to 83.
+        lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed. Defaults to 33.
+
+    Returns:
+        xr.Dataset: Dataset containing the exceedance of normalized variables for varying lower limits of potential intensity wind speed.
+    """
+
+    file_name = os.path.join(IBTRACS_DATA_PATH, "vary_vp_lower_exceedance.nc")
+    if os.path.exists(file_name):
+        return xr.open_dataset(os.path.join(file_name))
+    else:
+        vp_lower_array = np.linspace(lower_vp_min, lower_vp_max, num=num)
+        ps_exceedance = np.zeros(num)
+        ps_cat1_exceedance = np.zeros(num)
+        ps_obs_exceedance = np.zeros(num)
+        intensity_exceedance = np.zeros(num)
+
+        for i, vp_lower in tqdm(enumerate(vp_lower_array)):
+            pi_ps_ds = get_normalized_data(
+                lower_wind_vp=vp_lower, lower_wind_obs=lower_wind_obs
+            )
+            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
+            ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
+            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
+            intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+
+        # save the data to a xarray dataset
+        vp_lower_ds = xr.Dataset(
+            {
+                "vp_lower": (("vp_lower"), vp_lower_array),
+                "ps_exceedance": (("vp_lower"), ps_exceedance),
+                "ps_cat1_exceedance": (("vp_lower"), ps_cat1_exceedance),
+                "ps_obs_exceedance": (("vp_lower"), ps_obs_exceedance),
+                "intensity_exceedance": (("vp_lower"), intensity_exceedance),
+            }
+        )
+        vp_lower_ds.attrs["description"] = (
+            "Exceedance of normalized variables for varying lower limits of potential intensity wind speed."
+        )
+        vp_lower_ds.attrs["lower_wind_vp_min"] = lower_vp_min
+        vp_lower_ds.attrs["lower_wind_vp_max"] = lower_vp_max
+        vp_lower_ds.attrs["lower_wind_obs"] = lower_wind_obs
+        vp_lower_ds.attrs["units"] = "m/s"
+        vp_lower_ds.to_netcdf(
+            file_name,
+            mode="w",
+            format="NETCDF4",
+        )
+        return vp_lower_ds
+
+
+def get_vary_vobs_lower_data(
+    num: int = 6,
+    lower_vobs_min: float = 18,
+    lower_vobs_max: float = 83,
+    lower_wind_vp: float = 33,
+) -> xr.Dataset:
+    """
+    Get the exceedance of normalized variables for varying lower limits of observed wind speed.
+    Args:
+        num (int, optional): Number of points to plot. Defaults to 6.
+        lower_vobs_min (float, optional): Minimum lower limit for observed wind speed. Defaults to 18 m/s.
+        lower_vobs_max (float, optional): Maximum lower limit for observed wind speed. Defaults to 83 m/s.
+        lower_wind_vp (float, optional): Lower limit for potential intensity wind speed. Defaults to 33 m/s.
+    Returns:
+        xr.Dataset: Dataset containing the exceedance of normalized variables for varying lower limits of observed wind speed.
+    """
+    file_name = os.path.join(IBTRACS_DATA_PATH, "vary_vobs_lower_exceedance.nc")
+    if os.path.exists(file_name):
+        return xr.open_dataset(os.path.join(file_name))
+    else:
+        vobs_lower_array = np.linspace(lower_vobs_min, lower_vobs_max, num=num)
+        ps_exceedance = np.zeros(num)
+        ps_cat1_exceedance = np.zeros(num)
+        ps_obs_exceedance = np.zeros(num)
+        intensity_exceedance = np.zeros(num)
+
+        for i, vobs_lower in tqdm(enumerate(vobs_lower_array)):
+            pi_ps_ds = get_normalized_data(
+                lower_wind_vp=lower_wind_vp, lower_wind_obs=vobs_lower
+            )
+            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
+            ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
+            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
+            intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+
+        # save the data to a xarray dataset
+        vobs_lower_ds = xr.Dataset(
+            {
+                "vobs_lower": (("vobs_lower"), vobs_lower_array),
+                "ps_exceedance": (("vobs_lower"), ps_exceedance),
+                "ps_cat1_exceedance": (("vobs_lower"), ps_cat1_exceedance),
+                "ps_obs_exceedance": (("vobs_lower"), ps_obs_exceedance),
+                "intensity_exceedance": (("vobs_lower"), intensity_exceedance),
+            }
+        )
+        vobs_lower_ds.attrs["description"] = (
+            "Exceedance of normalized variables for varying lower limits of observed wind speed."
+        )
+        vobs_lower_ds.attrs["lower_wind_vp"] = lower_wind_vp
+        vobs_lower_ds.attrs["lower_wind_obs_min"] = lower_vobs_min
+        vobs_lower_ds.attrs["lower_wind_obs_max"] = lower_vobs_max
+        vobs_lower_ds.attrs["units"] = "m/s"
+        vobs_lower_ds.to_netcdf(
+            file_name,
+            mode="w",
+            format="NETCDF4",
+        )
+        return vobs_lower_ds
+
+
 def vary_limits(num=6):
     """Vary the lower limits for the normalized variables, and see how exceedance changes.
 
     Args:
         num (int, optional): Number of points to plot. Defaults to 6.
     """
-
-    def perc_gt_1(x: np.ndarray) -> float:
-        """Calculate the percentage of values greater than 1."""
-        x = x.ravel()  # Flatten the array to 1D
-        x = x[~np.isnan(x)]  # Remove NaN values
-        return np.sum(x > 1) / len(x) * 100
-
-    vp_lower_array = np.linspace(33, 83, num=num)
-    ps_exceedance = np.zeros(num)
-    ps_cat1_exceedance = np.zeros(num)
-    ps_obs_exceedance = np.zeros(num)
-    intensity_exceedance = np.zeros(num)
-
-    for i, vp_lower in tqdm(enumerate(vp_lower_array)):
-        pi_ps_ds = get_normalized_data(lower_wind_vp=vp_lower, lower_wind_obs=33.0)
-        ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
-        ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
-        ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
-        intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
-
-    # save the data to a xarray dataset
-    vp_lower_ds = xr.Dataset(
-        {
-            "vp_lower": (("vp_lower"), vp_lower_array),
-            "ps_exceedance": (("vp_lower"), ps_exceedance),
-            "ps_cat1_exceedance": (("vp_lower"), ps_cat1_exceedance),
-            "ps_obs_exceedance": (("vp_lower"), ps_obs_exceedance),
-            "intensity_exceedance": (("vp_lower"), intensity_exceedance),
-        }
-    )
-    vp_lower_ds.attrs["description"] = (
-        "Exceedance of normalized variables for varying lower limits of potential intensity wind speed."
-    )
-    vp_lower_ds.attrs["lower_wind_vp"] = 33.0
-    vp_lower_ds.attrs["lower_wind_obs"] = 18.0
-    vp_lower_ds.attrs["units"] = "m/s"
-    vp_lower_ds.to_netcdf(
-        os.path.join(IBTRACS_DATA_PATH, "vary_vp_lower_exceedance.nc"),
-        mode="w",
-        format="NETCDF4",
-    )
+    vp_lower_ds = get_vary_vp_lower_data(num=num)
 
     fig, ax = plt.subplots(1, 1, figsize=get_dim())
     ax.plot(
-        vp_lower_array,
-        ps_exceedance,
+        vp_lower_ds["vp_lower"].values,
+        vp_lower_ds["ps_exceedance"].values,
         label=r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$",
         color="green",
     )
     ax.plot(
-        vp_lower_array,
-        ps_obs_exceedance,
+        vp_lower_ds["vp_lower"].values,
+        vp_lower_ds["ps_obs_exceedance"].values,
         label=r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$",
         color="blue",
     )
     ax.plot(
-        vp_lower_array,
-        ps_cat1_exceedance,
+        vp_lower_ds["vp_lower"].values,
+        vp_lower_ds["ps_cat1_exceedance"].values,
         label=r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$",
         color="orange",
     )
     ax.plot(
-        vp_lower_array,
-        intensity_exceedance,
+        vp_lower_ds["vp_lower"].values,
+        vp_lower_ds["intensity_exceedance"].values,
         label=r"$V_{\mathrm{max}} / V_{\mathrm{p}}$",
         color="red",
     )
     ax.set_xlabel(r"$V_{\mathrm{p}}$ lower limit [m s$^{-1}$]")
     ax.set_ylabel("Exceedance [%]")
     ax.legend()
-    ax.set_xlim(np.nanmin(vp_lower_array), np.nanmax(vp_lower_array))
+    ax.set_xlim(
+        np.nanmin(vp_lower_ds["vp_lower"].values),
+        np.nanmax(vp_lower_ds["vp_lower"].values),
+    )
     plt.savefig(
         os.path.join(FIGURE_PATH, "vary_vp_lower_exceedance.pdf"),
     )
     plt.clf()
     plt.close()
 
-    vobs_lower_array = np.linspace(18, 83, num=num)
-    ps_exceedance = np.zeros(num)
-    ps_cat1_exceedance = np.zeros(num)
-    ps_obs_exceedance = np.zeros(num)
-    intensity_exceedance = np.zeros(num)
-    for i, vobs_lower in tqdm(enumerate(vobs_lower_array)):
-        pi_ps_ds = get_normalized_data(lower_wind_vp=33.0, lower_wind_obs=vobs_lower)
-        ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
-        ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
-        ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
-        intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+    vobs_lower_ds = get_vary_vobs_lower_data(num=num)
 
-    # save the data to a xarray dataset
-    vobs_lower_ds = xr.Dataset(
-        {
-            "vobs_lower": (("vobs_lower"), vobs_lower_array),
-            "ps_exceedance": (("vobs_lower"), ps_exceedance),
-            "ps_cat1_exceedance": (("vobs_lower"), ps_cat1_exceedance),
-            "ps_obs_exceedance": (("vobs_lower"), ps_obs_exceedance),
-            "intensity_exceedance": (("vobs_lower"), intensity_exceedance),
-        }
-    )
-    vobs_lower_ds.attrs["description"] = (
-        "Exceedance of normalized variables for varying lower limits of observed wind speed."
-    )
-    vobs_lower_ds.attrs["lower_wind_vp"] = 33.0
-    vobs_lower_ds.attrs["lower_wind_obs"] = 18.0
-    vobs_lower_ds.attrs["units"] = "m/s"
-    vobs_lower_ds.to_netcdf(
-        os.path.join(IBTRACS_DATA_PATH, "vary_vobs_lower_exceedance.nc"),
-        mode="w",
-        format="NETCDF4",
-    )
-    fig, ax = plt.subplots(1, 1, figsize=get_dim())
+    _, ax = plt.subplots(1, 1, figsize=get_dim())
     ax.plot(
-        vobs_lower_array,
-        ps_exceedance,
+        vobs_lower_ds["vobs_lower"].values,
+        vobs_lower_ds["ps_exceedance"].values,
         label=r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$",
         color="green",
     )
     ax.plot(
-        vobs_lower_array,
-        ps_obs_exceedance,
+        vobs_lower_ds["vobs_lower"].values,
+        vobs_lower_ds["ps_obs_exceedance"].values,
         label=r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$",
         color="blue",
     )
     ax.plot(
-        vobs_lower_array,
-        ps_cat1_exceedance,
+        vobs_lower_ds["vobs_lower"].values,
+        vobs_lower_ds["ps_obs_exceedance"].values,
         label=r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$",
         color="orange",
     )
 
     ax.plot(
-        vobs_lower_array,
-        intensity_exceedance,
+        vobs_lower_ds["vobs_lower"].values,
+        vobs_lower_ds["intensity_exceedance"].values,
         label=r"$V_{\mathrm{max}} / V_{\mathrm{p}}$",
         color="red",
     )
     ax.set_xlabel(r"$V_{\mathrm{max}}$ Obs. lower limit [m s$^{-1}$]")
     ax.set_ylabel("Exceedance [%]")
     ax.legend()
-    ax.set_xlim(np.nanmin(vobs_lower_array), np.nanmax(vobs_lower_array))
+    ax.set_xlim(
+        np.nanmin(vobs_lower_ds["vobs_lower"].values),
+        np.nanmax(vobs_lower_ds["vobs_lower"].values),
+    )
     plt.savefig(
         os.path.join(FIGURE_PATH, "vary_vobs_lower_exceedance.pdf"),
     )
