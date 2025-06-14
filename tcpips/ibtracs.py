@@ -1774,6 +1774,49 @@ def plot_tc_example(
     print("tc_ds", tc_ds)
     tc_cps_ds = select_tc_from_ds(cps_ds, name=name, basin=basin, subbasin=subbasin)
     print("tc_cps_ds", tc_cps_ds)
+    tc_ds["ps_vobs"] = tc_cps_ds["rmax"]  # take the rmax from the cps dataset
+    track_dir = os.path.join(FIGURE_PATH, "tracks")
+    os.makedirs(track_dir, exist_ok=True)
+    plot_name = os.path.join(track_dir, f"{name.decode().lower()}_track.pdf")
+    print(plot_name)
+    _plot_tc_track(tc_ds, plot_name, boox=bbox, landing_no=landing_no)
+
+
+def plot_tc_track_by_index(index, plot_name):
+    """Plot a tropical cyclone track by index.
+
+    Args:
+        index (int): Index of the tropical cyclone to plot.
+        plot_name (str): Name of the plot file to save.
+    """
+    ibtracs_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
+    )
+    cps_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
+    )
+    tc_ds = ibtracs_ds.isel(storm=index)
+    tc_cps_ds = cps_ds.isel(storm=index)
+    # add rmax from cps_ds to tc_ds
+    tc_ds["ps_vobs"] = tc_cps_ds["rmax"]  # take the rmax from the cps dataset
+
+    _plot_tc_track(tc_ds, plot_name)
+
+
+def _plot_tc_track(
+    tc_ds: xr.Dataset,
+    plot_name: str,
+    bbox: Optional[tuple] = None,
+    landing_no: int = -1,
+) -> None:
+    """Plot the track of a tropical cyclone.
+
+    Args:
+        tc_ds (xr.Dataset): Dataset containing the tropical cyclone data.
+        plot_name (str): Name of the plot file to save.
+        bbox (Optional[tuple], optional): Bounding box for the map. Defaults to None.
+        landing_no (int, optional): Index of the landing to plot. Defaults to -1 (last landing).
+    """
 
     if bbox is None:
         perc = 0.1
@@ -1804,7 +1847,7 @@ def plot_tc_example(
         # last true value in non_nan_times
         last_true_index = np.where(non_nan_times)[0][-1]
         tc_impact = tc_ds.isel(date_time=last_true_index)
-    print("time at start:", tc_ds["time"].values.ravel()[-1])
+    print("time at start:", tc_ds["time"].values.ravel()[0])
     print("time of landfall:", tc_impact["time"].values)
 
     times = (
@@ -1981,7 +2024,7 @@ def plot_tc_example(
     )
     ax_line2.plot(
         times.ravel(),
-        tc_cps_ds["rmax"].values.ravel() / 1000,  # convert m to km
+        tc_ds["ps_vobs"].values.ravel() / 1000,  # convert m to km
         label=r"$r''_{\mathrm{max}}$ CPS [km]"
         + "\n"
         + r"($V_{\mathrm{max}}=V_{\mathrm{max}} \text{ Obs.}$)",
@@ -1994,14 +2037,10 @@ def plot_tc_example(
     ax_line2.set_xlim(np.nanmin(times), np.nanmax(times))
 
     label_subplots([ax_map])
-
     label_subplots([ax_line1, ax_line2], override="outside", start_from=1)
     plt.tight_layout()
-    track_dir = os.path.join(FIGURE_PATH, "tracks")
-    os.makedirs(track_dir, exist_ok=True)
-    print(os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"))
     plt.savefig(
-        os.path.join(track_dir, f"{name.decode().lower()}_track.pdf"),
+        plot_name,
         dpi=300,
         bbox_inches="tight",
     )
@@ -2508,6 +2547,18 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33
     print(
         f"Top 10 storms normalized intensities: {', '.join([str(x) for x in pi_ps_ds['normalized_intensity'].max(dim='date_time').values[top_intensity_storms]])}"
     )
+    dir = os.path.join(FIGURE_PATH, "top_10_superintense")
+    os.makedirs(dir, exist_ok=True)
+    for i, storm in enumerate(top_intensity_storms):
+        start_time = ibtracs_ds["time"].isel(storm=storm).values[0]
+        plot_name = os.path.join(
+            dir,
+            f"{i:02}-{np.datetime_as_string(start_time, unit='M')}-{ibtracs_ds.name.values[storm].decode()}.pdf",
+        )
+        plot_tc_track_by_index(
+            storm,
+            plot_name,
+        )
 
     top_size_storms = np.argsort(
         -pi_ps_ds["normalized_size_cat1"].max(dim="date_time").values
@@ -2518,6 +2569,18 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33
     print(
         f"Top 10 storms normalized sizes: {', '.join([str(x) for x in pi_ps_ds['normalized_size_cat1'].max(dim='date_time').values[top_size_storms]])}"
     )
+    dir = os.path.join(FIGURE_PATH, "top_10_supersize")
+    os.makedirs(dir, exist_ok=True)
+    for i, storm in enumerate(top_size_storms):
+        start_time = ibtracs_ds["time"].isel(storm=storm).values[0]
+        plot_name = os.path.join(
+            dir,
+            f"{i:02}-{np.datetime_as_string(start_time, unit='M')}-{ibtracs_ds.name.values[storm].decode()}.pdf",
+        )
+        plot_tc_track_by_index(
+            storm,
+            plot_name,
+        )
 
     # print the names of the storms which have these
 
