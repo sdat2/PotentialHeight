@@ -2340,13 +2340,16 @@ def get_normalized_data(
     return pi_ps_ds
 
 
-def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0):
+def plot_normalized_quad(
+    lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0, plot_storms: bool = False
+) -> None:
     """
     Plot the normalized variables from the IBTrACS dataset:
 
     Args:
         lower_wind_vp (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
         lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed filtering. Defaults to 33.0 m/s.
+        plot_storms (bool, optional): If True, plot the storms with their normalized variables. Defaults to False.
     """
 
     # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
@@ -2547,18 +2550,19 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33
     print(
         f"Top 10 storms normalized intensities: {', '.join([str(x) for x in pi_ps_ds['normalized_intensity'].max(dim='date_time').values[top_intensity_storms]])}"
     )
-    dir = os.path.join(FIGURE_PATH, "top_10_superintense")
-    os.makedirs(dir, exist_ok=True)
-    for i, storm in enumerate(top_intensity_storms):
-        start_time = ibtracs_ds["time"].isel(storm=storm).values[0]
-        plot_name = os.path.join(
-            dir,
-            f"{i:02}-{np.datetime_as_string(start_time, unit='M')}-{ibtracs_ds.name.values[storm].decode()}.pdf",
-        )
-        plot_tc_track_by_index(
-            storm,
-            plot_name,
-        )
+    if plot_storms:
+        dir = os.path.join(FIGURE_PATH, "top_10_superintense")
+        os.makedirs(dir, exist_ok=True)
+        for i, storm in enumerate(top_intensity_storms):
+            start_time = ibtracs_ds["time"].isel(storm=storm).values[0]
+            plot_name = os.path.join(
+                dir,
+                f"{i:02}-{np.datetime_as_string(start_time, unit='M')}-{ibtracs_ds.name.values[storm].decode()}.pdf",
+            )
+            plot_tc_track_by_index(
+                storm,
+                plot_name,
+            )
 
     top_size_storms = np.argsort(
         -pi_ps_ds["normalized_size_cat1"].max(dim="date_time").values
@@ -2571,16 +2575,102 @@ def plot_normalized_quad(lower_wind_vp: float = 33.0, lower_wind_obs: float = 33
     )
     dir = os.path.join(FIGURE_PATH, "top_10_supersize")
     os.makedirs(dir, exist_ok=True)
-    for i, storm in enumerate(top_size_storms):
-        start_time = ibtracs_ds["time"].isel(storm=storm).values[0]
-        plot_name = os.path.join(
-            dir,
-            f"{i:02}-{np.datetime_as_string(start_time, unit='M')}-{ibtracs_ds.name.values[storm].decode()}.pdf",
-        )
-        plot_tc_track_by_index(
-            storm,
-            plot_name,
-        )
+    if plot_storms:
+        for i, storm in enumerate(top_size_storms):
+            start_time = ibtracs_ds["time"].isel(storm=storm).values[0]
+            plot_name = os.path.join(
+                dir,
+                f"{i:02}-{np.datetime_as_string(start_time, unit='M')}-{ibtracs_ds.name.values[storm].decode()}.pdf",
+            )
+            plot_tc_track_by_index(
+                storm,
+                plot_name,
+            )
+
+    # let's select and argmax those storms so we can make a latex table summary
+    top_size_storms_ds = pi_ps_ds.isel(storm=top_size_storms)
+    top_intensity_storms_ds = pi_ps_ds.isel(storm=top_intensity_storms)
+
+    # print(top_intensity_storms_ds)
+    # print(top_size_storms_ds)
+    # take max indexes
+    max_normalized_intensity_indices_da = top_intensity_storms_ds[
+        "normalized_intensity"
+    ].argmax(dim="date_time")
+    max_normalized_size_indices_da = top_size_storms_ds["normalized_size_cat1"].argmax(
+        dim="date_time"
+    )
+    var = [
+        "time",
+        "name",
+        "basin",
+        "lon",
+        "lat",
+        "normalized_intensity",
+        "normalized_size_cat1",
+        "usa_wind",
+        "usa_rmw",
+    ]
+    # select the storms at these indices and convert to dataframe
+    max_normalized_intensity_storms_df = (
+        top_intensity_storms_ds[var]
+        .isel(date_time=max_normalized_intensity_indices_da)
+        .to_dataframe()
+    )
+    max_normalized_size_storms_df = (
+        top_size_storms_ds[var]
+        .isel(date_time=max_normalized_size_indices_da)
+        .to_dataframe()
+    )
+
+    # save these to csv and latex files
+    max_normalized_intensity_storms_df.to_csv(
+        os.path.join(DATA_PATH, "max_normalized_intensity_storms.csv")
+    )
+    max_normalized_size_storms_df.to_csv(
+        os.path.join(DATA_PATH, "max_normalized_size_storms.csv")
+    )
+    formatters = {
+        "time": lambda x: x.round(freq="H").strftime("%Y-%m-%d %H:00"),
+        "usa_wind": lambda x: f"{x*0.514444:.2f}",  # convert knots to m/s
+        "usa_rmw": lambda x: f"{x*1852/1000:.2f}",  # convert nautical miles to km
+        "name": lambda x: x.decode().title(),
+        "basin": lambda x: x.decode(),
+    }
+    publication_headers = [
+        "Time (UTC)",
+        "Name",
+        "Basin",
+        r"Longitude [$^\circ$]",
+        r"Latitude [$^\circ$]",
+        r"\(V_{{ \mathrm{{max}} }} / V_{{ \mathrm{{p}} }}\)",  # CORRECTED
+        r"\(r_{{ \mathrm{{max}} }} / r'''_{{ \mathrm{{max}} }}\)",  # CORRECTED
+        r"\(V_{{ \mathrm{{max}} }}\) Obs. [m s$^{{-1}}$]",  # CORRECTED
+        r"\(r_{{ \mathrm{{max}} }}\) Obs. [km]",  # CORRECTED
+    ]
+    # save to latex files
+    max_normalized_intensity_storms_df.to_latex(
+        os.path.join(DATA_PATH, "max_normalized_intensity_storms.tex"),
+        index=False,
+        float_format="%.2f",
+        formatters=formatters,
+        header=publication_headers,
+        # booktabs=True,
+        caption="Top Storms by Normalized Intensity.",
+        label="tab:norm_intensity_storms",
+        # column_format="lcccccc",
+    )
+    max_normalized_size_storms_df.to_latex(
+        os.path.join(DATA_PATH, "max_normalized_size_storms.tex"),
+        index=False,
+        float_format="%.2f",
+        formatters=formatters,
+        header=publication_headers,
+        # booktabs=True,
+        caption="Top Storms by Normalized Size.",
+        label="tab:norm_size_storms",
+        # column_format="lcccccc",
+    )
 
     # print the names of the storms which have these
 
