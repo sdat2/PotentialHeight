@@ -855,7 +855,7 @@ def calculate_potential_size_cat1(vmin=33, v_reduc=0.8) -> None:
     # if vmax > vmin/v_reduc, set to vmin/v_reduc
     combined_ds["vmax"] = combined_ds["vmax"].where(
         combined_ds["vmax"] >= vmin / v_reduc, np.nan
-    )  # set to nan if below vmin
+    )  # set to nan if below vmin (i.e. the potential intensity is below category 1)
     combined_ds["vmax"] = combined_ds["vmax"].where(
         combined_ds["vmax"] < vmin / v_reduc, vmin / v_reduc
     )  # set to vmin/v_reduc if above vmin
@@ -2279,7 +2279,7 @@ def save_basin_names():
 
 @timeit
 def get_normalized_data(
-    lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0
+    lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0, v_reduc: float = 0.8
 ) -> xr.Dataset:
     """
     Get the normalized data from the IBTrACS dataset.
@@ -2304,11 +2304,12 @@ def get_normalized_data(
     ps_cat1_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.ps_cat1.nc")
     )
-    # only count where vp > 33
-    cps_ds = cps_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
-    ibtracs_ds = ibtracs_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
-    pi_ps_ds = pi_ps_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
-    ps_cat1_ds = ps_cat1_ds.where(pi_ps_ds.vmax > lower_wind_vp, drop=False)
+    # only count where vp > lower_wind_vp
+    cps_ds = cps_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
+    ibtracs_ds = ibtracs_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
+    pi_ps_ds = pi_ps_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
+    ps_cat1_ds = ps_cat1_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
+    # only count where usa_wind > lower_wind_obs
     ibtracs_ds = ibtracs_ds.where(
         ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
     )
@@ -2321,6 +2322,7 @@ def get_normalized_data(
     ps_cat1_ds = ps_cat1_ds.where(
         ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
     )
+    # calculate normalized variables
     pi_ps_ds["normalized_intensity"] = (
         ("storm", "date_time"),
         ibtracs_ds["usa_wind"].values * 0.514444 / pi_ps_ds.vmax.values / 0.8,
@@ -2337,7 +2339,25 @@ def get_normalized_data(
         ("storm", "date_time"),
         ibtracs_ds["usa_rmw"].values * 1852 / ps_cat1_ds.rmax.values,
     )
+    # adding the potential size variables back in
+    pi_ps_ds["potential_size_cat1"] = ps_cat1_ds["rmax"]
+    pi_ps_ds["potential_size_vp"] = pi_ps_ds["rmax"]
+    pi_ps_ds["vmax_obs_10m"] = ibtracs_ds["usa_wind"] * 0.514444
+    pi_ps_ds["vmax_vp_10m"] = pi_ps_ds["vmax"] * v_reduc
     return pi_ps_ds
+
+
+def perc_gt_1(x: np.ndarray) -> float:
+    """Calculate the percentage of values greater than 1.
+    Args:
+        x (np.ndarray): Input array to calculate the percentage from.
+
+    Returns:
+        float: Percentage of non nanvalues greater than 1.
+    """
+    x = x.ravel()  # Flatten the array to 1D
+    x = x[~np.isnan(x)]  # Remove NaN values
+    return np.sum(x > 1) / len(x) * 100
 
 
 def plot_normalized_quad(
@@ -2357,12 +2377,6 @@ def plot_normalized_quad(
     pi_ps_ds = get_normalized_data(
         lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs
     )
-
-    def perc_gt_1(x: np.ndarray) -> float:
-        """Calculate the percentage of values greater than 1."""
-        x = x.ravel()  # Flatten the array to 1D
-        x = x[~np.isnan(x)]  # Remove NaN values
-        return np.sum(x > 1) / len(x) * 100
 
     fig, axs = plt.subplots(
         1,
@@ -2656,7 +2670,7 @@ def plot_normalized_quad(
         formatters=formatters,
         header=publication_headers,
         # booktabs=True,
-        caption="Top Storms by Normalized Intensity.",
+        caption=r"Top storms by maximum normalized intensity, \(V_{{ \mathrm{{max}} }} / V_{{ \mathrm{{p}}}}\), selected at the point of their maximum normalized intensity.",
         label="tab:norm_intensity_storms",
         # column_format="lcccccc",
     )
@@ -2666,29 +2680,56 @@ def plot_normalized_quad(
         float_format="%.2f",
         formatters=formatters,
         header=publication_headers,
-        # booktabs=True,
-        caption="Top Storms by Normalized Size.",
+        caption=r"Top storms by normalized size \(r_{{ \mathrm{{max}} }} / r'''_{{ \mathrm{{max}}}}\), selected at the point of their maximum normalized intensity.",
         label="tab:norm_size_storms",
-        # column_format="lcccccc",
     )
-
-    # print the names of the storms which have these
 
 
 # Question: does the velocity size tradeoff look the same shape for all storms in this normalized space?
 
 
-def perc_gt_1(x: np.ndarray) -> float:
-    """Calculate the percentage of values greater than 1.
-    Args:
-        x (np.ndarray): Input array to calculate the percentage from.
-
-    Returns:
-        float: Percentage of non nanvalues greater than 1.
+def compare_normalized_potential_size(
+    lower_wind_vp: float = 33, lower_wind_obs: float = 33
+) -> None:
     """
-    x = x.ravel()  # Flatten the array to 1D
-    x = x[~np.isnan(x)]  # Remove NaN values
-    return np.sum(x > 1) / len(x) * 100
+    Compare normalized potential size.
+
+    Args:
+        lower_wind_vp (float, optional): Lower wind bound for potential intensity. Defaults to 33 m/s.
+        lower_wind_obs (float, optional): Lower wind bound for potential size. Defaults to 33 m/s.
+    """
+    # For relevant examples, I want to see if r'max / r'''max depends on other parameters, or is a constant value.
+
+    fig, ax = plt.subplots(1, 1, figsize=get_dim())
+
+    pi_ps_ds = get_normalized_data(
+        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs
+    )
+    pi_ps_ds["norm_potential_size"] = (
+        pi_ps_ds["potential_size_vp"] / pi_ps_ds["potential_size_cat1"]
+    )
+    plt.hexbin(
+        pi_ps_ds["potential_size_cat1"].values.ravel() / 1000,
+        pi_ps_ds["norm_potential_size"].values.ravel(),
+        gridsize=100,
+        cmap="cmo.thermal",
+        mincnt=1,
+        bins="log",
+    )
+    plt.colorbar(label="Log Count")
+    plt.xlabel(r"Potential size for cat1 $r'''_{\mathrm{max}}$ [km]")
+    plt.ylabel(r"Normalized potential size $r'_{\mathrm{max}} / r'''_{\mathrm{max}}$")
+    plt.savefig(os.path.join(FIGURE_PATH, "norm_ps.pdf"))
+    plt.clf()
+    plt.close()
+    # find out if potential intensity ever below 33 m/s
+
+    weird_storms = np.any(
+        pi_ps_ds["vmax_vp_10m"].values < lower_wind_vp, axis=1
+    )  # v_reduc to surface wind.
+    print(
+        f"Number of storms with potential intensity below {lower_wind_vp} m/s: {np.sum(weird_storms)} out of {len(weird_storms)}"
+    )
 
 
 def get_vary_vp_lower_data(
@@ -2711,6 +2752,7 @@ def get_vary_vp_lower_data(
 
     file_name = os.path.join(IBTRACS_DATA_PATH, "vary_vp_lower_exceedance.nc")
     if os.path.exists(file_name):
+        print(f"Loading existing dataset from {file_name}")
         return xr.open_dataset(os.path.join(file_name))
     else:
         vp_lower_array = np.linspace(lower_vp_min, lower_vp_max, num=num)
@@ -2771,6 +2813,7 @@ def get_vary_vobs_lower_data(
     """
     file_name = os.path.join(IBTRACS_DATA_PATH, "vary_vobs_lower_exceedance.nc")
     if os.path.exists(file_name):
+        print(f"Loading existing dataset from {file_name}")
         return xr.open_dataset(os.path.join(file_name))
     else:
         vobs_lower_array = np.linspace(lower_vobs_min, lower_vobs_max, num=num)
@@ -3008,7 +3051,8 @@ if __name__ == "__main__":
     # )
     # save_basin_names()
     # vary_v_cps()
-    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33)
+    # plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33)
+    # compare_normalized_potential_size()
     # calculate_potential_size_cat1()
     # add_pi_ps_back_onto_tracks(
     #     variables_to_map=("rmax", "vmax", "r0", "pm", "otl", "t0"),
@@ -3016,4 +3060,4 @@ if __name__ == "__main__":
     #     era5_name="era5_unique_points_ps_cat1.nc",
     #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
     # )
-    # vary_limits(num=50)
+    vary_limits(num=50)
