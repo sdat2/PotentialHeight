@@ -938,7 +938,7 @@ def plot_potential_size() -> None:
         / 1000,  # convert to km
         bins=100,
         alpha=0.5,
-        label=r"$r_{\mathrm{max}}$ [km]",
+        label=r"$r_1$ [km]",
     )
     axs[1].hist(
         grid_avg_ds["r0"].values.ravel()[~np.isnan(grid_avg_ds["r0"].values.ravel())]
@@ -947,7 +947,7 @@ def plot_potential_size() -> None:
         alpha=0.5,
         label=r"$r_a$ [km]",
     )
-    axs[0].set_xlabel(r"$r_{\mathrm{max}}$ [km]")
+    axs[0].set_xlabel(r"$r_1$ [km]")
     axs[1].set_xlabel(r"$r_a$ [km]")
     axs[0].set_ylabel("Count")
     label_subplots(axs)
@@ -1135,8 +1135,8 @@ def plot_normalized_variables() -> None:
         range=(0, 5),
         alpha=0.5,
     )
-    axs[0].set_xlabel(r"Normalized $r_{\mathrm{max}}/r'_{\mathrm{max}}$")
-    axs[1].set_xlabel(r"Normalized ${V_{\mathrm{max}}}/{V_{p}}$")
+    axs[0].set_xlabel(r"Normalized $r_{\mathrm{Obs.}}/r_1$")
+    axs[1].set_xlabel(r"Normalized ${V_{\mathrm{Obs.}}}/{V_{p}}$")
     axs[0].set_ylabel("Count")
 
     label_subplots(axs)
@@ -1174,7 +1174,7 @@ def plot_normalized_variables() -> None:
     plot_var_on_map(
         axs[1],
         avg_ds["normalized_rmax"],
-        r"Mean Normalized Size, $\frac{r_{\mathrm{max}}}{r'_{\mathrm{max}}}$",
+        r"Mean Normalized Size, $\frac{r_{\mathrm{Obs.}}}{r_1}$",
         "viridis",
         shrink=1,
     )
@@ -1321,8 +1321,8 @@ def plot_cps():
         alpha=0.5,
         label="Vmax",
     )
-    axs[0].set_xlabel(r"$r_{\mathrm{max}}$ [km]")
-    axs[1].set_xlabel(r"$V_{\mathrm{max}}$ [m/s]")
+    axs[0].set_xlabel(r"$r_{\mathrm{Obs.}}$ [km]")
+    axs[1].set_xlabel(r"$V_{\mathrm{Obs.}}$ [m s$^{-1}$]")
     axs[0].set_ylabel("Count")
 
     label_subplots(axs)
@@ -1359,14 +1359,14 @@ def plot_cps():
     plot_var_on_map(
         axs[1],
         avg_ds["rmax"] / 1000,
-        r"Mean $r_{\mathrm{max}}$ [km]",
+        r"Mean $r_2$ [km]",
         "viridis",
         shrink=1,
     )
     plot_var_on_map(
         axs[2],
         avg_ds["vmax"],
-        r"Mean $V_{\mathrm{max}}$ [m/s]",
+        r"Mean $V_{\mathrm{Obs.}}$ [m/s]",
         "viridis_r",
         shrink=1,
     )
@@ -1417,7 +1417,7 @@ def plot_normalized_cps():
         alpha=0.5,
         label="Normalized Rmax",
     )
-    ax.set_xlabel(r"Normalized $r_{\mathrm{max}}/r''_{\mathrm{max}}$")
+    ax.set_xlabel(r"Normalized $r_{\mathrm{Obs.}}/r_2$")
     ax.set_ylabel("Count")
     plt.savefig(
         os.path.join(FIGURE_PATH, "cps_normalized_rmax_hist.pdf"),
@@ -1771,15 +1771,15 @@ def plot_tc_example(
 
     # Select Katrina's data
     tc_ds = select_tc_from_ds(ibtracs_ds, name=name, basin=basin, subbasin=subbasin)
-    print("tc_ds", tc_ds)
+    # print("tc_ds", tc_ds)
     tc_cps_ds = select_tc_from_ds(cps_ds, name=name, basin=basin, subbasin=subbasin)
-    print("tc_cps_ds", tc_cps_ds)
+    # print("tc_cps_ds", tc_cps_ds)
     tc_ds["ps_vobs"] = tc_cps_ds["rmax"]  # take the rmax from the cps dataset
     track_dir = os.path.join(FIGURE_PATH, "tracks")
     os.makedirs(track_dir, exist_ok=True)
     plot_name = os.path.join(track_dir, f"{name.decode().lower()}_track.pdf")
-    print(plot_name)
-    _plot_tc_track(tc_ds, plot_name, boox=bbox, landing_no=landing_no)
+    # print(plot_name)
+    _plot_tc_track(tc_ds, plot_name, bbox=bbox, landing_no=landing_no)
 
 
 def plot_tc_track_by_index(index, plot_name):
@@ -1981,7 +1981,7 @@ def _plot_tc_track(
     ax_line1.plot(
         times.ravel(),
         tc_ds["usa_wind"].values.ravel() * 0.514444,  # convert knots to m/s
-        label=r"$V_{\mathrm{max}}$ Obs. [m s$^{-1}$]",
+        label=r"$V_{\mathrm{Obs.}}$ [m s$^{-1}$]",
         color="blue",
     )
     ax_line1.plot(
@@ -1991,7 +1991,7 @@ def _plot_tc_track(
         label=r"$V_{\mathrm{p}}$@10m [m s$^{-1}$]",
         color="green",
     )
-    ax_line1.set_ylabel(r"$V_{\mathrm{max}}$ [m s$^{-1}$]")
+    ax_line1.set_ylabel(r"$V$ [m s$^{-1}$]")
     add_saffir_simpson_boundaries(
         ax_line1,
     )
@@ -2011,26 +2011,22 @@ def _plot_tc_track(
     ax_line2.plot(
         times.ravel(),
         tc_ds["usa_rmw"].values.ravel() * 1852 / 1000,  # convert nautical miles to km
-        label=r"$r_{\mathrm{max}}$ Obs. [km]",
+        label=r"$r_{\mathrm{Obs.}}$ [km]",
         color="blue",
     )
     ax_line2.plot(
         times.ravel(),
         tc_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r'_{\mathrm{max}}$ PS [km]"
-        + "\n"
-        + r"($V_{\mathrm{max}}=V_{\mathrm{p}}$)",
+        label=r"$r_1$ PS [km]" + "\n" + r"($V=V_{\mathrm{p}}$)",
         color="green",
     )
     ax_line2.plot(
         times.ravel(),
         tc_ds["ps_vobs"].values.ravel() / 1000,  # convert m to km
-        label=r"$r''_{\mathrm{max}}$ CPS [km]"
-        + "\n"
-        + r"($V_{\mathrm{max}}=V_{\mathrm{max}} \text{ Obs.}$)",
+        label=r"$r_2$ CPS [km]" + "\n" + r"($V=V_{\mathrm{Obs.}} \text{ Obs.}$)",
         color="orange",
     )
-    ax_line2.set_ylabel(r"$r_{\mathrm{max}}$ [km]")
+    ax_line2.set_ylabel(r"$r$ [km]")
     ax_line2.set_xlabel("Time since impact [hours]")
     # expand legend to the right of the plot
     ax_line2.legend(loc="upper left", bbox_to_anchor=(1.05, 1), borderaxespad=0.0)
@@ -2090,9 +2086,11 @@ def vary_v_cps(
     ).isel(date_time=timestep)
     print("tc_inputs_ds", tc_inputs_ds)
     # category 1 to potential intensity
+    # go from 33 m/s to the potential intensity vmax
     vs = np.linspace(33 / v_reduc, tc_pi_ps_ds.vmax.values, num=20)
     tc_inputs_ds["vmax"] = ("v", vs)
 
+    # trim to get rid of unnecessary dimensions
     trimmed_ds = tc_inputs_ds[["vmax", "msl", "rh", "sst", "t0"]]
 
     # add in default param values
@@ -2103,8 +2101,13 @@ def vary_v_cps(
     ps_ds = parallelized_ps(
         trimmed_ds,
     )
+    r2 = scipy.interpolate.interp1d(
+        ps_ds.vmax.values * v_reduc,
+        ps_ds.rmax.values / 1000,  # convert m to km
+    )(tc_inputs_ds.usa_wind.values * 0.514444)
+
     plt.plot(
-        vs * v_reduc,
+        vs * v_reduc,  # tranlate velocity to 10m height
         ps_ds["rmax"].values / 1000,  # convert m to km
         label=f"v_reduc={v_reduc} (CPS)",
         color="orange",
@@ -2125,39 +2128,57 @@ def vary_v_cps(
         linewidth=0.8,
         alpha=0.7,
     )  # convert knots to m/s
+    # plot horizontal dashed line at cps rmax
+    plt.axhline(
+        ps_ds["rmax"].values[0] / 1000,  # convert m to km
+        color="orange",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.7,
+    )
+    plt.axhline(
+        r2,
+        color="blue",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.7,
+    )
+    plt.axhline(
+        tc_pi_ps_ds.rmax.values / 1000,  # convert m to km
+        color="green",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.7,
+    )  # convert knots to m/s
 
     plt.plot(
         tc_pi_ps_ds.vmax.values * v_reduc,
         tc_pi_ps_ds.rmax.values / 1000,  # convert m to km
         marker="o",
         color="green",
-        label=r"$r'_{\mathrm{max}}$ PS [km]",
+        label=r"$r_1$ PS [km]",
     )
     plt.plot(
         tc_inputs_ds.usa_wind.values * 0.514444,
         tc_inputs_ds.usa_rmw.values * 1852 / 1000,  # convert nautical miles to km
         marker="+",
         color="blue",
-        label=r"$V_{\mathrm{max}}, $r_{\mathrm{max}}$ Obs. [km]",
+        label=r"$V_{\mathrm{Obs.}}, $r_{\mathrm{Obs.}}$ [km]",
     )
+
     plt.plot(
         tc_inputs_ds.usa_wind.values * 0.514444,
-        scipy.interpolate.interp1d(
-            ps_ds.vmax.values * v_reduc,
-            ps_ds.rmax.values / 1000,  # convert m to km
-        )(
-            tc_inputs_ds.usa_wind.values * 0.514444
-        ),  # convert knots to m/s
+        r2,  # convert knots to m/s
         marker="o",
         color="blue",
-        label=r"$r''_{\mathrm{max}}$ CPS [km]",
+        label=r"$r_2$ CPS [km]",
     )
     plt.plot(
         ps_ds.vmax.values[0] * v_reduc,
-        ps_ds.rmax.values[0] / 1000,  # convert m to km
+        ps_ds.rmax.values[0],  # convert m to km
         marker="o",
         color="orange",
-        label=r"$r'''_{\mathrm{max}}$ PS @cat1 [km]",
+        label=r"$r_3$ PS @cat1 [km]",
     )
     # I want to grey out the area above the v curve.
     plt.fill_between(
@@ -2192,8 +2213,8 @@ def vary_v_cps(
             tc_pi_ps_ds.vmax.values * v_reduc,
         ],
         labels=[
-            r"$V_{\mathrm{max}} \mathrm{cat1}$" + f"={33:.1f}" + r" m s$^{-1}$",
-            r"$V_{\mathrm{max}}$ Obs."
+            r"$V \mathrm{cat1}$" + f"={33:.1f}" + r" m s$^{-1}$",
+            r"$V_{\mathrm{Obs.}}$"
             + f"={tc_inputs_ds.usa_wind.values * 0.514444:.1f}"
             + r" m s$^{-1}$",
             r"$V_{\mathrm{p}}$ @10m"
@@ -2202,8 +2223,8 @@ def vary_v_cps(
         ],
     )
 
-    plt.xlabel(r"$V_{\mathrm{max}}$ @ 10m [m s$^{-1}$]")
-    plt.ylabel(r"$r_{\mathrm{max}} \left(V_{\mathrm{max}}\right)$ [km]")
+    plt.xlabel(r"$V$ @ 10m [m s$^{-1}$]")
+    plt.ylabel(r"$r\left(V\right)$ [km]")
     plt.savefig(
         os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.pdf"),
         dpi=300,
@@ -2287,6 +2308,7 @@ def get_normalized_data(
     Args:
         lower_wind_vp (float, optional): Lower wind speed threshold for potential intensity. Defaults to 33.0 m/s.
         lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed. Defaults to 33.0 m/s.
+        v_reduc (float, optional): Reduction factor for the potential intensity. Defaults to 0.8.
 
     Returns:
         xr.Dataset: The normalized dataset.
@@ -2386,13 +2408,13 @@ def plot_normalized_quad(
         sharex=True,
     )
     axs[0].hist(pi_ps_ds["normalized_intensity"].values.ravel(), bins=100)
-    axs[0].set_xlabel(r"$V_{\mathrm{max}} / V_{\mathrm{p}}$")
+    axs[0].set_xlabel(r"$V_{\mathrm{Obs.}} / V_{\mathrm{p}}$")
     axs[0].set_ylabel("Count")
     axs[0].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
     )
     axs[1].hist(pi_ps_ds["normalized_size"].values.ravel(), bins=400)
-    axs[1].set_xlabel(r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$")
+    axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_1$")
     axs[1].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_size'].values):.1f} % exceedance"
     )
@@ -2400,12 +2422,12 @@ def plot_normalized_quad(
     axs[2].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_size_obs'].values):.1f} % exceedance"
     )
-    axs[2].set_xlabel(r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$")
+    axs[2].set_xlabel(r"$r_{\mathrm{Obs.}} / r_2$")
     axs[3].hist(pi_ps_ds["normalized_size_cat1"].values.ravel(), bins=600)
     axs[3].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_size_cat1'].values):.1f} % exceedance"
     )
-    axs[3].set_xlabel(r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$")
+    axs[3].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
     label_subplots(axs)
     plt.xlim(0, 3)
     plt.savefig(
@@ -2445,7 +2467,7 @@ def plot_normalized_quad(
         / length_of_array(max_normalized_intensity.values),
     )
     axs[0].set_xlabel(
-        r"$\max_{\mathrm{storm}}\left(V_{\mathrm{max}} / V_{\mathrm{p}}\right)$"
+        r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$"
     )
     axs[0].set_ylabel("Survival Function (1 - CDF)")
 
@@ -2455,27 +2477,21 @@ def plot_normalized_quad(
         - np.arange(1, length_of_array(max_normalized_ps.values) + 1)
         / length_of_array(max_normalized_ps.values),
     )
-    axs[1].set_xlabel(
-        r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r'_{\mathrm{max}}\right)$"
-    )
+    axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
     axs[2].plot(
         np.sort(processed_array(max_normalized_cps.values)),
         1
         - np.arange(1, length_of_array(max_normalized_cps.values) + 1)
         / length_of_array(max_normalized_cps.values),
     )
-    axs[2].set_xlabel(
-        r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r''_{\mathrm{max}}\right)$"
-    )
+    axs[2].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
     axs[3].plot(
         np.sort(processed_array(max_normalized_ps_cat1.values)),
         1
         - np.arange(1, length_of_array(max_normalized_ps_cat1.values) + 1)
         / length_of_array(max_normalized_ps_cat1.values),
     )
-    axs[3].set_xlabel(
-        r"$\max_{\mathrm{storm}}\left(r_{\mathrm{max}} / r'''_{\mathrm{max}}\right)$"
-    )
+    axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
     axs[3].set_title(
         f"{perc_gt_1(max_normalized_ps_cat1.values):.1f} % exceedance"
     )  # add the percentage of exceedance
@@ -2525,8 +2541,8 @@ def plot_normalized_quad(
         bins="log",
     )
     plt.colorbar(label="Log Count")
-    plt.xlabel(r"Normalized intensity, $V_{\mathrm{max}} / V_{\mathrm{p}}$")
-    plt.ylabel(r"Normalized size, $r_{\mathrm{max}} / r'''_{\mathrm{max}}$")
+    plt.xlabel(r"Normalized intensity, $V_{\mathrm{Obs.}} / V_{\mathrm{p}}$")
+    plt.ylabel(r"Normalized size, $r_{\mathrm{Obs.}} / r_3$")
     plt.savefig(
         os.path.join(FIGURE_PATH, "normalized_2d_hist.pdf"),
         dpi=300,
@@ -2659,8 +2675,8 @@ def plot_normalized_quad(
         r"Latitude [$^\circ$]",
         r"\(V_{{ \mathrm{{max}} }} / V_{{ \mathrm{{p}} }}\)",  # CORRECTED
         r"\(r_{{ \mathrm{{max}} }} / r'''_{{ \mathrm{{max}} }}\)",  # CORRECTED
-        r"\(V_{{ \mathrm{{max}} }}\) Obs. [m s$^{{-1}}$]",  # CORRECTED
-        r"\(r_{{ \mathrm{{max}} }}\) Obs. [km]",  # CORRECTED
+        r"\(V_{{ \mathrm{{max}} }}\) [m s$^{{-1}}$]",  # CORRECTED
+        r"\(r_{{ \mathrm{{max}} }}\) [km]",  # CORRECTED
     ]
     # save to latex files
     max_normalized_intensity_storms_df.to_latex(
@@ -2717,8 +2733,8 @@ def compare_normalized_potential_size(
         bins="log",
     )
     plt.colorbar(label="Log Count")
-    plt.xlabel(r"Potential size for cat1 $r'''_{\mathrm{max}}$ [km]")
-    plt.ylabel(r"Normalized potential size $r'_{\mathrm{max}} / r'''_{\mathrm{max}}$")
+    plt.xlabel(r"Potential size for cat1 $r_3$ [km]")
+    plt.ylabel(r"Normalized potential size $r_1 / r_3$")
     plt.savefig(os.path.join(FIGURE_PATH, "norm_ps.pdf"))
     plt.clf()
     plt.close()
@@ -2868,25 +2884,25 @@ def vary_limits(num=6):
     ax.plot(
         vp_lower_ds["vp_lower"].values,
         vp_lower_ds["ps_exceedance"].values,
-        label=r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$",
+        label=r"$r_{\mathrm{Obs.}} / r_1$",
         color="green",
     )
     ax.plot(
         vp_lower_ds["vp_lower"].values,
         vp_lower_ds["ps_obs_exceedance"].values,
-        label=r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$",
+        label=r"$r_{\mathrm{Obs.}} / r_2$",
         color="blue",
     )
     ax.plot(
         vp_lower_ds["vp_lower"].values,
         vp_lower_ds["ps_cat1_exceedance"].values,
-        label=r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$",
+        label=r"$r_{\mathrm{Obs.}} / r_3$",
         color="orange",
     )
     ax.plot(
         vp_lower_ds["vp_lower"].values,
         vp_lower_ds["intensity_exceedance"].values,
-        label=r"$V_{\mathrm{max}} / V_{\mathrm{p}}$",
+        label=r"$V_{\mathrm{Obs.}} / V_{\mathrm{p}}$",
         color="red",
     )
     ax.set_xlabel(r"$V_{\mathrm{p}}$ lower limit [m s$^{-1}$]")
@@ -2908,29 +2924,29 @@ def vary_limits(num=6):
     ax.plot(
         vobs_lower_ds["vobs_lower"].values,
         vobs_lower_ds["ps_exceedance"].values,
-        label=r"$r_{\mathrm{max}} / r'_{\mathrm{max}}$",
+        label=r"$r_{\mathrm{Obs.}} / r_1$",
         color="green",
     )
     ax.plot(
         vobs_lower_ds["vobs_lower"].values,
         vobs_lower_ds["ps_obs_exceedance"].values,
-        label=r"$r_{\mathrm{max}} / r''_{\mathrm{max}}$",
+        label=r"$r_{\mathrm{Obs.}} / r_2$",
         color="blue",
     )
     ax.plot(
         vobs_lower_ds["vobs_lower"].values,
         vobs_lower_ds["ps_obs_exceedance"].values,
-        label=r"$r_{\mathrm{max}} / r'''_{\mathrm{max}}$",
+        label=r"$r_{\mathrm{Obs.}} / r_3$",
         color="orange",
     )
 
     ax.plot(
         vobs_lower_ds["vobs_lower"].values,
         vobs_lower_ds["intensity_exceedance"].values,
-        label=r"$V_{\mathrm{max}} / V_{\mathrm{p}}$",
+        label=r"$V_{\mathrm{Obs.}} / V_{\mathrm{p}}$",
         color="red",
     )
-    ax.set_xlabel(r"$V_{\mathrm{max}}$ Obs. lower limit [m s$^{-1}$]")
+    ax.set_xlabel(r"$V_{\mathrm{Obs.}}$ lower limit [m s$^{-1}$]")
     ax.set_ylabel("Exceedance [%]")
     ax.legend()
     ax.set_xlim(
@@ -2942,6 +2958,102 @@ def vary_limits(num=6):
     )
     plt.clf()
     plt.close()
+
+
+def run_all_plots():
+    """Re-run all the plot (not the calculations) in the correct order."""
+    plot_defaults()
+    plot_unique_points()
+    plot_example_raw()
+    plot_era5_processed()
+    plot_potential_intensity()
+    plot_potential_size()
+    plot_normalized_variables()
+    vary_v_cps(v_reduc=0.8)
+    plot_cps()
+    plot_normalized_cps()
+    plot_tc_example()
+    plot_tc_example(
+        name=b"KATRINA", bbox=(-92.5, -72.5, 22.5, 37.5)
+    )  # Katrina's landfall in Louisiana
+    plot_tc_example(
+        name=b"IDA", bbox=(-92.5 - 5, -72.5, 22.5 - 5, 37.5)
+    )  # Ida's landfall in Louisiana
+    plot_tc_example(
+        name=b"HELENE",
+        bbox=(-92.5 - 5, -72.5, 22.5 - 5, 37.5),  # bbox=(-90, -80, 25, 35)
+    )
+    plot_tc_example(name=b"IAN", bbox=(-92.5 + 7.5, -72.5 + 10, 22.5 - 10, 37.5 - 5))
+    plot_tc_example(name=b"HARVEY", bbox=(-92.5 - 7.5, -72.5 + 20, 22.5 - 10, 37.5 + 5))
+    plot_tc_example(
+        name=b"FIONA",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"SAOLA",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=(108, 130, 15, 30),
+    )
+    plot_tc_example(
+        name=b"MANGKHUT",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        # bbox=None,
+        bbox=(100, 170, 10, 30),
+    )
+    plot_tc_example(
+        name=b"HATO",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        # bbox=None,
+        bbox=(90, 135, 10, 30),
+    )
+    plot_tc_example(
+        name=b"VICENTE",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"YORK",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"ELLEN",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"BEBINCA",  # Bebinca
+        basin=b"WP",
+        subbasin=b"WPAC",
+        # bbox=(100, 170, 10, 30),
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"JEBI",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"MERANTI",
+        basin=b"WP",
+        subbasin=b"WPAC",
+        bbox=None,
+    )
+    plot_tc_example(
+        name=b"FREDDY",
+        basin=b"SI",
+        bbox=None,
+    )
+    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33, plot_storms=True)
+    compare_normalized_potential_size()
+    vary_limits(num=50)
 
 
 if __name__ == "__main__":
@@ -3060,4 +3172,5 @@ if __name__ == "__main__":
     #     era5_name="era5_unique_points_ps_cat1.nc",
     #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
     # )
-    vary_limits(num=50)
+    # vary_limits(num=50)
+    run_all_plots()
