@@ -1,4 +1,4 @@
-"""Some functions for the Wang 2022 Carnot engine model."""
+"""Some functions for the Wang 2022 "Tropical Cyclone Potential Size" Carnot engine model."""
 
 from typing import Callable, Tuple
 import numpy as np
@@ -147,4 +147,49 @@ def wang_consts(
                 * gas_constant
             )
         ),
+    )
+
+
+def wang_carnot_velocity(
+    efficiency_relative_to_carnot: float = EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT,
+    near_surface_air_temperature: float = NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,
+    outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,
+    latent_heat_of_vaporization: float = LATENT_HEAT_OF_VAPORIZATION,
+    gas_constant_for_water_vapor: float = GAS_CONSTANT_FOR_WATER_VAPOR,
+    gas_constant: float = GAS_CONSTANT,
+    pressure_dry_at_inflow: float = PRESSURE_DRY_AT_INFLOW_DEFAULT,
+) -> float:
+    """
+    Calculate the Carnot velocity from the Wang 2022 Carnot engine model.
+
+    In equation 27 they make a series of assumptions, including that intensity does not signicantly change with potential size to get the formula.
+
+    V_carnot**2 = (eta * epsilon_c * L_v - R_v * T_s) * q_va^{*}
+
+    q_va^{star} = R/R_v (e*s)
+
+    Args:
+        efficiency_relative_to_carnot (float, optional): Efficiency relative to Carnot. Defaults
+            to EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT.
+        near_surface_air_temperature (float, optional): Near surface air temperature in Kelvin. Defaults to NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT.
+        outflow_temperature (float, optional): Outflow temperature in Kelvin. Defaults to OUTFLOW_TEMPERATURE_DEFAULT.
+        latent_heat_of_vaporization (float, optional): Latent heat of vaporization in J/kg. Defaults to LATENT_HEAT_OF_VAPORIZATION.
+        gas_constant_for_water_vapor (float, optional): Gas constant for water vapor in J/kg/K. Defaults to GAS_CONSTANT_FOR_WATER_VAPOR.
+        gas_constant (float, optional): Gas constant in J/kg/K. Defaults to GAS_CONSTANT.
+        pressure_dry_at_inflow (float, optional): Dry air pressure at inflow in Pa. Defaults to PRESSURE_DRY_AT_INFLOW_DEFAULT.
+    """
+    q_va_star = (
+        gas_constant
+        / gas_constant_for_water_vapor
+        * buck_sat_vap_pressure(near_surface_air_temperature)
+        / pressure_dry_at_inflow
+    )
+    return np.sqrt(
+        (
+            efficiency_relative_to_carnot
+            * carnot_efficiency(near_surface_air_temperature, outflow_temperature)
+            * latent_heat_of_vaporization
+            - near_surface_air_temperature * gas_constant_for_water_vapor
+        )
+        * q_va_star
     )
