@@ -67,7 +67,7 @@ def wang_consts(
     radius_of_max_wind: float = RADIUS_OF_MAX_WIND_DEFAULT,  # m
 ) -> Tuple[float, float, float]:  # a, b, c
     """
-    Wang 2022 Carnot engine model parameters.
+    Wang 2022 Carnot engine model parameters. This function calculates the constants that are then used to calculate the difference function whose root we want to find.
 
     Args:
         near_surface_air_temperature (float, optional): Defaults to 299 [K].
@@ -151,13 +151,13 @@ def wang_consts(
 
 
 def wang_carnot_velocity(
-    efficiency_relative_to_carnot: float = EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT,
-    near_surface_air_temperature: float = NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,
-    outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,
-    latent_heat_of_vaporization: float = LATENT_HEAT_OF_VAPORIZATION,
-    gas_constant_for_water_vapor: float = GAS_CONSTANT_FOR_WATER_VAPOR,
-    gas_constant: float = GAS_CONSTANT,
-    pressure_dry_at_inflow: float = PRESSURE_DRY_AT_INFLOW_DEFAULT,
+    efficiency_relative_to_carnot: float = EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT,  # dimensionless
+    near_surface_air_temperature: float = NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,  # K
+    outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,  # K
+    latent_heat_of_vaporization: float = LATENT_HEAT_OF_VAPORIZATION,  # J/kg
+    gas_constant_for_water_vapor: float = GAS_CONSTANT_FOR_WATER_VAPOR,  # J/kg/K
+    gas_constant: float = GAS_CONSTANT,  # J/kg/K
+    pressure_dry_at_inflow: float = PRESSURE_DRY_AT_INFLOW_DEFAULT,  # Pa
 ) -> float:
     """
     Calculate the Carnot velocity from the Wang 2022 Carnot engine model.
@@ -167,6 +167,8 @@ def wang_carnot_velocity(
     V_carnot**2 = (eta * epsilon_c * L_v - R_v * T_s) * q_va^{*}
 
     q_va^{star} = R/R_v (e*s)
+
+    They interpret this as the largest possible wind speed that can be reached at the outflow at radius r_a.
 
     Args:
         efficiency_relative_to_carnot (float, optional): Efficiency relative to Carnot. Defaults
@@ -192,4 +194,46 @@ def wang_carnot_velocity(
             - near_surface_air_temperature * gas_constant_for_water_vapor
         )
         * q_va_star
+    )
+
+
+def wang_outer_radius_approx(
+    efficiency_relative_to_carnot: float = EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT,  # dimensionless
+    near_surface_air_temperature: float = NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,  # K
+    outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,  # K
+    latent_heat_of_vaporization: float = LATENT_HEAT_OF_VAPORIZATION,  # J/kg
+    gas_constant_for_water_vapor: float = GAS_CONSTANT_FOR_WATER_VAPOR,  # J/kg/K
+    gas_constant: float = GAS_CONSTANT,  # J/kg/K
+    pressure_dry_at_inflow: float = PRESSURE_DRY_AT_INFLOW_DEFAULT,  # Pa
+    coriolis_parameter: float = F_COR_DEFAULT,  # s-1
+):
+    """
+    Calculate the length scale from the Wang 2022 Carnot engine model. The factor of 2 is from Appendix B.
+
+    Most of the time the length scale is referred to as V_carnot/f_cor, but there is a factor of 2 in derivation in Appendix B, so we include that here for completeness.
+
+    Args:
+        efficiency_relative_to_carnot (float, optional): Efficiency relative to Carnot. Defaults
+            to EFFICIENCY_RELATIVE_TO_CARNOT_DEFAULT.
+        near_surface_air_temperature (float, optional): Near surface air temperature in Kelvin. Defaults to NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT.
+        outflow_temperature (float, optional):
+            Outflow temperature in Kelvin. Defaults to OUTFLOW_TEMPERATURE_DEFAULT.
+        latent_heat_of_vaporization (float, optional): Latent heat of vaporization in J/kg. Defaults to LATENT_HEAT_OF_VAPORIZATION.
+        gas_constant_for_water_vapor (float, optional):
+            Gas constant for water vapor in J/kg/K. Defaults to GAS_CONSTANT_FOR_WATER_VAPOR.
+        gas_constant (float, optional): Gas constant in J/kg/K. Defaults to GAS_CONSTANT.
+        pressure_dry_at_inflow (float, optional): Dry air pressure at inflow in Pa. Defaults to PRESSURE_DRY_AT_INFLOW_DEFAULT.
+        coriolis_parameter (float, optional): Coriolis parameter in s-1. Defaults to F_COR_DEFAULT.
+    """
+    return 2 * (
+        wang_carnot_velocity(
+            efficiency_relative_to_carnot,
+            near_surface_air_temperature,
+            outflow_temperature,
+            latent_heat_of_vaporization,
+            gas_constant_for_water_vapor,
+            gas_constant,
+            pressure_dry_at_inflow,
+        )
+        / coriolis_parameter
     )
