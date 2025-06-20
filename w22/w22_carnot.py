@@ -168,7 +168,7 @@ def wang_carnot_velocity(
 
     q_va^{star} = R/R_v (e*s)
 
-    They interpret this as the largest possible wind speed that can be reached at the outflow at radius r_a.
+    They interpret this as the largest possible wind speed that can be reached in the outflow at radius r_a.
 
     Args:
         efficiency_relative_to_carnot (float, optional): Efficiency relative to Carnot. Defaults

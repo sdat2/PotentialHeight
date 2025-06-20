@@ -139,6 +139,16 @@ def q_s(
     )
 
 
+"""def vp_no_dissipation(
+    near_surface_air_temperature: float = 299,
+    outflow_temperature: float = 200,
+    ck_cd: float = 1,
+    k_boundary_layer: float = 0.002,
+    k_
+):
+"""
+
+
 def v_carnot(
     efficiency_relative_to_carnot: float = 0.5,
     near_surface_air_temperature: float = 299,
@@ -147,7 +157,23 @@ def v_carnot(
     gas_constant: float = 287,
     gas_constant_for_water_vapor: float = 461.5,
     pressure_dry_at_inflow: float = 985_00,
-):
+) -> float:
+    """
+    Calculate the carnot engine velocity approximated in Wang 2022.
+
+    Args:
+        efficiency_relative_to_carnot (float): The efficiency relative to Carnot.
+        near_surface_air_temperature (float): The near surface air temperature in Kelvin.
+        outflow_temperature (float): The outflow temperature in Kelvin.
+        latent_heat_of_vaporization (float): The latent heat of vaporization in J/kg
+        gas_constant (float): The gas constant for dry air in J/(kg*K).
+        gas_constant_for_water_vapor (float): The gas constant for water vapor in J/(kg*K).
+        pressure_dry_at_inflow (float): The dry pressure at inflow in
+            Pascals (Pa).
+
+    Returns:
+        float: The velocity at which the Carnot efficiency is achieved in m/s.
+    """
     return np.sqrt(
         (
             (
@@ -671,13 +697,17 @@ def make_plot(add_name: str = ""):
     plt.close()
 
 
-if __name__ == "__main__":
-    # python -m w22.test --name archer2-slurm
-    # test_figure_4()
-    # test_figure_5()
-    import argparse
+# if __name__ == "__main__":
+# python -m w22.test --name archer2-slurm
+# test_figure_4()
+# test_figure_5()
+# import argparse
 
-    parser = argparse.ArgumentParser(description="Process some inputs.")
-    parser.add_argument("--name", type=str, help="Input for octave_vs_python")
-    args = parser.parse_args()
-    octave_vs_python(args.name)
+# parser = argparse.ArgumentParser(description="Process some inputs.")
+# parser.add_argument("--name", type=str, help="Input for octave_vs_python")
+# args = parser.parse_args()
+# octave_vs_python(args.name)
+
+if __name__ == "__main__":
+
+    print(v_carnot())
