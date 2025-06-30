@@ -708,6 +708,8 @@ def make_plot(add_name: str = ""):
 # args = parser.parse_args()
 # octave_vs_python(args.name)
 
+
 if __name__ == "__main__":
+    # python -m w22.test
 
     print(v_carnot())
