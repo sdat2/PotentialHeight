@@ -14,7 +14,8 @@ import xarray as xr
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
 from sithom.time import timeit
-from .constants import ERA5_RAW_PATH, ERA5_PI_OG_PATH, ERA5_PI_PATH
+from w22.ps import parallelized_ps_dask
+from .constants import ERA5_RAW_PATH, ERA5_PI_OG_PATH, ERA5_PRODUCTS_PATH
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
 
@@ -360,11 +361,23 @@ def get_era5_combined() -> xr.Dataset:
     Get the raw ERA5 data for potential intensity and size as a lazily loaded xarray dataset.
     """
     # open the single level file
-    single_ds = xr.open_dataset(
-        os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
-        chunks={"valid_time": 1},
-        engine="netcdf4",
-    )
+    if os.path.exists(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")):
+        single_ds = xr.open_dataset(
+            os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
+            chunks={"valid_time": 1},
+            engine="netcdf4",
+        )
+    else:
+        fp = []
+        years = [str(year) for year in range(1980, 2025)]
+        for i in range(0, len(years), 10):
+            j = min(i + 10, len(years))
+            fp += [
+                os.path.join(
+                    ERA5_RAW_PATH, f"era5_single_levels_years{years[i]}_{years[j-1]}.nc"
+                )
+            ]
+        single_ds = xr.open_mfdataset(fp, chunks={"valid_time": 1}, engine="netcdf4")
     # open the pressure level files for all of the decades using xr.open_mfdataset
     file_paths = []
     years = [str(year) for year in range(1980, 2025)]
@@ -383,10 +396,52 @@ def get_era5_combined() -> xr.Dataset:
     return xr.merge([single_ds, pressure_ds])
 
 
-def get_era5_pi_trends() -> xr.Dataset:
+def era5_pi_trends() -> xr.Dataset:
     """
     Let's find the linear trends in the potential intensity
     """
+    # load all the decades of data for potential intensity
+    file_paths = []
+    years = [str(year) for year in range(1980, 2025)]
+    for i in range(0, len(years), 10):
+        j = min(i + 10, len(years))
+        file_paths += [
+            os.path.join(ERA5_PI_OG_PATH, f"era5_pi_years{years[i]}_{years[j-1]}.nc")
+        ]
+
+    print(f"Opening PI files: {file_paths}")
+    for file_path in file_paths:
+        if not os.path.exists(file_path):
+            print(f"File {file_path} does not exist. Please run era5_pi() first.")
+            return
+        else:
+            print(f"Found file: {file_path}")
+            print(xr.open_dataset(file_path, engine="h5netcdf"))
+    ds = xr.open_mfdataset(
+        file_paths,
+        combine="nested",
+        concat_dim="time",
+        chunks={"time": 1},
+        engine="h5netcdf",
+    )
+    print(ds)
+    sst_ds = preprocess_single_level_data(get_era5_combined())["sst"]
+    print("sst_ds", sst_ds)
+    # ds["sst"] = sst_ds["sst"]
+    # lets just select the augusts in the northern hemisphere
+    ds["sst"] = sst_ds
+    ds = ds.sel(time=ds.time.dt.month == 8)  # .sel(latitude=slice(0, 30))
+    print("Calculating trends in potential intensity...")
+    print(ds)
+    # calculate the linear trends in potential intensity
+    pi_vars = ["vmax", "t0", "otl", "sst"]
+    trend_ds = ds[pi_vars].polyfit(dim="time", deg=1, cov=True)
+    print(trend_ds)
+    trend_ds.to_netcdf(
+        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+        engine="h5netcdf",
+        encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
+    )
 
 
 def find_tropical_m():
@@ -410,6 +465,7 @@ if __name__ == "__main__":
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
-    era5_pi(
-        [str(year) for year in range(1980, 2025)]
-    )  # Modify or extend this list as needed.
+    # era5_pi(
+    #     [str(year) for year in range(1980, 2025)]
+    # )  # Modify or extend this list as needed.
+    era5_pi_trends()

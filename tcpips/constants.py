@@ -67,6 +67,8 @@ ERA5_PI_OG_PATH: str = os.path.join(ERA5_PATH, "pi_og")  # pi no bias correction
 os.makedirs(ERA5_PI_OG_PATH, exist_ok=True)  # potential intensity on original grid
 ERA5_PI_PATH: str = os.path.join(ERA5_PATH, "pi")  # pi on new grid
 os.makedirs(ERA5_PI_PATH, exist_ok=True)  # potential intensity on new grid
+ERA5_PRODUCTS_PATH = os.path.join(ERA5_PATH, "products")  # products from ERA5
+os.makedirs(ERA5_PRODUCTS_PATH, exist_ok=True)  # products from ERA5
 
 # Directories for CMIP6 data processing steps: make them ahead of time.
 CMIP6_PATH: str = os.path.join(DATA_PATH, "cmip6")  # main data folder
