@@ -9,7 +9,10 @@ The script is designed to download the data to calculate potential intensity (PI
 import os
 import cdsapi
 from typing import List
+import numpy as np
 import xarray as xr
+from dask.distributed import Client, LocalCluster
+from dask.diagnostics import ProgressBar
 from sithom.time import timeit
 from .constants import ERA5_RAW_PATH, ERA5_PI_OG_PATH, ERA5_PI_PATH
 from .pi import calculate_pi
@@ -212,104 +215,104 @@ def download_era5_data() -> None:
 
 @timeit
 def preprocess_single_level_data(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Preprocess the single-level data from ERA5.
-    This includes converting units and renaming variables.
+    """Optimized preprocessing for single-level ERA5 data."""
 
-    Args:
-        ds (xr.Dataset): xarray dataset containing the single-level data.
+    # Use assign for cleaner, dask-friendly operations and cast to float32
+    updates = {
+        "sst": (ds["sst"] - 273.15).astype(np.float32),
+        "msl": (ds["msl"] / 100).astype(np.float32),
+        "rh": relative_humidity_from_dew_point(ds["d2m"], ds["t2m"]).astype(np.float32),
+    }
+    ds = ds.assign(**updates)
 
-    Returns:
-        xr.Dataset: Preprocessed xarray dataset.
-    """
-    assert ds["d2m"].units == "K", "Sea surface temperature is not in Kelvin"
-    assert ds["t2m"].units == "K", "Mean sea level pressure is not in Pa"
+    # Set attributes for new variables
+    ds["sst"].attrs = {"long_name": "Sea Surface Temperature", "units": "Celsius"}
+    ds["msl"].attrs = {"long_name": "Mean Sea Level Pressure", "units": "hPa"}
+    ds["rh"].attrs = {"long_name": "Relative Humidity", "units": "fraction"}
 
-    ds["rh"] = relative_humidity_from_dew_point(ds["d2m"], ds["t2m"])
-    ds["rh"].attrs = {
-        "long_name": "Relative Humidity",
-        "units": "fraction",
-        "description": "Relative humidity at 2m calculated from dew point temperature and air temperature",
-    }
-    assert ds["sst"].units == "K", "Sea surface temperature is not in Kelvin"
-    ds["sst"] = ds["sst"] - 273.15
-    ds["sst"].attrs = {
-        "long_name": "Sea Surface Temperature",
-        "units": "Celsius",
-        "description": "Sea surface temperature",
-    }
-    assert ds["msl"].units == "Pa", "Mean sea level pressure is not in Pa"
-    ds["msl"] = ds["msl"] / 100
-    ds["msl"].attrs = {
-        "long_name": "Mean Sea Level Pressure",
-        "units": "hPa",
-        "description": "Mean sea level pressure",
-    }
-    del ds["d2m"]
-    del ds["t2m"]
-    ds = ds.rename({"valid_time": "time"})
+    # Drop original variables at the end
+    ds = ds.drop_vars(["d2m", "t2m"])
+
+    # Rename time dimension if it exists
+    if "valid_time" in ds.dims:
+        ds = ds.rename({"valid_time": "time"})
     return ds
 
 
 @timeit
 def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Preprocess the pressure-level data from ERA5.
-    This includes converting units and renaming variables.
-    Args:
-        ds (xr.Dataset): xarray dataset containing the pressure-level data.
-    Returns:
-        xr.Dataset: Preprocessed xarray dataset.
-    """
-    assert ds["t"].units == "K", "Temperature is not in Kelvin"
+    """Optimized preprocessing for pressure-level ERA5 data."""
 
-    ds["t"] = ds["t"] - 273.15
-    ds["t"].attrs = {
-        "long_name": "Temperature",
-        "units": "Celsius",
-        "description": "Temperature at pressure levels",
+    updates = {
+        "t": (ds["t"] - 273.15).astype(np.float32),
+        "q": (ds["q"] * 1000).astype(np.float32),
     }
-    assert ds["q"].units == "kg kg**-1", "Specific humidity is not in kg/kg"
-    ds["q"] = ds["q"] * 1000
-    ds["q"].attrs = {
-        "long_name": "Specific Humidity",
-        "units": "g/kg",
-        "description": "Specific humidity at pressure levels",
-    }
-    del ds["z"]
+    ds = ds.assign(**updates)
+
+    ds["t"].attrs = {"long_name": "Temperature", "units": "Celsius"}
+    ds["q"].attrs = {"long_name": "Specific Humidity", "units": "g/kg"}
+
+    # Drop geopotential
+    if "z" in ds:
+        ds = ds.drop_vars("z")
+
     if "valid_time" in ds.dims:
-        return ds.rename({"valid_time": "time"})
-    else:
-        return ds
+        ds = ds.rename({"valid_time": "time"})
+    return ds
 
 
 @timeit
 def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
-    """
-    Calculate potential intensity (PI) using the downloaded ERA5 data for a decade.
+    """Optimized calculation of Potential Intensity for a decade.
 
     Args:
         single_level_path (str): Path to the single-level data file.
         pressure_level_path (str): Path to the pressure-level data file.
-
-    Returns:
-        None
     """
-    print(
-        f"Calculating potential intensity for {single_level_path} and {pressure_level_path}"
-    )
-    years_str = single_level_path.split("years")[1].replace(".nc", "")
-    single_ds = preprocess_single_level_data(xr.open_dataset(single_level_path))
-    pressure_ds = preprocess_pressure_level_data(xr.open_dataset(pressure_level_path))
-    # let's assume they are on the same grid
-    # and that the time dimension is the same
-    combined_ds = xr.merge([single_ds, pressure_ds])
-    # calculate potential intensity
-    pi_ds = calculate_pi(combined_ds, dim="pressure_level")
-    # save the potential intensity dataset
 
-    # pi_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, "era5_pi.nc"))
-    pi_ds.to_netcdf(os.path.join(ERA5_PI_OG_PATH, f"era5_pi_years{years_str}.nc"))
+    print(f"Calculating PI for {single_level_path} and {pressure_level_path}")
+    cluster = LocalCluster(n_workers=10, threads_per_worker=1)
+    client = Client(cluster)
+    print(f"Dask dashboard link: {client.dashboard_link}")
+
+    # 1. Define a SINGLE, EXPLICIT chunking specification.
+    # This ensures both datasets are chunked identically along shared dimensions.
+    # Adjust values based on your available RAM.
+    chunk_spec = {"time": 12, "latitude": 120, "longitude": 120}
+
+    # 2. Open both datasets using the SAME chunks.
+    single_ds = xr.open_dataset(single_level_path, chunks=chunk_spec)
+
+    # For the pressure data, add the non-shared dimension chunking.
+    pressure_chunk_spec = chunk_spec.copy()
+    pressure_chunk_spec["pressure_level"] = -1  # Keep full vertical column in one chunk
+    pressure_ds = xr.open_dataset(pressure_level_path, chunks=pressure_chunk_spec)
+
+    # 3. Preprocess the data. This remains lazy.
+    single_ds = preprocess_single_level_data(single_ds)
+    pressure_ds = preprocess_pressure_level_data(pressure_ds)
+
+    # 4. Merge. Because chunks are aligned, this is now a fast, metadata-only operation.
+    combined_ds = xr.merge([single_ds, pressure_ds])
+
+    # 5. Calculate Potential Intensity (this remains lazy).
+    pi_ds = calculate_pi(combined_ds, dim="pressure_level")
+
+    # 6. Save to NetCDF with an efficient engine and compression.
+    # This is the step that triggers the computation.
+    years_str = single_level_path.split("years")[1].replace(".nc", "")
+    output_path = os.path.join(ERA5_PI_OG_PATH, f"era5_pi_years{years_str}.nc")
+
+    # Define encoding for efficient writing
+    encoding = {var: {"zlib": True, "complevel": 5} for var in pi_ds.variables}
+
+    print(f"Saving results to {output_path}...")
+
+    with ProgressBar():
+        pi_ds.to_netcdf(output_path, engine="h5netcdf", encoding=encoding)
+    print("...Done.")
+
+    client.close()
 
 
 def era5_pi(years: List[str]) -> None:

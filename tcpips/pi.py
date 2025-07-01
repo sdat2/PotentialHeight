@@ -128,6 +128,7 @@ def calculate_pi(
         output_core_dims=[[], [], [], [], []],
         vectorize=True,
         # dask="allowed", # maybe this could work with dask, but at the moment I get an error
+        dask="parallelized",
     )
 
     # store the result in an xarray data structure
