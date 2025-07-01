@@ -210,6 +210,7 @@ def download_era5_data() -> None:
     )
 
 
+@timeit
 def preprocess_single_level_data(ds: xr.Dataset) -> xr.Dataset:
     """
     Preprocess the single-level data from ERA5.
@@ -250,6 +251,7 @@ def preprocess_single_level_data(ds: xr.Dataset) -> xr.Dataset:
     return ds
 
 
+@timeit
 def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
     """
     Preprocess the pressure-level data from ERA5.
@@ -293,6 +295,9 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
     Returns:
         None
     """
+    print(
+        f"Calculating potential intensity for {single_level_path} and {pressure_level_path}"
+    )
     years_str = single_level_path.split("years")[1].replace(".nc", "")
     single_ds = preprocess_single_level_data(xr.open_dataset(single_level_path))
     pressure_ds = preprocess_pressure_level_data(xr.open_dataset(pressure_level_path))
@@ -375,13 +380,27 @@ def get_era5_combined() -> xr.Dataset:
     return xr.merge([single_ds, pressure_ds])
 
 
+def find_tropical_m():
+    """I want to find what the trends are for the tropical cyclone potential intensity and size over the pseudo observational period.
+
+    I defined m as the ratio of the change in the outflow temperature to the change in surface temperature.
+    T_s = T_s0 + delta_t
+    T_o = T_o0 + m * delta_t
+    where T_s0 is the initial sea surface temperature, T_o0 is the initial outflow temperature, and delta_t is the change in temperature.
+    """
+    print("This function is not implemented yet.")
+
+
 if __name__ == "__main__":
     # python -m tcpips.era5
     # python -m tcpips.era5 &> era5_pi_2.log
-    download_era5_data()
-    #era5_pi(
+    # download_era5_data()
+    # era5_pi(
     #    [str(year) for year in range(1980, #2025)]
-    #)  # Modify or extend this list as needed.)
+    # )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
+    era5_pi(
+        [str(year) for year in range(1980, 2025)]
+    )  # Modify or extend this list as needed.
