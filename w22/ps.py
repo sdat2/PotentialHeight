@@ -36,6 +36,168 @@ from .utils import (
 from .solve import bisection
 
 
+def calculate_ps_ufunc(
+    vmax,
+    msl,
+    sst,
+    t0,
+    lat,
+    rh,
+    ck_cd,
+    cd,
+    w_cool,
+    supergradient_factor,
+    pressure_assumption="isothermal",
+):
+    """
+    Core computation function designed for xr.apply_ufunc.
+    Accepts scalar NumPy values and returns a tuple of scalar results.
+    """
+    # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
+    if np.isnan(vmax) or vmax <= 0.01 or np.isnan(sst):
+        return np.nan, np.nan, np.nan, np.nan
+
+    # 2. Define the inner function for bisection (captures the inputs)
+    p_a = msl
+    coriolis_parameter = abs(coriolis_parameter_from_lat(lat))
+    near_surface_air_temperature = sst + TEMP_0K - 1.0
+
+    # Simplified air density calculation for the wrapper
+    water_vapour_pressure = rh * buck_sat_vap_pressure(near_surface_air_temperature)
+    rho_air = (p_a * 100 - water_vapour_pressure) / (
+        GAS_CONSTANT * near_surface_air_temperature
+    ) + water_vapour_pressure / (
+        GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
+    )
+
+    def try_for_r0(r0: float):
+        pm_cle, rmax_cle, _ = run_cle15(
+            inputs={
+                "r0": r0,
+                "Vmax": vmax,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+        ys = bisection(
+            wang_diff(
+                *wang_consts(
+                    radius_of_max_wind=rmax_cle,
+                    radius_of_inflow=r0,
+                    maximum_wind_speed=vmax * supergradient_factor,
+                    coriolis_parameter=coriolis_parameter,
+                    pressure_dry_at_inflow=(p_a * 100)
+                    - (rh * buck_sat_vap_pressure(near_surface_air_temperature)),
+                    near_surface_air_temperature=near_surface_air_temperature,
+                    outflow_temperature=t0,
+                )
+            ),
+            LOWER_Y_WANG_BISECTION,
+            UPPER_Y_WANG_BISECTION,
+            W22_BISECTION_TOLERANCE,
+        )
+        pm_car = (
+            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
+        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
+        return pm_cle - pm_car
+
+    # 3. Perform the main calculation (bisection to find r0)
+    try:
+        coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
+        lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
+        upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
+        r0 = bisection(
+            try_for_r0, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+        )
+
+        # 4. Final calculation with the solved r0
+        pm, rmax, pc = run_cle15(
+            inputs={
+                "r0": r0,
+                "Vmax": vmax,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+        return r0, pm, pc, rmax
+    except (ValueError, RuntimeError, AssertionError):
+        # Return NaNs if bisection or any other part fails
+        return np.nan, np.nan, np.nan, np.nan
+
+
+@timeit
+def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Apply point solution to all points using xr.apply_ufunc and Dask.
+    """
+    # Ensure input dataset is chunked for Dask
+    ds = ds.chunk("auto")
+
+    # 1. Define required variables and optional variables with their defaults
+    required_vars = ["vmax", "msl", "sst", "t0", "lat"]
+    optional_vars = {
+        "rh": ENVIRONMENTAL_HUMIDITY_DEFAULT,
+        "ck_cd": CK_CD_DEFAULT,
+        "cd": CD_DEFAULT,
+        "w_cool": W_COOL_DEFAULT,
+        "supergradient_factor": SUPERGRADIENT_FACTOR,
+    }
+
+    # 2. Check for required variables
+    for var in required_vars:
+        if var not in ds:
+            raise KeyError(f"Required variable '{var}' is missing from the dataset.")
+
+    # 3. Check for optional variables and add them with default values if missing
+    for var, default_value in optional_vars.items():
+        if var not in ds:
+            print(f"'{var}' not found in dataset, using default value: {default_value}")
+            # Add a DataArray with the default value. Xarray's broadcasting
+            # will handle matching it to the other dimensions.
+            ds[var] = xr.DataArray(default_value)
+
+    # Use apply_ufunc to apply the core function across the dataset
+    # This is lazy and builds the Dask graph
+    r0, pm, pc, rmax = xr.apply_ufunc(
+        calculate_ps_ufunc,  # The core function
+        ds["vmax"],
+        ds["msl"],
+        ds["sst"],
+        ds["t0"],
+        ds["lat"],  # Required inputs
+        ds["rh"],
+        ds["ck_cd"],
+        ds["cd"],
+        ds["w_cool"],
+        ds["supergradient_factor"],  # Optional inputs
+        input_core_dims=[[] for _ in range(10)],  # All inputs are scalars
+        output_core_dims=[[], [], [], []],  # Four scalar outputs
+        exclude_dims=set(),
+        vectorize=True,  # Key for broadcasting
+        dask="parallelized",  # Key for parallel execution
+        output_dtypes=[float, float, float, float],
+    )
+
+    # Assign results to a new dataset
+    output_ds = ds.copy()
+    output_ds["r0"] = r0
+    output_ds["pm"] = pm
+    output_ds["pc"] = pc
+    output_ds["rmax"] = rmax
+
+    return output_ds
+
+
 @timeit
 def point_solution_ps(
     ds: xr.Dataset,
@@ -49,7 +211,7 @@ def point_solution_ps(
     Args:
         ds (xr.Dataset): Dataset with the input values.
         supergradient_factor (float, optional): Supergradient. Defaults to 1.2.
-        include_profile (bool, optional)
+        include_profile (bool, optional): If True, include the full profile in the output dataset. Defaults to False.
         pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
 
     Returns:
@@ -447,6 +609,14 @@ def single_point_example() -> None:
         2.005e06,
         rtol=1e-2,
     ), f"r0: {out_ds['r0'].values} != 2.005e+06"
+
+    out_ds = parallelized_ps_dask(in_ds)
+    assert np.allclose(
+        out_ds["r0"].values,
+        2.005e06,
+        rtol=1e-2,
+    ), f"r0: {out_ds['r0'].values} != 2.005e+06"
+    # print("Single point example output:")
     # print(out_ds)
 
 
@@ -460,10 +630,17 @@ def multi_point_example_1d() -> None:
             "vmax": ("y", [49.5, 49.5]),  # m/s, potential intensity
             "sst": ("y", [28, 28]),  # degC
             "t0": ("y", [200, 200]),  # degK
+            "rh": ("y", [0.9, 0.9]),  # [dimensionless], relative humidity
+            "ck_cd": ("y", [0.95, 0.95]),
+            "cd": ("y", [0.0015, 0.0015]),  # [dimensionless], cd
+            "w_cool": ("y", [0.002, 0.002]),
+            "supergradient_factor": ("y", [1.2, 1.2]),  # mbar or hPa
         },
         coords={"lat": ("y", [28, 29])},  # degNorth
     )
     out_ds = parallelized_ps(in_ds)
+    print(out_ds)
+    out_ds = parallelized_ps_dask(in_ds)
     print(out_ds)
 
 
@@ -520,10 +697,12 @@ def multi_point_example_2d(autofail=True) -> None:
     # But if we exclude all points where vmax is nan or 0, perhaps it will be much faster (already done implictly in the code).
     # Still, maybe we will be waiting a day to get the ERA5/IBTrACS results
     out_ds = parallelized_ps(in_ds, jobs=10, autofail=autofail)
+
     # print(out_ds)
 
 
 if __name__ == "__main__":
     # python -m w22.ps
-    single_point_example()
-    multi_point_example_2d()
+    # single_point_example()
+    # multi_point_example_2d()
+    multi_point_example_1d()

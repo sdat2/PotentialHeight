@@ -383,6 +383,12 @@ def get_era5_combined() -> xr.Dataset:
     return xr.merge([single_ds, pressure_ds])
 
 
+def get_era5_pi_trends() -> xr.Dataset:
+    """
+    Let's find the linear trends in the potential intensity
+    """
+
+
 def find_tropical_m():
     """I want to find what the trends are for the tropical cyclone potential intensity and size over the pseudo observational period.
 
