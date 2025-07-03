@@ -8,13 +8,15 @@ The script is designed to download the data to calculate potential intensity (PI
 
 import os
 import cdsapi
-from typing import List
+from typing import List, Union, Tuple, Literal
 import numpy as np
 import xarray as xr
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
 from sithom.time import timeit
+from sithom.xr import mon_increase
 from w22.ps import parallelized_ps_dask
+from uncertainties import ufloat
 from .constants import ERA5_RAW_PATH, ERA5_PI_OG_PATH, ERA5_PRODUCTS_PATH
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
@@ -396,6 +398,99 @@ def get_era5_combined() -> xr.Dataset:
     return xr.merge([single_ds, pressure_ds])
 
 
+def get_trend(
+    da: xr.DataArray,
+    output: Literal["slope", "rise"] = "rise",
+    t_var: str = "T",
+    make_hatch_mask: bool = False,
+    keep_ds: bool = False,
+    uncertainty: bool = False,
+) -> Union[float, ufloat, xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
+    """
+    Returns either the linear trend rise, or the linear trend slope,
+    possibly with the array to hatch out where the trend is not significant.
+
+    Uses `xr.polyfit` order 1 to do everything.
+
+    Args:
+        da (xr.DataArray): the timeseries.
+        output (Literal[, optional): What to return. Defaults to "rise".
+        t_var (str, optional): The time variable name. Defaults to "T".
+            Could be changed to another variable that you want to fit along.
+        make_hatch_mask (bool, optional): Whether or not to also return a DataArray
+            of boolean values to indicate where is not significant.
+            Defaults to False. Will only work if you're passing in an xarray object.
+        uncertainty (bool, optional): Whether to return a ufloat object
+            if doing linear regression on a single timeseries. Defaults to false.
+
+    Returns:
+        Union[float, ufloat, xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
+            The rise/slope over the time period, possibly with the hatch array if
+            that opition is selected for a grid.
+    """
+
+    def length_time(da):
+        return (da.coords[t_var][-1] - da.coords[t_var][0]).values
+
+    def get_float(inp: Union[np.ndarray, list, float]):
+        try:
+            if hasattr(inp, "__iter__"):
+                inp = inp[0]
+        # pylint: disable=bare-except
+        except:
+            print(type(inp))
+        return float(inp)
+
+    if "X" in da.dims or "Y" in da.dims or "member" in da.dims or keep_ds:
+
+        fit_da = da.polyfit(t_var, 1, cov=make_hatch_mask)
+
+        if make_hatch_mask:
+            frac_error = np.abs(
+                np.sqrt(fit_da.polyfit_covariance.isel(cov_i=0, cov_j=0))
+                / fit_da.polyfit_coefficients.isel(degree=0)
+            )
+            hatch_mask = frac_error >= 1.0
+
+        slope = fit_da.polyfit_coefficients.sel(degree=1).drop("degree")
+    else:
+        if uncertainty:
+            # print("uncertainty running")
+            fit_da = da.polyfit(t_var, 1, cov=True)
+            error = np.sqrt(fit_da.polyfit_covariance.isel(cov_i=0, cov_j=0)).values
+            error = get_float(error)
+            slope = fit_da.polyfit_coefficients.values
+            slope = get_float(slope)
+            slope = ufloat(slope, error)
+        else:
+            slope = da.polyfit(t_var, 1).polyfit_coefficients.values
+            slope = get_float(slope)
+
+    if output == "rise":
+
+        run = length_time(da)
+        rise = slope * run
+
+        if isinstance(rise, xr.DataArray):
+            for pr_name in ["units", "long_name"]:
+                if pr_name in da.attrs:
+                    rise.attrs[pr_name] = da.attrs[pr_name]
+            rise = rise.rename("rise")
+
+        # print("run", run, "slope", slope, "rise = slope * run", rise)
+
+        if make_hatch_mask and not isinstance(rise, float, ufloat):
+            return rise, hatch_mask
+        else:
+            return rise
+
+    elif output == "slope":
+        if make_hatch_mask and not isinstance(slope, float):
+            return slope, hatch_mask
+        else:
+            return slope
+
+
 def era5_pi_trends() -> xr.Dataset:
     """
     Let's find the linear trends in the potential intensity
@@ -430,10 +525,12 @@ def era5_pi_trends() -> xr.Dataset:
     # ds["sst"] = sst_ds["sst"]
     # lets just select the augusts in the northern hemisphere
     ds["sst"] = sst_ds
-    ds = ds.sel(time=ds.time.dt.month == 8)  # .sel(latitude=slice(0, 30))
+    ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
     print("Calculating trends in potential intensity...")
     print(ds)
     # calculate the linear trends in potential intensity
+    # let's replace the time axis with the year
+    ds = ds.assign_coords(time=ds.time.dt.year)
     pi_vars = ["vmax", "t0", "otl", "sst"]
     trend_ds = ds[pi_vars].polyfit(dim="time", deg=1, cov=True)
     print(trend_ds)
@@ -453,6 +550,63 @@ def find_tropical_m():
     where T_s0 is the initial sea surface temperature, T_o0 is the initial outflow temperature, and delta_t is the change in temperature.
     """
     print("This function is not implemented yet.")
+    trend_ds = mon_increase(
+        xr.open_dataset(
+            os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+            engine="h5netcdf",
+        )
+    ).sel(latitude=slice(5, 40))
+
+    trend_ds["m"] = (
+        ["latitude", "longitude"],
+        trend_ds["t0_polyfit_coefficients"].sel(degree=1).values
+        / trend_ds["sst_polyfit_coefficients"].sel(degree=1).values,
+        {"long_name": "Temp Change Ratio", "units": "dimensionless"},
+    )
+    print(trend_ds)
+    from matplotlib import pyplot as plt
+    from sithom.plot import plot_defaults, label_subplots
+
+    plot_defaults()
+    fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
+    trend_ds["m"].plot(
+        ax=axs[0],
+        cmap="viridis",
+        vmin=-2,
+        vmax=2,
+    )  # vmin=0, vmax=1,
+    axs[0].set_title("m: Change in Outflow Temp / Change in SST")
+    axs[0].set_ylabel(r"Latitude [$^{\circ}$N]")
+    axs[0].set_xlabel("")
+    trend_ds["t0_polyfit_coefficients"].sel(degree=1).plot(
+        ax=axs[1],
+        cmap="cmo.balance",
+        # vmin=-5,
+        # vmax=5,
+    )
+    axs[1].set_ylabel(r"Latitude [$^{\circ}$N]")
+    axs[1].set_xlabel("")
+    axs[1].set_title("Outflow Temperature Trend [K/yr]")
+    trend_ds["sst_polyfit_coefficients"].sel(degree=1).plot(
+        ax=axs[2],
+        cmap="cmo.balance",
+        # vmin=-5,
+        # vmax=5,
+    )
+
+    axs[2].set_title("SST Trend [K/yr]")
+    axs[2].set_ylabel(r"Latitude [$^{\circ}$N]")
+    axs[2].set_xlabel(r"Longitude [$^{\circ}$E]")
+    label_subplots(axs, override="outside")
+    plt.tight_layout()
+    plt.savefig("era5_pi_trends.pdf", dpi=300)
+
+    print(trend_ds["sst_polyfit_coefficients"].sel(degree=0).mean())
+    print(trend_ds["sst_polyfit_coefficients"].sel(degree=1).mean())
+    print(trend_ds["t0_polyfit_coefficients"].sel(degree=0).mean())
+    print(trend_ds["t0_polyfit_coefficients"].sel(degree=1).mean())
+    print(trend_ds["m"].mean())
+    print(trend_ds["m"].median())
 
 
 if __name__ == "__main__":
@@ -469,3 +623,4 @@ if __name__ == "__main__":
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
     era5_pi_trends()
+    find_tropical_m()

@@ -387,7 +387,7 @@ def calculate_grid_avg_over_ibtracs_points(
 def plot_var_on_map(
     ax: plt.axis, da: xr.DataArray, label: str, cmap: str, shrink: float = 1, **kwargs
 ) -> None:
-    """Plot a variable on a map.
+    """Plot a variable on a geographic map.
 
     Args:
         ax (plt.axis): The axis to plot on.
