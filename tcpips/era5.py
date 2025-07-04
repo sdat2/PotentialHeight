@@ -10,6 +10,7 @@ import os
 import cdsapi
 from typing import List, Union, Tuple, Literal
 import numpy as np
+import pandas as pd
 import xarray as xr
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
@@ -17,7 +18,14 @@ from sithom.time import timeit
 from sithom.xr import mon_increase
 from w22.ps import parallelized_ps_dask
 from uncertainties import ufloat
-from .constants import ERA5_RAW_PATH, ERA5_PI_OG_PATH, ERA5_PRODUCTS_PATH
+from matplotlib import pyplot as plt
+from sithom.plot import plot_defaults, label_subplots, get_dim
+from .constants import (
+    ERA5_RAW_PATH,
+    ERA5_PI_OG_PATH,
+    ERA5_PRODUCTS_PATH,
+    ERA5_FIGURE_PATH,
+)
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
 
@@ -491,6 +499,64 @@ def get_trend(
             return slope
 
 
+def select_seasonal_hemispheric_data(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Selects August data from the Northern Hemisphere and March data
+    from the Southern Hemisphere, combining them into a single dataset
+    with an integer 'year' coordinate.
+
+    Args:
+        ds: An xarray Dataset with 'time', 'latitude', and 'longitude'
+            coordinates. 'time' must be a datetime-like coordinate.
+
+    Returns:
+        A new xarray Dataset with an integer 'year' dimension, containing
+        the combined seasonal and hemispheric data.
+
+    >>> # 1. Set up a sample dataset for the doctest
+    >>> time = pd.date_range('2000-01-01', '2002-12-31', freq='MS')
+    >>> latitudes = [-30, -10, 10, 30]
+    >>> longitudes = [100, 120]
+    >>> data = np.arange(len(time) * len(latitudes) * len(longitudes)).reshape(len(time), len(latitudes), len(longitudes))
+    >>> ds_test = xr.Dataset(
+    ...     {'some_variable': (['time', 'latitude', 'longitude'], data)},
+    ...     coords={'time': time, 'latitude': latitudes, 'longitude': longitudes}
+    ... )
+    >>> # 2. Run the function
+    >>> result = select_seasonal_hemispheric_data(ds_test)
+    >>> # 3. Check the result
+    >>> print(result)
+    <xarray.Dataset> Size: 264B
+    Dimensions:        (year: 3, latitude: 4, longitude: 2)
+    Coordinates:
+      * latitude       (latitude) int64 32B -30 -10 10 30
+      * longitude      (longitude) int64 16B 100 120
+      * year           (year) int64 24B 2000 2001 2002
+    Data variables:
+        some_variable  (year, latitude, longitude) float64 192B 16.0 17.0 ... 255.0
+    """
+    # ds = mon_increase(ds)
+    # Define a boolean mask for Augusts in the Northern Hemisphere (latitude >= 0)
+    is_nh_august = (ds["time"].dt.month == 8) & (ds["latitude"] >= 0)
+
+    # Define a boolean mask for Marches in the Southern Hemisphere (latitude < 0)
+    is_sh_march = (ds["time"].dt.month == 3) & (ds["latitude"] < 0)
+
+    # Use .where() with the combined boolean mask.
+    # For any given time, data is kept only for the latitudes matching the condition.
+    # For a March timestamp, NH data becomes NaN; for an August timestamp, SH data becomes NaN.
+    # drop=True removes timestamps where neither condition is met.
+    combined = ds.where(is_sh_march | is_nh_august, drop=True)
+
+    # Group the data by year. For each year, a lat/lon point will have at most one
+    # valid data point (either from March or August).
+    # .first() selects the first non-NaN value in each group along the 'time' dimension,
+    # effectively collapsing 'time' into 'year'.
+    result = combined.groupby(combined.time.dt.year).first("time")
+
+    return result
+
+
 def era5_pi_trends() -> xr.Dataset:
     """
     Let's find the linear trends in the potential intensity
@@ -525,14 +591,19 @@ def era5_pi_trends() -> xr.Dataset:
     # ds["sst"] = sst_ds["sst"]
     # lets just select the augusts in the northern hemisphere
     ds["sst"] = sst_ds
-    ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
+    ds = select_seasonal_hemispheric_data(mon_increase(ds))
+    # ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
     print("Calculating trends in potential intensity...")
     print(ds)
     # calculate the linear trends in potential intensity
     # let's replace the time axis with the year
-    ds = ds.assign_coords(time=ds.time.dt.year)
+    new_year = ds.year - ds.year.min()
+    assert len(new_year) > 20, "Not enough time points to calculate trends."
+    ds = ds.assign_coords(year=new_year)
+    print("New time coordinates:", ds.year.values)
+    print("Calculating trends in potential intensity...")
     pi_vars = ["vmax", "t0", "otl", "sst"]
-    trend_ds = ds[pi_vars].polyfit(dim="time", deg=1, cov=True)
+    trend_ds = ds[pi_vars].polyfit(dim="year", deg=1, cov=True)
     print(trend_ds)
     trend_ds.to_netcdf(
         os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
@@ -549,13 +620,12 @@ def find_tropical_m():
     T_o = T_o0 + m * delta_t
     where T_s0 is the initial sea surface temperature, T_o0 is the initial outflow temperature, and delta_t is the change in temperature.
     """
-    print("This function is not implemented yet.")
     trend_ds = mon_increase(
         xr.open_dataset(
             os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
             engine="h5netcdf",
         )
-    ).sel(latitude=slice(5, 40))
+    ).sel(latitude=slice(-40, 40))
 
     trend_ds["m"] = (
         ["latitude", "longitude"],
@@ -564,42 +634,43 @@ def find_tropical_m():
         {"long_name": "Temp Change Ratio", "units": "dimensionless"},
     )
     print(trend_ds)
-    from matplotlib import pyplot as plt
-    from sithom.plot import plot_defaults, label_subplots
 
     plot_defaults()
-    fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
+    fig, axs = plt.subplots(3, 1, sharex=True, sharey=True, figsize=get_dim(ratio=1.1))
     trend_ds["m"].plot(
         ax=axs[0],
         cmap="viridis",
         vmin=-2,
         vmax=2,
+        cbar_kwargs={"label": ""},
     )  # vmin=0, vmax=1,
     axs[0].set_title("m: Change in Outflow Temp / Change in SST")
     axs[0].set_ylabel(r"Latitude [$^{\circ}$N]")
     axs[0].set_xlabel("")
-    trend_ds["t0_polyfit_coefficients"].sel(degree=1).plot(
+    (trend_ds["t0_polyfit_coefficients"] * 10).sel(degree=1).plot(
         ax=axs[1],
         cmap="cmo.balance",
         # vmin=-5,
         # vmax=5,
+        cbar_kwargs={"label": ""},
     )
     axs[1].set_ylabel(r"Latitude [$^{\circ}$N]")
     axs[1].set_xlabel("")
-    axs[1].set_title("Outflow Temperature Trend [K/yr]")
-    trend_ds["sst_polyfit_coefficients"].sel(degree=1).plot(
+    axs[1].set_title("Outflow Temperature Trend [K/decade]")
+    (trend_ds["sst_polyfit_coefficients"] * 10).sel(degree=1).plot(
         ax=axs[2],
         cmap="cmo.balance",
         # vmin=-5,
         # vmax=5,
+        cbar_kwargs={"label": ""},
     )
 
-    axs[2].set_title("SST Trend [K/yr]")
+    axs[2].set_title("SST Trend [K/decade]")
     axs[2].set_ylabel(r"Latitude [$^{\circ}$N]")
     axs[2].set_xlabel(r"Longitude [$^{\circ}$E]")
-    label_subplots(axs, override="outside")
+    label_subplots(axs)  # , override="outside")
     plt.tight_layout()
-    plt.savefig("era5_pi_trends.pdf", dpi=300)
+    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_pi_trends.pdf"), dpi=300)
 
     print(trend_ds["sst_polyfit_coefficients"].sel(degree=0).mean())
     print(trend_ds["sst_polyfit_coefficients"].sel(degree=1).mean())
@@ -607,6 +678,45 @@ def find_tropical_m():
     print(trend_ds["t0_polyfit_coefficients"].sel(degree=1).mean())
     print(trend_ds["m"].mean())
     print(trend_ds["m"].median())
+
+
+def plot_vmax_trends():
+    """Plot trend in vmax, t0 and otl in another 3 panel subplot with no cbar label but
+    labels in subplot title instead."""
+    trend_ds = xr.open_dataset(
+        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+        engine="h5netcdf",
+    )
+    trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
+
+    vmax = trend_ds["vmax_polyfit_coefficients"].sel(degree=1)
+    t0 = trend_ds["t0_polyfit_coefficients"].sel(degree=1)
+    otl = trend_ds["otl_polyfit_coefficients"].sel(degree=1)
+
+    plot_defaults()
+    fig, axs = plt.subplots(3, 1, sharex=True, sharey=True, figsize=get_dim(ratio=1.1))
+    vmax.plot(ax=axs[0], cmap="cmo.balance", cbar_kwargs={"label": ""})
+    axs[0].set_title("Vmax Trend [m/s/decade]")
+    axs[0].set_ylabel(r"Latitude [$^{\circ}$N]")
+    axs[0].set_xlabel("")
+
+    t0.plot(ax=axs[1], cmap="cmo.balance", cbar_kwargs={"label": ""})
+    axs[1].set_title("T0 Trend [K/decade]")
+    axs[1].set_ylabel(r"Latitude [$^{\circ}$N]")
+    axs[1].set_xlabel("")
+
+    otl.plot(ax=axs[2], cmap="cmo.balance", cbar_kwargs={"label": ""})
+    axs[2].set_title("OTL Trend [m/decade]")
+    axs[2].set_ylabel(r"Latitude [$^{\circ}$N]")
+    axs[2].set_xlabel(r"Longitude [$^{\circ}$E]")
+
+    label_subplots(axs)  # , override="outside")
+    plt.tight_layout()
+    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_vmax_trends.pdf"), dpi=300)
+
+    print("vmax trend mean:", vmax.mean())
+    print("t0 trend mean:", t0.mean())
+    print("otl trend mean:", otl.mean())
 
 
 if __name__ == "__main__":
@@ -622,5 +732,6 @@ if __name__ == "__main__":
     # era5_pi(
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
-    era5_pi_trends()
-    find_tropical_m()
+    # era5_pi_trends()
+    # find_tropical_m()
+    plot_vmax_trends()

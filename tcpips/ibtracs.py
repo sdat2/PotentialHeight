@@ -81,6 +81,8 @@ def ibtracs_to_era5_map():
     Currently takes around 36 seconds to run on laptop.
 
     Parallelization could be implemented if we ignored having a unique counter for each point, however this is not the rate limting step.
+
+    TODO: Currently I only get ERA5 data up until the end of 2024, but IBTRACS data goes until mid 2025. This means that the last few storms will erroneously select december 2024 as the closest time point.
     """
     # load ibtracs
     ibtracs_ds = xr.open_dataset(IBTRACS_DATA_FILE)
@@ -870,11 +872,19 @@ def calculate_potential_size_cat1(vmin=33, v_reduc=0.8) -> None:
     )
 
 
+def before_2025(ds: xr.Dataset) -> xr.Dataset:
+    """Filter the dataset to only include data before 2025."""
+    if "time" not in ds:
+        raise ValueError("Dataset must contain a 'time' dimension.")
+    return ds.where(ds.time < np.datetime64("2024-12-30"))
+
+
 @timeit
 def plot_potential_size() -> None:
     """Plot the potential size data."""
 
     ps_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_ps.nc"))
+    ps_ds = before_2025(ps_ds)  # filter to only include data before 2025
 
     ps_ds = ps_ds.rename({"lat": "latitude", "lon": "longitude"})
 
@@ -1106,6 +1116,7 @@ def plot_normalized_variables() -> None:
     pi_ps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.normalized.nc")
     )
+    pi_ps_ds = before_2025(pi_ps_ds)  # filter to only include data before 2025
     avg_ds = calculate_grid_avg_over_ibtracs_points(
         pi_ps_ds, vars=("normalized_rmax", "normalized_vmax")
     )
@@ -1301,6 +1312,7 @@ def plot_cps():
     cps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
     )
+    cps_ds = before_2025(cps_ds)  # filter to only include data before 2025
     avg_ds = calculate_grid_avg_over_ibtracs_points(
         cps_ds, vars=("rmax", "vmax", "r0", "pm", "t0")
     )
@@ -1388,6 +1400,7 @@ def plot_normalized_cps():
     cps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
     )
+    cps_ds = before_2025(cps_ds)  # filter to only include data before 2025
     print("cps_ds", cps_ds.sizes)
 
     # load usa_rmw data
@@ -2366,6 +2379,7 @@ def get_normalized_data(
     pi_ps_ds["potential_size_vp"] = pi_ps_ds["rmax"]
     pi_ps_ds["vmax_obs_10m"] = ibtracs_ds["usa_wind"] * 0.514444
     pi_ps_ds["vmax_vp_10m"] = pi_ps_ds["vmax"] * v_reduc
+    pi_ps_ds = before_2025(pi_ps_ds)
     return pi_ps_ds
 
 
@@ -2724,6 +2738,7 @@ def compare_normalized_potential_size(
     pi_ps_ds["norm_potential_size"] = (
         pi_ps_ds["potential_size_vp"] / pi_ps_ds["potential_size_cat1"]
     )
+    before_2025(pi_ps_ds)
     plt.hexbin(
         pi_ps_ds["potential_size_cat1"].values.ravel() / 1000,
         pi_ps_ds["norm_potential_size"].values.ravel(),
@@ -2842,6 +2857,7 @@ def get_vary_vobs_lower_data(
             pi_ps_ds = get_normalized_data(
                 lower_wind_vp=lower_wind_vp, lower_wind_obs=vobs_lower
             )
+            pi_ps_ds = before_2025(pi_ps_ds)
             ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
             ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
             ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
