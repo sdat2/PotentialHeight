@@ -957,7 +957,6 @@ def plot_lineplots(
         figsize=get_dim(ratio=0.8),
     )
 
-    # x = year
     def plot_trend(ax, var: str, color: str, label: str):
         ys = era5_ds[var].values
         x = era5_ds["year"].values
@@ -1000,6 +999,15 @@ def plot_lineplots(
             # new_ys.n - new_ys.s,
             color=color,
             alpha=0.2,
+        )
+        ax.text(
+            0.5,
+            0.95,
+            f"{label} Trend: {slope.n:.2f} ± {slope.s:.2f}",
+            transform=ax.transAxes,
+            fontsize=10,
+            verticalalignment="top",
+            color=color,
         )
 
     print(era5_ds["sst"].values)
