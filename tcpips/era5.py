@@ -1001,7 +1001,7 @@ def plot_lineplots(
             alpha=0.2,
         )
         ax.text(
-            0.5,
+            0.3,
             0.95,
             f"{label} Trend: {slope.n:.2f} ± {slope.s:.2f}",
             transform=ax.transAxes,
@@ -1037,10 +1037,10 @@ def plot_lineplots(
     axs[3].plot(
         era5_ds["year"].values + 1980,
         era5_ds["vmax"].values,
-        label=r"$V_p$ [m/s]",
+        label=r"$V_p$ [m s$^{-1}$]",
         color="tab:red",
     )
-    plot_trend(axs[3], "vmax", "tab:red", r"$V_p$ [m/s]")
+    plot_trend(axs[3], "vmax", "tab:red", r"$V_p$ [m s$^{-1}$]")
     axs[0].set_ylabel(r"$T_s$ [$^{\circ}$C]")
     axs[1].set_ylabel(r"$T_o$ [K]")
     axs[2].set_ylabel(r"$z_o$ [hPa]")
