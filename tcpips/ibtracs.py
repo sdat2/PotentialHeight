@@ -549,6 +549,7 @@ def plot_example_raw():
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_raw.nc")
     )
+    # era5_unique_data = before_2025(era5_unique_data)
 
     era5_coords_ds = calculate_grid_avg_over_unique_points(
         era5_unique_data, variables=("sst", "msl", "t2m")
@@ -618,13 +619,13 @@ def plot_example_raw():
     era5_coords_ds["sst"] -= 273.15  # convert to C
 
     plot_var_on_map(
-        axs[0], era5_coords_ds["sst"], "Mean SST [$^{\circ}$C]", "viridis", shrink=1
+        axs[0], era5_coords_ds["sst"], "Mean $T_s$ [$^{\circ}$C]", "viridis", shrink=1
     )
     plot_var_on_map(
-        axs[1], era5_coords_ds["msl"], "Mean MSL [hPa]", "viridis_r", shrink=1
+        axs[1], era5_coords_ds["msl"], "Mean $p_A$ [hPa]", "viridis_r", shrink=1
     )
     plot_var_on_map(
-        axs[2], era5_coords_ds["t2m"], "Mean T2M [$^{\circ}$C]", "viridis", shrink=1
+        axs[2], era5_coords_ds["t2m"], "Mean $T_2$ [$^{\circ}$C]", "viridis", shrink=1
     )
     label_subplots(axs)
 
@@ -666,6 +667,7 @@ def plot_era5_processed() -> None:
     era5_unique_data = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_processed.nc")
     )
+    era5_unique_data = before_2025(era5_unique_data)
     era5_ds = calculate_grid_avg_over_unique_points(
         era5_unique_data, variables=("sst", "msl", "rh")
     )
@@ -723,6 +725,7 @@ def plot_potential_intensity():
 
     pi_ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "era5_unique_points_pi.nc"))
     # get coords
+    pi_ds = before_2025(pi_ds)  # remove data after 2024
 
     # create 3 panel plot of avg vmax, avg t0, avg otl
     grid_avg_ds = calculate_grid_avg_over_unique_points(
