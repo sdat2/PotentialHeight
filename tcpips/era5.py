@@ -20,9 +20,26 @@ from w22.ps import parallelized_ps_dask
 from uncertainties import ufloat, correlated_values, unumpy
 from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, label_subplots, get_dim
-from cartopy import crs as ccrs
-from cartopy.feature import NaturalEarthFeature
-from cartopy.mpl.gridliner import LongitudeFormatter, LatitudeFormatter
+
+CARTOPY_INSTALLED = True
+try:
+    import cartopy
+    from cartopy import crs as ccrs
+    from cartopy.feature import NaturalEarthFeature
+    from cartopy.mpl.gridliner import LongitudeFormatter, LatitudeFormatter
+
+    CARTOPY_DIR = os.getenv("CARTOPY_DIR")
+    if CARTOPY_DIR is not None and CARTOPY_DIR != "":
+        print(f"Using Cartopy with CARTOPY_DIR: {CARTOPY_DIR}")
+        cartopy.config["data_dir"] = CARTOPY_DIR
+        os.makedirs(CARTOPY_DIR, exist_ok=True)  # Ensure the directory exists
+    else:
+        print("CARTOPY_DIR not set. Using default Cartopy data directory.")
+except ImportError:
+    print("Cartopy is not installed. Some plotting functions will not work.")
+    CARTOPY_INSTALLED = False
+
+
 from .constants import (
     ERA5_RAW_PATH,
     ERA5_PI_OG_PATH,
@@ -51,6 +68,8 @@ def plot_var_on_map(
         cmap (str): The colormap to use.
         shrink (float): The size of the colorbar.
     """
+    if not CARTOPY_INSTALLED:
+        return
     # add feature at back of plot
     ax.add_feature(
         NaturalEarthFeature("physical", "land", "110m"),
@@ -1071,6 +1090,7 @@ if __name__ == "__main__":
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
     # era5_pi_trends()
-    # find_tropical_m()
-    # plot_vmax_trends()
-    plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
+    find_tropical_m()
+    plot_vmax_trends()
+    plot_lineplots(360 - 90.0, 29.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
+    # plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
