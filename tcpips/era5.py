@@ -49,6 +49,9 @@ from .constants import (
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
 
+DEFAULT_START_YEAR = 1980
+DEFAULT_END_YEAR = 2024
+
 
 def plot_var_on_map(
     ax: plt.axis,
@@ -71,6 +74,7 @@ def plot_var_on_map(
     if not CARTOPY_INSTALLED:
         return
     # add feature at back of plot
+
     ax.add_feature(
         NaturalEarthFeature("physical", "land", "110m"),
         edgecolor="black",
@@ -116,23 +120,40 @@ def plot_var_on_map(
         **kwargs,
     )
     # add hatch mask if provided
-    if hatch_mask is not None and False:
-        # ensure hatch_mask is boolean
+    if hatch_mask is not None:
         if not isinstance(hatch_mask, xr.DataArray):
             raise ValueError("hatch_mask must be an xarray DataArray.")
-        # plot the hatch mask
-        hatch_mask.plot(
-            ax=ax,
-            x="longitude",
-            y="latitude",
-            add_colorbar=False,
-            transform=ccrs.PlateCarree(),
-            rasterized=True,
-            hatch="xx",
-            color="none",
-            edgecolor="black",
-        )
+        else:
+
+            plt.rcParams["hatch.linewidth"] = 0.4  # Default is 1.0
+            plt.rcParams["hatch.color"] = "gray"  # Default is black
+            # plot the hatch mask
+            # hatch_mask.plot(
+            #     ax=ax,
+            #     x="longitude",
+            #     y="latitude",
+            #     add_colorbar=False,
+            #     transform=ccrs.PlateCarree(),
+            #     rasterized=True,
+            #     hatch=".",
+            #     alpha=0.3,
+            #     color="none",
+            #     edgecolor="gray",
+            #     # z_order=1,
+            # )
+            contours = hatch_mask.astype(int).plot.contourf(
+                ax=ax,
+                transform=ccrs.PlateCarree(),
+                x="longitude",
+                y="latitude",
+                levels=[0.5, 1.5],  # Isolate the area where the mask is 1 (True)
+                hatches=["//"],  # Use a sparse pattern. Note it's in a list!
+                colors="none",  # Makes the area transparent, leaving only the hatch
+                add_colorbar=False,  # No color bar for a hatch mask
+            )
+
     ax.set_title(label)
+    plot_defaults()
 
 
 @timeit
@@ -304,7 +325,9 @@ def download_pressure_levels(
     return
 
 
-def download_era5_data() -> None:
+def download_era5_data(
+    start_year=DEFAULT_START_YEAR, end_year=DEFAULT_END_YEAR
+) -> None:
     """
     Downloads ERA5 data for the specified years and months.
     This function is a wrapper around the download_single_levels
@@ -312,7 +335,7 @@ def download_era5_data() -> None:
     """
     # Specify the desired years and months.
     years = [
-        str(year) for year in range(1980, 2025)
+        str(year) for year in range(start_year, end_year + 1)
     ]  # Modify or extend this list as needed.
     months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 
@@ -446,7 +469,9 @@ def era5_pi(years: List[str]) -> None:
         era5_pi_decade(single_level_path, pressure_level_path)
 
 
-def get_era5_coordinates() -> xr.Dataset:
+def get_era5_coordinates(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+) -> xr.Dataset:
     """
     Get the coordinates of the ERA5 data.
     """
@@ -457,7 +482,7 @@ def get_era5_coordinates() -> xr.Dataset:
     else:
         # open the pressure level files for all of the decades using xr.open_mfdataset
         file_paths = []
-        years = [str(year) for year in range(1980, 2025)]
+        years = [str(year) for year in range(start_year, end_year + 1)]
         for i in range(0, len(years), 10):
             j = min(i + 10, len(years))
             file_paths += [
@@ -471,7 +496,9 @@ def get_era5_coordinates() -> xr.Dataset:
         return ds[["longitude", "latitude", "valid_time"]]
 
 
-def get_era5_combined() -> xr.Dataset:
+def get_era5_combined(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+) -> xr.Dataset:
     """
     Get the raw ERA5 data for potential intensity and size as a lazily loaded xarray dataset.
     """
@@ -484,7 +511,7 @@ def get_era5_combined() -> xr.Dataset:
         )
     else:
         fp = []
-        years = [str(year) for year in range(1980, 2025)]
+        years = [str(year) for year in range(start_year, end_year + 1)]
         for i in range(0, len(years), 10):
             j = min(i + 10, len(years))
             fp += [
@@ -495,7 +522,7 @@ def get_era5_combined() -> xr.Dataset:
         single_ds = xr.open_mfdataset(fp, chunks={"valid_time": 1}, engine="netcdf4")
     # open the pressure level files for all of the decades using xr.open_mfdataset
     file_paths = []
-    years = [str(year) for year in range(1980, 2025)]
+    years = [str(year) for year in range(start_year, end_year + 1)]
     for i in range(0, len(years), 10):
         j = min(i + 10, len(years))
         file_paths += [
@@ -711,10 +738,12 @@ def select_seasonal_hemispheric_data(ds: xr.Dataset) -> xr.Dataset:
     # return result
 
 
-def get_era5_pi() -> xr.Dataset:
+def get_era5_pi(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+) -> xr.Dataset:
     """Load the potential intensity (PI) data calculated from ERA5 data."""
     file_paths = []
-    years = [str(year) for year in range(1980, 2025)]
+    years = [str(year) for year in range(start_year, end_year + 1)]
     for i in range(0, len(years), 10):
         j = min(i + 10, len(years))
         file_paths += [
@@ -823,7 +852,9 @@ def find_tropical_m():
         axs[0],
         trend_ds["m"],
         label="Change in Outflow Temp / Change in SST",
-        cmap="viridis",
+        cmap="cmo.balance",
+        vmin=-2,
+        vmax=2,
         hatch_mask=trend_ds["t0_hatch_mask"],
     )
     plot_var_on_map(
@@ -831,6 +862,8 @@ def find_tropical_m():
         trend_ds["t0_polyfit_coefficients"].sel(degree=1) * 10,
         label="Outflow Temperature Trend [K/decade]",
         cmap="cmo.balance",
+        vmin=-0.5,
+        vmax=0.5,
         hatch_mask=trend_ds["t0_hatch_mask"],
     )
     plot_var_on_map(
@@ -838,6 +871,8 @@ def find_tropical_m():
         trend_ds["sst_polyfit_coefficients"].sel(degree=1) * 10,
         label="SST Trend [K/decade]",
         cmap="cmo.balance",
+        vmin=-0.5,
+        vmax=0.5,
         hatch_mask=trend_ds["sst_hatch_mask"],
     )
     label_subplots(axs)  # , override="outside")
@@ -878,8 +913,10 @@ def plot_vmax_trends():
         axs[0],
         vmax * 10,  # convert to m/s/decade
         label="$V_p$ Trend [m s$^{-1}$ decade$^{-1}$]",
-        cmap="viridis",
+        cmap="cmo.balance",
         hatch_mask=trend_ds["vmax_hatch_mask"],
+        vmin=-10,
+        vmax=10,
     )
     plot_var_on_map(
         axs[1],
@@ -887,13 +924,17 @@ def plot_vmax_trends():
         label="$T_o$ Trend [K decade$^{-1}$]",
         cmap="viridis",
         hatch_mask=trend_ds["t0_hatch_mask"],
+        vmin=-0.5,
+        vmax=0.5,
     )
     plot_var_on_map(
         axs[2],
         otl * 10,  # convert to m/decade
-        label="$z_{\mathrm{lnb}}$ Trend [hpa decade$^{-1}$]",
+        label="$z_{\mathrm{lnb}}$ Trend [hPa decade$^{-1}$]",
         cmap="viridis",
         hatch_mask=trend_ds["otl_hatch_mask"],
+        vmin=-1,
+        vmax=1,
     )
 
     # vmax.plot(ax=axs[0], cmap="cmo.balance", cbar_kwargs={"label": ""})
@@ -921,11 +962,15 @@ def plot_vmax_trends():
 
 
 @timeit
-def get_all_data():
-    era5_ds = get_era5_combined().rename({"valid_time": "time"})
+def get_all_data(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+) -> xr.Dataset:
+    era5_ds = get_era5_combined(start_year=start_year, end_year=end_year).rename(
+        {"valid_time": "time"}
+    )
     # print(era5_ds.sst.values.sel(longitude))
     print(era5_ds)
-    era5_pi = get_era5_pi()
+    era5_pi = get_era5_pi(start_year=start_year, end_year=end_year)
     print(era5_pi)
     return xr.merge([era5_ds, era5_pi], compat="override", join="override")
 
@@ -949,6 +994,8 @@ def plot_lineplots(
     )
     if ds is None:
         era5_ds = get_all_data()
+    else:
+        era5_ds = ds
     era5_ds = mon_increase(era5_ds).sel(latitude=lat, longitude=lon, method="nearest")
     trend_ds = mon_increase(trend_ds).sel(latitude=lat, longitude=lon, method="nearest")
     print("era5_ds", era5_ds.sst.values)
@@ -1092,5 +1139,9 @@ if __name__ == "__main__":
     # era5_pi_trends()
     find_tropical_m()
     plot_vmax_trends()
-    plot_lineplots(360 - 90.0, 29.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
+    # ds = get_all_data()
+    # plot_lineplots(
+    #     360 - 90.0, 29.0, label="new_orleans", ds=ds
+    # )  # New Orleans, USA (30N, 90W)
+    # plot_lineplots(360 - 80.0, 25.0, label="miami", ds=ds)  # Miami, USA (25N, 80W)
     # plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
