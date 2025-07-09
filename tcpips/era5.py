@@ -141,7 +141,7 @@ def plot_var_on_map(
             #     edgecolor="gray",
             #     # z_order=1,
             # )
-            contours = hatch_mask.astype(int).plot.contourf(
+            _ = hatch_mask.astype(int).plot.contourf(
                 ax=ax,
                 transform=ccrs.PlateCarree(),
                 x="longitude",
@@ -161,7 +161,7 @@ def download_single_levels(
     years: List[str], months: List[str], output_file: str, redo: bool = False
 ) -> None:
     """
-    Downloads monthly-averaged single-level fields:
+    Downloads monthly-averaged single-level fields in decadal chunks.
       - Sea surface temperature (for PI and PS)
       - Mean sea level pressure (for PI and PS)
       - Relative humidity (PS only)
@@ -169,12 +169,40 @@ def download_single_levels(
     Args:
         years (List[str]): List of years to download data for.
         months (List[str]): List of months to download data for.
-        output_file (str): Name of the output file to save the data.
-        redo (bool): If True, download the data again even if the file already exists. Default is False.
+        output_file (str): The base name for the output files.
+        redo (bool): If True, re-download data even if files exist.
     """
-    if os.path.exists(os.path.join(ERA5_RAW_PATH, output_file)) and not redo:
-        print(f"File {output_file} already exists. Use redo=True to download again.")
+    # Check if the overall task is already done by looking for the last chunk
+    last_decade_start = (len(years) - 1) // 10 * 10
+    last_file_name = f"{output_file.replace('.nc', '')}_years{years[last_decade_start]}_{years[-1]}.nc"
+    if os.path.exists(os.path.join(ERA5_RAW_PATH, last_file_name)) and not redo:
+        print(
+            f"All chunks for {output_file} seem to exist. Use redo=True to download again."
+        )
         return
+
+    # If more than 10 years, split into chunks and call recursively
+    if len(years) > 10:
+        print(
+            f"Request for {len(years)} years is too large. Splitting into decadal chunks."
+        )
+        for i in range(0, len(years), 10):
+            j = min(i + 10, len(years))
+            # Call the function for each smaller chunk of years
+            download_single_levels(years[i:j], months, output_file, redo)
+        return
+
+    # Base case: Download a single chunk (10 years or less)
+    chunk_file_name = f"{output_file.replace('.nc', '')}_years{years[0]}_{years[-1]}.nc"
+    chunk_file_path = os.path.join(ERA5_RAW_PATH, chunk_file_name)
+
+    if os.path.exists(chunk_file_path) and not redo:
+        print(f"File {chunk_file_name} already exists. Skipping.")
+        return
+
+    print(
+        f"Downloading single-level data for years {years[0]}-{years[-1]} to {chunk_file_name}"
+    )
     c = cdsapi.Client()
     c.retrieve(
         "reanalysis-era5-single-levels-monthly-means",
@@ -191,31 +219,10 @@ def download_single_levels(
             "month": months,
             "time": "00:00",
         },
-        os.path.join(ERA5_RAW_PATH, output_file),
+        chunk_file_path,
     )
-    print(f"Downloaded single-level data to {output_file}")
+    print(f"Downloaded single-level data to {chunk_file_name}")
     return
-
-
-def break_single_levels(years: List[str], output_file: str) -> None:
-    """
-    Breaks the single-level data into decade chunks and saves them as separate files.
-
-    Args:
-        years (List[str]): List of years to download data for.
-        output_file (str): Name of the output file to save the data.
-    """
-    # break the single level file into decade chunks
-    # and save them as separate files
-    prefix = output_file.replace(".nc", "")
-    ds = xr.open_dataset(os.path.join(ERA5_RAW_PATH, output_file))
-    for i in range(0, len(years), 10):
-        j = min(i + 10, len(years))
-        file_name = f"{prefix}_years{years[i]}_{years[j-1]}.nc"
-        file_path = os.path.join(ERA5_RAW_PATH, file_name)
-        out_ds = ds.sel(valid_time=slice(f"{years[i]}-01-01", f"{years[j-1]}-12-31"))
-        out_ds.to_netcdf(file_path)
-        print(f"Saved {file_path}")
 
 
 @timeit
@@ -344,7 +351,6 @@ def download_era5_data(
 
     # break the single level file into decade chunks
     # and save them as separate files
-    break_single_levels(years, "era5_single_levels.nc")
 
     # Download the pressure-level variables (including geopotential).
     download_pressure_levels(
@@ -410,7 +416,7 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
     """
 
     print(f"Calculating PI for {single_level_path} and {pressure_level_path}")
-    cluster = LocalCluster(n_workers=10, threads_per_worker=1)
+    cluster = LocalCluster()  # n_workers=10, threads_per_worker=1)
     client = Client(cluster)
     print(f"Dask dashboard link: {client.dashboard_link}")
 
@@ -633,109 +639,88 @@ def get_trend(
             return slope
 
 
-def select_seasonal_hemispheric_data(ds: xr.Dataset) -> xr.Dataset:
+def select_seasonal_hemispheric_data(
+    ds: xr.Dataset, months_to_average: int = 1
+) -> xr.Dataset:
     """
-    Selects August data from the Northern Hemisphere and March data
-    from the Southern Hemisphere, combining them into a single dataset
-    with an integer 'year' coordinate.
+    Selects seasonal hemispheric data, with an option to average over peak months.
 
     Args:
-        ds: An xarray Dataset with 'time', 'latitude', and 'longitude'
-            coordinates. 'time' must be a datetime-like coordinate.
+        ds (xr.Dataset): An xarray Dataset with 'time', 'latitude', and
+            'longitude' coordinates. 'time' must be a datetime-like coordinate.
+        months_to_average (int): The number of months to average.
+            - 1: Selects August for NH and March for SH.
+            - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
 
     Returns:
-        A new xarray Dataset with an integer 'year' dimension, containing
+        xr.Dataset: A new Dataset with an integer 'year' dimension, containing
         the combined seasonal and hemispheric data.
 
-    >>> # 1. Set up a sample dataset for the doctest
-    >>> time = pd.date_range('2000-01-01', '2002-12-31', freq='MS')
-    >>> latitudes = [-30, -10, 10, 30]
-    >>> longitudes = [100, 120]
-    >>> data = np.arange(len(time) * len(latitudes) * len(longitudes)).reshape(len(time), len(latitudes), len(longitudes))
-    >>> ds_test = xr.Dataset(
-    ...     {'some_variable': (['time', 'latitude', 'longitude'], data)},
-    ...     coords={'time': time, 'latitude': latitudes, 'longitude': longitudes}
-    ... )
-    >>> # 2. Run the function
-    >>> result = select_seasonal_hemispheric_data(ds_test)
-    >>> # 3. Check the result
-    >>> print(result)
-    <xarray.Dataset> Size: 264B
-    Dimensions:        (year: 3, latitude: 4, longitude: 2)
-    Coordinates:
-      * latitude       (latitude) int64 32B -30 -10 10 30
-      * longitude      (longitude) int64 16B 100 120
-      * year           (year) int64 24B 2000 2001 2002
-    Data variables:
-        some_variable  (year, latitude, longitude) float64 192B 16.0 17.0 ... 255.0
-    >>> # 1. Set up a sample dataset for the doctest.
-    >>> # The data value for each point is simply its month number (1-12).
+    >>> # --- Test Setup ---
+    >>> # Create a 2-year dataset where the data value is the month number.
     >>> time = pd.date_range('2020-01-01', '2021-12-31', freq='MS')
-    >>> lats = [-20, -10, 10, 20] # Southern and Northern latitudes
-    >>> lons = [100, 120]
+    >>> lats = [-20, 20]  # One SH, one NH point
+    >>> lons = [100]
     >>> month_data = time.month.values.reshape(-1, 1, 1) * np.ones((len(time), len(lats), len(lons)))
     >>> ds_test = xr.Dataset(
     ...     {'some_variable': (['time', 'latitude', 'longitude'], month_data)},
     ...     coords={'time': time, 'latitude': lats, 'longitude': lons}
     ... )
-    >>>
-    >>> # 2. Run the function
-    >>> result = select_seasonal_hemispheric_data(ds_test)
-    >>>
-    >>> # 3. Check the results
-    >>> # For any Northern Hemisphere point, the value for any year should be 8 (from August).
-    >>> print(int(result.sel(year=2021, latitude=10, longitude=120).some_variable))
-    8
-    >>> # For any Southern Hemisphere point, the value for any year should be 3 (from March).
-    >>> print(int(result.sel(year=2020, latitude=-20, longitude=100).some_variable))
-    3
-    >>> # Check that the dimensions are correct and 'time' has been replaced by 'year'.
-    >>> print(sorted(result.dims))
-    ['latitude', 'longitude', 'year']
+
+    >>> # --- Test Case 1: 3-Month Average ---
+    >>> result_3m = select_seasonal_hemispheric_data(ds_test, months_to_average=3)
+    >>> # For NH (lat=20), average of Aug(8), Sep(9), Oct(10) should be 9.0
+    >>> assert int(result_3m.sel(year=2021, latitude=20).some_variable) == 9
+    >>> # For SH (lat=-20), average of Jan(1), Feb(2), Mar(3) should be 2.0
+    >>> assert int(result_3m.sel(year=2020, latitude=-20).some_variable) == 2
+    >>> # Check that the dimensions are correct and 'time' is replaced by 'year'.
+    >>> assert sorted(result_3m.dims) == ['latitude', 'longitude', 'year']
+    >>> assert result_3m.year.values.tolist() == [2020, 2021]
+
+    >>> # --- Test Case 2: 1-Month Selection (Original behavior) ---
+    >>> result_1m = select_seasonal_hemispheric_data(ds_test, months_to_average=1)
+    >>> # For NH (lat=20), the value for August (month 8) should be 8.
+    >>> assert int(result_1m.sel(year=2021, latitude=20).some_variable) == 8
+    >>> # For SH (lat=-20), the value for March (month 3) should be 3.
+    >>> assert int(result_1m.sel(year=2020, latitude=-20).some_variable) == 3
     """
-    # 1. Isolate August data for the Northern Hemisphere
-    nh_data = ds.where((ds.time.dt.month == 8) & (ds.latitude >= 0), drop=True)
+    if months_to_average == 1:
+        # Original logic: Select a single peak month
+        nh_data = ds.where((ds.time.dt.month == 8) & (ds.latitude >= 0), drop=True)
+        sh_data = ds.where((ds.time.dt.month == 3) & (ds.latitude < 0), drop=True)
 
-    # 2. Isolate March data for the Southern Hemisphere
-    sh_data = ds.where((ds.time.dt.month == 3) & (ds.latitude < 0), drop=True)
+        nh_data = (
+            nh_data.assign_coords(year=nh_data.time.dt.year)
+            .swap_dims({"time": "year"})
+            .drop_vars("time")
+        )
+        sh_data = (
+            sh_data.assign_coords(year=sh_data.time.dt.year)
+            .swap_dims({"time": "year"})
+            .drop_vars("time")
+        )
 
-    # 3. Align both datasets to a common 'year' coordinate
-    nh_data = (
-        nh_data.assign_coords(year=nh_data.time.dt.year)
-        .swap_dims({"time": "year"})
-        .drop_vars("time")
-    )
-    sh_data = (
-        sh_data.assign_coords(year=sh_data.time.dt.year)
-        .swap_dims({"time": "year"})
-        .drop_vars("time")
-    )
+        return nh_data.combine_first(sh_data)
 
-    # 4. Combine the two datasets.
-    # combine_first fills NaN values in nh_data with corresponding values from sh_data.
-    # This correctly merges the two hemispheres.
-    return nh_data.combine_first(sh_data)
+    elif months_to_average == 3:
+        # New logic: Average over 3-month peak season
+        # Northern Hemisphere: August-September-October (ASO)
+        nh_data = ds.where(
+            ds.time.dt.month.isin([8, 9, 10]) & (ds.latitude >= 0), drop=True
+        )
+        nh_annual = nh_data.groupby(nh_data.time.dt.year).mean("time")
 
-    # # ds = mon_increase(ds)
-    # # Define a boolean mask for Augusts in the Northern Hemisphere (latitude >= 0)
-    # is_nh_august = (ds["time"].dt.month == 8) & (ds["latitude"] >= 0)
+        # Southern Hemisphere: January-February-March (JFM)
+        sh_data = ds.where(
+            ds.time.dt.month.isin([1, 2, 3]) & (ds.latitude < 0), drop=True
+        )
+        sh_annual = sh_data.groupby(sh_data.time.dt.year).mean("time")
 
-    # # Define a boolean mask for Marches in the Southern Hemisphere (latitude < 0)
-    # is_sh_march = (ds["time"].dt.month == 3) & (ds["latitude"] < 0)
+        # Merge the two hemispheric, annually-averaged datasets
+        return nh_annual.combine_first(sh_annual)
 
-    # # Use .where() with the combined boolean mask.
-    # # For any given time, data is kept only for the latitudes matching the condition.
-    # # For a March timestamp, NH data becomes NaN; for an August timestamp, SH data becomes NaN.
-    # # drop=True removes timestamps where neither condition is met.
-    # combined = ds.where(is_sh_march | is_nh_august, drop=True)
-
-    # # Group the data by year. For each year, a lat/lon point will have at most one
-    # # valid data point (either from March or August).
-    # # .first() selects the first non-NaN value in each group along the 'time' dimension,
-    # # effectively collapsing 'time' into 'year'.
-    # result = combined.groupby(combined.time.dt.year).first("time")
-
-    # return result
+    else:
+        raise ValueError("`months_to_average` must be 1 or 3.")
 
 
 def get_era5_pi(
@@ -783,7 +768,7 @@ def era5_pi_trends() -> xr.Dataset:
     # ds["sst"] = sst_ds["sst"]
     # lets just select the augusts in the northern hemisphere
     ds["sst"] = sst_ds
-    ds = select_seasonal_hemispheric_data(mon_increase(ds))
+    ds = select_seasonal_hemispheric_data(mon_increase(ds), months_to_average=3)
     # ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
     print("Calculating trends in potential intensity...")
     print(ds)
@@ -810,7 +795,7 @@ def era5_pi_trends() -> xr.Dataset:
             trend_ds[var + "_hatch_mask"] = frac_error >= 1.0
     # print(trend_ds)
     trend_ds.to_netcdf(
-        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
         engine="h5netcdf",
         encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
     )
@@ -826,7 +811,7 @@ def find_tropical_m():
     """
     trend_ds = mon_increase(
         xr.open_dataset(
-            os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+            os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
             engine="h5netcdf",
         )
     ).sel(latitude=slice(-40, 40))
@@ -877,7 +862,7 @@ def find_tropical_m():
     )
     label_subplots(axs)  # , override="outside")
     plt.tight_layout()
-    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_pi_trends.pdf"), dpi=300)
+    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_pi_trends_3m.pdf"), dpi=300)
 
     print(trend_ds["sst_polyfit_coefficients"].sel(degree=0).mean())
     print(trend_ds["sst_polyfit_coefficients"].sel(degree=1).mean())
@@ -891,7 +876,7 @@ def plot_vmax_trends():
     """Plot trend in vmax, t0 and otl in another 3 panel subplot with no cbar label but
     labels in subplot title instead."""
     trend_ds = xr.open_dataset(
-        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
         engine="h5netcdf",
     )
     trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
@@ -922,7 +907,7 @@ def plot_vmax_trends():
         axs[1],
         t0 * 10,  # convert to K/decade
         label="$T_o$ Trend [K decade$^{-1}$]",
-        cmap="viridis",
+        cmap="cmo.balance",
         hatch_mask=trend_ds["t0_hatch_mask"],
         vmin=-0.5,
         vmax=0.5,
@@ -931,7 +916,7 @@ def plot_vmax_trends():
         axs[2],
         otl * 10,  # convert to m/decade
         label="$z_{\mathrm{lnb}}$ Trend [hPa decade$^{-1}$]",
-        cmap="viridis",
+        cmap="cmo.balance",
         hatch_mask=trend_ds["otl_hatch_mask"],
         vmin=-1,
         vmax=1,
@@ -954,7 +939,7 @@ def plot_vmax_trends():
 
     label_subplots(axs)  # , override="outside")
     plt.tight_layout()
-    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_vmax_trends.pdf"), dpi=300)
+    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_vmax_trends_3m.pdf"), dpi=300)
 
     print("vmax trend mean:", vmax.mean())
     print("t0 trend mean:", t0.mean())
@@ -989,7 +974,7 @@ def plot_lineplots(
     """
     plot_defaults()
     trend_ds = xr.open_dataset(
-        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends.nc"),
+        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
         engine="h5netcdf",
     )
     if ds is None:
@@ -1023,7 +1008,8 @@ def plot_lineplots(
         figsize=get_dim(ratio=0.8),
     )
 
-    def plot_trend(ax, var: str, color: str, label: str):
+    def plot_trend(ax: plt.Axis, var: str, color: str, label: str):
+        """Plot the trend for a specific variable."""
         ys = era5_ds[var].values
         x = era5_ds["year"].values
         slope = trend_ds[f"{var}_polyfit_coefficients"].sel(degree=1).values
@@ -1118,7 +1104,7 @@ def plot_lineplots(
     label_subplots(axs)  # , override="outside")
     # era5_ds["otl"].plot(ax=axs[2], label="OTL [
     plt.savefig(
-        os.path.join(ERA5_FIGURE_PATH, f"era5_pi_{label}.pdf"),
+        os.path.join(ERA5_FIGURE_PATH, f"era5_pi_{label}_3m.pdf"),
         dpi=300,
     )
 
@@ -1126,7 +1112,7 @@ def plot_lineplots(
 if __name__ == "__main__":
     # python -m tcpips.era5
     # python -m tcpips.era5 &> era5_pi_2.log
-    # download_era5_data()
+    download_era5_data(start_year=1940)
     # era5_pi(
     #    [str(year) for year in range(1980, #2025)]
     # )  # Modify or extend this list as needed.)
@@ -1137,8 +1123,8 @@ if __name__ == "__main__":
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
     # era5_pi_trends()
-    find_tropical_m()
-    plot_vmax_trends()
+    # find_tropical_m()
+    # plot_vmax_trends()
     # ds = get_all_data()
     # plot_lineplots(
     #     360 - 90.0, 29.0, label="new_orleans", ds=ds
