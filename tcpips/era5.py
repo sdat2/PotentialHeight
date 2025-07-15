@@ -172,14 +172,7 @@ def download_single_levels(
         output_file (str): The base name for the output files.
         redo (bool): If True, re-download data even if files exist.
     """
-    # Check if the overall task is already done by looking for the last chunk
-    last_decade_start = (len(years) - 1) // 10 * 10
-    last_file_name = f"{output_file.replace('.nc', '')}_years{years[last_decade_start]}_{years[-1]}.nc"
-    if os.path.exists(os.path.join(ERA5_RAW_PATH, last_file_name)) and not redo:
-        print(
-            f"All chunks for {output_file} seem to exist. Use redo=True to download again."
-        )
-        return
+    print(f"Called for years: {years}, months: {months}, output_file: {output_file}")
 
     # If more than 10 years, split into chunks and call recursively
     if len(years) > 10:
@@ -197,8 +190,10 @@ def download_single_levels(
     chunk_file_path = os.path.join(ERA5_RAW_PATH, chunk_file_name)
 
     if os.path.exists(chunk_file_path) and not redo:
-        print(f"File {chunk_file_name} already exists. Skipping.")
+        print(f"File {chunk_file_path} already exists. Skipping.")
         return
+    else:
+        print(f"Downloading chunk: {chunk_file_path} as it does not exist.")
 
     print(
         f"Downloading single-level data for years {years[0]}-{years[-1]} to {chunk_file_name}"
@@ -347,7 +342,7 @@ def download_era5_data(
     months = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
 
     # Download the single-level (surface) variables.
-    download_single_levels(years, months, "era5_single_levels.nc", redo=True)
+    download_single_levels(years, months, "era5_single_levels.nc", redo=False)
 
     # break the single level file into decade chunks
     # and save them as separate files
@@ -1112,10 +1107,10 @@ def plot_lineplots(
 if __name__ == "__main__":
     # python -m tcpips.era5
     # python -m tcpips.era5 &> era5_pi_2.log
-    download_era5_data(start_year=1940)
-    # era5_pi(
-    #    [str(year) for year in range(1980, #2025)]
-    # )  # Modify or extend this list as needed.)
+    # download_era5_data(start_year=1940)
+    era5_pi(
+        [str(year) for year in range(1940, 1950)]  # 2025)]
+    )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
