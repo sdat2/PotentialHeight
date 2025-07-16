@@ -747,23 +747,29 @@ def get_era5_pi(
     )
 
 
-def era5_pi_trends() -> xr.Dataset:
+def era5_pi_trends(
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    months: int = 1,
+) -> None:
     """
     Let's find the linear trends in the potential intensity
     """
     # load all the decades of data for potential intensity
-    ds = get_era5_pi()
+    ds = get_era5_pi(start_year=start_year, end_year=end_year)
     if ds is None:
         print("No ERA5 PI data found. Please run era5_pi() first.")
         return
 
     print(ds)
-    sst_ds = preprocess_single_level_data(get_era5_combined())["sst"]
+    sst_ds = preprocess_single_level_data(
+        get_era5_combined(start_year=start_year, end_year=end_year)
+    )["sst"]
     print("sst_ds", sst_ds)
     # ds["sst"] = sst_ds["sst"]
     # lets just select the augusts in the northern hemisphere
     ds["sst"] = sst_ds
-    ds = select_seasonal_hemispheric_data(mon_increase(ds), months_to_average=3)
+    ds = select_seasonal_hemispheric_data(mon_increase(ds), months_to_average=months)
     # ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
     print("Calculating trends in potential intensity...")
     print(ds)
@@ -790,23 +796,40 @@ def era5_pi_trends() -> xr.Dataset:
             trend_ds[var + "_hatch_mask"] = frac_error >= 1.0
     # print(trend_ds)
     trend_ds.to_netcdf(
-        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
+        os.path.join(
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+        ),
         engine="h5netcdf",
         encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
     )
 
 
-def find_tropical_m():
+def find_tropical_m(
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    months: int = 1,
+) -> None:
     """I want to find what the trends are for the tropical cyclone potential intensity and size over the pseudo observational period.
 
     I defined m as the ratio of the change in the outflow temperature to the change in surface temperature.
     T_s = T_s0 + delta_t
     T_o = T_o0 + m * delta_t
     where T_s0 is the initial sea surface temperature, T_o0 is the initial outflow temperature, and delta_t is the change in temperature.
+
+    Args:
+        start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
+        end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+        months (int, optional): The number of months to average over. Defaults to 1.
+
+    Returns:
+        None: This function saves the results to a file and does not return anything.
     """
     trend_ds = mon_increase(
         xr.open_dataset(
-            os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
+            os.path.join(
+                ERA5_PRODUCTS_PATH,
+                f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc",
+            ),
             engine="h5netcdf",
         )
     ).sel(latitude=slice(-40, 40))
@@ -857,7 +880,12 @@ def find_tropical_m():
     )
     label_subplots(axs)  # , override="outside")
     plt.tight_layout()
-    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_pi_trends_3m.pdf"), dpi=300)
+    plt.savefig(
+        os.path.join(
+            ERA5_FIGURE_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.pdf"
+        ),
+        dpi=300,
+    )
 
     print(trend_ds["sst_polyfit_coefficients"].sel(degree=0).mean())
     print(trend_ds["sst_polyfit_coefficients"].sel(degree=1).mean())
@@ -867,11 +895,23 @@ def find_tropical_m():
     print(trend_ds["m"].median())
 
 
-def plot_vmax_trends():
+def plot_vmax_trends(
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    months: int = 3,
+) -> None:
     """Plot trend in vmax, t0 and otl in another 3 panel subplot with no cbar label but
-    labels in subplot title instead."""
+    labels in subplot title instead.
+
+    Args:
+        start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
+        end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+        months (int, optional): The number of months to average over. Defaults to 3.
+    """
     trend_ds = xr.open_dataset(
-        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
+        os.path.join(
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+        ),
         engine="h5netcdf",
     )
     trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
@@ -956,7 +996,13 @@ def get_all_data(
 
 
 def plot_lineplots(
-    lon: float, lat: float, label: str = "new_orleans", ds: Optional[xr.Dataset] = None
+    lon: float,
+    lat: float,
+    label: str = "new_orleans",
+    ds: Optional[xr.Dataset] = None,
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    months: int = 1,
 ) -> None:
     """Plot the linear trend and variables for a specific point
     in the ERA5 dataset.
@@ -966,14 +1012,19 @@ def plot_lineplots(
         lat (float): Latitude of the point to plot.
         label (str, optional): Label for the plot. Defaults to "new_orleans".
         ds (Optional[xr.Dataset], optional): If provided, use this dataset instead of loading it.
+        start_year (int, optional): Start year for the data. Defaults to 1980.
+        end_year (int, optional): End year for the data. Defaults to 2020
+        months (int, optional): Number of months to average over. Defaults to 1.
     """
     plot_defaults()
     trend_ds = xr.open_dataset(
-        os.path.join(ERA5_PRODUCTS_PATH, "era5_pi_trends_3m.nc"),
+        os.path.join(
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+        ),
         engine="h5netcdf",
     )
     if ds is None:
-        era5_ds = get_all_data()
+        era5_ds = get_all_data(start_year=start_year, end_year=end_year)
     else:
         era5_ds = ds
     era5_ds = mon_increase(era5_ds).sel(latitude=lat, longitude=lon, method="nearest")
@@ -1003,7 +1054,7 @@ def plot_lineplots(
         figsize=get_dim(ratio=0.8),
     )
 
-    def plot_trend(ax: plt.Axis, var: str, color: str, label: str):
+    def plot_trend(ax: plt.axis, var: str, color: str, label: str):
         """Plot the trend for a specific variable."""
         ys = era5_ds[var].values
         x = era5_ds["year"].values
@@ -1012,10 +1063,11 @@ def plot_lineplots(
         trend = slope * era5_ds["year"].values + intercept
         cov_matrix_unscaled = trend_ds[f"{var}_polyfit_covariance"].values
         coeffs = np.array([slope, intercept])
-        residuals = ys - np.polyval(coeffs, x)
-        n_dof = len(x) - len(coeffs)  # Number of degrees of freedom
-        residual_variance = np.sum(residuals**2) / n_dof
-        cov_matrix = cov_matrix_unscaled * residual_variance
+        # residuals = ys - np.polyval(coeffs, x)
+        # n_dof = len(x) - len(coeffs)  # Number of degrees of freedom
+        # residual_variance = np.sum(residuals**2) / n_dof
+        # cov_matrix = cov_matrix_unscaled * residual_variance
+        cov_matrix = cov_matrix_unscaled
 
         print(f"{var} Fit Coefficients (slope, intercept): {coeffs}")
         print(f"{var} Covariance Matrix:\n{cov_matrix}\n")
@@ -1025,12 +1077,12 @@ def plot_lineplots(
         u_coeffs = correlated_values(coeffs, cov_matrix)
         slope, intercept = u_coeffs
 
-        print(f"{var} Correlated Slope (m):     {slope}")
-        print(f"{var} Correlated Intercept (c): {intercept}")
+        print(f"{var} Correlated Slope (m):       {slope}")
+        print(f"{var} Correlated Intercept (c):   {intercept}")
         print("-" * 30)
 
         ax.plot(
-            era5_ds["year"].values + 1980,
+            era5_ds["year"].values + start_year,
             trend,
             label=f"{label} Trend",
             color=color,
@@ -1040,7 +1092,7 @@ def plot_lineplots(
 
         new_ys = u_coeffs[0] * x + u_coeffs[1]
         ax.fill_between(
-            x + 1980,
+            x + start_year,
             [y.n - y.s for y in new_ys],
             [y.n + y.s for y in new_ys],
             # new_ys.n - new_ys.s,
@@ -1057,32 +1109,32 @@ def plot_lineplots(
             color=color,
         )
 
-    print(era5_ds["sst"].values)
-    print(era5_ds["t0"].values)
-    print(era5_ds["otl"].values)
+    print("sst", era5_ds["sst"].values.tolist())
+    print("t0", era5_ds["t0"].values.tolist())
+    print("otl", era5_ds["otl"].values.tolist())
     axs[0].plot(
-        era5_ds["year"].values + 1980,
+        era5_ds["year"].values + start_year,
         era5_ds["sst"].values - 273.15,
         label=r"$T_s$ [$^{\circ}$C]",
         color="tab:blue",
     )
     plot_trend(axs[0], "sst", "tab:blue", r"$T_s$ [$^{\circ}$C]")
     axs[1].plot(
-        era5_ds["year"].values + 1980,
+        era5_ds["year"].values + start_year,
         era5_ds["t0"].values,
         label=r"$T_o$ [K]",
         color="tab:orange",
     )
     plot_trend(axs[1], "t0", "tab:orange", r"$T_o$ [K]")
     axs[2].plot(
-        era5_ds["year"].values + 1980,
+        era5_ds["year"].values + start_year,
         era5_ds["otl"].values,
         label=r"$z_o$ [m]",
         color="tab:green",
     )
     plot_trend(axs[2], "otl", "tab:green", r"$z_o$ [hPa]")
     axs[3].plot(
-        era5_ds["year"].values + 1980,
+        era5_ds["year"].values + start_year,
         era5_ds["vmax"].values,
         label=r"$V_p$ [m s$^{-1}$]",
         color="tab:red",
@@ -1095,11 +1147,13 @@ def plot_lineplots(
     axs[3].set_xlabel("Year")
     # era5_ds["sst"].plot(ax=axs[0], x="year", label="SST [C]", color="tab:blue")
     # era5_pi["t0"].plot(ax=axs[1], x="year", label="T0 [K]", color="tab:orange")
-    plt.xlim(0 + 1980, 44 + 1980)  # limit the x-axis to 45 years
+    plt.xlim(0 + start_year, end_year)
     label_subplots(axs)  # , override="outside")
     # era5_ds["otl"].plot(ax=axs[2], label="OTL [
     plt.savefig(
-        os.path.join(ERA5_FIGURE_PATH, f"era5_pi_{label}_3m.pdf"),
+        os.path.join(
+            ERA5_FIGURE_PATH, f"era5_pi_{label}_{start_year}_{end_year}_{months}m.pdf"
+        ),
         dpi=300,
     )
 
@@ -1108,21 +1162,52 @@ if __name__ == "__main__":
     # python -m tcpips.era5
     # python -m tcpips.era5 &> era5_pi_2.log
     # download_era5_data(start_year=1940)
-    era5_pi(
-        [str(year) for year in range(1940, 1950)]  # 2025)]
-    )  # Modify or extend this list as needed.)
+    # era5_pi(
+    #     [str(year) for year in range(1940, 1950)]  # 2025)]
+    # )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
     # era5_pi(
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
-    # era5_pi_trends()
-    # find_tropical_m()
-    # plot_vmax_trends()
+    # era5_pi_trends(start_year=1940)
+    # era5_pi_trends(start_year=1980)
+    find_tropical_m(start_year=1980, months=1)
+    find_tropical_m(start_year=1940, months=1)
+
+    plot_vmax_trends(start_year=1980, months=1)
+    plot_vmax_trends(start_year=1940, months=1)
+    plot_lineplots(
+        360 - 90.0,
+        29.0,
+        label="new_orleans",
+        start_year=1980,
+    )  # New Orleans, USA (30N, 90W)
+    plot_lineplots(
+        360 - 80.0,
+        25.0,
+        label="miami",
+        start_year=1980,
+    )  # Miami, USA (25N, 80W)
+    plot_lineplots(
+        360 - 90.0,
+        27.0,
+        label="new_orleans",
+        start_year=1940,
+    )  # New Orleans, USA (30N, 90W)
+    plot_lineplots(
+        360 - 80.0,
+        25.0,
+        label="miami",
+        start_year=1940,
+    )  # Miami, USA (25N, 80W)
+
     # ds = get_all_data()
     # plot_lineplots(
     #     360 - 90.0, 29.0, label="new_orleans", ds=ds
     # )  # New Orleans, USA (30N, 90W)
     # plot_lineplots(360 - 80.0, 25.0, label="miami", ds=ds)  # Miami, USA (25N, 80W)
     # plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
+    # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
+    # Ed Hawkins?

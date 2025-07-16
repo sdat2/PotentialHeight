@@ -3018,14 +3018,12 @@ def run_all_plots():
         name=b"MANGKHUT",
         basin=b"WP",
         subbasin=b"WPAC",
-        # bbox=None,
         bbox=(100, 170, 10, 30),
     )
     plot_tc_example(
         name=b"HATO",
         basin=b"WP",
         subbasin=b"WPAC",
-        # bbox=None,
         bbox=(90, 135, 10, 30),
     )
     plot_tc_example(
@@ -3193,3 +3191,5 @@ if __name__ == "__main__":
     # )
     # vary_limits(num=50)
     run_all_plots()
+
+# add a processing step to exclude cyclone time points where PI is going / has gone down.
