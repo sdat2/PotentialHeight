@@ -141,15 +141,25 @@ def plot_var_on_map(
             #     edgecolor="gray",
             #     # z_order=1,
             # )
+            if np.all(hatch_mask.astype(int).values == 1):
+                warning = "All values in the hatch mask are True (1)."
+                print(warning)
+            else:
+                ones = np.sum(hatch_mask.astype(int).values == 1)
+                zeros = np.sum(hatch_mask.astype(int).values == 0)
+                print(
+                    f"{ones/(ones + zeros) * 100:.2f}% of the area for {label} is masked out."
+                )
+
             _ = hatch_mask.astype(int).plot.contourf(
                 ax=ax,
                 transform=ccrs.PlateCarree(),
                 x="longitude",
                 y="latitude",
-                levels=[0.5, 1.5],  # Isolate the area where the mask is 1 (True)
-                hatches=["//"],  # Use a sparse pattern. Note it's in a list!
-                colors="none",  # Makes the area transparent, leaving only the hatch
-                add_colorbar=False,  # No color bar for a hatch mask
+                levels=[0, 0.5, 1],  # Define regions for 0s and 1s
+                hatches=[None, "xxxx"],  # Apply hatch ONLY to the region of 1s
+                colors="none",  # Makes the area transparent
+                add_colorbar=False,
             )
 
     ax.set_title(label)
@@ -794,6 +804,8 @@ def era5_pi_trends(
                 / trend_ds[trend_n].sel(degree=1)
             )
             trend_ds[var + "_hatch_mask"] = frac_error >= 1.0
+            if np.all(trend_ds[var + "_hatch_mask"].astype(int).values == 1):
+                print(f"Warning: All values in the hatch mask for {var} are True (1).")
     # print(trend_ds)
     trend_ds.to_netcdf(
         os.path.join(
@@ -854,16 +866,16 @@ def find_tropical_m(
     plot_var_on_map(
         axs[0],
         trend_ds["m"],
-        label="Change in Outflow Temp / Change in SST",
+        label="$\Delta T_o / \Delta T_s$",
         cmap="cmo.balance",
         vmin=-2,
         vmax=2,
-        hatch_mask=trend_ds["t0_hatch_mask"],
+        hatch_mask=trend_ds["t0_hatch_mask"],  # or trend_ds["sst_hatch_mask"],
     )
     plot_var_on_map(
         axs[1],
         trend_ds["t0_polyfit_coefficients"].sel(degree=1) * 10,
-        label="Outflow Temperature Trend [K/decade]",
+        label="$T_o$ trend [K decade$^{-1}$]",
         cmap="cmo.balance",
         vmin=-0.5,
         vmax=0.5,
@@ -872,7 +884,7 @@ def find_tropical_m(
     plot_var_on_map(
         axs[2],
         trend_ds["sst_polyfit_coefficients"].sel(degree=1) * 10,
-        label="SST Trend [K/decade]",
+        label="$T_s$ trend [K/decade]",
         cmap="cmo.balance",
         vmin=-0.5,
         vmax=0.5,
@@ -932,7 +944,7 @@ def plot_vmax_trends(
     plot_var_on_map(
         axs[0],
         vmax * 10,  # convert to m/s/decade
-        label="$V_p$ Trend [m s$^{-1}$ decade$^{-1}$]",
+        label="$V_p$ trend [m s$^{-1}$ decade$^{-1}$]",
         cmap="cmo.balance",
         hatch_mask=trend_ds["vmax_hatch_mask"],
         vmin=-10,
@@ -941,7 +953,7 @@ def plot_vmax_trends(
     plot_var_on_map(
         axs[1],
         t0 * 10,  # convert to K/decade
-        label="$T_o$ Trend [K decade$^{-1}$]",
+        label="$T_o$ trend [K decade$^{-1}$]",
         cmap="cmo.balance",
         hatch_mask=trend_ds["t0_hatch_mask"],
         vmin=-0.5,
@@ -950,7 +962,7 @@ def plot_vmax_trends(
     plot_var_on_map(
         axs[2],
         otl * 10,  # convert to m/decade
-        label="$z_{\mathrm{lnb}}$ Trend [hPa decade$^{-1}$]",
+        label="$z_{\mathrm{o}}$ trend [hPa decade$^{-1}$]",
         cmap="cmo.balance",
         hatch_mask=trend_ds["otl_hatch_mask"],
         vmin=-1,
@@ -1054,9 +1066,9 @@ def plot_lineplots(
         figsize=get_dim(ratio=0.8),
     )
 
-    def plot_trend(ax: plt.axis, var: str, color: str, label: str):
+    def plot_trend(ax: plt.axis, var: str, color: str, label: str, unit: str) -> None:
         """Plot the trend for a specific variable."""
-        ys = era5_ds[var].values
+        # ys = era5_ds[var].values
         x = era5_ds["year"].values
         slope = trend_ds[f"{var}_polyfit_coefficients"].sel(degree=1).values
         intercept = trend_ds[f"{var}_polyfit_coefficients"].sel(degree=0).values
@@ -1099,13 +1111,13 @@ def plot_lineplots(
             color=color,
             alpha=0.2,
         )
-        ax.text(
-            0.3,
-            0.95,
-            f"{label} Trend: {slope.n:.2f} ± {slope.s:.2f}",
-            transform=ax.transAxes,
+        ax.set_title(
+            # 0.3,
+            # 0.95,
+            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}",
+            # transform=ax.transAxes,
             fontsize=10,
-            verticalalignment="top",
+            # verticalalignment="top",
             color=color,
         )
 
@@ -1118,28 +1130,28 @@ def plot_lineplots(
         label=r"$T_s$ [$^{\circ}$C]",
         color="tab:blue",
     )
-    plot_trend(axs[0], "sst", "tab:blue", r"$T_s$ [$^{\circ}$C]")
+    plot_trend(axs[0], "sst", "tab:blue", r"$T_s$ [$^{\circ}$C]", r"$^{\circ}$C")
     axs[1].plot(
         era5_ds["year"].values + start_year,
         era5_ds["t0"].values,
         label=r"$T_o$ [K]",
         color="tab:orange",
     )
-    plot_trend(axs[1], "t0", "tab:orange", r"$T_o$ [K]")
+    plot_trend(axs[1], "t0", "tab:orange", r"$T_o$ [K]", "K")
     axs[2].plot(
         era5_ds["year"].values + start_year,
         era5_ds["otl"].values,
         label=r"$z_o$ [m]",
         color="tab:green",
     )
-    plot_trend(axs[2], "otl", "tab:green", r"$z_o$ [hPa]")
+    plot_trend(axs[2], "otl", "tab:green", r"$z_o$ [hPa]", "hPa")
     axs[3].plot(
         era5_ds["year"].values + start_year,
         era5_ds["vmax"].values,
         label=r"$V_p$ [m s$^{-1}$]",
         color="tab:red",
     )
-    plot_trend(axs[3], "vmax", "tab:red", r"$V_p$ [m s$^{-1}$]")
+    plot_trend(axs[3], "vmax", "tab:red", r"$V_p$ [m s$^{-1}$]", r"m s$^{-1}$")
     axs[0].set_ylabel(r"$T_s$ [$^{\circ}$C]")
     axs[1].set_ylabel(r"$T_o$ [K]")
     axs[2].set_ylabel(r"$z_o$ [hPa]")
@@ -1159,7 +1171,7 @@ def plot_lineplots(
 
 
 if __name__ == "__main__":
-    # python -m tcpips.era5
+    # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
     # download_era5_data(start_year=1940)
     # era5_pi(
@@ -1178,30 +1190,30 @@ if __name__ == "__main__":
 
     plot_vmax_trends(start_year=1980, months=1)
     plot_vmax_trends(start_year=1940, months=1)
-    plot_lineplots(
-        360 - 90.0,
-        29.0,
-        label="new_orleans",
-        start_year=1980,
-    )  # New Orleans, USA (30N, 90W)
-    plot_lineplots(
-        360 - 80.0,
-        25.0,
-        label="miami",
-        start_year=1980,
-    )  # Miami, USA (25N, 80W)
-    plot_lineplots(
-        360 - 90.0,
-        27.0,
-        label="new_orleans",
-        start_year=1940,
-    )  # New Orleans, USA (30N, 90W)
-    plot_lineplots(
-        360 - 80.0,
-        25.0,
-        label="miami",
-        start_year=1940,
-    )  # Miami, USA (25N, 80W)
+    # plot_lineplots(
+    #     360 - 90.0,
+    #     29.0,
+    #     label="new_orleans",
+    #     start_year=1980,
+    # )  # New Orleans, USA (30N, 90W)
+    # plot_lineplots(
+    #     360 - 80.0,
+    #     25.0,
+    #     label="miami",
+    #     start_year=1980,
+    # )  # Miami, USA (25N, 80W)
+    # plot_lineplots(
+    #     360 - 90.0,
+    #     27.0,
+    #     label="new_orleans",
+    #     start_year=1940,
+    # )  # New Orleans, USA (30N, 90W)
+    # plot_lineplots(
+    #     360 - 80.0,
+    #     25.0,
+    #     label="miami",
+    #     start_year=1940,
+    # )  # Miami, USA (25N, 80W)
 
     # ds = get_all_data()
     # plot_lineplots(
