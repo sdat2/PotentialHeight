@@ -1,4 +1,4 @@
-v0.0.4:
+v0.1.1:
 - Added `tcpips/ibtracs.py` script to compare observations with potential and intensity calculated from `era5` monthly averages (all post 1980).
 - Added more dual graph functionality in `adforce/dual_graph.py` so that we can train different ML algorithms with ADCIRC output, fixing bugs in imp lementation. Is pretty well tested, but takes around a minute to convert each run of ADCIRC to a dual graph (5GB of data).
 - `pyproj` now an option for all distance calculations. It is a bit slow though, and now takes 6x longer to make the `fort.22.nc` input file for ADCIRC. Fairly well tested, but could be improved. Adds about 2 minutes to the run time of each adforce call on archer2 (to 5 minutes from 3 minutes).
@@ -8,7 +8,7 @@ v0.0.4:
 - Added 1D Bayesian optimization expeirment to `adbo/exp_1d.py` and `adbo/gp_exp.py`.
 - Added `lc12` asymmetry option to `adforce/fort22.py`.
 - Added Ide et al. 2022 curved parabolic tropical cyclone tracks to `adforce/fort22.py` and `adforce/geo.py`.
-- Added new python implementation of calculating the CLE15 profile at `w22/cle15.py`, which is at least 10x faster, has trivial parallelization, has less artifacts, but is less numerically stable than original matlab implementation.
+- Added new python implementation of calculating the CLE15 profile at `w22/cle15.py`, which is at least 10x faster, has trivial parallelization, has less artifacts, but is less numerically stable than original matlab implementation. In practice on archer2, it turns 
 
 v0.0.3:
 - Improved `era5` data download script.

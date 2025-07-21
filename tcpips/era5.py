@@ -8,7 +8,8 @@ The script is designed to download the data to calculate potential intensity (PI
 
 import os
 import cdsapi
-from typing import List, Union, Tuple, Literal, Optional
+import time
+from typing import List, Union, Tuple, Literal, Optional, Callable
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -51,6 +52,7 @@ from .rh import relative_humidity_from_dew_point
 
 DEFAULT_START_YEAR = 1980
 DEFAULT_END_YEAR = 2024
+LAT_BOUND = 40 # Degrees North / South for plotting
 
 
 def plot_var_on_map(
@@ -99,7 +101,7 @@ def plot_var_on_map(
     gl.top_labels = False
     gl.right_labels = False
     # set the extent of the plot
-    ax.set_extent([-180, 180, -40, 40], crs=ccrs.PlateCarree(central_longitude=180))
+    ax.set_extent([-180, 180, -LAT_BOUND, LAT_BOUND], crs=ccrs.PlateCarree(central_longitude=180))
     # plot the data
     da = da.where(da > 0, np.nan)
     da.plot(
@@ -480,76 +482,7 @@ def era5_pi(years: List[str]) -> None:
         era5_pi_decade(single_level_path, pressure_level_path)
 
 
-def get_era5_coordinates(
-    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
-) -> xr.Dataset:
-    """
-    Get the coordinates of the ERA5 data.
-    """
-    sfp = os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")
-    if os.path.exists(sfp):
-        # open the single level file
-        return xr.open_dataset(sfp)[["longitude", "latitude", "valid_time"]]
-    else:
-        # open the pressure level files for all of the decades using xr.open_mfdataset
-        file_paths = []
-        years = [str(year) for year in range(start_year, end_year + 1)]
-        for i in range(0, len(years), 10):
-            j = min(i + 10, len(years))
-            file_paths += [
-                os.path.join(
-                    ERA5_RAW_PATH,
-                    f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc",
-                )
-            ]
-        print(f"Opening pressure level files: {file_paths}")
-        ds = xr.open_mfdataset(file_paths, chunks={"valid_time": 1}, engine="netcdf4")
-        return ds[["longitude", "latitude", "valid_time"]]
-
-
-def get_era5_combined(
-    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
-) -> xr.Dataset:
-    """
-    Get the raw ERA5 data for potential intensity and size as a lazily loaded xarray dataset.
-    """
-    # open the single level file
-    if os.path.exists(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")):
-        single_ds = xr.open_dataset(
-            os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
-            chunks={"valid_time": 1},
-            engine="netcdf4",
-        )
-    else:
-        fp = []
-        years = [str(year) for year in range(start_year, end_year + 1)]
-        for i in range(0, len(years), 10):
-            j = min(i + 10, len(years))
-            fp += [
-                os.path.join(
-                    ERA5_RAW_PATH, f"era5_single_levels_years{years[i]}_{years[j-1]}.nc"
-                )
-            ]
-        single_ds = xr.open_mfdataset(fp, chunks={"valid_time": 1}, engine="netcdf4")
-    # open the pressure level files for all of the decades using xr.open_mfdataset
-    file_paths = []
-    years = [str(year) for year in range(start_year, end_year + 1)]
-    for i in range(0, len(years), 10):
-        j = min(i + 10, len(years))
-        file_paths += [
-            os.path.join(
-                ERA5_RAW_PATH, f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc"
-            )
-        ]
-    print(f"Opening pressure level files: {file_paths}")
-    pressure_ds = xr.open_mfdataset(
-        file_paths, chunks={"valid_time": 1}, engine="netcdf4"
-    )
-    # merge the datasets
-    return xr.merge([single_ds, pressure_ds])
-
-
-def get_trend(
+def calculate_trend(
     da: xr.DataArray,
     output: Literal["slope", "rise"] = "rise",
     t_var: str = "T",
@@ -728,8 +661,85 @@ def select_seasonal_hemispheric_data(
         raise ValueError("`months_to_average` must be 1 or 3.")
 
 
-def get_era5_pi(
+
+def get_era5_coordinates(
     start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+) -> xr.Dataset:
+    """
+    Get the coordinates of the ERA5 data.
+
+    Should have coordinates longitude, latitude, valid_time.
+    """
+    sfp = os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")
+    if os.path.exists(sfp):
+        # open the single level file
+        return xr.open_dataset(sfp)[["longitude", "latitude", "valid_time"]]
+    else:
+        # open the pressure level files for all of the decades using xr.open_mfdataset
+        file_paths = []
+        years = [str(year) for year in range(start_year, end_year + 1)]
+        for i in range(0, len(years), 10):
+            j = min(i + 10, len(years))
+            file_paths += [
+                os.path.join(
+                    ERA5_RAW_PATH,
+                    f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc",
+                )
+            ]
+        print(f"Opening pressure level files: {file_paths}")
+        ds = xr.open_mfdataset(file_paths, chunks={"valid_time": 1}, engine="netcdf4")
+        return ds[["longitude", "latitude", "valid_time"]]
+
+# --- data access functions ---
+# TODO: add an option to chunk for trends (times all one chunk) or chunk for spatial averages.
+
+CHUNK_IN = {"space": {"longitude": 30, "latitude": 30, "valid_time": -1},
+            "time": {"valid_time": 1}}
+
+def get_era5_combined(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR, chunk_in: Literal["space", "time"] ="space"
+) -> xr.Dataset:
+    """
+    Get the raw ERA5 data for potential intensity and size as a lazily loaded xarray dataset.
+    """
+    # open the single level file
+    if os.path.exists(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")):
+        single_ds = xr.open_dataset(
+            os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
+            chunks=CHUNK_IN[chunk_in],
+            engine="netcdf4",
+        )
+    else:
+        fp = []
+        years = [str(year) for year in range(start_year, end_year + 1)]
+        for i in range(0, len(years), 10):
+            j = min(i + 10, len(years))
+            fp += [
+                os.path.join(
+                    ERA5_RAW_PATH, f"era5_single_levels_years{years[i]}_{years[j-1]}.nc"
+                )
+            ]
+        single_ds = preprocess_single_level_data(xr.open_mfdataset(fp, chunks=CHUNK_IN[chunk_in], engine="netcdf4"))
+    # open the pressure level files for all of the decades using xr.open_mfdataset
+    file_paths = []
+    years = [str(year) for year in range(start_year, end_year + 1)]
+    for i in range(0, len(years), 10):
+        j = min(i + 10, len(years))
+        file_paths += [
+            os.path.join(
+                ERA5_RAW_PATH, f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc"
+            )
+        ]
+    print(f"Opening pressure level files: {file_paths}")
+    pressure_ds = preprocess_pressure_level_data(xr.open_mfdataset(
+        file_paths, chunks=CHUNK_IN[chunk_in], engine="netcdf4"
+    ))
+    # merge the datasets
+    return xr.merge([single_ds, pressure_ds])
+
+
+def get_era5_pi(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR, chunk_in: Literal["space", "time"] = "space"
 ) -> xr.Dataset:
     """Load the potential intensity (PI) data calculated from ERA5 data."""
     file_paths = []
@@ -752,11 +762,49 @@ def get_era5_pi(
         file_paths,
         combine="nested",
         concat_dim="time",
-        chunks={"time": 1},
+        chunks=CHUNK_IN[chunk_in],
         engine="h5netcdf",
     )
 
 
+@timeit
+def get_all_data(
+    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR, chunk_in: Literal["space", "time"] = "space"
+) -> xr.Dataset:
+    """Get both the derived data from PI calculation, and the processed era5 data."""
+    era5_ds = get_era5_combined(start_year=start_year, end_year=end_year, chunk_in=chunk_in)
+    if "valid_time" in era5_ds.dims:
+        era5_dsds = era5_dsds.rename({"valid_time": "time"})
+    # print(era5_ds.sst.values.sel(longitude))
+    print(era5_ds)
+    era5_pi = get_era5_pi(start_year=start_year, end_year=end_year, chunk_in=chunk_in)
+    print(era5_pi)
+    return xr.merge([era5_ds, era5_pi], compat="override", join="override")
+
+
+def dask_cluster_wrapper(
+    func: Callable,
+    *args,
+    **kwargs,
+) -> None:
+    """
+    A wrapper to run a function on a Dask cluster.
+    This is useful for running functions that take a long time to compute
+    and can be parallelized across multiple workers.
+    """
+    tick = time.perf_counter()
+    cluster = LocalCluster()  # n_workers=10, threads_per_worker=1)
+    client = Client(cluster)
+    print(f"Dask dashboard link: {client.dashboard_link}")
+
+    func(*args, **kwargs)
+
+    client.close()
+    tock = time.perf_counter()
+    print(f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {tock - tick:.2f} seconds.")
+
+
+# @dask_cluster_wrapper
 def era5_pi_trends(
     start_year: int = DEFAULT_START_YEAR,
     end_year: int = DEFAULT_END_YEAR,
@@ -766,19 +814,19 @@ def era5_pi_trends(
     Let's find the linear trends in the potential intensity
     """
     # load all the decades of data for potential intensity
-    ds = get_era5_pi(start_year=start_year, end_year=end_year)
+    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")
     if ds is None:
         print("No ERA5 PI data found. Please run era5_pi() first.")
         return
 
-    print(ds)
-    sst_ds = preprocess_single_level_data(
-        get_era5_combined(start_year=start_year, end_year=end_year)
-    )["sst"]
-    print("sst_ds", sst_ds)
-    # ds["sst"] = sst_ds["sst"]
-    # lets just select the augusts in the northern hemisphere
-    ds["sst"] = sst_ds
+    # print(ds)
+    # sst_ds = preprocess_single_level_data(
+    #     get_era5_combined(start_year=start_year, end_year=end_year)
+    # )["sst"]
+    # print("sst_ds", sst_ds)
+    # # ds["sst"] = sst_ds["sst"]
+    # # lets just select the augusts in the northern hemisphere
+    # ds["sst"] = sst_ds
     ds = select_seasonal_hemispheric_data(mon_increase(ds), months_to_average=months)
     # ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
     print("Calculating trends in potential intensity...")
@@ -790,7 +838,8 @@ def era5_pi_trends(
     ds = ds.assign_coords(year=new_year)
     print("New time coordinates:", ds.year.values)
     print("Calculating trends in potential intensity...")
-    pi_vars = ["vmax", "t0", "otl", "sst"]
+    # pi_vars = ["vmax", "t0", "otl", "sst"]
+    pi_vars = [x for x in ds.variables]
     trend_ds = ds[pi_vars].polyfit(dim="year", deg=1, cov=True)
     # let's go through and work out the hatch mask for each variable
     for var in pi_vars:
@@ -993,20 +1042,6 @@ def plot_vmax_trends(
     print("otl trend mean:", otl.mean())
 
 
-@timeit
-def get_all_data(
-    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
-) -> xr.Dataset:
-    era5_ds = get_era5_combined(start_year=start_year, end_year=end_year).rename(
-        {"valid_time": "time"}
-    )
-    # print(era5_ds.sst.values.sel(longitude))
-    print(era5_ds)
-    era5_pi = get_era5_pi(start_year=start_year, end_year=end_year)
-    print(era5_pi)
-    return xr.merge([era5_ds, era5_pi], compat="override", join="override")
-
-
 def plot_lineplots(
     lon: float,
     lat: float,
@@ -1183,13 +1218,13 @@ if __name__ == "__main__":
     # era5_pi(
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
-    # era5_pi_trends(start_year=1940)
-    # era5_pi_trends(start_year=1980)
-    find_tropical_m(start_year=1980, months=1)
-    find_tropical_m(start_year=1940, months=1)
+    era5_pi_trends(start_year=1940, months=1)
+    era5_pi_trends(start_year=1980, months=1)
+    #find_tropical_m(start_year=1980, months=1)
+    #find_tropical_m(start_year=1940, months=1)
 
-    plot_vmax_trends(start_year=1980, months=1)
-    plot_vmax_trends(start_year=1940, months=1)
+    #plot_vmax_trends(start_year=1980, months=1)
+    # plot_vmax_trends(start_year=1940, months=1)
     # plot_lineplots(
     #     360 - 90.0,
     #     29.0,
