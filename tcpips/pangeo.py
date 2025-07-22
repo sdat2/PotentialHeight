@@ -298,19 +298,19 @@ if __name__ == "__main__":
     # get_data_pair(institution_id="MOHC", source_id="HadGEM3-GC31-HH")
     # client = Client(n_workers=4, threads_per_worker=1, memory_limit="4GB")
     cmd_download_call()
-    cat_subset = cat.search(
-        experiment_id=["historical", "ssp585"],
-        table_id=["Amon", "Omon"],
-        institution_id="MOHC",
-        # source_id="CIESM",
-        # member_id="r1i1p1f1",
-        # member_id="r10i1p1f1",
-        variable_id=CONVERSION_NAMES.keys(),
-        # grid_label="gn",
-    ).unique()
-    print("cat_subset", cat_subset)
+    # cat_subset = cat.search(
+    #     experiment_id=["historical", "ssp585"],
+    #     table_id=["Amon", "Omon"],
+    #     institution_id="MOHC",
+    #     # source_id="CIESM",
+    #     # member_id="r1i1p1f1",
+    #     # member_id="r10i1p1f1",
+    #     variable_id=CONVERSION_NAMES.keys(),
+    #     # grid_label="gn",
+    # ).unique()
+    # print("cat_subset", cat_subset)
 
-    cat_subset.to_csv("cat_subset.csv")
+    # cat_subset.to_csv("cat_subset.csv")
 
     # get_data_pair(institution_id="THU", source_id="CIESM")
     # get_data_pair(institution_id="THU", source_id="CIESM")

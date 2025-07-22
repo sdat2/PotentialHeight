@@ -72,4 +72,7 @@ def regrid_cmip6_part(
 
 if __name__ == "__main__":
     # python -m tcpips.regrid_cdo
-    regrid_cmip6_part(exp="ssp585", typ="ocean", model="CESM2", member="r4i1p1f1")
+    # regrid_cmip6_part(exp="ssp585", typ="ocean", model="CESM2", member="r4i1p1f1")
+    # regrid_cmip6_part(exp="ssp585", typ="atmos", model="CESM2", member="r4i1p1f1")
+    regrid_cmip6_part(exp="historical", typ="ocean", model="CESM2", member="r4i1p1f1")
+    regrid_cmip6_part(exp="historical", typ="atmos", model="CESM2", member="r4i1p1f1")

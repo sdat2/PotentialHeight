@@ -182,5 +182,6 @@ def pi_cmip6_part(
 
 if __name__ == "__main__":
     # python -m tcpips.pi_driver
-    pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
+    # pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
+    pi_cmip6_part(exp="historical", model="CESM2", member="r4i1p1f1")
     # investigate_cmip6_pairs()
