@@ -797,30 +797,6 @@ def get_all_data(
     return xr.merge([era5_ds, era5_pi], compat="override", join="override")
 
 
-def dask_cluster_wrapper(
-    func: Callable,
-    *args,
-    **kwargs,
-) -> None:
-    """
-    A wrapper to run a function on a Dask cluster.
-    This is useful for running functions that take a long time to compute
-    and can be parallelized across multiple workers.
-    """
-    tick = time.perf_counter()
-    cluster = LocalCluster()  # n_workers=10, threads_per_worker=1)
-    client = Client(cluster)
-    print(f"Dask dashboard link: {client.dashboard_link}")
-
-    func(*args, **kwargs)
-
-    client.close()
-    tock = time.perf_counter()
-    print(
-        f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {tock - tick:.2f} seconds."
-    )
-
-
 # @dask_cluster_wrapper
 def era5_pi_trends(
     start_year: int = DEFAULT_START_YEAR,
