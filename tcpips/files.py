@@ -224,18 +224,22 @@ def get_task_dict(
         ]:
             for model in os.listdir(os.path.join(original_root, exp, typ)):
                 for member in os.listdir(os.path.join(original_root, exp, typ, model)):
-                    member = member.replace(".nc", "")
-                    key = f"{exp}.{typ}.{model}.{member}"
-                    tasks[key] = {
-                        "exp": exp,
-                        "typ": typ,
-                        "model": model,
-                        "member": member,
-                        "processed_exists": os.path.exists(
-                            os.path.join(new_root, exp, typ, model, member) + ".nc"
-                        ),
-                        "locked": os.path.exists(os.path.join(new_root, key) + ".lock"),
-                    }
+                    if member.endswith(".nc"):
+
+                        member = member.replace(".nc", "")
+                        key = f"{exp}.{typ}.{model}.{member}"
+                        tasks[key] = {
+                            "exp": exp,
+                            "typ": typ,
+                            "model": model,
+                            "member": member,
+                            "processed_exists": os.path.exists(
+                                os.path.join(new_root, exp, typ, model, member) + ".nc"
+                            ),
+                            "locked": os.path.exists(
+                                os.path.join(new_root, key) + ".lock"
+                            ),
+                        }
     return tasks
 
 

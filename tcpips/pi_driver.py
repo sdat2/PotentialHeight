@@ -4,7 +4,7 @@ import os
 from typing import Dict
 import pandas as pd
 import xarray as xr
-from dask.diagnostics import ProgressBar
+from dask.distributed import ProgressBar
 from sithom.misc import human_readable_size, get_git_revision_hash
 from sithom.time import timeit, time_stamp
 from .constants import (
@@ -167,18 +167,18 @@ def pi_cmip6_part(
     # 4. Save to disk
     folder = os.path.join(PI4_PATH, exp, model)
     os.makedirs(folder, exist_ok=True)
-    # delayed_obj =
-    ds_out.to_zarr(
+    delayed_obj = ds_out.to_zarr(
         os.path.join(folder, member + ".zarr"),
         # format="NETCDF4",
         # engine="h5netcdf",
         # compute=False,
         consolidated=True,
         mode="w",
+        compute=False,
     )
 
-    # with ProgressBar():
-    #    _ = delayed_obj.compute(scheduler="threads")
+    with ProgressBar():
+        _ = delayed_obj.compute()  # scheduler="threads")
 
     print(ds_out)
 
@@ -186,7 +186,5 @@ def pi_cmip6_part(
 if __name__ == "__main__":
     # python -m tcpips.pi_driver
     # pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
-    dask_cluster_wrapper(
-        pi_cmip6_part, exp="historical", model="CESM2", member="r4i1p1f1"
-    )
+    dask_cluster_wrapper(pi_cmip6_part, exp="ssp585", model="CESM2", member="r4i1p1f1")
     # investigate_cmip6_pairs()
