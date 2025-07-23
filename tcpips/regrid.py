@@ -61,6 +61,8 @@ def run_regridding_sequentially(
         print(client)
         dask.distributed.print(client)
         print(f"Dask dashboard link: {client.dashboard_link}")
+    else:
+        client = None
 
     for key in tasks:
         if not tasks[key]["locked"]:
@@ -173,7 +175,11 @@ def regrid_cmip6_part(
 
         # 2. Set up parameters for batch processing
         output_path = os.path.join(CMIP6_PATH, output_name)
-        batch_size = 100  # Process 100 timesteps at a time
+        if typ == "atmos":
+            batch_size = 10  # Process 10 timesteps at a time
+        else:
+            batch_size = 100  # Process 100 timesteps at a time
+        # batch_size = 100  # Process 100 timesteps at a time
         num_timesteps = len(input_ds.time)
         num_batches = math.ceil(num_timesteps / batch_size)
 
@@ -235,10 +241,8 @@ if __name__ == "__main__":
     # get_task_dict()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-w", "--worker", type=int, default=8)  # number of workers
-    parser.add_argument(
-        "-m", "--memory", type=str, default="1.5GiB"
-    )  # memory per worker
+    parser.add_argument("-w", "--worker", type=int, default=2)  # number of workers
+    parser.add_argument("-m", "--memory", type=str, default="6GiB")  # memory per worker
     parser.add_argument(
         "-f", "--force", type=lambda x: (str(x).lower() == "true"), default=False
     )  # force regrid

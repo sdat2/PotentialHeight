@@ -4,15 +4,13 @@ import os
 from typing import Dict
 import pandas as pd
 import xarray as xr
-from dask.distributed import ProgressBar
+from dask.diagnostics import ProgressBar
 from sithom.misc import human_readable_size, get_git_revision_hash
 from sithom.time import timeit, time_stamp
 from .constants import (
     CDO_PATH,
-    PI2_PATH,
     REGRIDDED_PATH,
     PI_PATH,
-    PI3_PATH,
     PI4_PATH,
     PROJECT_PATH,
 )
@@ -186,5 +184,7 @@ def pi_cmip6_part(
 if __name__ == "__main__":
     # python -m tcpips.pi_driver
     # pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
-    dask_cluster_wrapper(pi_cmip6_part, exp="ssp585", model="CESM2", member="r4i1p1f1")
+    dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r4i1p1f1")
+    dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r10i1p1f1")
+    dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r11i1p1f1")
     # investigate_cmip6_pairs()

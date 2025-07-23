@@ -13,13 +13,13 @@ from typing import List, Union, Tuple, Literal, Optional, Callable
 import numpy as np
 import pandas as pd
 import xarray as xr
+from matplotlib import pyplot as plt
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
 from sithom.time import timeit
 from sithom.xr import mon_increase
 from w22.ps import parallelized_ps_dask
 from uncertainties import ufloat, correlated_values, unumpy
-from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, label_subplots, get_dim
 
 CARTOPY_INSTALLED = True
