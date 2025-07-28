@@ -18,7 +18,6 @@ from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
 from sithom.time import timeit
 from sithom.xr import mon_increase
-from w22.ps import parallelized_ps_dask
 from uncertainties import ufloat, correlated_values, unumpy
 from sithom.plot import plot_defaults, label_subplots, get_dim
 
@@ -40,7 +39,7 @@ except ImportError:
     print("Cartopy is not installed. Some plotting functions will not work.")
     CARTOPY_INSTALLED = False
 
-
+from w22.ps import parallelized_ps_dask
 from .constants import (
     ERA5_RAW_PATH,
     ERA5_PI_OG_PATH,
@@ -49,6 +48,7 @@ from .constants import (
 )
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
+from .dask import dask_cluster_wrapper
 
 DEFAULT_START_YEAR = 1980
 DEFAULT_END_YEAR = 2024
@@ -711,11 +711,11 @@ def get_era5_combined(
     """
     # open the single level file
     if os.path.exists(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")):
-        single_ds = xr.open_dataset(
+        single_ds = preprocess_single_level_data(xr.open_dataset(
             os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
             chunks=CHUNK_IN[chunk_in],
             engine="netcdf4",
-        )
+        ))
     else:
         fp = []
         years = [str(year) for year in range(start_year, end_year + 1)]
@@ -1203,11 +1203,47 @@ def calculate_potential_sizes(
 ) -> None:
     """Calculate the potential sizes of tropical cyclones from ERA5 data.
 
-    This is going to be a very expensive function to run."""
+    This is going to be a very expensive function to run.
+
+    Args:
+        start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
+        end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+
+    Returns:
+        None: This function saves the results to a zarr file.
+    """
     ds = get_all_data(start_year=start_year, end_year=end_year)
     if ds is None:
         print("No ERA5 data found. Please run era5_pi() first.")
         return
+    ds = ds.rename({"latitude": "lat", "longitude": "lon"})
+    # delete the unnecessary volume variables
+    del ds["t"]
+    del ds["q"]
+    del ds["pressure_level"]
+    #ds = convert(ds)
+    # call expensive function. There was some issues with chunking
+    ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
+        {"time": 64, "lat": 480, "lon": 480}
+    )  # chunk the data for saving
+    ds = ds.rename({"r0": "r0_pi", "rmax": "rmax_pi", "vmax": "vmax_pi"})
+    ds["vmax"] = 33 # set the vmax to 33 m/s for the lower limit of category 1.
+    ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
+        {"time": 64, "lat": 480, "lon": 480}
+    )  # chunk the data for saving
+    ds = ds.rename({"r0": "r0_cat1", "rmax": "rmax_cat1", "vmax": "vmax_cat1"})
+
+    ds = ds.rename({"lat": "latitude", "lon": "longitude"})
+    ds.to_zarr(
+        os.path.join(
+            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
+        ),
+        mode="w",
+        #encoding={
+        #    var: {"zlib": True, #"complevel": 5} for var in ds.#variables
+        #},
+        consolidated=True,
+    )
     # First potential size corresponding to the potential intensity velocity -- needs vmax, t0, sst, t2
 
     # Then calculate the potential size corresponding to the lower limit of category 1 which is 33 m/s --
@@ -1226,8 +1262,8 @@ if __name__ == "__main__":
     # era5_pi(
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
-    era5_pi_trends(start_year=1940, months=1)
-    era5_pi_trends(start_year=1980, months=1)
+    # era5_pi_trends(start_year=1940, months=1)
+    # era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
     # find_tropical_m(start_year=1940, months=1)
 
@@ -1266,3 +1302,12 @@ if __name__ == "__main__":
     # plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
+    #
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR,
+        end_year=DEFAULT_START_YEAR + 9,
+    )  # This will take a long time to run.
+    # calculate_potential_sizes(
+    #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
+    # )  # This will take a long time to run.

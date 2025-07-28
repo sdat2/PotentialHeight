@@ -2,13 +2,13 @@
 
 Keep the file pipeline clean and organized with these functions.
 """
-
+from typing import Dict
 import os
 import collections
 from sithom.io import write_json
 from sithom.time import time_stamp, timeit
 from sithom.misc import human_readable_size
-from .constants import CMIP6_PATH, RAW_PATH, DATA_PATH, REGRIDDED_PATH
+from .constants import CMIP6_PATH, RAW_PATH, DATA_PATH, REGRIDDED_PATH, PI_PATH
 
 
 def locker(path: str) -> callable:
@@ -241,6 +241,97 @@ def get_task_dict(
                             ),
                         }
     return tasks
+
+
+def find_atmos_ocean_pairs(path: str = REGRIDDED_PATH,
+                           new_path: str = PI_PATH,
+                           ) -> Dict[str, Dict[str, any]]:
+    """
+    Find the atmospheric and oceanic data pairs that can be combined to calculate potential intensity.
+
+    Args:
+        path (str): Path to the regridded data directory. Defaults to REGRIDDED_PATH.
+        new_path (str): Path to the directory where potential intensity data will be stored. Defaults to PI_PATH.
+
+    Returns:
+        Dict[str, Dict[str, any]]: Dictionary of pairs.
+    """
+
+    pairs = {}
+    for exp in [
+        x
+        for x in os.listdir(path)
+        if os.path.isdir(os.path.join(path, x))
+    ]:
+        for model in os.listdir(os.path.join(path, exp, "ocean")):
+            for member in [
+                x.strip(".nc")
+                for x in os.listdir(os.path.join(path, exp, "ocean", model))
+            ]:
+                key = f"{exp}.{model}.{member}"
+                pi_lock = os.path.join(new_path, key + ".lock")
+                print(key)
+                oc_path = os.path.exists(
+                    os.path.join(path, exp, "ocean", model, member) + ".nc"
+                )
+                oc_lock = os.path.exists(
+                    os.path.join(path) + f"{exp}.ocean.{model}.{member}.lock"
+                )
+                at_path = os.path.exists(
+                    os.path.join(path, exp, "atmos", model, member) + ".nc"
+                )
+                at_lock = os.path.exists(
+                    os.path.join(path) + f"{exp}.atmos.{model}.{member}.lock"
+                )
+                if oc_path and at_path and not oc_lock and not at_lock:
+                    pairs[f"{exp}.{model}.{member}"] = {
+                        "exp": exp,
+                        "model": model,
+                        "member": member,
+                        "locked": os.path.exists(pi_lock),
+                    }
+                if oc_lock:
+                    print(f"Ocean lock file exists for {key}")
+                if at_lock:
+                    print(f"Atmos lock file exists for {key}")
+                if not oc_path:
+                    print(f"File missing for {exp}.ocean.{model}.{member}")
+                if not at_path:
+                    print(f"File missing for {exp}.atmos.{model}.{member}")
+
+    return pairs
+
+
+def investigate_cmip6_pairs(path: str = REGRIDDED_PATH) -> None:
+    """
+    Investigate the CMIP6 pairs to see if they are the correct size.
+
+    Args:
+        path (str): Path to the regridded data directory. Defaults to REGRIDDED_PATH.
+    """
+
+    def hr_file_size(filename: str) -> str:
+        st = os.stat(filename)
+        return human_readable_size(st.st_size)
+
+    pairs = find_atmos_ocean_pairs()
+    for key in pairs:
+        print(key)
+        for i in ["ocean", "atmos"]:
+            print(
+                i,
+                hr_file_size(
+                    os.path.join(
+                        path,
+                        pairs[key]["exp"],
+                        i,
+                        pairs[key]["model"],
+                        pairs[key]["member"] + ".nc",
+                    )
+                ),
+            )
+
+
 
 
 if __name__ == "__main__":
