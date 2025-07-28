@@ -3,6 +3,7 @@
 from typing import Callable
 import time
 from dask.distributed import Client, LocalCluster
+from sithom.time import hr_time
 
 
 def dask_cluster_wrapper(
@@ -26,5 +27,5 @@ def dask_cluster_wrapper(
     cluster.close()  # Also a good idea to close the cluster
     tock = time.perf_counter()
     print(
-        f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {tock - tick:.2f} seconds."
+        f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {hr_time(tock-tick)} seconds."
     )

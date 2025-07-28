@@ -6,7 +6,7 @@ import pandas as pd
 import xarray as xr
 from dask.diagnostics import ProgressBar
 from sithom.misc import human_readable_size, get_git_revision_hash
-from sithom.time import timeit, time_stamp
+from sithom.time import time_stamp
 from .constants import (
     CDO_PATH,
     REGRIDDED_PATH,
@@ -20,9 +20,15 @@ from .convert import convert
 from .pi import calculate_pi
 
 
-def find_atmos_ocean_pairs() -> Dict[str, Dict[str, any]]:
+def find_atmos_ocean_pairs(path: str = REGRIDDED_PATH,
+                           new_path: str = PI_PATH,
+                           ) -> Dict[str, Dict[str, any]]:
     """
     Find the atmospheric and oceanic data pairs that can be combined to calculate potential intensity.
+
+    Args:
+        path (str): Path to the regridded data directory. Defaults to REGRIDDED_PATH.
+        new_path (str): Path to the directory where potential intensity data will be stored. Defaults to PI_PATH.
 
     Returns:
         Dict[str, Dict[str, any]]: Dictionary of pairs.
@@ -31,28 +37,28 @@ def find_atmos_ocean_pairs() -> Dict[str, Dict[str, any]]:
     pairs = {}
     for exp in [
         x
-        for x in os.listdir(REGRIDDED_PATH)
-        if os.path.isdir(os.path.join(REGRIDDED_PATH, x))
+        for x in os.listdir(path)
+        if os.path.isdir(os.path.join(path, x))
     ]:
-        for model in os.listdir(os.path.join(REGRIDDED_PATH, exp, "ocean")):
+        for model in os.listdir(os.path.join(path, exp, "ocean")):
             for member in [
                 x.strip(".nc")
-                for x in os.listdir(os.path.join(REGRIDDED_PATH, exp, "ocean", model))
+                for x in os.listdir(os.path.join(path, exp, "ocean", model))
             ]:
                 key = f"{exp}.{model}.{member}"
-                pi_lock = os.path.join(PI_PATH, key + ".lock")
+                pi_lock = os.path.join(new_path, key + ".lock")
                 print(key)
                 oc_path = os.path.exists(
-                    os.path.join(REGRIDDED_PATH, exp, "ocean", model, member) + ".nc"
+                    os.path.join(path, exp, "ocean", model, member) + ".nc"
                 )
                 oc_lock = os.path.exists(
-                    os.path.join(REGRIDDED_PATH) + f"{exp}.ocean.{model}.{member}.lock"
+                    os.path.join(path) + f"{exp}.ocean.{model}.{member}.lock"
                 )
                 at_path = os.path.exists(
-                    os.path.join(REGRIDDED_PATH, exp, "atmos", model, member) + ".nc"
+                    os.path.join(path, exp, "atmos", model, member) + ".nc"
                 )
                 at_lock = os.path.exists(
-                    os.path.join(REGRIDDED_PATH) + f"{exp}.atmos.{model}.{member}.lock"
+                    os.path.join(path) + f"{exp}.atmos.{model}.{member}.lock"
                 )
                 if oc_path and at_path and not oc_lock and not at_lock:
                     pairs[f"{exp}.{model}.{member}"] = {
@@ -73,7 +79,7 @@ def find_atmos_ocean_pairs() -> Dict[str, Dict[str, any]]:
     return pairs
 
 
-def investigate_cmip6_pairs() -> None:
+def investigate_cmip6_pairs(path: str = REGRIDDED_PATH) -> None:
     """
     Investigate the CMIP6 pairs to see if they are the correct size.
     """
@@ -90,7 +96,7 @@ def investigate_cmip6_pairs() -> None:
                 i,
                 hr_file_size(
                     os.path.join(
-                        REGRIDDED_PATH,
+                        path,
                         pairs[key]["exp"],
                         i,
                         pairs[key]["model"],
@@ -184,7 +190,16 @@ def pi_cmip6_part(
 if __name__ == "__main__":
     # python -m tcpips.pi_driver
     # pi_cmip6_part(exp="ssp585", model="CESM2", member="r4i1p1f1")
-    dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r4i1p1f1")
-    dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r10i1p1f1")
-    dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r11i1p1f1")
+    for exp in ["ssp585", "historical"]:
+        for model in ["CESM2"]:
+            for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
+                dask_cluster_wrapper(
+                    pi_cmip6_part,
+                    exp=exp,
+                    model=model,
+                    member=member
+                )
+    # dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r4i1p1f1")
+    # dask_cluster_wrapper(pi_cmip6_part, exp="ssp585", model="CESM2", member="r10i1p1f1")
+    # dask_cluster_wrapper(pi_cmip6_part, exp="ssp585", model="CESM2", member="r11i1p1f1")
     # investigate_cmip6_pairs()
