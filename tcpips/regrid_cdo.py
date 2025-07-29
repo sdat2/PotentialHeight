@@ -81,7 +81,9 @@ if __name__ == "__main__":
     # regrid_cmip6_part(exp="historical", typ="atmos", model="CESM2", member="r10i1p1f1")
     # regrid_cmip6_part(exp="historical", typ="ocean", model="CESM2", member="r11i1p1f1")
     # regrid_cmip6_part(exp="historical", typ="atmos", model="CESM2", member="r11i1p1f1")
-    regrid_cmip6_part(exp="ssp585", typ="ocean", model="CESM2", member="r10i1p1f1")
-    regrid_cmip6_part(exp="ssp585", typ="atmos", model="CESM2", member="r10i1p1f1")
-    regrid_cmip6_part(exp="ssp585", typ="ocean", model="CESM2", member="r11i1p1f1")
-    regrid_cmip6_part(exp="ssp585", typ="atmos", model="CESM2", member="r11i1p1f1")
+    for model in ["CESM2"]:
+        for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
+            for exp in ["ssp585", "historical"]:
+                for typ in ["ocean", "atmos"]:
+                    regrid_cmip6_part(exp=exp, typ=typ, model=model, member=member)
+

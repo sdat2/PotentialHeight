@@ -106,7 +106,7 @@ def file_crawler(folder_to_search: str = RAW_PATH) -> dict:
                     for x in os.listdir(
                         os.path.join(folder_to_search, experiment, aoc, model)
                     )
-                    if x.endswith(".nc")
+                    if x.endswith(".nc") or x.endswith(".zarr")
                 ]
                 for member_nc in member_ncs:
                     print(member_nc)
@@ -330,8 +330,6 @@ def investigate_cmip6_pairs(path: str = REGRIDDED_PATH) -> None:
                     )
                 ),
             )
-
-
 
 
 if __name__ == "__main__":

@@ -1239,9 +1239,6 @@ def calculate_potential_sizes(
             ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
         ),
         mode="w",
-        #encoding={
-        #    var: {"zlib": True, #"complevel": 5} for var in ds.#variables
-        #},
         consolidated=True,
     )
     # First potential size corresponding to the potential intensity velocity -- needs vmax, t0, sst, t2

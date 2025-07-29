@@ -95,6 +95,8 @@ PI4_PATH: str = os.path.join(CMIP6_PATH, "pi4")  # pi with different temp profil
 os.makedirs(PI4_PATH, exist_ok=True)
 BC_PI_PATH: str = os.path.join(CMIP6_PATH, "bc_pi")  # pi after bias correction
 os.makedirs(BC_PI_PATH, exist_ok=True)
+PS_PATH = os.path.join(CMIP6_PATH, "ps")  # potential size
+os.makedirs(PS_PATH, exist_ok=True)  # potential size
 
 # Constants for converting CMIP6 variables to PI input variables
 CONVERSION_NAMES: Dict[str, str] = {

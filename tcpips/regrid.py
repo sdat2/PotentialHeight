@@ -15,10 +15,8 @@ import xarray as xr
 import argparse
 import dask
 from dask.distributed import LocalCluster, Client
-from dask.diagnostics import ProgressBar
 import xesmf as xe
 from matplotlib import pyplot as plt
-from sithom.misc import in_notebook, get_git_revision_hash
 from sithom.plot import plot_defaults
 from sithom.time import timeit, time_stamp
 from sithom.io import write_json
@@ -49,7 +47,7 @@ def run_regridding_sequentially(
         parallel (bool, optional): Run in parallel. Defaults to False.
 
     """
-    tasks = get_task_dict()
+    tasks = get_task_dict(original_root=RAW_PATH,new_root=REGRIDDED_PATH)
     write_json(tasks, os.path.join(DATA_PATH, "regridding_tasks.json"))
     print("tasks", tasks)
 
