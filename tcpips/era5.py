@@ -8,8 +8,7 @@ The script is designed to download the data to calculate potential intensity (PI
 
 import os
 import cdsapi
-import time
-from typing import List, Union, Tuple, Literal, Optional, Callable
+from typing import List, Union, Tuple, Literal, Optional
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -43,6 +42,10 @@ from w22.ps import parallelized_ps_dask
 from .constants import (
     ERA5_RAW_PATH,
     ERA5_PI_OG_PATH,
+    ERA5_PS_OG_PATH,
+    ERA5_REGRIDDED_PATH,
+    ERA5_PS_PATH,
+    ERA5_PI_PATH,
     ERA5_PRODUCTS_PATH,
     ERA5_FIGURE_PATH,
 )
@@ -708,6 +711,14 @@ def get_era5_combined(
 ) -> xr.Dataset:
     """
     Get the raw ERA5 data for potential intensity and size as a lazily loaded xarray dataset.
+
+    Args:
+        start_year (int): The starting year for the data.
+        end_year (int): The ending year for the data.
+        chunk_in (Literal["space", "time"]): The chunking strategy to use.
+
+    Returns:
+        xr.Dataset: The xarray dataset containing the combined single-level and pressure-level data.
     """
     # open the single level file
     if os.path.exists(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")):
@@ -752,7 +763,16 @@ def get_era5_pi(
     end_year: int = DEFAULT_END_YEAR,
     chunk_in: Literal["space", "time"] = "space",
 ) -> xr.Dataset:
-    """Load the potential intensity (PI) data calculated from ERA5 data."""
+    """Load the potential intensity (PI) data calculated from ERA5 data.
+
+    Args:
+        start_year (int): The starting year for the data.
+        end_year (int): The ending year for the data.
+        chunk_in (Literal["space", "time"]): The chunking strategy to use.
+
+    Returns:
+        xr.Dataset: The xarray dataset containing the PI data.
+    """
     file_paths = []
     years = [str(year) for year in range(start_year, end_year + 1)]
     for i in range(0, len(years), 10):
@@ -784,7 +804,16 @@ def get_all_data(
     end_year: int = DEFAULT_END_YEAR,
     chunk_in: Literal["space", "time"] = "space",
 ) -> xr.Dataset:
-    """Get both the derived data from PI calculation, and the processed era5 data."""
+    """Get both the derived data from PI calculation, and the processed era5 data.
+
+    Args:
+        start_year (int): The starting year for the data.
+        end_year (int): The ending year for the data.
+        chunk_in (Literal["space", "time"]): The chunking strategy to use.
+
+    Returns:
+        xr.Dataset: The xarray dataset containing both the ERA5 data and the PI data.
+    """
     era5_ds = get_era5_combined(
         start_year=start_year, end_year=end_year, chunk_in=chunk_in
     )
@@ -805,6 +834,13 @@ def era5_pi_trends(
 ) -> None:
     """
     Let's find the linear trends in the potential intensity
+
+    Args:
+        start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
+        end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+        months (int, optional): The number of months to average over. Defaults to 1.
+            - 1: Selects August for NH and March for SH.
+            - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
     """
     # load all the decades of data for potential intensity
     ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")
@@ -1246,6 +1282,76 @@ def calculate_potential_sizes(
     # Then calculate the potential size corresponding to the lower limit of category 1 which is 33 m/s --
 
 
+# import tcpips.regrid_cdo import call_cdo
+from .constants import CONFIG_PATH
+def call_cdo(input_path: str, output_path: str) -> None:
+    """Call CDO to regrid the input netCDF file to a half-degree grid.
+    """
+    os.system(f"ncdump -h {input_path}")
+    # delete the misnamed coordinates (xmip's fault?)
+    os.system(
+        f"ncks -4 -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies   {input_path} {output_path+'.tmp'}"
+    )
+    os.system(
+        f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt {output_path+'.tmp'} {output_path} > /dev/null"
+    )
+    # f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/era5_grid_from_file.txt {output_path+'.tmp'} {output_path} > /dev/null"
+    try:
+        os.remove(f"{output_path + '.tmp'}")
+    except Exception as e:
+        print(e)
+    os.system(f"ncdump -h {output_path}")
+
+
+def regrid_all(years: List[str]) -> None:
+    """Regrid all the ERA5 data for the given years.
+    Args:
+        years (List[str]): List of years to regrid.
+    """
+    for i in range(0, len(years), 10):
+        j = min(i + 10, len(years))
+
+        single_level_path = os.path.join(
+            ERA5_RAW_PATH, f"era5_single_levels_years{years[i]}_{years[j-1]}.nc"
+        )
+        output_single_level_path = os.path.join(
+            ERA5_REGRIDDED_PATH,
+            f"era5_single_levels_years{years[i]}_{years[j-1]}.nc",
+        )
+        if os.path.exists(single_level_path) and not os.path.exists(output_single_level_path):
+            print(f"Regridding single level data for years {years[i]}-{years[j-1]}")
+            call_cdo(single_level_path, output_single_level_path)
+
+        pressure_level_path = os.path.join(
+            ERA5_RAW_PATH, f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc"
+        )
+        output_pressure_level_path = os.path.join(
+            ERA5_REGRIDDED_PATH,
+            f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc",
+        )
+        if os.path.exists(pressure_level_path) and not os.path.exists(output_pressure_level_path):
+            print(f"Regridding pressure level data for years {years[i]}-{years[j-1]}")
+            call_cdo(pressure_level_path, output_pressure_level_path)
+        pi_path = os.path.join(
+            ERA5_PI_OG_PATH, f"era5_pi_years{years[i]}_{years[j-1]}.nc"
+        )
+        output_pi_path = os.path.join(
+            ERA5_PI_PATH, f"era5_pi_years{years[i]}_{years[j-1]}.nc"
+        )
+        if os.path.exists(pi_path) and not os.path.exists(output_pi_path):
+            print(f"Regridding PI data for years {years[i]}-{years[j-1]}")
+            call_cdo(pi_path, output_pi_path)
+        ps_path = os.path.join(
+            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
+        )
+        output_ps_path = os.path.join(
+            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
+        )
+        if os.path.exists(ps_path) and not os.path.exists(output_ps_path):
+            print(f"Regridding potential sizes data for years {years[i]}-{years[j-1]}")
+            call_cdo(ps_path, output_ps_path)
+
+
 if __name__ == "__main__":
     # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
@@ -1300,11 +1406,13 @@ if __name__ == "__main__":
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
-    dask_cluster_wrapper(
-        calculate_potential_sizes,
-        start_year=DEFAULT_START_YEAR,
-        end_year=DEFAULT_START_YEAR + 9,
-    )  # This will take a long time to run.
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR,
+    #     end_year=DEFAULT_START_YEAR + 9,
+    # )  # This will take a long time to run.
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
+    years = [str(year) for year in range(DEFAULT_START_YEAR, DEFAULT_END_YEAR + 1)]
+    regrid_all(years)

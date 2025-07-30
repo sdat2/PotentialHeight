@@ -10,5 +10,13 @@ For the ensemble as a whole we might want to compare how the distribution of mea
 
 import numpy as np
 import xarray as xr
+# from .constants import
 
 #def load_cmip6_data():
+
+if __name__ == "__main__":
+    # python -m tcpips.bias
+    # Load the CMIP6 data
+    # cmip6_data = load_cmip6_data()
+    pass  # Placeholder for actual implementation
+
