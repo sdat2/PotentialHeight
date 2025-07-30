@@ -12,7 +12,7 @@ import os
 import xarray as xr
 import pandas as pd
 from w22.ps import parallelized_ps_dask
-from .constants import CDO_PATH, RAW_PATH, PI4_PATH, PS_PATH
+from .constants import CDO_PATH, PI4_PATH, PS_PATH
 from .files import locker
 from .dask import dask_cluster_wrapper
 from .convert import convert
@@ -25,9 +25,17 @@ def ps_cmip6_part(
     model: str = "CESM2",
     member: str = "r4i1p1f1",
     time_chunk: int = 1,
-    reduce_storage: bool = False,
 ) -> None:
-    """Potential size calculation for CMIP6 data."""
+    """Potential size calculation for CMIP6 data.
+
+    Args:
+        exp (str, optional): Experiment name. Defaults to "ssp585".
+        model (str, optional): Model name. Defaults to "CESM2".
+        member (str, optional): Member name. Defaults to "r4i1p1
+f1".
+        time_chunk (int, optional): Chunk size for time. Defaults to 1.
+    """
+    print(f"exp:{exp} model:{model} member:{member}")
     oc_ds = xr.open_dataset(
         os.path.join(CDO_PATH, exp, "ocean", model, member) + ".nc",
         chunks={"time": time_chunk},
