@@ -214,6 +214,8 @@ def get_task_dict(
 
     Returns:
         dict: dictionary of tasks.
+
+    TODO: adapt so it can work for tasks that take in single files, rathe than ocean and atmos
     """
     tasks = {}
     for exp in os.listdir(original_root):
