@@ -87,16 +87,24 @@ def calc_bias(start_year=1980, end_year=2014):
     print(f"Variables to compare: {vars_to_compare}")
     # ok, let's put the time coordinates on the same axis
     cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
+    print("Old CMIP6 time axis:", cmip6_ds.time)
+    cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("cmip6_mean_old_time.nc", mode="w")
     cmip6_ds = cmip6_ds.reindex(
         time=era5_ds.time,
         method="nearest",
-        tolerance=pd.to_timedelta("1D"),
+        # tolerance = 1 month
+        tolerance=pd.to_timedelta("30D"),
+        # tolerance=pd.to_timedelta("1"),
     )
+
     print("CMIP6", cmip6_ds)
     cmip6_ds = cmip6_ds.rename({"plev": "pressure_level"})
     cmip6_ds = cmip6_ds.drop_vars("time_bounds", errors="ignore")
     print("Aligned CMIP6 data to ERA5 time axis.")
     bias_ds = cmip6_ds[vars_to_compare] - era5_ds[vars_to_compare]
+    cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("cmip6_mean.nc", mode="w")
+    era5_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("era5_mean.nc", mode="w")
+
     print("bias", bias_ds)
     print(f"Bias dataset variables: {list(bias_ds.data_vars)}")
     bias_ds.mean(dim="time", keep_attrs=True).to_netcdf("cmip6_bias.nc", mode="w")
