@@ -45,6 +45,7 @@ from .constants import (
     ERA5_PS_OG_PATH,
     ERA5_REGRIDDED_PATH,
     ERA5_PS_PATH,
+    CONFIG_PATH,
     ERA5_PI_PATH,
     ERA5_PRODUCTS_PATH,
     ERA5_FIGURE_PATH,
@@ -398,7 +399,9 @@ def preprocess_single_level_data(ds: xr.Dataset) -> xr.Dataset:
 
 @timeit
 def preprocess_pressure_level_data(ds: xr.Dataset) -> xr.Dataset:
-    """Optimized preprocessing for pressure-level ERA5 data."""
+    """Optimized preprocessing for pressure-level ERA5 data.
+
+    Converts temperature to Celsius and specific humidity to g/kg."""
 
     updates = {
         "t": (ds["t"] - 273.15).astype(np.float32),
@@ -470,6 +473,21 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
     print("...Done.")
 
     client.close()
+
+
+def fix_era5_pi_decade(output_path: str) -> None:
+    """Currently the ERA5 PI data is saved in a format that cannot be read by cdo."""
+    print(output_path)
+    print("initial ncdump")
+    os.system(f"ncdump -h '{output_path}'")
+    ds = xr.open_dataset(
+        output_path, engine="h5netcdf"
+    )  # Load the dataset to ensure it's processed
+    print(ds)
+    new_output_path = output_path.replace(".nc", ".fix.nc")
+    ds.to_netcdf(new_output_path, engine="netcdf4", format="NETCDF4")
+    print()
+    os.system(f"ncdump -h '{new_output_path}'")
 
 
 def era5_pi(years: List[str]) -> None:
@@ -722,11 +740,13 @@ def get_era5_combined(
     """
     # open the single level file
     if os.path.exists(os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")):
-        single_ds = preprocess_single_level_data(xr.open_dataset(
-            os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
-            chunks=CHUNK_IN[chunk_in],
-            engine="netcdf4",
-        ))
+        single_ds = preprocess_single_level_data(
+            xr.open_dataset(
+                os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc"),
+                chunks=CHUNK_IN[chunk_in],
+                engine="netcdf4",
+            )
+        )
     else:
         fp = []
         years = [str(year) for year in range(start_year, end_year + 1)]
@@ -1257,13 +1277,13 @@ def calculate_potential_sizes(
     del ds["t"]
     del ds["q"]
     del ds["pressure_level"]
-    #ds = convert(ds)
+    # ds = convert(ds)
     # call expensive function. There was some issues with chunking
     ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
         {"time": 64, "lat": 480, "lon": 480}
     )  # chunk the data for saving
     ds = ds.rename({"r0": "r0_pi", "rmax": "rmax_pi", "vmax": "vmax_pi"})
-    ds["vmax"] = 33 # set the vmax to 33 m/s for the lower limit of category 1.
+    ds["vmax"] = 33  # set the vmax to 33 m/s for the lower limit of category 1.
     ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
         {"time": 64, "lat": 480, "lon": 480}
     )  # chunk the data for saving
@@ -1283,24 +1303,51 @@ def calculate_potential_sizes(
 
 
 # import tcpips.regrid_cdo import call_cdo
-from .constants import CONFIG_PATH
+@timeit
 def call_cdo(input_path: str, output_path: str) -> None:
     """Call CDO to regrid the input netCDF file to a half-degree grid.
+
+    Args:
+        input_path (str): Path to the input netCDF file.
+        output_path (str): Path to the output netCDF file.
     """
-    os.system(f"ncdump -h {input_path}")
-    # delete the misnamed coordinates (xmip's fault?)
-    os.system(
-        f"ncks -4 -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies   {input_path} {output_path+'.tmp'}"
+    print(f"Regridding {input_path} to {output_path} using CDO...")
+    print(f"Input file: {input_path}")
+    os.system(f"ncdump -h '{input_path}'")
+    tmp_path = output_path + ".tmp"
+
+    # --- THIS IS THE LINE TO FIX ---
+    # Add the -C flag to the ncks command to allow exclusion of coordinate variables.
+    ncks_options = "-C -O -4"  # -C is for coordinates, -O is for overwrite
+    ncks_vars_to_exclude = "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver"
+
+    ncks_cmd = (
+        f"ncks {ncks_options} -x -v {ncks_vars_to_exclude} '{input_path}' '{tmp_path}'"
     )
-    os.system(
-        f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt {output_path+'.tmp'} {output_path} > /dev/null"
-    )
-    # f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/era5_grid_from_file.txt {output_path+'.tmp'} {output_path} > /dev/null"
-    try:
-        os.remove(f"{output_path + '.tmp'}")
-    except Exception as e:
-        print(e)
-    os.system(f"ncdump -h {output_path}")
+    os.system(ncks_cmd)
+    print(f"Temporary file created: {tmp_path}")
+    os.system(f"ncdump -h '{tmp_path}'")
+
+    # --- The rest of the script remains the same ---
+
+    # Run the cdo command only if the ncks command was successful
+    if os.path.exists(tmp_path):
+        cdo_cmd = (
+            f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt "
+            f"'{tmp_path}' '{output_path}'"
+        )  #  > /dev/null 2>&1
+        os.system(cdo_cmd)
+
+        try:
+            os.remove(tmp_path)
+        except OSError as e:
+            print(f"Error removing temporary file: {e}")
+    else:
+        print(f"Error: ncks failed to create temporary file for {input_path}")
+        return
+
+    if not os.path.exists(output_path):
+        print(f"Error: Final output file was not created: {output_path}")
 
 
 def regrid_all(years: List[str]) -> None:
@@ -1318,7 +1365,9 @@ def regrid_all(years: List[str]) -> None:
             ERA5_REGRIDDED_PATH,
             f"era5_single_levels_years{years[i]}_{years[j-1]}.nc",
         )
-        if os.path.exists(single_level_path) and not os.path.exists(output_single_level_path):
+        if os.path.exists(single_level_path) and not os.path.exists(
+            output_single_level_path
+        ):
             print(f"Regridding single level data for years {years[i]}-{years[j-1]}")
             call_cdo(single_level_path, output_single_level_path)
 
@@ -1329,12 +1378,16 @@ def regrid_all(years: List[str]) -> None:
             ERA5_REGRIDDED_PATH,
             f"era5_pressure_levels_years{years[i]}_{years[j-1]}.nc",
         )
-        if os.path.exists(pressure_level_path) and not os.path.exists(output_pressure_level_path):
+        if os.path.exists(pressure_level_path) and not os.path.exists(
+            output_pressure_level_path
+        ):
             print(f"Regridding pressure level data for years {years[i]}-{years[j-1]}")
             call_cdo(pressure_level_path, output_pressure_level_path)
         pi_path = os.path.join(
             ERA5_PI_OG_PATH, f"era5_pi_years{years[i]}_{years[j-1]}.nc"
         )
+        fix_era5_pi_decade(pi_path)
+        pi_path = pi_path.replace(".nc", ".fix.nc")
         output_pi_path = os.path.join(
             ERA5_PI_PATH, f"era5_pi_years{years[i]}_{years[j-1]}.nc"
         )
