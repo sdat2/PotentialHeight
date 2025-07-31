@@ -499,7 +499,6 @@ def assign_coordinate_attributes(file_path: str):
     ...     _ = ds.createVariable('time', 'i4', ('time',))
     ...     _ = ds.createVariable('vmax', 'f8', ('time', 'latitude', 'longitude'))
     ...     _ = ds.createVariable('pmin', 'f8', ('time', 'latitude', 'longitude'))
-    ...
     >>> # Run the function
     >>> assign_coordinate_attributes(file_name)
     Processing variable: vmax... Added 'coordinates' attribute.
@@ -1490,6 +1489,51 @@ def regrid_all(years: List[str]) -> None:
         if os.path.exists(ps_path) and not os.path.exists(output_ps_path):
             print(f"Regridding potential sizes data for years {years[i]}-{years[j-1]}")
             call_cdo(ps_path, output_ps_path)
+
+
+def get_all_regridded_data(
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    chunk_in: Literal["space", "time"] = "space",
+) -> xr.Dataset:
+    """Get all regridded ERA5 data for the specified years.
+
+    Args:
+        start_year (int): The starting year for the data.
+        end_year (int): The ending year for the data.
+        chunk_in (Literal["space", "time"]): The chunking strategy to use.
+
+    Returns:
+        xr.Dataset: The xarray dataset containing the regridded ERA5 data.
+    """
+    single_ds = preprocess_single_level_data(
+            xr.open_mfdataset(
+                os.path.join(ERA5_REGRIDDED_PATH, "era5_single*.nc"),
+                combine="by_coords",
+                chunks=CHUNK_IN[chunk_in],
+                engine="netcdf4",)
+        )
+    pressure_ds = preprocess_pressure_level_data(
+            xr.open_mfdataset(
+                os.path.join(ERA5_REGRIDDED_PATH, "era5_pressure*.nc"),
+                combine="by_coords",
+                chunks=CHUNK_IN[chunk_in],
+                engine="netcdf4",)
+        )
+    pi_ds = xr.open_mfdataset(
+            os.path.join(ERA5_PI_PATH, "era5_pi_years*.nc"),
+            combine="by_coords",
+            chunks=CHUNK_IN[chunk_in],
+            engine="netcdf4",
+        )
+
+    return xr.merge(
+        [single_ds, pressure_ds, pi_ds],
+        compat="override",
+        join="override",).sel(
+            time=slice(f"{start_year}-01-01", f"{end_year}-12-31"   )
+    )
+
 
 
 if __name__ == "__main__":
