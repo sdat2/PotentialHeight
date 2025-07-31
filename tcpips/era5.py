@@ -12,6 +12,7 @@ from typing import List, Union, Tuple, Literal, Optional
 import numpy as np
 import pandas as pd
 import xarray as xr
+import netCDF4 as nc
 from matplotlib import pyplot as plt
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
@@ -474,6 +475,78 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
 
     client.close()
 
+def assign_coordinate_attributes(file_path: str):
+    """Assigns CF-compliant 'coordinates' attributes to data variables.
+
+    This function opens a NetCDF file in append mode and inspects each variable.
+    For any variable that has both 'latitude' and 'longitude' as dimensions
+    (and is not a coordinate variable itself), it sets the 'coordinates'
+    attribute to 'longitude latitude'. This ensures compliance with CF
+    conventions and improves interoperability with analysis tools.
+
+    Args:
+        file_path (str): The path to the NetCDF file to be modified.
+
+    Doctests:
+    >>> # Setup a dummy NetCDF file for the test
+    >>> file_name = 'test_coord.nc'
+    >>> with nc.Dataset(file_name, 'w') as ds:
+    ...     _ =  ds.createDimension('latitude', 10)
+    ...     _ = ds.createDimension('longitude', 20)
+    ...     _ = ds.createDimension('time', 2)
+    ...     _ = ds.createVariable('latitude', 'f4', ('latitude',))
+    ...     _ = ds.createVariable('longitude', 'f4', ('longitude',))
+    ...     _ = ds.createVariable('time', 'i4', ('time',))
+    ...     _ = ds.createVariable('vmax', 'f8', ('time', 'latitude', 'longitude'))
+    ...     _ = ds.createVariable('pmin', 'f8', ('time', 'latitude', 'longitude'))
+    ...
+    >>> # Run the function
+    >>> assign_coordinate_attributes(file_name)
+    Processing variable: vmax... Added 'coordinates' attribute.
+    Processing variable: pmin... Added 'coordinates' attribute.
+    >>> # Verify the attributes were set
+    >>> with nc.Dataset(file_name, 'r') as ds:
+    ...     print(ds.variables['vmax'].coordinates)
+    ...     print(ds.variables['pmin'].coordinates)
+    longitude latitude
+    longitude latitude
+    >>> # Clean up the test file
+    >>> os.remove(file_name)
+    """
+    # Define the spatial coordinate variables as named in your file
+    lon_name = 'longitude'
+    lat_name = 'latitude'
+
+    try:
+        with nc.Dataset(file_path, 'a') as ds:
+            # Get the names of all coordinate variables
+            coord_vars = list(ds.dimensions.keys())
+
+            # Iterate over all variables in the file
+            for var_name in ds.variables:
+                # Skip coordinate variables themselves
+
+
+                var_obj = ds.variables[var_name]
+                # Check if the variable has the required dimensions
+                if lon_name in var_obj.dimensions and lat_name in var_obj.dimensions:
+                    print(f"Processing variable: {var_name}... ", end="")
+                    # Assign the coordinates attribute
+                    var_obj.setncattr('coordinates', f'{lon_name} {lat_name}')
+                    print("Added 'coordinates' attribute.")
+
+            ds[lon_name].setncattr('standard_name', 'longitude')
+            ds[lat_name].setncattr('standard_name', 'latitude')
+            ds[lon_name].setncattr('axis', 'X')
+            ds[lat_name].setncattr('axis', 'Y')
+            ds[lon_name].units = 'degrees_east'
+            ds[lat_name].units = 'degrees_north'
+
+    except FileNotFoundError:
+        print(f"Error: The file '{file_path}' was not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
 
 def fix_era5_pi_decade(output_path: str) -> None:
     """Currently the ERA5 PI data is saved in a format that cannot be read by cdo."""
@@ -484,9 +557,23 @@ def fix_era5_pi_decade(output_path: str) -> None:
         output_path, engine="h5netcdf"
     )  # Load the dataset to ensure it's processed
     print(ds)
+
+    coords_to_remove = ['number', 'expver']
+
+    # Use reset_coords with drop=True to completely remove them from the dataset
+    # This is the cleanest way to solve the CDO compatibility issue.
+    ds_fixed = ds.reset_coords(coords_to_remove, drop=True)
+    print(f"  - Removed coordinates: {coords_to_remove}")
+    print(ds_fixed)
+
     new_output_path = output_path.replace(".nc", ".fix.nc")
-    ds.to_netcdf(new_output_path, engine="netcdf4", format="NETCDF4")
+    ds_fixed.to_netcdf(new_output_path, engine="netcdf4", format="NETCDF4")
     print()
+    os.system(f"ncdump -h '{new_output_path}'")
+    print("Now running netcdf4 to change coords.")
+    #os.system(f"ncatted -O -a coordinates,.,d,, '{new_output_path}'")
+    # print("Final ncdump after ncatted")
+    assign_coordinate_attributes(new_output_path)
     os.system(f"ncdump -h '{new_output_path}'")
 
 
@@ -1319,7 +1406,7 @@ def call_cdo(input_path: str, output_path: str) -> None:
     # --- THIS IS THE LINE TO FIX ---
     # Add the -C flag to the ncks command to allow exclusion of coordinate variables.
     ncks_options = "-C -O -4"  # -C is for coordinates, -O is for overwrite
-    ncks_vars_to_exclude = "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver"
+    ncks_vars_to_exclude = "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver,ifl"
 
     ncks_cmd = (
         f"ncks {ncks_options} -x -v {ncks_vars_to_exclude} '{input_path}' '{tmp_path}'"
