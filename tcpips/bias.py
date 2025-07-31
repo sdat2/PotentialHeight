@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from sithom.time import timeit
-from .constants import CDO_PATH, PI4_PATH, PS_PATH
+from .constants import CDO_PATH, PI4_PATH, PS_PATH, BIAS_PATH
 from .era5 import get_all_regridded_data
 
 def load_cmip6_data(exp = "historical", model = "CESM2", member = "r4i1p1f1") -> Optional[xr.Dataset]:
@@ -67,8 +67,19 @@ def load_cmip6_data(exp = "historical", model = "CESM2", member = "r4i1p1f1") ->
 
 
 @timeit
-def calc_bias(start_year=1980, end_year=2014):
+def calc_bias(start_year: int = 1980,
+              end_year: int = 2014,
+              model: str = "CESM2",
+              member: str ="r4i1p1f1",
+              exp: str="historical") -> None:
     """Calc mean biases over specified period.
+
+    Args:
+        start_year (int): Start year for the analysis (default: 1980).
+        end_year (int): End year for the analysis (default: 2014).
+        model (str): Model name (default: "CESM2").
+        member (str): Ensemble member (default: "r4i1p1f1").
+        exp (str): Experiment name (default: "historical").
 
     """
     era5_ds = get_all_regridded_data(start_year=1980, end_year=2024).sel(
@@ -87,8 +98,8 @@ def calc_bias(start_year=1980, end_year=2014):
     print(f"Variables to compare: {vars_to_compare}")
     # ok, let's put the time coordinates on the same axis
     cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
-    print("Old CMIP6 time axis:", cmip6_ds.time)
-    cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("cmip6_mean_old_time.nc", mode="w")
+    # print("Old CMIP6 time axis:", cmip6_ds.time)
+    #cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("cmip6_mean_old_time.nc", mode="w")
     cmip6_ds = cmip6_ds.reindex(
         time=era5_ds.time,
         method="nearest",
@@ -102,12 +113,18 @@ def calc_bias(start_year=1980, end_year=2014):
     cmip6_ds = cmip6_ds.drop_vars("time_bounds", errors="ignore")
     print("Aligned CMIP6 data to ERA5 time axis.")
     bias_ds = cmip6_ds[vars_to_compare] - era5_ds[vars_to_compare]
-    cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("cmip6_mean.nc", mode="w")
-    era5_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("era5_mean.nc", mode="w")
+    #cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("cmip6_mean.nc", mode="w")
+    #era5_ds[vars_to_compare].mean(dim="time", keep_attrs=True).to_netcdf("era5_mean.nc", mode="w")
 
     print("bias", bias_ds)
     print(f"Bias dataset variables: {list(bias_ds.data_vars)}")
-    bias_ds.mean(dim="time", keep_attrs=True).to_netcdf("cmip6_bias.nc", mode="w")
+    #bias_ds.mean(dim="time", keep_attrs=True).to_netcdf("cmip6_bias.nc", mode="w")
+    bias_ds.mean(dim="time", keep_attrs=True).to_netcdf(".nc", mode="w")
+    historical_mean = cmip6_ds[vars_to_compare].mean(dim="time", keep_attrs=True)
+    folder = os.path.join(BIAS_PATH, exp, model)
+    os.makedirs(folder, exist_ok=True)
+    historical_mean.to_netcdf(os.path.join(folder, member+".nc"), mode="w")
+    print(f"Saved historical mean to {os.path.join(folder, member+ '.nc')}")
 
 
 
@@ -117,5 +134,8 @@ if __name__ == "__main__":
     # python -m tcpips.bias
     # Load the CMIP6 data
     # cmip6_data = load_cmip6_data()
-    calc_bias()  # Placeholder for actual implementation
+    for model in ["CESM2"]:
+        for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
+            print(f"Calculating bias for {model}, {member}...")
+            calc_bias(model=model, member=member)
 

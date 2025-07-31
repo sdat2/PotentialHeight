@@ -102,6 +102,9 @@ os.makedirs(BC_PI_PATH, exist_ok=True)
 PS_PATH = os.path.join(CMIP6_PATH, "ps")  # potential size
 os.makedirs(PS_PATH, exist_ok=True)  # potential size
 
+BIAS_PATH = os.path.join(CMIP6_PATH, "bias")  # bias data
+os.makedirs(BIAS_PATH, exist_ok=True)  # bias data
+
 # Constants for converting CMIP6 variables to PI input variables
 CONVERSION_NAMES: Dict[str, str] = {
     "tos": "sst",
