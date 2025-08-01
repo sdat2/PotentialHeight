@@ -6,6 +6,12 @@ For each ensemble member then might want to calculate the mean bias for each gri
 
 For the ensemble as a whole we might want to compare how the distribution of mean biases and their trends compare, and whether there are significant difference between different families of models.
 
+TODO: do hemisphere filtering to get August/March.
+
+TODO: Find linear trend in bias, CMIP6, and ERA5. Work out significance of each.
+
+TODO: Compare the distribution of biases, trends, and significance between different models and ensemble members.
+
 """
 import os
 from typing import Optional
@@ -15,6 +21,7 @@ import xarray as xr
 from sithom.time import timeit
 from .constants import CDO_PATH, PI4_PATH, PS_PATH, BIAS_PATH
 from .era5 import get_all_regridded_data
+
 
 def load_cmip6_data(exp = "historical", model = "CESM2", member = "r4i1p1f1") -> Optional[xr.Dataset]:
     """Load CMIP6 data for a specific experiment, model, and member.
@@ -62,8 +69,6 @@ def load_cmip6_data(exp = "historical", model = "CESM2", member = "r4i1p1f1") ->
     else:
         print("No datasets were loaded.")
         return None
-
-
 
 
 @timeit
@@ -128,14 +133,57 @@ def calc_bias(start_year: int = 1980,
 
 
 
+def example_new_orleans_plot():
+    # plot example for a point near New Orleans.
+    import matplotlib.pyplot as plt
+    from .constants import FIGURE_PATH
+    from sithom.plot import plot_defaults, label_subplots
+    # let's just go for vmax to start with.
+    # panel 1: ERA5 + CMIP6 ensemble members + CMIP6 multi-model mean
+    # panel 2: bias
+    plot_defaults()
+    fig, axs = plt.subplots(2, 1)
+    era5_ds = get_all_regridded_data().sel(
+        time=slice("1980-01-01", "2014-12-31")
+    )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
+    cmip6_ds = load_cmip6_data().sel(
+        time=slice("1980-01-01", "2014-12-31")
+    )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
+    cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
+    cmip6_ds = cmip6_ds.reindex(
+        time=era5_ds.time,
+        method="nearest",
+        # tolerance = 1 month
+        tolerance=pd.to_timedelta("30D"),
+        # tolerance=pd.to_timedelta("1"),
+    )
+    bias_ds = cmip6_ds - era5_ds
+    print(f"ERA5 data: {era5_ds}")
+    print(f"ERA5 values {era5_ds.values}" )
+    print(f"CMIP6 data: {cmip6_ds}")
+    print(f"CMIP6 values {cmip6_ds.values}" )
+    print(f"Bias data: {bias_ds}")
+    era5_ds.plot(ax=axs[0], label="ERA5", color="blue")
+    cmip6_ds.plot(ax=axs[0], label="CMIP6", color="orange")
+    axs[0].legend()
+    axs[0].set_title("")
+    bias_ds.plot(ax=axs[1], label="Bias", color="red")
+    axs[1].set_title("")
+    axs[0].set_ylabel("$V_p$ [m s$^{-1}$]")
+    axs[1].set_ylabel("Bias, $\Delta V_p$ [m s$^{-1}$]")
+    label_subplots(axs)
+    plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_vmax_bias.pdf"), dpi=300)
+    plt.close()
+    print(f"Saved figure to {os.path.join(FIGURE_PATH, 'new_orleans_vmax_bias.pdf')}")
 
 
 if __name__ == "__main__":
     # python -m tcpips.bias
     # Load the CMIP6 data
     # cmip6_data = load_cmip6_data()
-    for model in ["CESM2"]:
-        for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
-            print(f"Calculating bias for {model}, {member}...")
-            calc_bias(model=model, member=member)
+    # for model in ["CESM2"]:
+    #     for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
+    #         print(f"Calculating bias for {model}, {member}...")
+    #         calc_bias(model=model, member=member)
+    example_new_orleans_plot()
 
