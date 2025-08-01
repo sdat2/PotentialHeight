@@ -20,7 +20,7 @@ import pandas as pd
 import xarray as xr
 from sithom.time import timeit
 from .constants import CDO_PATH, PI4_PATH, PS_PATH, BIAS_PATH
-from .era5 import get_all_regridded_data
+from .era5 import get_all_regridded_data, select_seasonal_hemispheric_data
 
 
 def load_cmip6_data(exp = "historical", model = "CESM2", member = "r4i1p1f1") -> Optional[xr.Dataset]:
@@ -132,8 +132,9 @@ def calc_bias(start_year: int = 1980,
     print(f"Saved historical mean to {os.path.join(folder, member+ '.nc')}")
 
 
-
-def example_new_orleans_plot():
+# TODO: write an ensemble reading function
+@timeit
+def example_new_orleans_plot() -> None:
     # plot example for a point near New Orleans.
     import matplotlib.pyplot as plt
     from .constants import FIGURE_PATH
@@ -142,7 +143,7 @@ def example_new_orleans_plot():
     # panel 1: ERA5 + CMIP6 ensemble members + CMIP6 multi-model mean
     # panel 2: bias
     plot_defaults()
-    fig, axs = plt.subplots(2, 1)
+    fig, axs = plt.subplots(2, 1, sharex=True)
     era5_ds = get_all_regridded_data().sel(
         time=slice("1980-01-01", "2014-12-31")
     )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
@@ -150,13 +151,15 @@ def example_new_orleans_plot():
         time=slice("1980-01-01", "2014-12-31")
     )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
     cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
-    cmip6_ds = cmip6_ds.reindex(
+    cmip6_ds = select_seasonal_hemispheric_data(cmip6_ds.reindex(
         time=era5_ds.time,
         method="nearest",
         # tolerance = 1 month
         tolerance=pd.to_timedelta("30D"),
         # tolerance=pd.to_timedelta("1"),
-    )
+    ),
+    lon="lon", lat="lat")
+    era5_ds = select_seasonal_hemispheric_data(era5_ds, lon="lon", lat="lat")
     bias_ds = cmip6_ds - era5_ds
     print(f"ERA5 data: {era5_ds}")
     print(f"ERA5 values {era5_ds.values}" )
@@ -164,13 +167,19 @@ def example_new_orleans_plot():
     print(f"CMIP6 values {cmip6_ds.values}" )
     print(f"Bias data: {bias_ds}")
     era5_ds.plot(ax=axs[0], label="ERA5", color="blue")
+    axs[0].axhline(era5_ds.mean(dim="year").values, color="blue", linestyle="--", label="ERA5 Mean")
     cmip6_ds.plot(ax=axs[0], label="CMIP6", color="orange")
-    axs[0].legend()
+    axs[0].axhline(cmip6_ds.mean(dim="year").values, color="orange", linestyle="--", label="CMIP6 Mean")
+    axs[0].legend(ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.25))
     axs[0].set_title("")
     bias_ds.plot(ax=axs[1], label="Bias", color="red")
+    axs[1].axhline(bias_ds.mean(dim="year").values, color="red", linestyle="--", label="Bias mean")
     axs[1].set_title("")
     axs[0].set_ylabel("$V_p$ [m s$^{-1}$]")
+    axs[0].set_xlabel("")
+    axs[0].set_xlim(1980, 2014)
     axs[1].set_ylabel("Bias, $\Delta V_p$ [m s$^{-1}$]")
+    axs[1].set_xlabel("")
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "new_orleans_vmax_bias.pdf"), dpi=300)
     plt.close()

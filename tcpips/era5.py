@@ -687,7 +687,7 @@ def calculate_trend(
 
 
 def select_seasonal_hemispheric_data(
-    ds: xr.Dataset, months_to_average: int = 1
+    ds: xr.Dataset, months_to_average: int = 1, lon: str = "longitude", lat: str = "latitude"
 ) -> xr.Dataset:
     """
     Selects seasonal hemispheric data, with an option to average over peak months.
@@ -733,8 +733,8 @@ def select_seasonal_hemispheric_data(
     """
     if months_to_average == 1:
         # Original logic: Select a single peak month
-        nh_data = ds.where((ds.time.dt.month == 8) & (ds.latitude >= 0), drop=True)
-        sh_data = ds.where((ds.time.dt.month == 3) & (ds.latitude < 0), drop=True)
+        nh_data = ds.where((ds.time.dt.month == 8) & (ds[lat] >= 0), drop=True)
+        sh_data = ds.where((ds.time.dt.month == 3) & (ds[lat] < 0), drop=True)
 
         nh_data = (
             nh_data.assign_coords(year=nh_data.time.dt.year)
@@ -753,13 +753,13 @@ def select_seasonal_hemispheric_data(
         # New logic: Average over 3-month peak season
         # Northern Hemisphere: August-September-October (ASO)
         nh_data = ds.where(
-            ds.time.dt.month.isin([8, 9, 10]) & (ds.latitude >= 0), drop=True
+            ds.time.dt.month.isin([8, 9, 10]) & (ds[lat] >= 0), drop=True
         )
         nh_annual = nh_data.groupby(nh_data.time.dt.year).mean("time")
 
         # Southern Hemisphere: January-February-March (JFM)
         sh_data = ds.where(
-            ds.time.dt.month.isin([1, 2, 3]) & (ds.latitude < 0), drop=True
+            ds.time.dt.month.isin([1, 2, 3]) & (ds[lat] < 0), drop=True
         )
         sh_annual = sh_data.groupby(sh_data.time.dt.year).mean("time")
 
