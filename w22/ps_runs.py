@@ -33,13 +33,13 @@ def ex_data_path(pi_version=2, member: int = 4) -> str:
         str: path to the example data.
     """
     if pi_version == 2:
-        return os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+        return os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.zarr")
     elif pi_version == 3:
-        return os.path.join(PI3_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+        return os.path.join(PI3_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.zarr")
     elif pi_version == 4:
-        return os.path.join(PI4_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
+        return os.path.join(PI4_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.zarr")
     else:
-        raise ValueError("pi_version must be 2 or 3")
+        raise ValueError("pi_version must be 2, 3, or 4")
 
 
 @timeit
@@ -203,6 +203,7 @@ def load_global(year: int = 2015) -> xr.Dataset:
 
 def point_timeseries(
     member: int = 10,
+    exp: str = "ssp585",
     place: str = "new_orleans",
     pressure_assumption="isothermal",
     pi_version=3,
@@ -215,12 +216,20 @@ def point_timeseries(
         place (str, optional): location. Defaults to "new_orleans".
         pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
     """
-    file_name = os.path.join(PI2_PATH, "ssp585", "CESM2", f"r{member}i1p1f1.nc")
-    point_ds = xr.open_dataset(file_name).sel(
+    if pi_version == 2:
+        file_name = os.path.join(PI2_PATH, exp, "CESM2", f"r{member}i1p1f1.zarr")
+    elif pi_version == 3:
+        file_name = os.path.join(PI3_PATH, exp, "CESM2", f"r{member}i1p1f1.zarr")
+    elif pi_version == 4:
+        file_name = os.path.join(PI4_PATH, exp, "CESM2", f"r{member}i1p1f1.zarr")
+    else:
+        raise ValueError("pi_version must be 2, 3, or 4")
+    point_ds = xr.open_zarr(file_name).sel(
         lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
         lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
         method="nearest",
     )
+    print("point ds", point_ds)
     rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
     trimmed_ds = point_ds[["sst", "msl", "vmax", "t0"]]
     trimmed_ds["rh"] = rh
@@ -237,7 +246,7 @@ def point_timeseries(
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"{place}_august_ssp585_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc",
+            f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc",
         )
     )
 
@@ -245,6 +254,13 @@ def point_timeseries(
 if __name__ == "__main__":
     # python -m w22.ps_runs
     print("Running as main")
+    # point_timeseries(4, "new_orleans", pi_version=4)
+    # point_timeseries(10, "new_orleans", pi_version=4)
+    # point_timeseries(11, "new_orleans", pi_version=4)
+    for i in [4, 10, 11]:
+        for exp in ["historical", "ssp585"]:
+            point_timeseries(member=i, place="new_orleans", pi_version=4, exp=exp)
+        # point_timeseries(member=i, place="new_orleans", pi_version=4, exp="historical")
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 1)"
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 1)"
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 2)"
@@ -280,3 +296,4 @@ if __name__ == "__main__":
 
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
     # python -c "from w22.ps_runs import new_orleans_10year as no; no()"
+    # trimmed_cmip6_example(trial=2, pressure_assumption="isothermal", pi_version=4)

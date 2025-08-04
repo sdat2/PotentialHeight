@@ -143,7 +143,7 @@ def read_ensemble_for_point_var(
     var: Union[str, List[str]] = "vmax",
     lat: float = 29.95,
     lon: float = -90.07,
-) -> Optional[xr.DataArray]:
+) -> Optional[Union[xr.DataArray, xr.Dataset]]:
     """Read ensemble data for a specific point and variable.
 
     Args:
@@ -159,79 +159,111 @@ def read_ensemble_for_point_var(
             Will have dimension "year" instead of "time.
     """
     print(f"Reading data for {model}, {member}, {exp}, {var} at lat={lat}, lon={lon}...")
-    if isinstance(member, str):
-        if isinstance(exp, list):
-            if len(exp) == 1:
-                exp = exp[0]
-                return read_ensemble_for_point_var(
-                    model=model,
-                    member=member,
-                    exp=exp,
-                    var=var,
-                    lat=lat,
-                    lon=lon,
-                )
-            elif len(exp) == 2 and "historical" in exp:
-                historical_ds = read_ensemble_for_point_var(
-                    model=model,
-                    member=member,
-                    exp="historical",
-                    var=var,
-                    lat=lat,
-                    lon=lon,
-                )
-                hist_index = exp.index("historical")
-                non_hist_index = int(not bool(hist_index))
-                ssp_ds = read_ensemble_for_point_var(
+    if isinstance(model, str):
+        if isinstance(member, str):
+            if isinstance(exp, list):
+                if len(exp) == 1:
+                    exp = exp[0]
+                    return read_ensemble_for_point_var(
                         model=model,
                         member=member,
-                        exp=exp[non_hist_index],
+                        exp=exp,
                         var=var,
                         lat=lat,
                         lon=lon,
                     )
-                if historical_ds is not None and ssp_ds is not None:
-                    print(f"Combining historical and {exp[non_hist_index]} datasets.")
-                    return xr.concat([historical_ds, ssp_ds], dim="year",
-                                      coords="minimal", compat="override")
+                elif len(exp) == 2 and "historical" in exp:
+                    historical_ds = read_ensemble_for_point_var(
+                        model=model,
+                        member=member,
+                        exp="historical",
+                        var=var,
+                        lat=lat,
+                        lon=lon,
+                    )
+                    hist_index = exp.index("historical")
+                    non_hist_index = int(not bool(hist_index))
+                    ssp_ds = read_ensemble_for_point_var(
+                            model=model,
+                            member=member,
+                            exp=exp[non_hist_index],
+                            var=var,
+                            lat=lat,
+                            lon=lon,
+                        )
+                    if historical_ds is not None and ssp_ds is not None:
+                        print(f"Combining historical and {exp[non_hist_index]} datasets.")
+                        return xr.concat([historical_ds, ssp_ds], dim="year",
+                                        coords="minimal", compat="override")
+                    else:
+                        return None
+
                 else:
+                    print(f"Multiple experiments {exp} found, please specify one, or two if one of them is historical.")
                     return None
-
+            cmip6_ds = load_cmip6_data(exp=exp, model=model, member=member)
+            print(f"CMIP6 ds: {cmip6_ds}")
+            if cmip6_ds is not None:
+                cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
+                print(f"CMIP6 ds after conversion: {cmip6_ds}")
+                cmip6_ds = select_seasonal_hemispheric_data(cmip6_ds, lon="lon", lat="lat")
+                return cmip6_ds[var].sel(lat=lat, lon=lon, method="nearest")
             else:
-                print(f"Multiple experiments {exp} found, please specify one, or two if one of them is historical.")
+                print(f"No data found for {model}, {member}, {exp}.")
                 return None
-        cmip6_ds = load_cmip6_data(exp=exp, model=model, member=member)
-        print(f"CMIP6 ds: {cmip6_ds}")
-        if cmip6_ds is not None:
-            cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
-            print(f"CMIP6 ds after conversion: {cmip6_ds}")
-            cmip6_ds = select_seasonal_hemispheric_data(cmip6_ds, lon="lon", lat="lat")
-            return cmip6_ds[var].sel(lat=lat, lon=lon, method="nearest")
-        else:
-            print(f"No data found for {model}, {member}, {exp}.")
-            return None
 
-    elif isinstance(member, list):
+        elif isinstance(member, list):
+            data_arrays = []
+            for m in member:
+                output = read_ensemble_for_point_var(
+                    model=model,
+                    member=m,
+                    exp=exp,
+                    var=var,
+                    lat=lat,
+                    lon=lon,
+                    )
+                if output is not None:
+                    data_arrays.append(output)
+            if data_arrays != []:
+                ds = xr.concat(data_arrays, dim="member")
+                # add members as a coordinate
+                ds = ds.assign_coords(member=member)
+                return ds
+            else:
+                return None
+        else:
+            raise ValueError("Member must be a string or a list of strings.")
+    elif isinstance(model, list):
         data_arrays = []
-        for m in member:
-            data_arrays.append(read_ensemble_for_point_var(
-                model=model,
-                member=m,
+        for m in model:
+            output = read_ensemble_for_point_var(
+                model=m,
+                member=member,
                 exp=exp,
                 var=var,
                 lat=lat,
                 lon=lon,
-                ))
+            )
+            if output is not None:
+                # if member is a list there will be a member dimension with its respective coordiname member: ("member", [member1, member2, ...])
+                # we relabel member coordinate values to be [model.{member}] from [{member}]
+                # we assign new updated values to this coordinate array
+                if isinstance(member, list):
+                    output = output.assign_coords(member=[f"{m}.{mem}" for mem in output.member.values])
+                else:
+                    output = output.assign_coords(member=[f"{m}.{member}"])
+                data_arrays.append(output)
         ds = xr.concat(data_arrays, dim="member")
-        # add members as a coordinate
-        ds = ds.assign_coords(member=member)
+        # add models as a coordinate
+        ds = ds.assign_coords(model=model)
         return ds
     else:
-        raise ValueError("Member must be a string or a list of strings.")
+        raise ValueError("Model must be a string or a list of strings.")
 
 
 @timeit
-def example_new_orleans_plot(start_year=1940, end_year=2024) -> None:
+def example_new_orleans_plot(start_year=1980, end_year=2024) -> None:
     # plot example for a point near New Orleans.
     import matplotlib.pyplot as plt
     from .constants import FIGURE_PATH

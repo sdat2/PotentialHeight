@@ -11,6 +11,7 @@ import cdsapi
 from typing import List, Union, Tuple, Literal, Optional
 import numpy as np
 import pandas as pd
+import subprocess
 import xarray as xr
 import netCDF4 as nc
 from matplotlib import pyplot as plt
@@ -1388,52 +1389,96 @@ def calculate_potential_sizes(
     # Then calculate the potential size corresponding to the lower limit of category 1 which is 33 m/s --
 
 
-# import tcpips.regrid_cdo import call_cdo
 @timeit
 def call_cdo(input_path: str, output_path: str) -> None:
-    """Call CDO to regrid the input netCDF file to a half-degree grid.
+    """Call CDO to regrid the input netCDF file to a half-degree grid using multiple CPU cores.
+
+    Includes ncdump calls for debugging.
 
     Args:
         input_path (str): Path to the input netCDF file.
         output_path (str): Path to the output netCDF file.
     """
     print(f"Regridding {input_path} to {output_path} using CDO...")
-    print(f"Input file: {input_path}")
-    os.system(f"ncdump -h '{input_path}'")
+
+    # --- Define the number of threads to use ---
+    # You can set this to a specific number or use os.cpu_count() to use all available cores.
+    # On an M1 Pro with 10 cores, using 8 or 10 is a good starting point.
+    num_threads = os.cpu_count() or 8 # Fallback to 8 if cpu_count() returns None
+
+    # Temporary file for the intermediate step
     tmp_path = output_path + ".tmp"
 
-    # --- THIS IS THE LINE TO FIX ---
-    # Add the -C flag to the ncks command to allow exclusion of coordinate variables.
-    ncks_options = "-C -O -4"  # -C is for coordinates, -O is for overwrite
+    # --- Debug: Show header of the original input file ---
+    print(f"\n--- Header for original input file: {input_path} ---")
+    subprocess.run(["ncdump", "-h", input_path])
+    print("--- End Header ---")
+
+    # --- Step 1: Use ncks to remove unnecessary variables ---
+    # This step helps to reduce the file size before regridding.
+    ncks_options = ["-C","-O", "-4"]  # -C: exclude coordinate variables, -O: overwrite, -4: netCDF-4
     ncks_vars_to_exclude = "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver,ifl"
+    ncks_cmd = [
+        "ncks"] + ncks_options + [
+        "-x", "-v", ncks_vars_to_exclude,
+        "--thr", str(num_threads),
+        input_path,
+        tmp_path
+    ]
 
-    ncks_cmd = (
-        f"ncks {ncks_options} -x -v {ncks_vars_to_exclude} '{input_path}' '{tmp_path}'"
-    )
-    os.system(ncks_cmd)
-    print(f"Temporary file created: {tmp_path}")
-    os.system(f"ncdump -h '{tmp_path}'")
+    print(f"\nRunning ncks to create temporary file: {' '.join(ncks_cmd)}")
+    # Using subprocess.run is generally safer and more flexible than os.system
+    ncks_result = subprocess.run(ncks_cmd, capture_output=True, text=True)
 
-    # --- The rest of the script remains the same ---
-
-    # Run the cdo command only if the ncks command was successful
-    if os.path.exists(tmp_path):
-        cdo_cmd = (
-            f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt "
-            f"'{tmp_path}' '{output_path}'"
-        )  #  > /dev/null 2>&1
-        os.system(cdo_cmd)
-
-        try:
-            os.remove(tmp_path)
-        except OSError as e:
-            print(f"Error removing temporary file: {e}")
-    else:
-        print(f"Error: ncks failed to create temporary file for {input_path}")
+    if ncks_result.returncode != 0:
+        print(f"Error: ncks failed for {input_path}")
+        print(f"ncks stderr: {ncks_result.stderr}")
         return
 
+    print(f"Temporary file created: {tmp_path}")
+
+    # --- Debug: Show header of the temporary file ---
+    if os.path.exists(tmp_path):
+        print(f"\n--- Header for temporary file: {tmp_path} ---")
+        subprocess.run(["ncdump", "-h", tmp_path])
+        print("--- End Header ---")
+
+    # --- Step 2: Run the parallelized cdo command ---
+    grid_file = os.path.join(CONFIG_PATH, "halfdeg.txt")
+
+    # Added the -P flag to specify the number of parallel threads.
+    cdo_cmd = [
+        "cdo",
+        "-P", str(num_threads),  # Enable parallel processing with specified threads
+        "-f", "nc4",             # Set output format to netCDF-4
+        "-s",                    # Silent mode
+        f"remapbil,{grid_file}", # The regridding operation
+        tmp_path,                # Input file
+        output_path              # Output file
+    ]
+
+    print(f"\nRunning parallel CDO command: {' '.join(cdo_cmd)}")
+    cdo_result = subprocess.run(cdo_cmd, capture_output=True, text=True)
+
+    if cdo_result.returncode != 0:
+        print(f"Error: CDO command failed for {input_path}")
+        print(f"CDO stderr: {cdo_result.stderr}")
+    else:
+        print("CDO command completed successfully.")
+
+    # --- Step 3: Clean up the temporary file ---
+    try:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+            print(f"\nRemoved temporary file: {tmp_path}")
+    except OSError as e:
+        print(f"Error removing temporary file: {e}")
+
+    # --- Final check ---
     if not os.path.exists(output_path):
         print(f"Error: Final output file was not created: {output_path}")
+    else:
+        print(f"Successfully created: {output_path}")
 
 
 def regrid_all(years: List[str]) -> None:

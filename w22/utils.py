@@ -256,6 +256,13 @@ def qair2rh(
         temp = temp - TEMP_0K
 
     if isinstance(press, xr.DataArray):
+        # TODO: this is not a great way to handle pressure units, but it works for now
+        if "units" not in press.attrs:
+            if press.max() > 10_000:
+                press.attrs["units"] = "Pa"
+            else:
+                press.attrs["units"] = "hPa"
+
         if press.attrs["units"] in ["Pa"]:
             press = press / 100
         elif press.attrs["units"] in ["hPa", "mb", "mbar"]:

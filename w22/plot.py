@@ -392,7 +392,7 @@ def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     assert len(axs) == 2
     plot_defaults()
     ds = xr.open_dataset(
-        os.path.join(DATA_PATH, "potential_size_gom_august_isothermal_trial_3.nc")
+        os.path.join(DATA_PATH, "potential_size_gom_august_isothermal_trial_2_pi4new.nc")
     )
     # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
@@ -463,10 +463,13 @@ def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     axs[1].scatter(*no, color="black", s=75, marker="x")
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
+    axs[0].set_xlabel("")
 
 
 def plot_two_timeseries_new_orleans(
-    axs: np.ndarray, text=True, color="black", member: int = 4
+    axs: np.ndarray,
+    text=True, color="black", member: int = 4,
+    pressure_assumption: str = "isothermal", pi_version: int = 4,
 ) -> None:
     """Plot the potential intensity and size timeseries for the point near New Orleans for different ensemble members.
 
@@ -479,21 +482,22 @@ def plot_two_timeseries_new_orleans(
     """
 
     assert len(axs) == 2
-    timeseries_ds = xr.open_dataset(
-        os.path.join(DATA_PATH, f"new_orleans_august_ssp585_r{member}i1p1f1.nc")
-    )
+    timeseries_ds = xr.concat(
+        [xr.open_dataset(
+        os.path.join(DATA_PATH, f"new_orleans_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
+    ) for exp in ["historical", "ssp585"]], dim="time")
     print("timeseries_ds", timeseries_ds)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
     ## work out correlation between time and vmax between 2000 and 2099
-    # year_min = 2014
-    # year_max = 2100
-    ssts = timeseries_ds["sst"].values  # .sel(time=slice(year_min, year_max)).values
-    vmaxs = timeseries_ds["vmax"].values  # .sel(time=slice(year_min, year_max)).values
-    r0s = timeseries_ds["r0"].values  # .sel(time=slice(year_min, year_max)).values
+    year_min = str(2014)
+    year_max = str(2100)
+    ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
+    vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
+    r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
     years = np.array(
-        [time.year for time in timeseries_ds["time"].values]
-    )  # .sel(time=slice(year_min, year_max)).values
+        [time.year for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values]
+    )
     rho_vmax = safe_corr(vmaxs, years)
     rho_r0 = safe_corr(r0s, years)
     rho_sst = safe_corr(ssts, years)
@@ -533,18 +537,19 @@ def plot_two_timeseries_new_orleans(
             transform=axs[1].transAxes,
         )
 
-    axs[0].plot(years, timeseries_ds["vmax"], color=color)
-    axs[1].plot(years, timeseries_ds["r0"] / 1000, color=color)
+    axs[0].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["vmax"], color=color)
+    axs[1].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["r0"] / 1000, color=color)
     axs[0].set_xlabel("")
     axs[1].set_xlabel("Year")
-    # just the SSP585 years at the moment
-    axs[0].set_xlim([2015, 2100])
-    axs[1].set_xlim([2015, 2100])
-    # axs[0].set_xlim([1850, 2100])
-    # axs[1].set_xlim([1850, 2100])
+
+    axs[0].set_xlim([1850, 2100])
+    axs[1].set_xlim([1850, 2100])
+    axs[0].set_xticks(np.arange(1850, 2101, 25))
+    axs[1].set_xticks(np.arange(1850, 2101, 25))
+    axs[1].set_xticklabels(np.arange(1850, 2101, 25).astype(str), rotation=45)
     # vertical black line at year_min
-    # axs[0].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
-    # axs[1].axvline(year_min, color="black", linestyle="--", linewidth=0.5)
+    axs[0].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
+    axs[1].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
 
 
 def figure_two():
@@ -567,6 +572,12 @@ def figure_two():
         text=False,
         color="purple",
         member=10,
+    )
+    plot_two_timeseries_new_orleans(
+        axs[:, 1],
+        text=False,
+        color="orange",
+        member=11
     )
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))
