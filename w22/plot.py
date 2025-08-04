@@ -4,6 +4,7 @@ import os
 from typing import List
 import numpy as np
 import numpy.ma as ma
+import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 from uncertainties import ufloat
@@ -544,12 +545,84 @@ def plot_two_timeseries_new_orleans(
 
     axs[0].set_xlim([1850, 2100])
     axs[1].set_xlim([1850, 2100])
-    axs[0].set_xticks(np.arange(1850, 2101, 25))
-    axs[1].set_xticks(np.arange(1850, 2101, 25))
-    axs[1].set_xticklabels(np.arange(1850, 2101, 25).astype(str), rotation=45)
+    #axs[0].set_xticks(np.arange(1850, 2101, 10))
+    #axs[0].set_xticklabels(["" for _ in range(10)])
+    #axs[1].set_xticks(np.arange(1850, 2101, 10))
+    #axs[1].set_xticklabels(np.arange(1850, 2101, 10).astype(str))
     # vertical black line at year_min
     axs[0].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
     axs[1].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
+
+def plot_era5_timeseries_new_orleans(
+    axs: np.ndarray,
+    text=True, color="black", pi_version: int = 4,
+) -> None:
+    """Plot the potential intensity and size timeseries for the point near New Orleans for ERA5 data.
+
+    Args:
+        axs (np.ndarray): The axes to plot on.
+        text (bool): Whether to add text to the plot (default is True).
+        color (str): The color of the line (default is "black").
+    """
+    def _years_from_times(times: xr.DataArray) -> np.ndarray:
+        return times.astype('datetime64[Y]').astype(int) + 1970
+
+    assert len(axs) == 2
+    timeseries_ds = xr.open_dataset(
+        os.path.join(DATA_PATH, f"new_orleans_august_era5_{'isothermal'}_pi{pi_version}new.nc")
+    )
+    timeseries_ds = timeseries_ds.assign_coords(time=_years_from_times(timeseries_ds["time"].values))
+    axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
+    axs[1].set_title("Potential size, $r_a$ [km]")
+    ## work out correlation between time and vmax between 2000 and 2099
+    year_min = 2014
+    year_max = 2100
+    ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
+    vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
+    r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
+    years = np.array(
+        [time for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values]
+    )
+    rho_vmax = safe_corr(vmaxs, years)
+    rho_r0 = safe_corr(r0s, years)
+    rho_sst = safe_corr(ssts, years)
+    rho_sst_vmax = safe_corr(ssts, vmaxs)
+    rho_sst_r0 = safe_corr(ssts, r0s)
+    print("rho_vmax_years", rho_vmax)
+    print("rho_r0_years", rho_r0)
+    print("rho_sst_vmax", rho_sst_vmax)
+    print("rho_sst_r0", rho_sst_r0)
+    print("rho_sst_years", rho_sst)
+    if text:
+        axs[0].text(0.75, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
+        axs[1].text(0.75, 0.9, f"$\\rho$  = {rho_r0:.2f}", transform=axs[1].transAxes)
+
+    # work out gradient with error bars for same period
+    fit_vmax = safe_grad(years, vmaxs)
+    fit_r0 = safe_grad(years, r0s / 1000)
+    fit_r0_sst = safe_grad(ssts, r0s / 1000)
+    print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
+    fit_vmax_sst = safe_grad(ssts, vmaxs)
+    print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
+    print("fit_vmax_years timeseries", fit_vmax, "m s$^{-1}$ yr$^{-1}$")
+    print("fit_r0_years timeseries", fit_r0, "km yr$^{-1}$")
+    if text:
+        axs[0].text(
+            0.60,
+            0.05,
+            f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+            transform=axs[0].transAxes,
+        )
+        axs[1].text(
+            0.60,
+            0.1,
+            f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
+            transform=axs[1].transAxes,
+        )
+    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"], color=color)
+    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"] / 1000, color=color)
+    # axs[0].set_xlabel("")
+    # axs[1].set_xlabel("Year")
 
 
 def figure_two():
@@ -578,6 +651,12 @@ def figure_two():
         text=False,
         color="orange",
         member=11
+    )
+    plot_era5_timeseries_new_orleans(
+        axs[:, 1],
+        text=False,
+        color="blue",
+        pi_version=4,
     )
     label_subplots(axs)
     plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))

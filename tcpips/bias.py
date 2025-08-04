@@ -279,7 +279,7 @@ def example_new_orleans_plot(start_year=1980, end_year=2024) -> None:
     cmip6_ds = read_ensemble_for_point_var(
         model="CESM2",
         member=["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"],
-        exp=["historical", "ssp585"], # "historical", #
+        exp=["historical", "ssp585"],
         var="vmax",
         lat=29.95-1,
         lon=-90.07,

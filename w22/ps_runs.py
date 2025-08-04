@@ -5,6 +5,7 @@ import xarray as xr
 from sithom.time import timeit
 from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
 from tcpips.constants import PI2_PATH, PI3_PATH, PI4_PATH
+from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
 from .ps import parallelized_ps
 from .constants import DATA_PATH
@@ -250,6 +251,53 @@ def point_timeseries(
         )
     )
 
+def point_era5_timeseries(
+    place: str = "new_orleans",
+    pressure_assumption: str = "isothermal",
+) -> None:
+    """Point timeseries for ERA5 data.
+
+    Args:
+        member (int, optional): member number. Defaults to 10.
+        place (str, optional): location. Defaults to "new_orleans".
+        pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
+    """
+    point_ds = get_all_regridded_data(start_year=1940, end_year=2024,
+    ).sel(
+        lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+        lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"] -0.5,
+        method="nearest",
+    ).compute()
+    print("point ds era5", point_ds)
+    point_ds = point_ds.rename({"pressure_level": "p"})
+    print("point ds", point_ds)
+    if point_ds["t"].max().values > 100:
+        point_ds["t"].attrs["units"] = "K"
+    elif point_ds["t"].max().values <= 100:
+        point_ds["t"].attrs["units"] = "degC"
+    point_ds["t"].attrs["units"] = "K"
+    if point_ds["q"].max().values > 10:
+        point_ds["q"].attrs["units"] = "g/kg"
+    elif point_ds["q"].max().values <= 1:
+        point_ds["q"].attrs["units"] = "kg/kg"
+
+    rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
+    trimmed_ds = point_ds[["sst", "msl", "vmax", "t0"]]
+    trimmed_ds["rh"] = rh
+
+    print("trimmed_ds", trimmed_ds)
+    # select august data from every year of timeseries xarray
+    trimmed_ds = trimmed_ds.isel(
+        time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
+    )
+    out_ds = parallelized_ps(trimmed_ds, jobs=10)
+    out_ds.to_netcdf(
+        os.path.join(
+            DATA_PATH,
+            f"{place}_august_era5_{pressure_assumption}_pi4new.nc",
+        )
+    )
+
 
 if __name__ == "__main__":
     # python -m w22.ps_runs
@@ -257,9 +305,12 @@ if __name__ == "__main__":
     # point_timeseries(4, "new_orleans", pi_version=4)
     # point_timeseries(10, "new_orleans", pi_version=4)
     # point_timeseries(11, "new_orleans", pi_version=4)
-    for i in [4, 10, 11]:
-        for exp in ["historical", "ssp585"]:
-            point_timeseries(member=i, place="new_orleans", pi_version=4, exp=exp)
+    point_era5_timeseries(
+        place="new_orleans", pressure_assumption="isothermal"
+        )
+    # for i in [4, 10, 11]:
+    #     for exp in ["historical", "ssp585"]:
+    #         point_timeseries(member=i, place="new_orleans", pi_version=4, exp=exp)
         # point_timeseries(member=i, place="new_orleans", pi_version=4, exp="historical")
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 1)"
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 1)"
