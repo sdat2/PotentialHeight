@@ -467,10 +467,14 @@ def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     axs[0].set_xlabel("")
 
 
-def plot_two_timeseries_new_orleans(
+def plot_two_timeseries(
     axs: np.ndarray,
-    text=True, color="black", member: int = 4,
-    pressure_assumption: str = "isothermal", pi_version: int = 4,
+    text=True,
+    color="black",
+    member: int = 4,
+    pressure_assumption: str = "isothermal",
+    place: str = "new_orleans",
+    pi_version: int = 4,
 ) -> None:
     """Plot the potential intensity and size timeseries for the point near New Orleans for different ensemble members.
 
@@ -485,7 +489,7 @@ def plot_two_timeseries_new_orleans(
     assert len(axs) == 2
     timeseries_ds = xr.concat(
         [xr.open_dataset(
-        os.path.join(DATA_PATH, f"new_orleans_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
+        os.path.join(DATA_PATH, f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
     ) for exp in ["historical", "ssp585"]], dim="time")
     print("timeseries_ds", timeseries_ds)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
@@ -538,8 +542,8 @@ def plot_two_timeseries_new_orleans(
             transform=axs[1].transAxes,
         )
 
-    axs[0].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["vmax"], color=color)
-    axs[1].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["r0"] / 1000, color=color)
+    axs[0].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["vmax"], color=color, linewidth=0.5)
+    axs[1].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["r0"] / 1000, color=color, linewidth=0.5)
     axs[0].set_xlabel("")
     axs[1].set_xlabel("Year")
 
@@ -553,9 +557,13 @@ def plot_two_timeseries_new_orleans(
     axs[0].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
     axs[1].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
 
-def plot_era5_timeseries_new_orleans(
+
+def plot_era5_timeseries(
     axs: np.ndarray,
-    text=True, color="black", pi_version: int = 4,
+    place: str = "new_orleans",
+    text=True,
+    color="black",
+    pi_version: int = 4,
 ) -> None:
     """Plot the potential intensity and size timeseries for the point near New Orleans for ERA5 data.
 
@@ -569,7 +577,7 @@ def plot_era5_timeseries_new_orleans(
 
     assert len(axs) == 2
     timeseries_ds = xr.open_dataset(
-        os.path.join(DATA_PATH, f"new_orleans_august_era5_{'isothermal'}_pi{pi_version}new.nc")
+        os.path.join(DATA_PATH, f"{place}_august_era5_{'isothermal'}_pi{pi_version}new.nc")
     )
     timeseries_ds = timeseries_ds.assign_coords(time=_years_from_times(timeseries_ds["time"].values))
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
@@ -619,10 +627,8 @@ def plot_era5_timeseries_new_orleans(
             f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
             transform=axs[1].transAxes,
         )
-    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"], color=color)
-    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"] / 1000, color=color)
-    # axs[0].set_xlabel("")
-    # axs[1].set_xlabel("Year")
+    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"].values, color=color, linewidth=1)
+    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"].values / 1000, color=color, linewidth=1)
 
 
 def figure_two():
@@ -639,20 +645,20 @@ def figure_two():
         height_ratios=[1, 1],
     )
     plot_two_spatial_gulf_of_mexico(axs[:, 0])
-    plot_two_timeseries_new_orleans(axs[:, 1], text=False)
-    plot_two_timeseries_new_orleans(
+    plot_two_timeseries(axs[:, 1], text=False, color="orange")
+    plot_two_timeseries(
         axs[:, 1],
         text=False,
-        color="purple",
+        color="orange",
         member=10,
     )
-    plot_two_timeseries_new_orleans(
+    plot_two_timeseries(
         axs[:, 1],
         text=False,
         color="orange",
         member=11
     )
-    plot_era5_timeseries_new_orleans(
+    plot_era5_timeseries(
         axs[:, 1],
         text=False,
         color="blue",
