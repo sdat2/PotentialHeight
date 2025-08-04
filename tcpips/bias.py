@@ -14,10 +14,11 @@ TODO: Compare the distribution of biases, trends, and significance between diffe
 
 """
 import os
-from typing import Optional
+from typing import Optional, Union, List, Dict
 import numpy as np
 import pandas as pd
 import xarray as xr
+from collections import OrderedDict
 from sithom.time import timeit
 from .constants import CDO_PATH, PI4_PATH, PS_PATH, BIAS_PATH
 from .era5 import get_all_regridded_data, select_seasonal_hemispheric_data
@@ -76,7 +77,8 @@ def calc_bias(start_year: int = 1980,
               end_year: int = 2014,
               model: str = "CESM2",
               member: str ="r4i1p1f1",
-              exp: str="historical") -> None:
+              exp: str="historical"
+              ) -> None:
     """Calc mean biases over specified period.
 
     Args:
@@ -133,8 +135,103 @@ def calc_bias(start_year: int = 1980,
 
 
 # TODO: write an ensemble reading function
+
+def read_ensemble_for_point_var(
+    model: str = "CESM2",
+    member: Union[str, List[str]] = "r4i1p1f1",
+    exp: Union[str, List[str]] = "historical",
+    var: Union[str, List[str]] = "vmax",
+    lat: float = 29.95,
+    lon: float = -90.07,
+) -> Optional[xr.DataArray]:
+    """Read ensemble data for a specific point and variable.
+
+    Args:
+        model (str): Model name (default: "CESM2").
+        member (str): Ensemble member (default: "r4i1p1f1").
+        exp (str): Experiment name (default: "historical").
+        var (str): Variable to read (default: "vmax").
+        lat (float): Latitude of the point (default: 29.95).
+        lon (float): Longitude of the point (default: -90.07).
+
+    Returns:
+        xarray.DataArray: Data for the specified point and variable.
+            Will have dimension "year" instead of "time.
+    """
+    print(f"Reading data for {model}, {member}, {exp}, {var} at lat={lat}, lon={lon}...")
+    if isinstance(member, str):
+        if isinstance(exp, list):
+            if len(exp) == 1:
+                exp = exp[0]
+                return read_ensemble_for_point_var(
+                    model=model,
+                    member=member,
+                    exp=exp,
+                    var=var,
+                    lat=lat,
+                    lon=lon,
+                )
+            elif len(exp) == 2 and "historical" in exp:
+                historical_ds = read_ensemble_for_point_var(
+                    model=model,
+                    member=member,
+                    exp="historical",
+                    var=var,
+                    lat=lat,
+                    lon=lon,
+                )
+                hist_index = exp.index("historical")
+                non_hist_index = int(not bool(hist_index))
+                ssp_ds = read_ensemble_for_point_var(
+                        model=model,
+                        member=member,
+                        exp=exp[non_hist_index],
+                        var=var,
+                        lat=lat,
+                        lon=lon,
+                    )
+                if historical_ds is not None and ssp_ds is not None:
+                    print(f"Combining historical and {exp[non_hist_index]} datasets.")
+                    return xr.concat([historical_ds, ssp_ds], dim="year",
+                                      coords="minimal", compat="override")
+                else:
+                    return None
+
+            else:
+                print(f"Multiple experiments {exp} found, please specify one, or two if one of them is historical.")
+                return None
+        cmip6_ds = load_cmip6_data(exp=exp, model=model, member=member)
+        print(f"CMIP6 ds: {cmip6_ds}")
+        if cmip6_ds is not None:
+            cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
+            print(f"CMIP6 ds after conversion: {cmip6_ds}")
+            cmip6_ds = select_seasonal_hemispheric_data(cmip6_ds, lon="lon", lat="lat")
+            return cmip6_ds[var].sel(lat=lat, lon=lon, method="nearest")
+        else:
+            print(f"No data found for {model}, {member}, {exp}.")
+            return None
+
+    elif isinstance(member, list):
+        data_arrays = []
+        for m in member:
+            data_arrays.append(read_ensemble_for_point_var(
+                model=model,
+                member=m,
+                exp=exp,
+                var=var,
+                lat=lat,
+                lon=lon,
+                ))
+        ds = xr.concat(data_arrays, dim="member")
+        # add members as a coordinate
+        ds = ds.assign_coords(member=member)
+        return ds
+    else:
+        raise ValueError("Member must be a string or a list of strings.")
+
+
 @timeit
-def example_new_orleans_plot() -> None:
+def example_new_orleans_plot(start_year=1940, end_year=2024) -> None:
     # plot example for a point near New Orleans.
     import matplotlib.pyplot as plt
     from .constants import FIGURE_PATH
@@ -144,21 +241,30 @@ def example_new_orleans_plot() -> None:
     # panel 2: bias
     plot_defaults()
     fig, axs = plt.subplots(2, 1, sharex=True)
-    era5_ds = get_all_regridded_data().sel(
-        time=slice("1980-01-01", "2014-12-31")
+    era5_ds = get_all_regridded_data(start_year=start_year, end_year=end_year).sel(
+        time=slice(f"{start_year}-01-01", f"{end_year}-12-31")
     )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
-    cmip6_ds = load_cmip6_data().sel(
-        time=slice("1980-01-01", "2014-12-31")
-    )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
-    cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
-    cmip6_ds = select_seasonal_hemispheric_data(cmip6_ds.reindex(
-        time=era5_ds.time,
-        method="nearest",
-        # tolerance = 1 month
-        tolerance=pd.to_timedelta("30D"),
-        # tolerance=pd.to_timedelta("1"),
-    ),
-    lon="lon", lat="lat")
+    cmip6_ds = read_ensemble_for_point_var(
+        model="CESM2",
+        member=["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"],
+        exp=["historical", "ssp585"], # "historical", #
+        var="vmax",
+        lat=29.95-1,
+        lon=-90.07,
+    ).sel(year=slice(start_year, end_year))  # Adjust the year range as needed
+
+    # cmip6_ds = load_cmip6_data().sel(
+    #     time=slice("1980-01-01", "2014-12-31")
+    # )["vmax"].sel(lat=29.95-1, lon=-90.07, method="nearest")
+    # cmip6_ds = cmip6_ds.convert_calendar('standard', use_cftime=False)
+    # cmip6_ds = select_seasonal_hemispheric_data(cmip6_ds.reindex(
+    #     time=era5_ds.time,
+    #     method="nearest",
+    #     # tolerance = 1 month
+    #     tolerance=pd.to_timedelta("30D"),
+    #     # tolerance=pd.to_timedelta("1"),
+    # ),
+    # lon="lon", lat="lat")
     era5_ds = select_seasonal_hemispheric_data(era5_ds, lon="lon", lat="lat")
     bias_ds = cmip6_ds - era5_ds
     print(f"ERA5 data: {era5_ds}")
@@ -168,16 +274,23 @@ def example_new_orleans_plot() -> None:
     print(f"Bias data: {bias_ds}")
     era5_ds.plot(ax=axs[0], label="ERA5", color="blue")
     axs[0].axhline(era5_ds.mean(dim="year").values, color="blue", linestyle="--", label="ERA5 Mean")
-    cmip6_ds.plot(ax=axs[0], label="CMIP6", color="orange")
-    axs[0].axhline(cmip6_ds.mean(dim="year").values, color="orange", linestyle="--", label="CMIP6 Mean")
-    axs[0].legend(ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.25))
+    print("CMIP6 data:", cmip6_ds)
+    cmip6_ds.plot.line(ax=axs[0], x="year",
+                        label="CMIP6", color="orange", linewidth=0.5) # x="year",
+    axs[0].axhline(cmip6_ds.mean(dim="year").mean(dim="member").values, color="orange", linestyle="--", label="CMIP6 Mean")
+    handles, labels = axs[0].get_legend_handles_labels()
+    by_label = OrderedDict(zip(labels, handles))
+    axs[0].legend(by_label.values(), by_label.keys(), ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.25))
     axs[0].set_title("")
-    bias_ds.plot(ax=axs[1], label="Bias", color="red")
-    axs[1].axhline(bias_ds.mean(dim="year").values, color="red", linestyle="--", label="Bias mean")
+    bias_ds.plot.line(ax=axs[1], x="year", label="Bias", color="red", linewidth=0.5)
+    axs[1].axhline(bias_ds.mean(dim="year").mean(dim="member").values, color="red", linestyle="--", label="Bias mean")
+    handles, labels = axs[1].get_legend_handles_labels()
+    by_label = OrderedDict(zip(labels, handles))
+    axs[1].legend(by_label.values(), by_label.keys(), ncol=4, loc="upper center", bbox_to_anchor=(0.5, 1.25))
     axs[1].set_title("")
     axs[0].set_ylabel("$V_p$ [m s$^{-1}$]")
     axs[0].set_xlabel("")
-    axs[0].set_xlim(1980, 2014)
+    axs[0].set_xlim(start_year, end_year)
     axs[1].set_ylabel("Bias, $\Delta V_p$ [m s$^{-1}$]")
     axs[1].set_xlabel("")
     label_subplots(axs)

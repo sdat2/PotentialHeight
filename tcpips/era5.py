@@ -1598,5 +1598,5 @@ if __name__ == "__main__":
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
-    years = [str(year) for year in range(DEFAULT_START_YEAR, DEFAULT_END_YEAR + 1)]
+    years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
     regrid_all(years)
