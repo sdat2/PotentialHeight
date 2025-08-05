@@ -1,7 +1,8 @@
 """Plot the new potential size calculation results for PIPS chapter/paper"""
 
 import os
-from typing import List, Tuple, Union
+from typing import List
+import math
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
@@ -502,8 +503,8 @@ def plot_two_timeseries(
     pressure_assumption: str = "isothermal",
     place: str = "new_orleans",
     pi_version: int = 4,
-    year_min: Union[int, str] = 2014,
-    year_max: Union[int, str] = 2100,
+    year_min: int = 2014,
+    year_max: int = 2100,
 ) -> None:
     """Plot the potential intensity and size timeseries for the point near New Orleans for different ensemble members.
 
@@ -604,7 +605,7 @@ def plot_era5_timeseries(
 def timeseries_relationships(
     timeseries_ds: xr.Dataset,
     place: str,
-    member: Union[int, str],
+    member: int,
     year_min: int = 2014,
     year_max: int = 2100
     ) -> pd.DataFrame:
@@ -709,7 +710,7 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
             timeseries_relationships(
                 timeseries_ds,
                 place=place,
-                member=member,
+                member="r" + str(member) + "i1p1f1",
                 year_min=2014,
                 year_max=2100,
             )
@@ -718,8 +719,7 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
             timeseries_relationships(
                 timeseries_ds,
                 place=place,
-                member=member,
-                year_min=1980,
+                member="r" + str(member) + "i1p1f1",                year_min=1980,
                 year_max=2024,
             )
         )
@@ -749,14 +749,193 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
         index=False,
     )
     print("Saved temporal relationships data to CSV.")
+    # now let's save this pandas dataframe to a LaTeX table.
+    # it needs to be formatted so that the headers are renamed to formal names with units
+    # it is in scientific notation with 2 significant figures
+    # it combines the nominal and error values into one column like \(nominal \pm error\)
+    # the error if it exists in in "{name}_err" where name is the nominal name
+    # the headers should be transformed so that "fit_vmax" and "fit_vmax_err" become "\(m\left(t, V_p\right)\) [m s\(^{-1}\)]"
+    # the headers should be transformed so that "rho_vmax" becomes "\(\\rho\left(t, V_p\right)\)"
+    # the headers should be transformed so that "fit_vmax_sst" and "fit_vmax_sst_err" become "\(m\left(T_s, V_p\right)\) [m s\(^{-1}\) \(^{\circ}\)C\(^{-1}\)]"
+    # the labels name, members, year_min, year_max should not be changed
+    # dictionary of variable to symbol transformations:
+    # vmax -> V_p
+    # r0 -> r_a
+    # sst -> T_s
+    # t0 -> T_0
+    # rmax -> r_{\mathrm{max}}
+    # rh -> \mathcal{H}_e
+    # p -> p_a
+    # msl -> p_a
+    df.drop(columns=["place"], inplace=True)
+
+    df_str = dataframe_to_latex_table(df)
+    print(df_str)
+    df_str
+
+
+def dataframe_to_latex_table(df: pd.DataFrame) -> str:
+    """
+    Converts a pandas DataFrame to a publication-quality LaTeX table string.
+
+    This function automatically generates formal LaTeX headers and formats
+    numerical values into a human-readable scientific notation suitable for
+    academic papers.
+
+    Key features:
+    - **Dynamic Header Generation**: Parses column names like 'rho_vmax' or
+      'fit_r0_sst' into LaTeX expressions, e.g., '\\(\\rho(V_p)\\)'.
+    - **Advanced Number Formatting**:
+        - Single numbers are formatted as \\(m \\times 10^{e}\\).
+        - Value ± error pairs are formatted as \\((\\textit{m}_n \\pm \\textit{m}_e) \\times 10^{E}\\),
+          where the exponent is factored out and values are rounded
+          systematically based on the error's magnitude.
+    - **Custom Table Style**: Uses '\\topline', '\\midline', '\\bottomline' for
+      table rules.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame. Column names are expected to
+            follow conventions like 'rho_{...}' and 'fit_{...}'.
+
+    Returns:
+        str: A string containing the fully formatted LaTeX table.
+
+    Doctest:
+        >>> # Example DataFrame mimicking a typical analysis output
+        >>> data = {
+        ...     'place': ['Atlantic'],
+        ...     'member': ['member_01'],
+        ...     'rho_vmax': [0.891],
+        ...     'fit_vmax': [43.2],
+        ...     'fit_vmax_err': [5.73],
+        ...     'fit_r0_sst': [-1.54],
+        ...     'fit_r0_sst_err': [0.11],
+        ... }
+        >>> df_test = pd.DataFrame(data)
+
+    """
+    # --- Local Helper Functions for Advanced Formatting ---
+
+    def format_single_latex_sci(value, sig_figs=2):
+        """Formats a single number as m x 10^e."""
+        if value == 0 or not math.isfinite(value):
+            return f"\\({0.0:.{sig_figs-1}f}\\)"
+
+        exponent = math.floor(math.log10(abs(value)))
+        mantissa = value / 10**exponent
+
+        # Round mantissa to specified significant figures
+        mantissa = round(mantissa, sig_figs - 1)
+
+        # Correct for rounding rollovers (e.g., 9.99 -> 10.0)
+        if abs(mantissa) >= 10.0:
+            mantissa /= 10.0
+            exponent += 1
+
+        mantissa_str = f"{{:.{sig_figs-1}f}}".format(mantissa)
+
+        if exponent == 0:
+            return f"\\({mantissa_str}\\)"
+        return f"\\({mantissa_str} \\times 10^{{{exponent}}}\\)"
+
+    def format_error_latex_sci(nominal, error):
+        """Formats a nominal ± error pair with a common exponent."""
+        if error == 0 or not math.isfinite(error) or not math.isfinite(nominal):
+            return format_single_latex_sci(nominal) + " \\pm 0"
+
+        # Determine the common exponent from the nominal value
+        exponent = math.floor(math.log10(abs(nominal))) if nominal != 0 else math.floor(math.log10(abs(error)))
+
+        # Rescale numbers to the common exponent
+        nominal_rescaled = nominal / (10**exponent)
+        error_rescaled = error / (10**exponent)
+
+        # Determine decimal places for rounding from the error's first significant digit
+        if error_rescaled == 0:
+             rounding_decimals = 1
+        else:
+             rounding_decimals = -math.floor(math.log10(abs(error_rescaled)))
+
+        # Round the rescaled numbers to the determined decimal place
+        nominal_rounded = round(nominal_rescaled, rounding_decimals)
+        error_rounded = round(error_rescaled, rounding_decimals)
+
+        fmt_str = f"{{:.{rounding_decimals}f}}"
+        nominal_str = fmt_str.format(nominal_rounded)
+        error_str = fmt_str.format(error_rounded)
+
+        if exponent == 0:
+            return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\)"
+        return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
+
+    # --- Main Function Logic ---
+    df_proc = df.copy()
+
+    def _generate_header_map(columns: list[str]) -> dict[str, str]:
+        symbol_map = {
+            "vmax": "V_p", "r0": "r_a", "sst": "T_s", "t0": "T_0",
+            "rmax": r"r_{\mathrm{max}}", "rh": r"\mathcal{H}_e",
+            "p": "p_a", "msl": "p_a", "years": "t"
+        }
+        unit_map = {
+            "vmax": r"\text{m s}^{-1}", "r0": "\text{km}", "sst": r"^{\circ}\text{C}",
+            "years": "\\text{yr}"
+        }
+        header_map = {}
+        for col in columns:
+            if col.startswith("rho_"):
+                parts = col.split('_')[1:]
+                symbols = [symbol_map.get(p, p) for p in parts]
+                header_map[col] = f"\\(\\rho({', '.join(symbols)})\\)"
+            elif col.startswith("fit_"):
+                parts = col.split('_')[1:]
+                dep_var, ind_var = parts[0], parts[1] if len(parts) > 1 else "years"
+                dep_sym, ind_sym = symbol_map.get(dep_var, dep_var), symbol_map.get(ind_var, ind_var)
+                dep_unit, ind_unit = unit_map.get(dep_var), unit_map.get(ind_var)
+                unit_str = f" [\\({dep_unit} {ind_unit}^{{-1}}\\)]" if dep_unit and ind_unit else ""
+                header_map[col] = f"\\(m({ind_sym}, {dep_sym})\\){unit_str}"
+        return header_map
+
+    header_map = _generate_header_map(list(df_proc.columns))
+    err_cols_to_drop = []
+
+    for col in df_proc.columns:
+        err_col = f"{col}_err"
+        if err_col in df_proc.columns:
+            df_proc[col] = df_proc.apply(
+                lambda row: format_error_latex_sci(row[col], row[err_col])
+                if pd.notnull(row[col]) and pd.notnull(row[err_col]) else "",
+                axis=1
+            )
+            err_cols_to_drop.append(err_col)
+        elif col in header_map:
+            df_proc[col] = df_proc[col].apply(
+                lambda x: format_single_latex_sci(x) if pd.notnull(x) else ""
+            )
+
+
+    df_proc.drop(columns=err_cols_to_drop, inplace=True)
+
+    final_order = [col for col in df.columns if not col.endswith('_err')]
+    df_proc.rename(columns=header_map, inplace=True)
+    final_renamed_order = [header_map.get(col, col) for col in final_order]
+    df_proc = df_proc[final_renamed_order]
+
+    col_format = "l" * len(df_proc.columns)
+    latex_str = df_proc.to_latex(
+        index=False, escape=False, header=True, column_format=col_format, caption=" "
+    )
+
+
+    return latex_str
 
 
 if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
     #
-    figure_two()
-    # temporal_relationship_data(place="new_orleans", pi_version=4)
+    # figure_two()
+    temporal_relationship_data(place="new_orleans", pi_version=4)
     # plot_seasonal_profiles()
     # years = [2015, 2100]
     # timeseries_plot(
