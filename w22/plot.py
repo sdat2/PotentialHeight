@@ -1,7 +1,7 @@
 """Plot the new potential size calculation results for PIPS chapter/paper"""
 
 import os
-from typing import List
+from typing import List, Tuple, Union
 import numpy as np
 import numpy.ma as ma
 import pandas as pd
@@ -466,6 +466,27 @@ def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     axs[1].set_title("Potential size, $r_a$ [km]")
     axs[0].set_xlabel("")
 
+def get_cmip6_timeseries(
+    place: str = "new_orleans",
+    pressure_assumption: str = "isothermal",
+    member: int = 4,
+    pi_version: int = 4,
+) -> xr.Dataset:
+    """Get the CMIP6 timeseries dataset for the given place and potential intensity version.
+
+    Args:
+        place (str): The place to get the timeseries for (default is "new_orleans").
+        pressure_assumption (str): The pressure assumption to use (default is "isothermal").
+        member (int): The ensemble member to use (default is 4).
+        pi_version (int): The potential intensity version to use (default is 4).
+    Returns:
+        xr.Dataset: The timeseries dataset.
+    """
+    return xr.concat(
+        [xr.open_dataset(
+        os.path.join(DATA_PATH, f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
+    ) for exp in ["historical", "ssp585"]], dim="time")
+
 
 def plot_two_timeseries(
     axs: np.ndarray,
@@ -475,6 +496,8 @@ def plot_two_timeseries(
     pressure_assumption: str = "isothermal",
     place: str = "new_orleans",
     pi_version: int = 4,
+    year_min: Union[int, str] = 2014,
+    year_max: Union[int, str] = 2100,
 ) -> None:
     """Plot the potential intensity and size timeseries for the point near New Orleans for different ensemble members.
 
@@ -487,58 +510,32 @@ def plot_two_timeseries(
     """
 
     assert len(axs) == 2
-    timeseries_ds = xr.concat(
-        [xr.open_dataset(
-        os.path.join(DATA_PATH, f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
-    ) for exp in ["historical", "ssp585"]], dim="time")
+    # put historical and ssp585 together
+    timeseries_ds = get_cmip6_timeseries(
+        place=place,
+        pressure_assumption=pressure_assumption,
+        member=member,
+        pi_version=pi_version,
+    )
     print("timeseries_ds", timeseries_ds)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
-    ## work out correlation between time and vmax between 2000 and 2099
-    year_min = str(2014)
-    year_max = str(2100)
-    ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
-    vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
-    r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
-    years = np.array(
-        [time.year for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values]
-    )
-    rho_vmax = safe_corr(vmaxs, years)
-    rho_r0 = safe_corr(r0s, years)
-    rho_sst = safe_corr(ssts, years)
-    rho_sst_vmax = safe_corr(ssts, vmaxs)
-    rho_sst_r0 = safe_corr(ssts, r0s)
-    print("rho_vmax_years", rho_vmax)
-    print("rho_r0_years", rho_r0)
-    print("rho_sst_vmax", rho_sst_vmax)
-    print("rho_sst_r0", rho_sst_r0)
-    print("rho_sst_years", rho_sst)
-    if text:
-        axs[0].text(0.75, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
-        axs[1].text(0.75, 0.9, f"$\\rho$ = {rho_r0:.2f}", transform=axs[1].transAxes)
 
-    # work out gradient with error bars for same period
-    fit_vmax = safe_grad(years, vmaxs)
-    fit_r0 = safe_grad(years, r0s / 1000)
-    fit_r0_sst = safe_grad(ssts, r0s / 1000)
-    print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
-    fit_vmax_sst = safe_grad(ssts, vmaxs)
-    print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
-
-    print("fit_vmax_years timeseries", fit_vmax, "m s$^{-1}$ yr$^{-1}$")
-    print("fit_r0_years timeseries", fit_r0, "km yr$^{-1}$")
 
     if text:
+        df = timeseries_relationships(timeseries_ds, place, member, year_min=str(year_min), year_max=str(year_max))
+        axs[0].text(0.75, 0.9, f"$\\rho$ = {df['rho_vmax']:.2f}", transform=axs[0].transAxes)
+        axs[1].text(0.75, 0.9, f"$\\rho$ = {df['rho_r0']:.2f}", transform=axs[1].transAxes)
         axs[0].text(
             0.60,
             0.05,
-            f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+            f"$m=$  " + "${:.1eL}$".format(ufloat(df['fit_vmax'], df['fit_vmax_err'])) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
             transform=axs[0].transAxes,
         )
         axs[1].text(
             0.60,
             0.1,
-            f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
+            f"$m=$" + "${:.2L}$".format(ufloat(df['fit_r0'], df['fit_r0_err'])) + " km yr$^{-1}$",
             transform=axs[1].transAxes,
         )
 
@@ -558,6 +555,24 @@ def plot_two_timeseries(
     axs[1].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
 
 
+def get_era5_timeseries(place: str = "new_orleans", pi_version: int = 4) -> xr.Dataset:
+    """Get the ERA5 timeseries dataset for the given place and potential intensity version.
+
+    Args:
+        place (str): The place to get the timeseries for (default is "new_orleans").
+        pi_version (int): The potential intensity version to use (default is 4).
+
+    Returns:
+        xr.Dataset: The timeseries dataset.
+    """
+    def _years_from_times(times: xr.DataArray) -> np.ndarray:
+        return times.astype('datetime64[Y]').astype(int) + 1970
+    timeseries_ds = xr.open_dataset(
+        os.path.join(DATA_PATH, f"{place}_august_era5_{'isothermal'}_pi{pi_version}new.nc")
+    )
+    return timeseries_ds.assign_coords(time=_years_from_times(timeseries_ds["time"].values))
+
+
 def plot_era5_timeseries(
     axs: np.ndarray,
     place: str = "new_orleans",
@@ -572,63 +587,66 @@ def plot_era5_timeseries(
         text (bool): Whether to add text to the plot (default is True).
         color (str): The color of the line (default is "black").
     """
-    def _years_from_times(times: xr.DataArray) -> np.ndarray:
-        return times.astype('datetime64[Y]').astype(int) + 1970
-
     assert len(axs) == 2
-    timeseries_ds = xr.open_dataset(
-        os.path.join(DATA_PATH, f"{place}_august_era5_{'isothermal'}_pi{pi_version}new.nc")
-    )
-    timeseries_ds = timeseries_ds.assign_coords(time=_years_from_times(timeseries_ds["time"].values))
+    timeseries_ds = get_era5_timeseries(place, pi_version)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
     ## work out correlation between time and vmax between 2000 and 2099
-    year_min = 2014
-    year_max = 2100
+    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"].values, color=color, linewidth=1)
+    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"].values / 1000, color=color, linewidth=1)
+
+
+def timeseries_relationships(
+    timeseries_ds: xr.Dataset,
+    place: str,
+    member: Union[int, str],
+    year_min: int = 2014,
+    year_max: int = 2100
+    ) -> pd.DataFrame:
+
     ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
     vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
     r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
     years = np.array(
-        [time for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values]
-    )
+            [time for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values]
+        )
+
     rho_vmax = safe_corr(vmaxs, years)
     rho_r0 = safe_corr(r0s, years)
     rho_sst = safe_corr(ssts, years)
     rho_sst_vmax = safe_corr(ssts, vmaxs)
     rho_sst_r0 = safe_corr(ssts, r0s)
-    print("rho_vmax_years", rho_vmax)
-    print("rho_r0_years", rho_r0)
-    print("rho_sst_vmax", rho_sst_vmax)
-    print("rho_sst_r0", rho_sst_r0)
-    print("rho_sst_years", rho_sst)
-    if text:
-        axs[0].text(0.75, 0.9, f"$\\rho$ = {rho_vmax:.2f}", transform=axs[0].transAxes)
-        axs[1].text(0.75, 0.9, f"$\\rho$  = {rho_r0:.2f}", transform=axs[1].transAxes)
 
     # work out gradient with error bars for same period
     fit_vmax = safe_grad(years, vmaxs)
     fit_r0 = safe_grad(years, r0s / 1000)
     fit_r0_sst = safe_grad(ssts, r0s / 1000)
-    print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
+
+    # print("fit_r0_sst timeseries", fit_r0_sst, "km $^{\circ}$C$^{-1}$")
     fit_vmax_sst = safe_grad(ssts, vmaxs)
-    print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
-    print("fit_vmax_years timeseries", fit_vmax, "m s$^{-1}$ yr$^{-1}$")
-    print("fit_r0_years timeseries", fit_r0, "km yr$^{-1}$")
-    if text:
-        axs[0].text(
-            0.60,
-            0.05,
-            f"$m=$  " + "${:.1eL}$".format(fit_vmax) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
-            transform=axs[0].transAxes,
-        )
-        axs[1].text(
-            0.60,
-            0.1,
-            f"$m=$" + "${:.2L}$".format(fit_r0) + " km yr$^{-1}$",
-            transform=axs[1].transAxes,
-        )
-    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"].values, color=color, linewidth=1)
-    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"].values / 1000, color=color, linewidth=1)
+    # print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
+    # print("fit_vmax_years timeseries", fit_vmax, "m s$^{-1}$ yr$^{-1}$")
+    # print("fit_r0_years timeseries", fit_r0, "km yr$^{-1}$")
+    df = pd.DataFrame({
+            "place": [place],
+            "member": member,
+            "year_min": [year_min],
+            "year_max": [year_max],
+            "rho_vmax": [rho_vmax],
+            "rho_r0": [rho_r0],
+            "rho_sst": [rho_sst],
+            "rho_sst_vmax": [rho_sst_vmax],
+            "rho_sst_r0": [rho_sst_r0],
+            "fit_vmax": [fit_vmax.n],
+            "fit_vmax_err": [fit_vmax.s],
+            "fit_r0": [fit_r0.n],
+            "fit_r0_err": [fit_r0.s],
+            "fit_r0_sst": [fit_r0_sst.n],
+            "fit_r0_sst_err": [fit_r0_sst.s],
+            "fit_vmax_sst": [fit_vmax_sst.n],
+            "fit_vmax_sst_err": [fit_vmax_sst.s],
+        })
+    return df
 
 
 def figure_two():
