@@ -769,10 +769,17 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     # msl -> p_a
     df.drop(columns=["place"], inplace=True)
 
-    df_str = dataframe_to_latex_table(df)
+    df_str = dataframe_to_latex_table(df[[col for col in df.columns if not col.startswith("fit_")]])
     print(df_str)
-    df_str
+    with open(os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}new.tex"), "w") as f:
+        f.write(df_str)
+    print("Saved temporal relationships data to LaTeX table.")
 
+    df_str = dataframe_to_latex_table(df[[col for col in df.columns if not col.startswith("rho_")]])
+    print(df_str)
+    with open(os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}new.tex"), "w") as f:
+        f.write(df_str)
+    print("Saved temporal relationships data to LaTeX table.")
 
 def dataframe_to_latex_table(df: pd.DataFrame) -> str:
     """
@@ -865,7 +872,7 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
         error_str = fmt_str.format(error_rounded)
 
         if exponent == 0:
-            return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\)"
+            return f"\\({nominal_str} \\pm {error_str}\\)"
         return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
 
     # --- Main Function Logic ---
@@ -878,7 +885,7 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
             "p": "p_a", "msl": "p_a", "years": "t"
         }
         unit_map = {
-            "vmax": r"\text{m s}^{-1}", "r0": "\text{km}", "sst": r"^{\circ}\text{C}",
+            "vmax": r"\text{m s}^{-1}", "r0": "\\text{km}", "sst": r"^{\circ}\text{C}",
             "years": "\\text{yr}"
         }
         header_map = {}
@@ -886,14 +893,20 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
             if col.startswith("rho_"):
                 parts = col.split('_')[1:]
                 symbols = [symbol_map.get(p, p) for p in parts]
+                if len(symbols) == 1:
+                    symbols.append("t")
                 header_map[col] = f"\\(\\rho({', '.join(symbols)})\\)"
             elif col.startswith("fit_"):
                 parts = col.split('_')[1:]
                 dep_var, ind_var = parts[0], parts[1] if len(parts) > 1 else "years"
                 dep_sym, ind_sym = symbol_map.get(dep_var, dep_var), symbol_map.get(ind_var, ind_var)
                 dep_unit, ind_unit = unit_map.get(dep_var), unit_map.get(ind_var)
-                unit_str = f" [\\({dep_unit} {ind_unit}^{{-1}}\\)]" if dep_unit and ind_unit else ""
+                unit_str = f" [\\({dep_unit} \;{ind_unit}^{{-1}}\\)]" if dep_unit and ind_unit else ""
                 header_map[col] = f"\\(m({ind_sym}, {dep_sym})\\){unit_str}"
+        header_map["member"] = "Member"
+        header_map["place"] = "Place"
+        header_map["year_min"] = "Start"
+        header_map["year_max"] = "End"
         return header_map
 
     header_map = _generate_header_map(list(df_proc.columns))
@@ -908,9 +921,9 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
                 axis=1
             )
             err_cols_to_drop.append(err_col)
-        elif col in header_map:
+        elif col in header_map and not col in ["place", "member", "year_min", "year_max"]:
             df_proc[col] = df_proc[col].apply(
-                lambda x: format_single_latex_sci(x) if pd.notnull(x) else ""
+                lambda x: f"{x:.2f}" if pd.notnull(x) else ""
             )
 
 
@@ -925,7 +938,6 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
     latex_str = df_proc.to_latex(
         index=False, escape=False, header=True, column_format=col_format, caption=" "
     )
-
 
     return latex_str
 
