@@ -466,6 +466,7 @@ def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     axs[1].set_title("Potential size, $r_a$ [km]")
     axs[0].set_xlabel("")
 
+
 def get_cmip6_timeseries(
     place: str = "new_orleans",
     pressure_assumption: str = "isothermal",
@@ -482,10 +483,15 @@ def get_cmip6_timeseries(
     Returns:
         xr.Dataset: The timeseries dataset.
     """
-    return xr.concat(
+    ds = xr.concat(
         [xr.open_dataset(
         os.path.join(DATA_PATH, f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
     ) for exp in ["historical", "ssp585"]], dim="time")
+    print("cmip6_ds", ds)
+
+    ds = ds.assign_coords(time=[t.year for t in ds["time"].values])
+    return ds
+
 
 
 def plot_two_timeseries(
@@ -521,9 +527,8 @@ def plot_two_timeseries(
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
 
-
     if text:
-        df = timeseries_relationships(timeseries_ds, place, member, year_min=str(year_min), year_max=str(year_max))
+        df = timeseries_relationships(timeseries_ds, place, member, year_min=year_min, year_max=year_max)
         axs[0].text(0.75, 0.9, f"$\\rho$ = {df['rho_vmax']:.2f}", transform=axs[0].transAxes)
         axs[1].text(0.75, 0.9, f"$\\rho$ = {df['rho_r0']:.2f}", transform=axs[1].transAxes)
         axs[0].text(
@@ -539,8 +544,8 @@ def plot_two_timeseries(
             transform=axs[1].transAxes,
         )
 
-    axs[0].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["vmax"], color=color, linewidth=0.5)
-    axs[1].plot([t.year for t in timeseries_ds["time"].values], timeseries_ds["r0"] / 1000, color=color, linewidth=0.5)
+    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"], color=color, linewidth=0.5)
+    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"] / 1000, color=color, linewidth=0.5)
     axs[0].set_xlabel("")
     axs[1].set_xlabel("Year")
 
@@ -576,7 +581,6 @@ def get_era5_timeseries(place: str = "new_orleans", pi_version: int = 4) -> xr.D
 def plot_era5_timeseries(
     axs: np.ndarray,
     place: str = "new_orleans",
-    text=True,
     color="black",
     pi_version: int = 4,
 ) -> None:
@@ -584,8 +588,9 @@ def plot_era5_timeseries(
 
     Args:
         axs (np.ndarray): The axes to plot on.
-        text (bool): Whether to add text to the plot (default is True).
         color (str): The color of the line (default is "black").
+        place (str): The place to plot (default is "new_orleans").
+        pi_version (int): The potential intensity version to use (default is 4).
     """
     assert len(axs) == 2
     timeseries_ds = get_era5_timeseries(place, pi_version)
@@ -649,7 +654,7 @@ def timeseries_relationships(
     return df
 
 
-def figure_two():
+def figure_two(place: str = "new_orleans") -> None:
     """Plot the solution for the GOM bbox for potential size and intensity.
 
     Then plot New Orleans timeseries.
@@ -663,23 +668,25 @@ def figure_two():
         height_ratios=[1, 1],
     )
     plot_two_spatial_gulf_of_mexico(axs[:, 0])
-    plot_two_timeseries(axs[:, 1], text=False, color="orange")
+    plot_two_timeseries(axs[:, 1], text=False, color="orange", place=place, member=4)
     plot_two_timeseries(
         axs[:, 1],
         text=False,
         color="orange",
         member=10,
+        place=place
     )
     plot_two_timeseries(
         axs[:, 1],
         text=False,
         color="orange",
+        place=place,
         member=11
     )
     plot_era5_timeseries(
         axs[:, 1],
-        text=False,
         color="blue",
+        place=place,
         pi_version=4,
     )
     label_subplots(axs)
@@ -688,10 +695,68 @@ def figure_two():
     plt.close()
 
 
+def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) -> None:
+    """Get the temporal relationships data for the given place and potential intensity version.
+
+    Args:
+        place (str): The place to get the data for (default is "new_orleans").
+        pi_version (int): The potential intensity version to use (default is 4).
+    """
+    df_l = []
+    for member in [4, 10, 11]:
+        timeseries_ds = get_cmip6_timeseries(place=place,member=member, pi_version=pi_version)
+        df_l.append(
+            timeseries_relationships(
+                timeseries_ds,
+                place=place,
+                member=member,
+                year_min=2014,
+                year_max=2100,
+            )
+        )
+        df_l.append(
+            timeseries_relationships(
+                timeseries_ds,
+                place=place,
+                member=member,
+                year_min=1980,
+                year_max=2024,
+            )
+        )
+    timeseries_ds = get_era5_timeseries(place=place, pi_version=pi_version)
+    df_l.append(
+        timeseries_relationships(
+            timeseries_ds,
+            place=place,
+            member="era5",
+            year_min=1980,
+            year_max=2024,
+        )
+    )
+    df_l.append(
+        timeseries_relationships(
+            timeseries_ds,
+            place=place,
+            member="era5",
+            year_min=1940,
+            year_max=2024,
+        )
+    )
+    df = pd.concat(df_l, ignore_index=True)
+    from .constants import DATA_PATH
+    df.to_csv(
+        os.path.join(DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}new.csv"),
+        index=False,
+    )
+    print("Saved temporal relationships data to CSV.")
+
+
 if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
+    #
     figure_two()
+    # temporal_relationship_data(place="new_orleans", pi_version=4)
     # plot_seasonal_profiles()
     # years = [2015, 2100]
     # timeseries_plot(
