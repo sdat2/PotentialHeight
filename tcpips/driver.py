@@ -18,6 +18,7 @@ from .constants import RAW_PATH, CDO_PATH, PI4_PATH, PS_PATH
 from .pi_driver import pi_cmip6_part
 from .ps_driver import ps_cmip6_part
 from .regrid_cdo import regrid_cmip6_part
+from .dask import dask_cluster_wrapper
 
 
 def loop_through_all() -> None:
@@ -37,4 +38,20 @@ def loop_through_all() -> None:
 
 if __name__ == "__main__":
     # python -m tcpips.driver
-    loop_through_all()
+    # loop_through_all()
+
+    for model in ["HADGEM3-GC31-MM"]:
+        for member in ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3", "r4i1p1f3"]:
+            for exp in ["ssp585", "historical"]:
+                for typ in ["ocean", "atmos"]:
+                    try:
+                        regrid_cmip6_part(exp=exp, typ=typ, model=model, member=member)
+                    except Exception as e:
+                        print(f"Error in regridding {exp} {typ} {model} {member}: {e}")
+                try:
+                    dask_cluster_wrapper(
+                        pi_cmip6_part, exp=exp, model=model, member=member
+                    )
+                except Exception as e:
+                    print(f"Error in potential intensity calculation {exp} {model} {member}: {e}")
+
