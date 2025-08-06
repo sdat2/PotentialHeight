@@ -10,6 +10,8 @@ Steps:
 
 
 In stages 1-2 The ouputs are stored in netcdf files, in stages 3-5 the outputs are stored in zarr format.
+
+Maybe it could be good to control this function with a config file, so we can specify which steps to run for which experiments and models.
 """
 from .files import get_task_dict, find_atmos_ocean_pairs
 from .constants import RAW_PATH, CDO_PATH, PI4_PATH, PS_PATH

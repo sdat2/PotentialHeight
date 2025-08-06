@@ -11,52 +11,85 @@ from .xr_utils import standard_name_to_long_name
 
 CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
 PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
+KAPPA: float = 0.286 # R/cp for dry air [dimensionless]
 
 
-def fix_temp_profile(ds: xr.Dataset, offset_temp_param: float = 1) -> xr.Dataset:
+def fix_temp_profile(
+    ds: xr.Dataset,
+    method: str = "lapse_rate",
+    max_temp_c: float = 100.0,
+) -> xr.Dataset:
     """
-    Fix the temperature profile in the dataset.
+    Fills missing values in a vertical temperature profile using a principled method.
 
-    Problem in calculating the potential intensity with incomplete temperature profiles.
-
-    At some places such as the Gulf of Tonkin and the Bay of Bengal, the mean sea level
-    pressure in CESM2 in August is low, leading to NaN values in the temperature profile
-    at the 1000 hPa level.
-
-    To fix this, we could assume an approximation that the temperature at these low levels
-    is equal to sea surface temperature minus one kelvin (a standard parameterization for near surface air temperature).
-
-    TODO: Make this only effect the bottom NaNs of the profile.
-    TODO: convert all very high values to NaN (i.e. if t > 300 C, set to NaN).
+    Methods:
+    1.  'interpolate': Fills internal NaNs using linear interpolation. Cannot fill
+        NaNs at the top or bottom of the profile.
+    2.  'lapse_rate': Fills NaNs at the bottom of the profile by extrapolating
+        downwards from the lowest valid data point using a dry adiabatic lapse rate.
+        This is ideal for fixing missing surface-level pressure data.
 
     Args:
-        ds (xr.Dataset): xarray dataset containing the necessary variables "t" and "sst".
-        offset_temp_param (float, optional): Temperature offset parameter. Defaults to 1.
+        ds (xr.Dataset): Xarray dataset containing temperature 't' with a
+                         vertical pressure coordinate 'p'.
+        method (str, optional): The method to use: 'interpolate' or 'lapse_rate'.
+                                Defaults to "lapse_rate".
+        max_temp_c (float, optional): Plausibility check. Temperatures above this
+                                      value (in Celsius) are set to NaN. Defaults to 100.0.
 
     Returns:
-        xr.Dataset: xarray dataset with fixed temperature profile.
+        xr.Dataset: Dataset with the temperature profile 't' filled.
 
     Example:
-        >>> ds = xr.Dataset(data_vars={"sst": (["x", "y"], [[1, 2], [3, 4]],
-        ...                                    {"units": "degrees_Celsius"}),
-        ...                            "t": (["x", "y", "p"],
-        ...                              [[[np.nan, 2], [3, 4]], [[5, 6], [np.nan, 8]]],
-        ...                              {"units": "degrees_Celsius"})},
-        ...                 coords={"x": (["x"], [-80, -85], {"units": "degrees_East"}),
-        ...                         "y": (["y"], [20, 25], {"units": "degrees_North"}),
-        ...                         "p": (["p"], [1000, 850], {"units": "hPa"})})
-        >>> ds_fixed = fix_temp_profile(ds, offset_temp_param=1)
-        >>> np.allclose(ds_fixed.isel(p=0).t.values, [[0, 3], [5, 3]])
-        True
+        >>> p_coords = [1000, 925, 850]
+        >>> t_data = [[[np.nan, 290, 285], [305, 298, 292]], # Profile 1 has NaN at bottom
+        ...           [[np.nan, np.nan, 280], [302, 296, 290]]] # Profile 2 has two NaNs at bottom
+        >>> ds = xr.Dataset(
+        ...     data_vars={
+        ...         "t": (("x", "y", "p"), t_data, {"units": "K"}),
+        ...     },
+        ...     coords={
+        ...         "p": (("p",), p_coords, {"units": "hPa"}),
+        ...         "x": (("x",), [1, 2]), "y": (("y",), [1, 2])
+        ...     },
+        ... )
+        >>> ds_fixed = fix_temp_profile(ds, method='lapse_rate')
+        >>> # For profile 1: T_ref=290K at p_ref=925hPa. T(1000) = 290 * (1000/925)**0.286
+        >>> expected_t1 = 290 * (1000/925)**KAPPA
+        >>> # For profile 2: T_ref=280K at p_ref=850hPa. T(1000) = 280 * (1000/850)**0.286 etc.
+        >>> expected_t2_925 = 280 * (925/850)**KAPPA
+        >>> expected_t2_1000 = 280 * (1000/850)**KAPPA
+        >>> np.testing.assert_almost_equal(ds_fixed.t.values[0, 0, 0], expected_t1, decimal=2)
+        >>> np.testing.assert_almost_equal(ds_fixed.t.values[1, 0, 1], expected_t2_925, decimal=2)
+        >>> np.testing.assert_almost_equal(ds_fixed.t.values[1, 0, 0], expected_t2_1000, decimal=2)
     """
-    # Fix the temperature profile (doesn't check how)
-    sea_level_temp = ds["sst"] - offset_temp_param
-    # make all implausibly high values NaN
-    # if air temperature > 300 C, set to NaN
-    ds["t"] = ds["t"].where(ds["t"] < 300, np.nan)
-    # fill in NaN values in the temperature profile with the sea level temperature
-    # If air temperature is NaN, set to sea level temperature
-    ds["t"] = ds["t"].where(ds["t"].notnull(), sea_level_temp)
+    ds["t"] = ds["t"].where(ds["t"] < (max_temp_c + 273.15), np.nan)
+
+    if ds.p.attrs.get("units", "hPa").lower() in ["pa", "pascal"]:
+        if ds.p.max() > 2000: # Heuristic check if already in Pa
+             p_hpa = ds.p / 100.0
+    else: # Assume hPa if not specified or specified otherwise
+        p_hpa = ds.p
+
+    if method == "interpolate":
+        # Note: This will not fill NaNs at the boundaries of the dimension
+        ds["t"] = ds["t"].interpolate_na(dim="p", method="linear")
+
+    elif method == "lapse_rate":
+        # Extrapolate downwards (from low pressure to high pressure)
+        # bfill finds the next valid observation along the dimension
+        t_ref = ds["t"].bfill(dim="p")
+        # Create a p_ref array that matches the t_ref values
+        p_ref = p_hpa.where(ds["t"].notnull()).bfill(dim="p")
+
+        # Where t was originally NaN, calculate the new temperature
+        # using the lapse rate formula from the reference level.
+        extrapolated_t = t_ref * (p_hpa / p_ref) ** KAPPA
+        ds["t"] = ds["t"].fillna(extrapolated_t)
+
+    else:
+        raise ValueError(f"Unknown method: {method}")
+
     return ds
 
 

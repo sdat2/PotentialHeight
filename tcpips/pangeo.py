@@ -254,12 +254,12 @@ def cmd_download_call() -> None:
     )
     parser.add_argument(
         "--institution_id",
-        default="THU",
+        default="MOHC",
         help="Institution id",
     )
     parser.add_argument(
         "--source_id",
-        default="CIESM",
+        default="UKESM1-0-LL",
         help="Source id",
     )
     parser.add_argument(

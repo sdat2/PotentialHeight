@@ -4,6 +4,7 @@ import os
 import xarray as xr
 from sithom.time import timeit
 from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
+from sithom.xr import mon_increase
 from tcpips.constants import PI2_PATH, PI3_PATH, PI4_PATH
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
@@ -45,7 +46,7 @@ def ex_data_path(pi_version=2, member: int = 4) -> str:
 
 @timeit
 def trimmed_cmip6_example(
-    pressure_assumption="isothermal", trial=1, pi_version=2
+    pressure_assumption="isothermal", trial=1, pi_version=2, place="new_orleans",
 ) -> None:
     """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
 
@@ -56,11 +57,26 @@ def trimmed_cmip6_example(
     # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
-    in_ds = xr.open_dataset(ex_data_path(pi_version=pi_version, member=4)).isel(
-        lat=slice(215, 245),
-        lon=slice(160, 205),
+    in_ds = mon_increase(xr.open_dataset(ex_data_path(pi_version=pi_version, member=4)), x_dim='lon', y_dim='lat').isel(
+        #lat=slice(215, 245),
+        #lon=slice(160, 205),
         time=7,  # slice(0, 12) # just august 2015
+
     )
+    if place in ["new_orleans", "galverston", "miami"]:
+        in_ds = in_ds.sel(
+            lon=slice(-100, -73),
+            lat=slice(17.5, 32.5),
+            # method="nearest"
+            ).compute()
+    elif place in ["shanghai", "hong_kong", "hanoi"]:
+        in_ds = in_ds.sel(
+            lon=slice(100, 130),
+            lat=slice(17.5, 32.5),
+            # method="nearest"
+        ).compute()
+    else:
+        raise ValueError("place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi")
     print("trimmed input data", in_ds)
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
@@ -69,12 +85,20 @@ def trimmed_cmip6_example(
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
+
     out_ds = parallelized_ps(in_ds, jobs=20)
+    name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
+
+    if place in ["new_orleans", "galverston", "miami"]:
+        name = "gom_" + name
+    if place in ["shanghai", "hong_kong", "hanoi"]:
+        name = "scs_" + name
+
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"potential_size_gom_august_{pressure_assumption}_trial_{trial}_pi{pi_version}new.nc",
+            name,
         )
     )
 
@@ -305,13 +329,38 @@ if __name__ == "__main__":
     # point_timeseries(4, "new_orleans", pi_version=4)
     # point_timeseries(10, "new_orleans", pi_version=4)
     # point_timeseries(11, "new_orleans", pi_version=4)
-    point_era5_timeseries(
-        place="new_orleans", pressure_assumption="isothermal"
+
+    def data_for_place(place: str, pressure_assumption: str = "isothermal") -> None:
+        """Run point timeseries for a specific place.
+
+        Args:
+            place (str): place to run for.
+            pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
+        """
+        print(f"Running point timeseries for {place} with pressure assumption {pressure_assumption}")
+        for i in [4, 10, 11]:
+            point_timeseries(
+                member=i,
+                place=place,
+                pressure_assumption=pressure_assumption,
+                pi_version=4,
+            )
+        point_era5_timeseries(
+            place=place, pressure_assumption=pressure_assumption
         )
+
+    # data_for_place("hong_kong")
+    # trimmed_cmip6_example(
+    #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"
+    # )
+
+    trimmed_cmip6_example( trial=1, pi_version=4, place="hong_kong"
+    )
+
     # for i in [4, 10, 11]:
     #     for exp in ["historical", "ssp585"]:
     #         point_timeseries(member=i, place="new_orleans", pi_version=4, exp=exp)
-        # point_timeseries(member=i, place="new_orleans", pi_version=4, exp="historical")
+    # point_timeseries(member=i, place="new_orleans", pi_version=4, exp="historical")
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 1)"
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 1)"
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 2)"

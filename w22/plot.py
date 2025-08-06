@@ -100,7 +100,7 @@ def safe_corr(xt: np.ndarray, yt: np.ndarray) -> float:
     return corr[0, 1]
 
 
-def _float_to_latex(x, precision=2):
+def _float_to_latex(x: float, precision: int =2):
     """
     Convert a float x to a LaTeX-formatted string with the given number of significant figures.
 
@@ -384,7 +384,7 @@ def plot_seasonal_profiles():
     plt.close()
 
 
-def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
+def plot_two_spatial(axs: np.ndarray, place: str = "new_orleans", pi_version: int = 4, trial = 1, pressure_assumption="isothermal") -> None:
     """
     Plot the potential intensity and size for the Gulf of Mexico area.
 
@@ -393,8 +393,16 @@ def plot_two_spatial_gulf_of_mexico(axs: np.ndarray) -> None:
     """
     assert len(axs) == 2
     plot_defaults()
+
+    name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
+
+    if place in ["new_orleans", "galverston", "miami"]:
+        name = "gom_" + name
+    if place in ["shanghai", "hong_kong", "hanoi"]:
+        name = "scs_" + name
+
     ds = xr.open_dataset(
-        os.path.join(DATA_PATH, "potential_size_gom_august_isothermal_trial_2_pi4new.nc")
+        os.path.join(DATA_PATH, name)
     )
     # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
@@ -668,7 +676,7 @@ def figure_two(place: str = "new_orleans") -> None:
         width_ratios=[1, 1.5],
         height_ratios=[1, 1],
     )
-    plot_two_spatial_gulf_of_mexico(axs[:, 0])
+    plot_two_spatial(axs[:, 0], place=place)
     plot_two_timeseries(axs[:, 1], text=False, color="orange", place=place, member=4)
     plot_two_timeseries(
         axs[:, 1],
@@ -691,7 +699,11 @@ def figure_two(place: str = "new_orleans") -> None:
         pi_version=4,
     )
     label_subplots(axs)
-    plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))
+    if place == "new_orleans":
+        plt.savefig(os.path.join(FIGURE_PATH, "figure_two.pdf"))
+    else:
+        plt.savefig(os.path.join(FIGURE_PATH, f"figure_two_{place}.pdf"))
+
     plt.clf()
     plt.close()
 
@@ -769,6 +781,7 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     # msl -> p_a
     df.drop(columns=["place"], inplace=True)
 
+    # data frame was getting too large for latex table, so splitting into correlations and fits
     df_str = dataframe_to_latex_table(df[[col for col in df.columns if not col.startswith("fit_")]])
     print(df_str)
     with open(os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}new.tex"), "w") as f:
@@ -780,6 +793,7 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     with open(os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}new.tex"), "w") as f:
         f.write(df_str)
     print("Saved temporal relationships data to LaTeX table.")
+
 
 def dataframe_to_latex_table(df: pd.DataFrame) -> str:
     """
@@ -946,8 +960,8 @@ if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
     #
-    # figure_two()
-    temporal_relationship_data(place="new_orleans", pi_version=4)
+    figure_two(place="hong_kong")
+    # temporal_relationship_data(place="new_orleans", pi_version=4)
     # plot_seasonal_profiles()
     # years = [2015, 2100]
     # timeseries_plot(

@@ -15,6 +15,9 @@ def dask_cluster_wrapper(
     A wrapper to run a function on a Dask cluster.
     This is useful for running functions that take a long time to compute
     and can be parallelized across multiple workers.
+
+    I think this only works as long as you use it in the 'if __name__ == "__main__":' part of the script.
+    Not really sure.
     """
     tick = time.perf_counter()
     cluster = LocalCluster()  # n_workers=10, threads_per_worker=1)
@@ -27,5 +30,5 @@ def dask_cluster_wrapper(
     cluster.close()  # Also a good idea to close the cluster
     tock = time.perf_counter()
     print(
-        f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {hr_time(tock-tick)} seconds."
+        f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {hr_time(tock-tick)} seconds using a dask cluster."
     )

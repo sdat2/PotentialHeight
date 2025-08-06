@@ -25,6 +25,9 @@
         "**/.DS_Store": true,
         "**/__pycache__": true,
         "**/**/*.pyc": true,
+        "._*": true,
+        "*._*": true,
+        "._.DS_Store": true,
     },
     // PYTHON SETTINGS
     // Python interpreter
