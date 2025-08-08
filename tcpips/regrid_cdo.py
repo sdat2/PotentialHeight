@@ -28,11 +28,12 @@ def call_cdo(input_path: str, output_path: str) -> None:
     os.system(f"ncdump -h {input_path}")
     # delete the misnamed coordinates (xmip's fault?)
     os.system(
-        f"ncks -O -4 -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies   {input_path} {output_path+'.tmp'}"
+        f"ncks -O -4 -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies,dcpp_init_year,member_id   {input_path} {output_path+'.tmp'}"
     )
-    # relabel the standard names for lat and lon
+    # relabel the standard names for lat and lon so that CDO can undertand them
     os.system(
-        f"ncatted -O -a standard_name,lat,o,c,'latitude' -a standard_name,lon,o,c,'longitude' {output_path+'.tmp'}")
+        f"ncatted -O -a standard_name,lat,o,c,'latitude' -a standard_name,lon,o,c,'longitude' {output_path+'.tmp'}"
+    )
 
     if "atmos" in input_path:
         typ = "atmos"
@@ -48,27 +49,30 @@ def call_cdo(input_path: str, output_path: str) -> None:
 
     # remap bilinearly using cdo in silent mode
     if typ == "atmos" and model == "HADGEM3-GC31-MM":
-        os.system(
-            f"ncatted -O -a coordinates,hus,d,, {output_path+'.tmp'}"
-        )
-        os.system(f"ncatted -O -a coordinates,hus,m,c,'lat lon' output_path+'.tmp'")
-        os.system(f"ncatted -O -a coordinates,hus,m,c,'lat lon' {output_path+'.tmp'}")
-                # Fix time_bnds mismatch
+        # os.system(f"ncatted -O -a coordinates,hus,d,, {output_path+'.tmp'}")
+        os.system(f"ncatted -O -a coordinates,hus,m,s,'lat lon' {output_path+'.tmp'}")
+        os.system(f"ncatted -O -a coordinates,hurs,m,s,'lat lon' {output_path+'.tmp'}")
+        os.system(f"ncatted -O -a coordinates,psl,m,s,'lat lon' {output_path+'.tmp'}")
+        os.system(f"ncatted -O -a coordinates,ta,m,s,'lat lon' {output_path+'.tmp'}")
+        os.system(f"ncatted -O -a coordinates,tos,m,s,'lat lon' {output_path+'.tmp'}")
+        # Fix time_bnds mismatch
         os.system(f"ncks -O -v time_bnds {output_path+'.tmp'}")
     elif typ == "ocean" and model == "HADGEM3-GC31-MM":
         #    # Remove broken coordinates attributes on tos
         # ncatted -O -a coordinates,tos,d,, file.nc
-        os.system(f"ncatted -O -a coordinates,tos,d,, {output_path+'.tmp'}")
+        # os.system(f"ncatted -O -a coordinates,tos,d,, {output_path+'.tmp'}")
         # # Point lat/lon bounds to actual vars or remove
+        os.system(f"ncatted -O -a coordinates,tos,m,s,'lat lon' {output_path+'.tmp'}")
         # ncatted -O -a bounds,lat,d,, file.nc
-        os.system(f"ncatted -O -a bounds,lat,d,, {output_path+'.tmp'}")
-        # ncatted -O -a bounds,lon,d,, file.nc
-        os.system(f"ncatted -O -a bounds,lon,d,, {output_path+'.tmp'}")
+        # os.system(f"ncatted -O -a bounds,lat,d,, {output_path+'.tmp'}")
+        # # ncatted -O -a bounds,lon,d,, file.nc
+        # os.system(f"ncatted -O -a bounds,lon,d,, {output_path+'.tmp'}")
 
         # # If you want bounds to exist, rename the *_verticies vars to *_vertices and update bounds attrs
         # ncrename -O -v lat_verticies,lat_vertices -v lon_verticies,lon_vertices file.nc
     print("About to regrid processed file with CDO")
     os.system(f"ncdump -h {output_path+'.tmp'}")
+
     os.system(
         f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt -setgrid,{output_path+'.tmp'} {output_path+'.tmp'} {output_path}"
     )
