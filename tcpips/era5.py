@@ -137,20 +137,6 @@ def plot_var_on_map(
 
             plt.rcParams["hatch.linewidth"] = 0.4  # Default is 1.0
             plt.rcParams["hatch.color"] = "gray"  # Default is black
-            # plot the hatch mask
-            # hatch_mask.plot(
-            #     ax=ax,
-            #     x="longitude",
-            #     y="latitude",
-            #     add_colorbar=False,
-            #     transform=ccrs.PlateCarree(),
-            #     rasterized=True,
-            #     hatch=".",
-            #     alpha=0.3,
-            #     color="none",
-            #     edgecolor="gray",
-            #     # z_order=1,
-            # )
             if np.all(hatch_mask.astype(int).values == 1):
                 warning = "All values in the hatch mask are True (1)."
                 print(warning)
