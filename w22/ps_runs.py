@@ -1,11 +1,14 @@
 """Run potential size calculations on CMIP6 data to make specific subsets (very expensive computation)."""
 
 import os
+from typing import Union
 import xarray as xr
 from sithom.time import timeit
 from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
 from sithom.xr import mon_increase
-from tcpips.constants import PI2_PATH, PI3_PATH, PI4_PATH
+from tcpips.constants import PI2_PATH, PI3_PATH, PI4_PATH, CDO_PATH
+from tcpips.pi import calculate_pi
+from tcpips.convert import convert
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
 from .ps import parallelized_ps
@@ -46,7 +49,10 @@ def ex_data_path(pi_version=2, member: int = 4) -> str:
 
 @timeit
 def trimmed_cmip6_example(
-    pressure_assumption="isothermal", trial=1, pi_version=2, place="new_orleans",
+    pressure_assumption="isothermal",
+    trial=1,
+    pi_version=2,
+    place="new_orleans",
 ) -> None:
     """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
 
@@ -57,18 +63,21 @@ def trimmed_cmip6_example(
     # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
-    in_ds = mon_increase(xr.open_dataset(ex_data_path(pi_version=pi_version, member=4)), x_dim='lon', y_dim='lat').isel(
-        #lat=slice(215, 245),
-        #lon=slice(160, 205),
+    in_ds = mon_increase(
+        xr.open_dataset(ex_data_path(pi_version=pi_version, member=4)),
+        x_dim="lon",
+        y_dim="lat",
+    ).isel(
+        # lat=slice(215, 245),
+        # lon=slice(160, 205),
         time=7,  # slice(0, 12) # just august 2015
-
     )
     if place in ["new_orleans", "galverston", "miami"]:
         in_ds = in_ds.sel(
             lon=slice(-100, -73),
             lat=slice(17.5, 32.5),
             # method="nearest"
-            ).compute()
+        ).compute()
     elif place in ["shanghai", "hong_kong", "hanoi"]:
         in_ds = in_ds.sel(
             lon=slice(100, 130),
@@ -76,7 +85,9 @@ def trimmed_cmip6_example(
             # method="nearest"
         ).compute()
     else:
-        raise ValueError("place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi")
+        raise ValueError(
+            "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
+        )
     print("trimmed input data", in_ds)
     rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
     in_ds["rh"] = rh
@@ -227,7 +238,9 @@ def load_global(year: int = 2015) -> xr.Dataset:
 
 
 def point_timeseries(
-    member: int = 10,
+    member: Union[int, str] = 10,
+    model: str = "CESM2",
+    recalculate_pi: bool = True,
     exp: str = "ssp585",
     place: str = "new_orleans",
     pressure_assumption="isothermal",
@@ -238,42 +251,100 @@ def point_timeseries(
 
     Args:
         member (int, optional): member number. Defaults to 10.
+        model (str, optional): model name. Defaults to "CESM2".
+        recalculate_pi (bool, optional): whether to recalculate pi. Defaults to True.
+        exp (str, optional): experiment name. Defaults to "ssp585".
+        pi_version (int, optional): pi version. Defaults to 3.xxeexexe
         place (str, optional): location. Defaults to "new_orleans".
         pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
     """
-    if pi_version == 2:
-        file_name = os.path.join(PI2_PATH, exp, "CESM2", f"r{member}i1p1f1.zarr")
-    elif pi_version == 3:
-        file_name = os.path.join(PI3_PATH, exp, "CESM2", f"r{member}i1p1f1.zarr")
-    elif pi_version == 4:
-        file_name = os.path.join(PI4_PATH, exp, "CESM2", f"r{member}i1p1f1.zarr")
+    if isinstance(member, int):
+        member = f"r{member}i1p1f1"
+    if recalculate_pi:
+        file_names = [
+            os.path.join(CDO_PATH, exp, typ, model, f"{member}.nc")
+            for typ in ["ocean", "atmos"]
+        ]
+
+        ds_list = [
+            xr.open_mfdataset(
+                file_name,
+            )
+            .sel(
+                lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"] - 0.5,
+                method="nearest",
+            )
+            .compute()
+            .drop_vars(
+                ["time_bounds"],
+            )
+            for file_name in file_names
+        ]
+        print("ds_list", ds_list)
+        ds = xr.merge(ds_list)
+        print("merged ds", ds)
+        ds = convert(ds)
+        print("converted ds", ds)
+
+        # print("point ds intial:", ds)
+        pi_ds = calculate_pi(
+            ds,
+            dim="p",
+        )
+        print("pi ds", pi_ds)
+        trimmed_ds = pi_ds[["vmax", "t0"]]
+        trimmed_ds["rh"] = ds["rh"] / 100  # convert to dimensionless
+        trimmed_ds["rh"].attrs["units"] = "dimensionless"
+        trimmed_ds["sst"] = ds["sst"]
+        trimmed_ds["msl"] = ds["msl"]
+
+        # trimmed_ds["rh"] = qtp2rh(pi_ds["q"], pi_ds["t"], pi_ds["msl"])
+
     else:
-        raise ValueError("pi_version must be 2, 3, or 4")
-    point_ds = xr.open_zarr(file_name).sel(
-        lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-        lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
-        method="nearest",
-    )
-    print("point ds", point_ds)
-    rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
-    trimmed_ds = point_ds[["sst", "msl", "vmax", "t0"]]
-    trimmed_ds["rh"] = rh
-    if pi_version == 2:
-        # accidentally added in V_reduc for vmax calculation before
-        trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
+        if pi_version == 2:
+            file_name = os.path.join(PI2_PATH, exp, model, f"{member}.zarr")
+        elif pi_version == 3:
+            file_name = os.path.join(PI3_PATH, exp, model, f"{member}.zarr")
+        elif pi_version == 4:
+            file_name = os.path.join(PI4_PATH, exp, model, f"{member}.zarr")
+        else:
+            raise ValueError("pi_version must be 2, 3, or 4")
+        point_ds = (
+            xr.open_zarr(file_name)
+            .sel(
+                lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
+                method="nearest",
+            )
+            .compute()
+        )
+        print("point ds", point_ds)
+        if "rh" not in point_ds:
+            point_ds["rh"] = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
+            rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
+            trimmed_ds["rh"] = rh
+            trimmed_ds = point_ds[["sst", "msl", "vmax", "t0", "rh"]]
+
+        if pi_version == 2:
+            # accidentally added in V_reduc for vmax calculation before
+            trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
 
     print("trimmed", trimmed_ds)
     # select august data from every year of timeseries xarray
     trimmed_ds = trimmed_ds.isel(
         time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
+    )  # it could be better to use a month selector here
+    out_ds = parallelized_ps(
+        trimmed_ds, jobs=25, pressure_assumption=pressure_assumption
     )
-    out_ds = parallelized_ps(trimmed_ds, jobs=25)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc",
+            f"{place}_august_{exp}_{model}_{member}_{pressure_assumption}_pi{pi_version}new.nc",
         )
     )
+
 
 def point_era5_timeseries(
     place: str = "new_orleans",
@@ -286,12 +357,18 @@ def point_era5_timeseries(
         place (str, optional): location. Defaults to "new_orleans".
         pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
     """
-    point_ds = get_all_regridded_data(start_year=1940, end_year=2024,
-    ).sel(
-        lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-        lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"] -0.5,
-        method="nearest",
-    ).compute()
+    point_ds = (
+        get_all_regridded_data(
+            start_year=1940,
+            end_year=2024,
+        )
+        .sel(
+            lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+            lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"] - 0.5,
+            method="nearest",
+        )
+        .compute()
+    )
     print("point ds era5", point_ds)
     point_ds = point_ds.rename({"pressure_level": "p"})
     print("point ds", point_ds)
@@ -337,25 +414,36 @@ if __name__ == "__main__":
             place (str): place to run for.
             pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
         """
-        print(f"Running point timeseries for {place} with pressure assumption {pressure_assumption}")
-        for i in [4, 10, 11]:
+        print(
+            f"Running point timeseries for {place} with pressure assumption {pressure_assumption}"
+        )
+        # CESM2
+        # for i in [4, 10, 11]:
+        #     point_timeseries(
+        #         member=i,
+        #         place=place,
+        #         pressure_assumption=pressure_assumption,
+        #         pi_version=4,
+        #     )
+        # HadGEM3-GC31-MM
+        for i in [1, 2, 3]:
             point_timeseries(
-                member=i,
+                member="r" + str(i) + "i1p1f3",
                 place=place,
                 pressure_assumption=pressure_assumption,
+                model="HADGEM3-GC31-MM",
                 pi_version=4,
+                recalculate_pi=True,
             )
-        point_era5_timeseries(
-            place=place, pressure_assumption=pressure_assumption
-        )
+        # point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
 
+    data_for_place("new_orleans")
     # data_for_place("hong_kong")
     # trimmed_cmip6_example(
     #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"
     # )
 
-    trimmed_cmip6_example( trial=1, pi_version=4, place="hong_kong"
-    )
+    # trimmed_cmip6_example(trial=1, pi_version=4, place="hong_kong")
 
     # for i in [4, 10, 11]:
     #     for exp in ["historical", "ssp585"]:
