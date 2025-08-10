@@ -1,7 +1,7 @@
 """Plot the new potential size calculation results for PIPS chapter/paper"""
 
 import os
-from typing import List
+from typing import List, Union
 import math
 import numpy as np
 import numpy.ma as ma
@@ -100,7 +100,7 @@ def safe_corr(xt: np.ndarray, yt: np.ndarray) -> float:
     return corr[0, 1]
 
 
-def _float_to_latex(x: float, precision: int =2):
+def _float_to_latex(x: float, precision: int = 2):
     """
     Convert a float x to a LaTeX-formatted string with the given number of significant figures.
 
@@ -384,7 +384,13 @@ def plot_seasonal_profiles():
     plt.close()
 
 
-def plot_two_spatial(axs: np.ndarray, place: str = "new_orleans", pi_version: int = 4, trial = 1, pressure_assumption="isothermal") -> None:
+def plot_two_spatial(
+    axs: np.ndarray,
+    place: str = "new_orleans",
+    pi_version: int = 4,
+    trial=1,
+    pressure_assumption="isothermal",
+) -> None:
     """
     Plot the potential intensity and size for the Gulf of Mexico area.
 
@@ -401,9 +407,7 @@ def plot_two_spatial(axs: np.ndarray, place: str = "new_orleans", pi_version: in
     if place in ["shanghai", "hong_kong", "hanoi"]:
         name = "scs_" + name
 
-    ds = xr.open_dataset(
-        os.path.join(DATA_PATH, name)
-    )
+    ds = xr.open_dataset(os.path.join(DATA_PATH, name))
     # print("ds", ds)
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
     ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
@@ -479,7 +483,8 @@ def plot_two_spatial(axs: np.ndarray, place: str = "new_orleans", pi_version: in
 def get_cmip6_timeseries(
     place: str = "new_orleans",
     pressure_assumption: str = "isothermal",
-    member: int = 4,
+    model: str = "CESM2",
+    member: Union[int, str] = 4,
     pi_version: int = 4,
 ) -> xr.Dataset:
     """Get the CMIP6 timeseries dataset for the given place and potential intensity version.
@@ -492,15 +497,24 @@ def get_cmip6_timeseries(
     Returns:
         xr.Dataset: The timeseries dataset.
     """
+    if isinstance(member, int):
+        member = f"r{member}i1p1f1"
     ds = xr.concat(
-        [xr.open_dataset(
-        os.path.join(DATA_PATH, f"{place}_august_{exp}_r{member}i1p1f1_{pressure_assumption}_pi{pi_version}new.nc")
-    ) for exp in ["historical", "ssp585"]], dim="time")
+        [
+            xr.open_dataset(
+                os.path.join(
+                    DATA_PATH,
+                    f"{place}_august_{exp}_{model}_{member}_{pressure_assumption}_pi{pi_version}new.nc",
+                )
+            )
+            for exp in ["historical", "ssp585"]
+        ],
+        dim="time",
+    )
     print("cmip6_ds", ds)
 
     ds = ds.assign_coords(time=[t.year for t in ds["time"].values])
     return ds
-
 
 
 def plot_two_timeseries(
@@ -537,33 +551,50 @@ def plot_two_timeseries(
     axs[1].set_title("Potential size, $r_a$ [km]")
 
     if text:
-        df = timeseries_relationships(timeseries_ds, place, member, year_min=year_min, year_max=year_max)
-        axs[0].text(0.75, 0.9, f"$\\rho$ = {df['rho_vmax']:.2f}", transform=axs[0].transAxes)
-        axs[1].text(0.75, 0.9, f"$\\rho$ = {df['rho_r0']:.2f}", transform=axs[1].transAxes)
+        df = timeseries_relationships(
+            timeseries_ds, place, member, year_min=year_min, year_max=year_max
+        )
+        axs[0].text(
+            0.75, 0.9, f"$\\rho$ = {df['rho_vmax']:.2f}", transform=axs[0].transAxes
+        )
+        axs[1].text(
+            0.75, 0.9, f"$\\rho$ = {df['rho_r0']:.2f}", transform=axs[1].transAxes
+        )
         axs[0].text(
             0.60,
             0.05,
-            f"$m=$  " + "${:.1eL}$".format(ufloat(df['fit_vmax'], df['fit_vmax_err'])) + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
+            f"$m=$  "
+            + "${:.1eL}$".format(ufloat(df["fit_vmax"], df["fit_vmax_err"]))
+            + "\n \t\t\t m s$^{-1}$ yr$^{-1}$",
             transform=axs[0].transAxes,
         )
         axs[1].text(
             0.60,
             0.1,
-            f"$m=$" + "${:.2L}$".format(ufloat(df['fit_r0'], df['fit_r0_err'])) + " km yr$^{-1}$",
+            f"$m=$"
+            + "${:.2L}$".format(ufloat(df["fit_r0"], df["fit_r0_err"]))
+            + " km yr$^{-1}$",
             transform=axs[1].transAxes,
         )
 
-    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"], color=color, linewidth=0.5)
-    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"] / 1000, color=color, linewidth=0.5)
+    axs[0].plot(
+        timeseries_ds["time"].values, timeseries_ds["vmax"], color=color, linewidth=0.5
+    )
+    axs[1].plot(
+        timeseries_ds["time"].values,
+        timeseries_ds["r0"] / 1000,
+        color=color,
+        linewidth=0.5,
+    )
     axs[0].set_xlabel("")
     axs[1].set_xlabel("Year")
 
     axs[0].set_xlim([1850, 2100])
     axs[1].set_xlim([1850, 2100])
-    #axs[0].set_xticks(np.arange(1850, 2101, 10))
-    #axs[0].set_xticklabels(["" for _ in range(10)])
-    #axs[1].set_xticks(np.arange(1850, 2101, 10))
-    #axs[1].set_xticklabels(np.arange(1850, 2101, 10).astype(str))
+    # axs[0].set_xticks(np.arange(1850, 2101, 10))
+    # axs[0].set_xticklabels(["" for _ in range(10)])
+    # axs[1].set_xticks(np.arange(1850, 2101, 10))
+    # axs[1].set_xticklabels(np.arange(1850, 2101, 10).astype(str))
     # vertical black line at year_min
     axs[0].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
     axs[1].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
@@ -579,12 +610,18 @@ def get_era5_timeseries(place: str = "new_orleans", pi_version: int = 4) -> xr.D
     Returns:
         xr.Dataset: The timeseries dataset.
     """
+
     def _years_from_times(times: xr.DataArray) -> np.ndarray:
-        return times.astype('datetime64[Y]').astype(int) + 1970
+        return times.astype("datetime64[Y]").astype(int) + 1970
+
     timeseries_ds = xr.open_dataset(
-        os.path.join(DATA_PATH, f"{place}_august_era5_{'isothermal'}_pi{pi_version}new.nc")
+        os.path.join(
+            DATA_PATH, f"{place}_august_era5_{'isothermal'}_pi{pi_version}new.nc"
+        )
     )
-    return timeseries_ds.assign_coords(time=_years_from_times(timeseries_ds["time"].values))
+    return timeseries_ds.assign_coords(
+        time=_years_from_times(timeseries_ds["time"].values)
+    )
 
 
 def plot_era5_timeseries(
@@ -606,8 +643,18 @@ def plot_era5_timeseries(
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
     ## work out correlation between time and vmax between 2000 and 2099
-    axs[0].plot(timeseries_ds["time"].values, timeseries_ds["vmax"].values, color=color, linewidth=1)
-    axs[1].plot(timeseries_ds["time"].values, timeseries_ds["r0"].values / 1000, color=color, linewidth=1)
+    axs[0].plot(
+        timeseries_ds["time"].values,
+        timeseries_ds["vmax"].values,
+        color=color,
+        linewidth=1,
+    )
+    axs[1].plot(
+        timeseries_ds["time"].values,
+        timeseries_ds["r0"].values / 1000,
+        color=color,
+        linewidth=1,
+    )
 
 
 def timeseries_relationships(
@@ -615,15 +662,18 @@ def timeseries_relationships(
     place: str,
     member: int,
     year_min: int = 2014,
-    year_max: int = 2100
-    ) -> pd.DataFrame:
+    year_max: int = 2100,
+) -> pd.DataFrame:
 
     ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
     vmaxs = timeseries_ds["vmax"].sel(time=slice(year_min, year_max)).values
     r0s = timeseries_ds["r0"].sel(time=slice(year_min, year_max)).values
     years = np.array(
-            [time for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values]
-        )
+        [
+            time
+            for time in timeseries_ds["time"].sel(time=slice(year_min, year_max)).values
+        ]
+    )
 
     rho_vmax = safe_corr(vmaxs, years)
     rho_r0 = safe_corr(r0s, years)
@@ -641,7 +691,8 @@ def timeseries_relationships(
     # print("fit_vmax_sst timeseries", fit_vmax_sst, "m s$^{-1}$C$ ^{-1}$")
     # print("fit_vmax_years timeseries", fit_vmax, "m s$^{-1}$ yr$^{-1}$")
     # print("fit_r0_years timeseries", fit_r0, "km yr$^{-1}$")
-    df = pd.DataFrame({
+    df = pd.DataFrame(
+        {
             "place": [place],
             "member": member,
             "year_min": [year_min],
@@ -659,7 +710,8 @@ def timeseries_relationships(
             "fit_r0_sst_err": [fit_r0_sst.s],
             "fit_vmax_sst": [fit_vmax_sst.n],
             "fit_vmax_sst_err": [fit_vmax_sst.s],
-        })
+        }
+    )
     return df
 
 
@@ -678,20 +730,8 @@ def figure_two(place: str = "new_orleans") -> None:
     )
     plot_two_spatial(axs[:, 0], place=place)
     plot_two_timeseries(axs[:, 1], text=False, color="orange", place=place, member=4)
-    plot_two_timeseries(
-        axs[:, 1],
-        text=False,
-        color="orange",
-        member=10,
-        place=place
-    )
-    plot_two_timeseries(
-        axs[:, 1],
-        text=False,
-        color="orange",
-        place=place,
-        member=11
-    )
+    plot_two_timeseries(axs[:, 1], text=False, color="orange", member=10, place=place)
+    plot_two_timeseries(axs[:, 1], text=False, color="orange", place=place, member=11)
     plot_era5_timeseries(
         axs[:, 1],
         color="blue",
@@ -717,7 +757,9 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     """
     df_l = []
     for member in [4, 10, 11]:
-        timeseries_ds = get_cmip6_timeseries(place=place,member=member, pi_version=pi_version)
+        timeseries_ds = get_cmip6_timeseries(
+            place=place, member=member, pi_version=pi_version
+        )
         df_l.append(
             timeseries_relationships(
                 timeseries_ds,
@@ -731,7 +773,8 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
             timeseries_relationships(
                 timeseries_ds,
                 place=place,
-                member="r" + str(member) + "i1p1f1",                year_min=1980,
+                member="r" + str(member) + "i1p1f1",
+                year_min=1980,
                 year_max=2024,
             )
         )
@@ -756,8 +799,11 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     )
     df = pd.concat(df_l, ignore_index=True)
     from .constants import DATA_PATH
+
     df.to_csv(
-        os.path.join(DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}new.csv"),
+        os.path.join(
+            DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}new.csv"
+        ),
         index=False,
     )
     print("Saved temporal relationships data to CSV.")
@@ -782,15 +828,24 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     df.drop(columns=["place"], inplace=True)
 
     # data frame was getting too large for latex table, so splitting into correlations and fits
-    df_str = dataframe_to_latex_table(df[[col for col in df.columns if not col.startswith("fit_")]])
+    df_str = dataframe_to_latex_table(
+        df[[col for col in df.columns if not col.startswith("fit_")]]
+    )
     print(df_str)
-    with open(os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}new.tex"), "w") as f:
+    with open(
+        os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}new.tex"),
+        "w",
+    ) as f:
         f.write(df_str)
     print("Saved temporal relationships data to LaTeX table.")
 
-    df_str = dataframe_to_latex_table(df[[col for col in df.columns if not col.startswith("rho_")]])
+    df_str = dataframe_to_latex_table(
+        df[[col for col in df.columns if not col.startswith("rho_")]]
+    )
     print(df_str)
-    with open(os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}new.tex"), "w") as f:
+    with open(
+        os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}new.tex"), "w"
+    ) as f:
         f.write(df_str)
     print("Saved temporal relationships data to LaTeX table.")
 
@@ -865,7 +920,11 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
             return format_single_latex_sci(nominal) + " \\pm 0"
 
         # Determine the common exponent from the nominal value
-        exponent = math.floor(math.log10(abs(nominal))) if nominal != 0 else math.floor(math.log10(abs(error)))
+        exponent = (
+            math.floor(math.log10(abs(nominal)))
+            if nominal != 0
+            else math.floor(math.log10(abs(error)))
+        )
 
         # Rescale numbers to the common exponent
         nominal_rescaled = nominal / (10**exponent)
@@ -873,9 +932,9 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
 
         # Determine decimal places for rounding from the error's first significant digit
         if error_rescaled == 0:
-             rounding_decimals = 1
+            rounding_decimals = 1
         else:
-             rounding_decimals = -math.floor(math.log10(abs(error_rescaled)))
+            rounding_decimals = -math.floor(math.log10(abs(error_rescaled)))
 
         # Round the rescaled numbers to the determined decimal place
         nominal_rounded = round(nominal_rescaled, rounding_decimals)
@@ -894,28 +953,42 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
 
     def _generate_header_map(columns: list[str]) -> dict[str, str]:
         symbol_map = {
-            "vmax": "V_p", "r0": "r_a", "sst": "T_s", "t0": "T_0",
-            "rmax": r"r_{\mathrm{max}}", "rh": r"\mathcal{H}_e",
-            "p": "p_a", "msl": "p_a", "years": "t"
+            "vmax": "V_p",
+            "r0": "r_a",
+            "sst": "T_s",
+            "t0": "T_0",
+            "rmax": r"r_{\mathrm{max}}",
+            "rh": r"\mathcal{H}_e",
+            "p": "p_a",
+            "msl": "p_a",
+            "years": "t",
         }
         unit_map = {
-            "vmax": r"\text{m s}^{-1}", "r0": "\\text{km}", "sst": r"^{\circ}\text{C}",
-            "years": "\\text{yr}"
+            "vmax": r"\text{m s}^{-1}",
+            "r0": "\\text{km}",
+            "sst": r"^{\circ}\text{C}",
+            "years": "\\text{yr}",
         }
         header_map = {}
         for col in columns:
             if col.startswith("rho_"):
-                parts = col.split('_')[1:]
+                parts = col.split("_")[1:]
                 symbols = [symbol_map.get(p, p) for p in parts]
                 if len(symbols) == 1:
                     symbols.append("t")
                 header_map[col] = f"\\(\\rho({', '.join(symbols)})\\)"
             elif col.startswith("fit_"):
-                parts = col.split('_')[1:]
+                parts = col.split("_")[1:]
                 dep_var, ind_var = parts[0], parts[1] if len(parts) > 1 else "years"
-                dep_sym, ind_sym = symbol_map.get(dep_var, dep_var), symbol_map.get(ind_var, ind_var)
+                dep_sym, ind_sym = symbol_map.get(dep_var, dep_var), symbol_map.get(
+                    ind_var, ind_var
+                )
                 dep_unit, ind_unit = unit_map.get(dep_var), unit_map.get(ind_var)
-                unit_str = f" [\\({dep_unit} \;{ind_unit}^{{-1}}\\)]" if dep_unit and ind_unit else ""
+                unit_str = (
+                    f" [\\({dep_unit} \;{ind_unit}^{{-1}}\\)]"
+                    if dep_unit and ind_unit
+                    else ""
+                )
                 header_map[col] = f"\\(m({ind_sym}, {dep_sym})\\){unit_str}"
         header_map["member"] = "Member"
         header_map["place"] = "Place"
@@ -930,20 +1003,27 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
         err_col = f"{col}_err"
         if err_col in df_proc.columns:
             df_proc[col] = df_proc.apply(
-                lambda row: format_error_latex_sci(row[col], row[err_col])
-                if pd.notnull(row[col]) and pd.notnull(row[err_col]) else "",
-                axis=1
+                lambda row: (
+                    format_error_latex_sci(row[col], row[err_col])
+                    if pd.notnull(row[col]) and pd.notnull(row[err_col])
+                    else ""
+                ),
+                axis=1,
             )
             err_cols_to_drop.append(err_col)
-        elif col in header_map and not col in ["place", "member", "year_min", "year_max"]:
+        elif col in header_map and not col in [
+            "place",
+            "member",
+            "year_min",
+            "year_max",
+        ]:
             df_proc[col] = df_proc[col].apply(
                 lambda x: f"{x:.2f}" if pd.notnull(x) else ""
             )
 
-
     df_proc.drop(columns=err_cols_to_drop, inplace=True)
 
-    final_order = [col for col in df.columns if not col.endswith('_err')]
+    final_order = [col for col in df.columns if not col.endswith("_err")]
     df_proc.rename(columns=header_map, inplace=True)
     final_renamed_order = [header_map.get(col, col) for col in final_order]
     df_proc = df_proc[final_renamed_order]
@@ -960,6 +1040,7 @@ if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
     #
+    figure_two(place="new_orleans")
     figure_two(place="hong_kong")
     # temporal_relationship_data(place="new_orleans", pi_version=4)
     # plot_seasonal_profiles()

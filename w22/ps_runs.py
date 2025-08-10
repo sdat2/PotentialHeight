@@ -338,6 +338,7 @@ def point_timeseries(
     out_ds = parallelized_ps(
         trimmed_ds, jobs=25, pressure_assumption=pressure_assumption
     )
+    print("out_ds", out_ds)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
@@ -418,26 +419,32 @@ if __name__ == "__main__":
             f"Running point timeseries for {place} with pressure assumption {pressure_assumption}"
         )
         # CESM2
-        # for i in [4, 10, 11]:
-        #     point_timeseries(
-        #         member=i,
-        #         place=place,
-        #         pressure_assumption=pressure_assumption,
-        #         pi_version=4,
-        #     )
-        # HadGEM3-GC31-MM
-        for i in [1, 2, 3]:
-            point_timeseries(
-                member="r" + str(i) + "i1p1f3",
-                place=place,
-                pressure_assumption=pressure_assumption,
-                model="HADGEM3-GC31-MM",
-                pi_version=4,
-                recalculate_pi=True,
-            )
-        # point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
+        for exp in ["historical", "ssp585"]:
+            for i in [4, 10, 11]:
+                point_timeseries(
+                    member=i,
+                    place=place,
+                    pressure_assumption=pressure_assumption,
+                    pi_version=4,
+                    exp=exp,
+                    model="CESM2",
+                    recalculate_pi=True,
+                )
+            # HadGEM3-GC31-MM
+            for i in [1, 2, 3]:
+                point_timeseries(
+                    member="r" + str(i) + "i1p1f3",
+                    place=place,
+                    pressure_assumption=pressure_assumption,
+                    model="HADGEM3-GC31-MM",
+                    pi_version=4,
+                    exp=exp,
+                    recalculate_pi=True,
+                )
+        point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
 
     data_for_place("new_orleans")
+    data_for_place("hong_kong")
     # data_for_place("hong_kong")
     # trimmed_cmip6_example(
     #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"
