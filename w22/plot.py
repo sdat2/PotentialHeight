@@ -519,9 +519,10 @@ def get_cmip6_timeseries(
 
 def plot_two_timeseries(
     axs: np.ndarray,
-    text=True,
-    color="black",
+    text: bool = True,
+    color: str = "black",
     member: int = 4,
+    model: str = "CESM2",
     pressure_assumption: str = "isothermal",
     place: str = "new_orleans",
     pi_version: int = 4,
@@ -537,6 +538,8 @@ def plot_two_timeseries(
         member (int): The ensemble member to plot (default is 4).
 
     """
+    # /Volumes/s/tcpips/w22/data/new_orleans_august_historical_HADGEM3-GC31-LL_r1i1p1f3_isothermal_pi4new.nc
+    # /Volumes/s/tcpips/w22/data/hong_kong_august_historical_HADGEM3-GC31-MM_r1i1p1f3_isothermal_pi4new.nc
 
     assert len(axs) == 2
     # put historical and ssp585 together
@@ -544,6 +547,7 @@ def plot_two_timeseries(
         place=place,
         pressure_assumption=pressure_assumption,
         member=member,
+        model=model,
         pi_version=pi_version,
     )
     print("timeseries_ds", timeseries_ds)
@@ -732,6 +736,16 @@ def figure_two(place: str = "new_orleans") -> None:
     plot_two_timeseries(axs[:, 1], text=False, color="orange", place=place, member=4)
     plot_two_timeseries(axs[:, 1], text=False, color="orange", member=10, place=place)
     plot_two_timeseries(axs[:, 1], text=False, color="orange", place=place, member=11)
+    for member in ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3"]:
+        plot_two_timeseries(
+            axs[:, 1],
+            text=False,
+            color="green",
+            place=place,
+            model="HADGEM3-GC31-MM",
+            member=member,
+        )
+
     plot_era5_timeseries(
         axs[:, 1],
         color="blue",

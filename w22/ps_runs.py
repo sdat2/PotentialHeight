@@ -442,6 +442,12 @@ if __name__ == "__main__":
                     recalculate_pi=True,
                 )
         point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
+        trimmed_cmip6_example(
+            pressure_assumption=pressure_assumption,
+            trial=1,
+            pi_version=4,
+            place=place,
+        )
 
     data_for_place("new_orleans")
     data_for_place("hong_kong")

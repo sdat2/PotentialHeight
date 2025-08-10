@@ -191,6 +191,12 @@ def get_data_part(
         "\nCONVERSION_NAMES.keys()",
         CONVERSION_NAMES.keys(),
     )
+    add_kwargs = {}
+    if source_id in ["MIROC6", "CESM2"]:
+        add_kwargs["member_id"] = ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"]
+    elif source_id in ["HadGEM3-GC31-MM"]:
+        add_kwargs["member_id"] = ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3"]
+
     cat_subset_obj = cat.search(
         experiment_id=experiments,
         table_id=[table],
@@ -200,6 +206,7 @@ def get_data_part(
         variable_id=CONVERSION_NAMES.keys(),
         # dcpp_init_year="20200528",
         # grid_label="gn",
+        **add_kwargs,
     )
     print("cat_subset_obj", cat_subset_obj)
     print("cat_subset_obj.unique()", cat_subset_obj.unique())
@@ -285,6 +292,9 @@ if __name__ == "__main__":
 
     # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM
     # python -m tcpips.pangeo --institution_id=THU --source_id=CIESM --exp=historical
+    # let's download MIROC MIROC6 data
+    # python -m tcpips.pangeo --source_id=MIROC6 --institution_id=MIROC --exp=ssp585
+    #
 
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-MM --exp=ssp585
     # python -m tcpips.pangeo --institution_id=MOHC --source_id=HadGEM3-GC31-LL --exp=historical

@@ -28,11 +28,11 @@ def call_cdo(input_path: str, output_path: str) -> None:
     os.system(f"ncdump -h {input_path}")
     # delete the misnamed coordinates (xmip's fault?)
     os.system(
-        f"ncks -O -4 -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies,dcpp_init_year,member_id   {input_path} {output_path+'.tmp'}"
+        f"ncks -O -4 -C -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies,dcpp_init_year,member_id  {input_path} {output_path+'.tmp'}"
     )
     # relabel the standard names for lat and lon so that CDO can undertand them
     os.system(
-        f"ncatted -O -a standard_name,lat,o,c,'latitude' -a standard_name,lon,o,c,'longitude' {output_path+'.tmp'}"
+        f"ncatted -O -a standard_name,lat,o,c,'latitude' -a standard_name,lon,o,c,'longitude' -a units,lon,o,c,'degrees_east' -a units,lat,o,c,'degrees_north' {output_path+'.tmp'}"
     )
 
     if "atmos" in input_path:
@@ -44,11 +44,13 @@ def call_cdo(input_path: str, output_path: str) -> None:
 
     if "HADGEM3-GC31-MM" in input_path:
         model = "HADGEM3-GC31-MM"
+    elif "MIROC6" in input_path:
+        model = "MIROC6"
     else:
         model = None
 
     # remap bilinearly using cdo in silent mode
-    if typ == "atmos" and model == "HADGEM3-GC31-MM":
+    if typ == "atmos" and (model == "HADGEM3-GC31-MM"):  # or model == "MIROC6"):
         # os.system(f"ncatted -O -a coordinates,hus,d,, {output_path+'.tmp'}")
         os.system(f"ncatted -O -a coordinates,hus,m,s,'lat lon' {output_path+'.tmp'}")
         os.system(f"ncatted -O -a coordinates,hurs,m,s,'lat lon' {output_path+'.tmp'}")
@@ -57,12 +59,22 @@ def call_cdo(input_path: str, output_path: str) -> None:
         os.system(f"ncatted -O -a coordinates,tos,m,s,'lat lon' {output_path+'.tmp'}")
         # Fix time_bnds mismatch
         os.system(f"ncks -O -v time_bnds {output_path+'.tmp'}")
-    elif typ == "ocean" and model == "HADGEM3-GC31-MM":
+    elif typ == "atmos" and model == "MIROC6":
+        os.system(
+            f"ncatted -O -a coordinates,hus,o,c,'height lat lon' {output_path+'.tmp'}"
+        )
+        os.system(f"ncatted -O -a coordinates,hurs,o,c,'lat lon' {output_path+'.tmp'}")
+        os.system(
+            f"ncatted -O -a coordinates,ta,o,c,'height lat lon' {output_path+'.tmp'}"
+        )
+        os.system(f"ncatted -O -a coordinates,psl,o,c,'lat lon' {output_path+'.tmp'}")
+
+    elif typ == "ocean" and (model == "HADGEM3-GC31-MM" or model == "MIROC6"):
         #    # Remove broken coordinates attributes on tos
         # ncatted -O -a coordinates,tos,d,, file.nc
         # os.system(f"ncatted -O -a coordinates,tos,d,, {output_path+'.tmp'}")
         # # Point lat/lon bounds to actual vars or remove
-        os.system(f"ncatted -O -a coordinates,tos,m,s,'lat lon' {output_path+'.tmp'}")
+        os.system(f"ncatted -O -a coordinates,tos,o,c,'lat lon' {output_path+'.tmp'}")
         # ncatted -O -a bounds,lat,d,, file.nc
         # os.system(f"ncatted -O -a bounds,lat,d,, {output_path+'.tmp'}")
         # # ncatted -O -a bounds,lon,d,, file.nc
@@ -73,9 +85,15 @@ def call_cdo(input_path: str, output_path: str) -> None:
     print("About to regrid processed file with CDO")
     os.system(f"ncdump -h {output_path+'.tmp'}")
 
-    os.system(
-        f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt -setgrid,{output_path+'.tmp'} {output_path+'.tmp'} {output_path}"
-    )
+    if model == "MIROC6":
+        # MIROC6 has a different grid file
+        os.system(
+            f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt {output_path+'.tmp'} {output_path}"
+        )
+    else:
+        os.system(
+            f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/halfdeg.txt -setgrid,{output_path+'.tmp'} {output_path+'.tmp'} {output_path}"
+        )
 
     # f"cdo -f nc4 -s remapbil,{CONFIG_PATH}/era5_grid_from_file.txt {output_path+'.tmp'} {output_path} > /dev/null"
     try:
@@ -124,8 +142,13 @@ if __name__ == "__main__":
     # regrid_cmip6_part(exp="historical", typ="atmos", model="CESM2", member="r10i1p1f1")
     # regrid_cmip6_part(exp="historical", typ="ocean", model="CESM2", member="r11i1p1f1")
     # regrid_cmip6_part(exp="historical", typ="atmos", model="CESM2", member="r11i1p1f1")
-    for model in ["CESM2"]:
-        for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
-            for exp in ["ssp585", "historical"]:
-                for typ in ["ocean", "atmos"]:
+    # for model in ["CESM2"]:
+    #     for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
+    #         for exp in ["ssp585", "historical"]:
+    #             for typ in ["ocean", "atmos"]:
+    #                 regrid_cmip6_part(exp=exp, typ=typ, model=model, member=member)
+    for exp in ["ssp585", "historical"]:
+        for typ in ["ocean", "atmos"]:
+            for model in ["MIROC6"]:
+                for member in ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"]:
                     regrid_cmip6_part(exp=exp, typ=typ, model=model, member=member)
