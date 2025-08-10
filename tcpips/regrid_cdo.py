@@ -28,7 +28,7 @@ def call_cdo(input_path: str, output_path: str) -> None:
     os.system(f"ncdump -h {input_path}")
     # delete the misnamed coordinates (xmip's fault?)
     os.system(
-        f"ncks -O -4 -C -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies,dcpp_init_year,member_id  {input_path} {output_path+'.tmp'}"
+        f"ncks -O -4 -C -x -v lon_verticies,lat_bounds,lon_bounds,lat_verticies,dcpp_init_year,member_id,time_bnds,time_bounds  {input_path} {output_path+'.tmp'}"
     )
     # relabel the standard names for lat and lon so that CDO can undertand them
     os.system(
@@ -46,6 +46,11 @@ def call_cdo(input_path: str, output_path: str) -> None:
         model = "HADGEM3-GC31-MM"
     elif "MIROC6" in input_path:
         model = "MIROC6"
+        os.system(f"ncatted -O -a bounds,time,o,c,time_bounds {output_path+'.tmp'}")
+        os.system(f"ncpdq -O -a y,x {output_path+'.tmp'} {output_path+'.tmp'}")
+        os.system(
+            f"ncatted -O -a standard_name,x,o,c,'model_x' -a standard_name,y,o,c,'model_y' {output_path+'.tmp'}"
+        )
     else:
         model = None
 
@@ -61,11 +66,12 @@ def call_cdo(input_path: str, output_path: str) -> None:
         os.system(f"ncks -O -v time_bnds {output_path+'.tmp'}")
     elif typ == "atmos" and model == "MIROC6":
         os.system(
-            f"ncatted -O -a coordinates,hus,o,c,'height lat lon' {output_path+'.tmp'}"
+            f"ncatted -O -a coordinates,hus,o,c,'plev lat lon' {output_path+'.tmp'}"
         )
         os.system(f"ncatted -O -a coordinates,hurs,o,c,'lat lon' {output_path+'.tmp'}")
+
         os.system(
-            f"ncatted -O -a coordinates,ta,o,c,'height lat lon' {output_path+'.tmp'}"
+            f"ncatted -O -a coordinates,ta,o,c,'plev lat lon' {output_path+'.tmp'}"
         )
         os.system(f"ncatted -O -a coordinates,psl,o,c,'lat lon' {output_path+'.tmp'}")
 
@@ -148,7 +154,7 @@ if __name__ == "__main__":
     #             for typ in ["ocean", "atmos"]:
     #                 regrid_cmip6_part(exp=exp, typ=typ, model=model, member=member)
     for exp in ["ssp585", "historical"]:
-        for typ in ["ocean", "atmos"]:
+        for typ in ["atmos"]:  # "ocean"
             for model in ["MIROC6"]:
                 for member in ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"]:
                     regrid_cmip6_part(exp=exp, typ=typ, model=model, member=member)
