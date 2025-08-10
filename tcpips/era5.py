@@ -1571,9 +1571,9 @@ if __name__ == "__main__":
     # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
     # download_era5_data(start_year=1940)
-    # era5_pi(
-    #     [str(year) for year in range(1940, 1950)]  # 2025)]
-    # )  # Modify or extend this list as needed.)
+    era5_pi(
+         [str(year) for year in range(1980, 2025)]  # 2025)]
+    )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
@@ -1621,11 +1621,11 @@ if __name__ == "__main__":
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
-    # dask_cluster_wrapper(
-    #     calculate_potential_sizes,
-    #     start_year=DEFAULT_START_YEAR,
-    #     end_year=DEFAULT_START_YEAR + 9,
-    # )  # This will take a long time to run.
+    dask_cluster_wrapper(
+         calculate_potential_sizes,
+         start_year=DEFAULT_START_YEAR,
+         end_year=DEFAULT_START_YEAR + 9,
+    )  # This will take a long time to run.
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
