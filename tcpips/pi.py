@@ -11,7 +11,7 @@ from .xr_utils import standard_name_to_long_name
 
 CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
 PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
-KAPPA: float = 0.286 # R/cp for dry air [dimensionless]
+KAPPA: float = 0.286  # R/cp for dry air [dimensionless]
 
 
 def fix_temp_profile(
@@ -66,9 +66,9 @@ def fix_temp_profile(
     ds["t"] = ds["t"].where(ds["t"] < (max_temp_c + 273.15), np.nan)
 
     if ds.p.attrs.get("units", "hPa").lower() in ["pa", "pascal"]:
-        if ds.p.max() > 2000: # Heuristic check if already in Pa
-             p_hpa = ds.p / 100.0
-    else: # Assume hPa if not specified or specified otherwise
+        if ds.p.max() > 2000:  # Heuristic check if already in Pa
+            p_hpa = ds.p / 100.0
+    else:  # Assume hPa if not specified or specified otherwise
         p_hpa = ds.p
 
     if method == "interpolate":
@@ -128,7 +128,10 @@ def calculate_pi(
         >>> pi_ds = calculate_pi(ds, fix_temp=True) # doctest: +SKIP
     """
     if fix_temp:
+        print("Fixing temperature profile...")
+        print("Before fixing:", ds)
         ds = fix_temp_profile(ds)
+        print("After fixing:", ds)
 
     result = xr.apply_ufunc(
         pi,
@@ -201,6 +204,7 @@ def calculate_pi(
         path=str(PROJECT_PATH)
     )
     ds.attrs["pi_calculated_at_time"] = time_stamp()
+    print("Calculated potential intensity:", out_ds)
 
     return standard_name_to_long_name(out_ds)
 

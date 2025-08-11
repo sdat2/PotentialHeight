@@ -772,7 +772,7 @@ def figure_two(place: str = "new_orleans") -> None:
         plot_two_timeseries(
             axs[:, 1],
             text=False,
-            color="purple",
+            color="grey",
             place=place,
             model="MIROC6",
             member=member,

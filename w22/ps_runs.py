@@ -41,6 +41,7 @@ def trimmed_cmip6_example(
     pressure_assumption="isothermal",
     trial=1,
     pi_version=2,
+    recalculate_pi: bool = True,
     place="new_orleans",
 ) -> None:
     """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
@@ -52,15 +53,41 @@ def trimmed_cmip6_example(
     # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
-    in_ds = mon_increase(
-        xr.open_dataset(ex_data_path(pi_version=pi_version, member=4)),
-        x_dim="lon",
-        y_dim="lat",
-    ).isel(
-        # lat=slice(215, 245),
-        # lon=slice(160, 205),
-        time=7,  # slice(0, 12) # just august 2015
-    )
+    if recalculate_pi:
+        # get the data from the example path
+        ds_list = [
+            xr.open_dataset(
+                os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc")
+            )
+            for typ in ["ocean", "atmos"]
+        ]
+        for i, ds in enumerate(ds_list):
+            ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
+        print("ds_list", ds_list)
+        ds = xr.merge(ds_list)
+        ds = convert(ds)
+        ds_pi = calculate_pi(
+            ds,
+            dim="p",
+            fix_temp=True,
+        )
+        ds["vmax"] = ds_pi["vmax"]
+        ds["t0"] = ds_pi["t0"]
+        ds["rh"] = ds["rh"] / 100  # convert to dimensionless
+        ds["rh"].attrs["units"] = "dimensionless"
+    else:
+        ds = xr.open_dataset(ex_data_path(pi_version=pi_version))
+        in_ds = mon_increase(
+            ds,
+            x_dim="lon",
+            y_dim="lat",
+        ).isel(
+            # lat=slice(215, 245),
+            # lon=slice(160, 205),
+            time=7,  # slice(0, 12) # just august 2015
+        )
+        print("input cmip6 data", in_ds)
+
     if place in ["new_orleans", "galverston", "miami"]:
         in_ds = in_ds.sel(
             lon=slice(-100, -73),
@@ -273,12 +300,14 @@ def point_timeseries(
         ds = xr.merge(ds_list)
         print("merged ds", ds)
         ds = convert(ds)
+        ds = ds.isel(time=[i for i in range(8, len(ds.time.values), 12)])
         print("converted ds", ds)
 
         # print("point ds intial:", ds)
         pi_ds = calculate_pi(
             ds,
             dim="p",
+            fix_temp=True,
         )
         print("pi ds", pi_ds)
         trimmed_ds = pi_ds[["vmax", "t0"]]
@@ -307,6 +336,9 @@ def point_timeseries(
             )
             .compute()
         )
+        trimmed_ds = trimmed_ds.isel(
+            time=[i for i in range(8, len(trimmed_ds.time.values), 12)]
+        )
         print("point ds", point_ds)
         if "rh" not in point_ds:
             point_ds["rh"] = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
@@ -319,10 +351,6 @@ def point_timeseries(
             trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
 
     print("trimmed", trimmed_ds)
-    # select august data from every year of timeseries xarray
-    trimmed_ds = trimmed_ds.isel(
-        time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
-    )  # it could be better to use a month selector here
     out_ds = parallelized_ps(
         trimmed_ds, jobs=25, pressure_assumption=pressure_assumption
     )
@@ -391,7 +419,6 @@ def point_era5_timeseries(
 
 if __name__ == "__main__":
     # python -m w22.ps_runs
-    print("Running as main")
     # point_timeseries(4, "new_orleans", pi_version=4)
     # point_timeseries(10, "new_orleans", pi_version=4)
     # point_timeseries(11, "new_orleans", pi_version=4)
@@ -457,18 +484,27 @@ if __name__ == "__main__":
                 place=place,
             )
 
-    data_for_place(
-        "new_orleans",
-        models={
-            "MIROC6",
-        },
-    )
-    data_for_place(
-        "hong_kong",
-        models={
-            "MIROC6",
-        },
-    )
+    # data_for_place(
+    #     "new_orleans",
+    # )
+    # data_for_place(
+    #     "hong_kong",
+    # )
+    for place in ["new_orleans", "hong_kong"]:
+        trimmed_cmip6_example(
+            pressure_assumption="isothermal",
+            trial=1,
+            pi_version=4,
+            place=place,
+        )
+    # point_timeseries(
+    #     member=4,
+    #     place="hong_kong",
+    #     recalculate_pi=True,
+    #     pi_version=4,
+    #     pressure_assumption="isothermal",
+    #     exp="ssp585",
+    # )
     # data_for_place("hong_kong")
     # trimmed_cmip6_example(
     #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"
