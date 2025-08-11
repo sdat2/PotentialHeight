@@ -4,7 +4,6 @@ import os
 from typing import Union
 import xarray as xr
 from sithom.time import timeit
-from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
 from sithom.xr import mon_increase
 from tcpips.constants import PI2_PATH, PI3_PATH, PI4_PATH, CDO_PATH
 from tcpips.pi import calculate_pi
@@ -12,19 +11,9 @@ from tcpips.convert import convert
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
 from .ps import parallelized_ps
-from .constants import DATA_PATH
+from .constants import DATA_PATH, OFFSET_D
 
 # store offsets for points to get data for.
-
-OFFSET_D = {
-    "galverston": {"point": GALVERSTON, "lon_offset": 0, "lat_offset": -0.9},
-    "miami": {"point": MIAMI, "lon_offset": 0.2, "lat_offset": 0},
-    "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -0.5},
-    # these ones are not checked
-    "shanghai": {"point": SHANGHAI, "lon_offset": 0.5, "lat_offset": -0.3},
-    "hong_kong": {"point": HONG_KONG, "lon_offset": 0.5, "lat_offset": -0.5},
-    "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": -0.1},
-}
 
 
 def ex_data_path(pi_version=2, member: int = 4) -> str:
@@ -272,7 +261,7 @@ def point_timeseries(
             )
             .sel(
                 lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"] - 0.5,
+                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
                 method="nearest",
             )
             .compute()
@@ -365,7 +354,7 @@ def point_era5_timeseries(
         )
         .sel(
             lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-            lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"] - 0.5,
+            lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
             method="nearest",
         )
         .compute()
@@ -408,7 +397,11 @@ if __name__ == "__main__":
     # point_timeseries(10, "new_orleans", pi_version=4)
     # point_timeseries(11, "new_orleans", pi_version=4)
 
-    def data_for_place(place: str, pressure_assumption: str = "isothermal") -> None:
+    def data_for_place(
+        place: str,
+        pressure_assumption: str = "isothermal",
+        models={"CESM2", "MIROC6", "HADGEM3-GC31-MM", "ERA5"},
+    ) -> None:
         """Run point timeseries for a specific place.
 
         Args:
@@ -420,27 +413,41 @@ if __name__ == "__main__":
         )
         # CESM2
         for exp in ["historical", "ssp585"]:
-            for i in [4, 10, 11]:
-                point_timeseries(
-                    member=i,
-                    place=place,
-                    pressure_assumption=pressure_assumption,
-                    pi_version=4,
-                    exp=exp,
-                    model="CESM2",
-                    recalculate_pi=True,
-                )
+            if "CESM2" in models:
+                for i in [4, 10, 11]:
+                    point_timeseries(
+                        member=i,
+                        place=place,
+                        pressure_assumption=pressure_assumption,
+                        pi_version=4,
+                        exp=exp,
+                        model="CESM2",
+                        recalculate_pi=True,
+                    )
             # HadGEM3-GC31-MM
-            for i in [1, 2, 3]:
-                point_timeseries(
-                    member="r" + str(i) + "i1p1f3",
-                    place=place,
-                    pressure_assumption=pressure_assumption,
-                    model="HADGEM3-GC31-MM",
-                    pi_version=4,
-                    exp=exp,
-                    recalculate_pi=True,
-                )
+            if "HADGEM3-GC31-MM" in models:
+                for i in [1, 2, 3]:
+                    point_timeseries(
+                        member="r" + str(i) + "i1p1f3",
+                        place=place,
+                        pressure_assumption=pressure_assumption,
+                        model="HADGEM3-GC31-MM",
+                        pi_version=4,
+                        exp=exp,
+                        recalculate_pi=True,
+                    )
+            # MIROC6
+            if "MIROC6" in models:
+                for i in [1, 2, 3]:
+                    point_timeseries(
+                        member="r" + str(i) + "i1p1f1",
+                        place=place,
+                        pressure_assumption=pressure_assumption,
+                        model="MIROC6",
+                        pi_version=4,
+                        exp=exp,
+                        recalculate_pi=True,
+                    )
         point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
         trimmed_cmip6_example(
             pressure_assumption=pressure_assumption,

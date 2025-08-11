@@ -12,7 +12,7 @@ from uncertainties import ufloat
 from sithom.io import write_json
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
-from .constants import DATA_PATH, FIGURE_PATH
+from .constants import DATA_PATH, FIGURE_PATH, OFFSET_D
 from .cle15m import profile_from_stats
 from .utils import coriolis_parameter_from_lat
 
@@ -384,6 +384,22 @@ def plot_seasonal_profiles():
     plt.close()
 
 
+def place_to_position(place: str) -> tuple:
+    """
+    Convert a place name to a latitude and longitude position.
+
+    Args:
+        place (str): The name of the place.
+
+    Returns:
+        tuple: A tuple containing the latitude and longitude.
+    """
+    return (
+        OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+        OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
+    )
+
+
 def plot_two_spatial(
     axs: np.ndarray,
     place: str = "new_orleans",
@@ -472,9 +488,9 @@ def plot_two_spatial(
     )
     (ds["r0"] / 1000).plot(ax=axs[1], cbar_kwargs={"label": ""})
     ds["vmax"].plot(ax=axs[0], cbar_kwargs={"label": ""})
-    no = (-90.25, 29.25)
-    axs[0].scatter(*no, color="black", s=75, marker="x")
-    axs[1].scatter(*no, color="black", s=75, marker="x")
+    point = place_to_position(place)
+    axs[0].scatter(*point, color="black", s=75, marker="x")
+    axs[1].scatter(*point, color="black", s=75, marker="x")
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
     axs[1].set_title("Potential size, $r_a$ [km]")
     axs[0].set_xlabel("")

@@ -83,3 +83,15 @@ W22_BISECTION_TOLERANCE = 1e-6  # [dimensionless]
 LOWER_RADIUS_BISECTION = 200_000  # [m] 200 km
 UPPER_RADIUS_BISECTION = 5_000_000  # [m] 5000 km
 PRESSURE_DIFFERENCE_BISECTION_TOLERANCE = 1  # [mbar]
+
+from adforce.constants import NEW_ORLEANS, MIAMI, GALVERSTON, HONG_KONG, SHANGHAI, HANOI
+
+OFFSET_D = {
+    "galverston": {"point": GALVERSTON, "lon_offset": 0, "lat_offset": -0.9},
+    "miami": {"point": MIAMI, "lon_offset": 0.2, "lat_offset": 0},
+    "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -1},
+    # these ones are not checked
+    "shanghai": {"point": SHANGHAI, "lon_offset": 0.5, "lat_offset": -0.3},
+    "hong_kong": {"point": HONG_KONG, "lon_offset": 0.5, "lat_offset": -0.5},
+    "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": -0.1},
+}
