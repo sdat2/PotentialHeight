@@ -265,11 +265,10 @@ def point_timeseries(
                 method="nearest",
             )
             .compute()
-            .drop_vars(
-                ["time_bounds"],
-            )
             for file_name in file_names
         ]
+        for i, ds in enumerate(ds_list):
+            ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
         print("ds_list", ds_list)
         ds = xr.merge(ds_list)
         print("merged ds", ds)
@@ -448,16 +447,28 @@ if __name__ == "__main__":
                         exp=exp,
                         recalculate_pi=True,
                     )
-        point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
-        trimmed_cmip6_example(
-            pressure_assumption=pressure_assumption,
-            trial=1,
-            pi_version=4,
-            place=place,
-        )
+        if "ERA5" in models:
+            point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
+        if "CESM2" in models:
+            trimmed_cmip6_example(
+                pressure_assumption=pressure_assumption,
+                trial=1,
+                pi_version=4,
+                place=place,
+            )
 
-    data_for_place("new_orleans")
-    data_for_place("hong_kong")
+    data_for_place(
+        "new_orleans",
+        models={
+            "MIROC6",
+        },
+    )
+    data_for_place(
+        "hong_kong",
+        models={
+            "MIROC6",
+        },
+    )
     # data_for_place("hong_kong")
     # trimmed_cmip6_example(
     #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"

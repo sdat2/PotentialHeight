@@ -418,9 +418,9 @@ def plot_two_spatial(
 
     name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
-    if place in ["new_orleans", "galverston", "miami"]:
+    if place in {"new_orleans", "galverston", "miami"}:
         name = "gom_" + name
-    if place in ["shanghai", "hong_kong", "hanoi"]:
+    if place in {"shanghai", "hong_kong", "hanoi"}:
         name = "scs_" + name
 
     ds = xr.open_dataset(os.path.join(DATA_PATH, name))
@@ -528,8 +528,15 @@ def get_cmip6_timeseries(
         dim="time",
     )
     print("cmip6_ds", ds)
-
-    ds = ds.assign_coords(time=[t.year for t in ds["time"].values])
+    if isinstance(ds["time"].values[0], np.datetime64):
+        # convert time to year
+        ds = ds.assign_coords(
+            time=[
+                t.astype("datetime64[Y]").astype(int) + 1970 for t in ds["time"].values
+            ]
+        )
+    else:
+        ds = ds.assign_coords(time=[t.year for t in ds["time"].values])
     return ds
 
 
@@ -759,6 +766,15 @@ def figure_two(place: str = "new_orleans") -> None:
             color="green",
             place=place,
             model="HADGEM3-GC31-MM",
+            member=member,
+        )
+    for member in [1, 2, 3]:
+        plot_two_timeseries(
+            axs[:, 1],
+            text=False,
+            color="purple",
+            place=place,
+            model="MIROC6",
             member=member,
         )
 

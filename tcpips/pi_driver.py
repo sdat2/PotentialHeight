@@ -107,12 +107,9 @@ if __name__ == "__main__":
         for exp in ["ssp585", "historical"]:
             for model in ["CESM2"]:
                 for member in ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"]:
-                    pi_cmip6_part(
-                        exp=exp,
-                        model=model,
-                        member=member
-                    )
+                    pi_cmip6_part(exp=exp, model=model, member=member)
         print("CESM2 runs complete.")
+
     run_CESM2()
     # dask_cluster_wrapper(pi_cmip6_part, exp="historical", model="CESM2", member="r4i1p1f1")
     # dask_cluster_wrapper(pi_cmip6_part, exp="ssp585", model="CESM2", member="r10i1p1f1")
