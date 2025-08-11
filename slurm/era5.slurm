@@ -30,4 +30,7 @@ micromamba activate t1
 echo "which python"
 which python
 
+export MPLCONFIGDIR="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/tmp/.matplotlib"
+mkdir -p $MPLCONFIGDIR
+
 python -m tcpips.era5

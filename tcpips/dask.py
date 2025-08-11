@@ -20,7 +20,15 @@ def dask_cluster_wrapper(
     Not really sure.
     """
     tick = time.perf_counter()
-    cluster = LocalCluster()  # n_workers=10, threads_per_worker=1)
+    # trying new option for Archer2
+    if os.getcwd().startswith("/work/"):  # assume Archer2
+        cluster = LocalCluster(n_workers=16,
+            threads_per_worker=8,
+            interface='lo',
+            memory_limit='15GB'  # <-- IMPORTANT: Adjust this based on your job's total RAM
+        )
+    else:
+        cluster = LocalCluster()
     client = Client(cluster)
     print(f"Dask dashboard link: {client.dashboard_link}")
 
