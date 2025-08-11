@@ -21,7 +21,7 @@ def dask_cluster_wrapper(
     """
     tick = time.perf_counter()
     # trying new option for Archer2
-    if os.getcwd().startswith("/work/"):  # assume Archer2
+    if "/work/" in str(os.getcwd()):  # assume Archer2
         cluster = LocalCluster(n_workers=16,
             threads_per_worker=8,
             interface='lo',
