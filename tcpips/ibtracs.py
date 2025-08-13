@@ -1780,6 +1780,9 @@ def plot_tc_example(
     cps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
     )
+    ps_cat1_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.ps_cat1.nc")
+    )
     # add name, basin, subbasin, nature, and usa_record to the cps_ds
 
     for var in ["name", "basin", "subbasin", "nature", "usa_record"]:
@@ -1789,8 +1792,13 @@ def plot_tc_example(
     tc_ds = select_tc_from_ds(ibtracs_ds, name=name, basin=basin, subbasin=subbasin)
     # print("tc_ds", tc_ds)
     tc_cps_ds = select_tc_from_ds(cps_ds, name=name, basin=basin, subbasin=subbasin)
+
+    ps_cat1_ds = select_tc_from_ds(
+        ps_cat1_ds, name=name, basin=basin, subbasin=subbasin
+    )
     # print("tc_cps_ds", tc_cps_ds)
     tc_ds["ps_vobs"] = tc_cps_ds["rmax"]  # take the rmax from the cps dataset
+    tc_ds["ps_cat1"] = ps_cat1_ds["rmax"]  # take the rmax from the ps_cat1 dataset
     track_dir = os.path.join(FIGURE_PATH, "tracks")
     os.makedirs(track_dir, exist_ok=True)
     plot_name = os.path.join(track_dir, f"{name.decode().lower()}_track.pdf")
@@ -1811,10 +1819,15 @@ def plot_tc_track_by_index(index, plot_name):
     cps_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
     )
+    ps_cat1_ds = xr.open_dataset(
+        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.ps_cat1.nc")
+    )
     tc_ds = ibtracs_ds.isel(storm=index)
     tc_cps_ds = cps_ds.isel(storm=index)
+    tc_cat1_ds = ps_cat1_ds.isel(storm=index)
     # add rmax from cps_ds to tc_ds
     tc_ds["ps_vobs"] = tc_cps_ds["rmax"]  # take the rmax from the cps dataset
+    tc_ds["ps_cat1"] = tc_cat1_ds["rmax"]  # take the rmax from the ps_cat1 dataset
 
     _plot_tc_track(tc_ds, plot_name)
 
@@ -2039,8 +2052,14 @@ def _plot_tc_track(
     ax_line2.plot(
         times.ravel(),
         tc_ds["ps_vobs"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_2$ CPS [km]" + "\n" + r"($V=V_{\mathrm{Obs.}} \text{ Obs.}$)",
+        label=r"$r_2$ CPS [km]" + "\n" + r"($V=V_{\mathrm{Obs.}}$)",
         color="orange",
+    )
+    ax_line2.plot(
+        times.ravel(),
+        tc_ds["ps_cat1"].values.ravel() / 1000,  # convert m to km
+        label=r"$r_3$ PS Cat 1 [km]" + "\n" + r"($V=33$ m s$^{-1}$)",
+        color="red",
     )
     ax_line2.set_ylabel(r"$r$ [km]")
     ax_line2.set_xlabel("Time since impact [hours]")
