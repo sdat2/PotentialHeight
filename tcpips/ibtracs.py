@@ -951,7 +951,7 @@ def plot_potential_size() -> None:
         / 1000,  # convert to km
         bins=100,
         alpha=0.5,
-        label=r"$r_1$ [km]",
+        label=r"$r_3$ [km]",
     )
     axs[1].hist(
         grid_avg_ds["r0"].values.ravel()[~np.isnan(grid_avg_ds["r0"].values.ravel())]
@@ -960,7 +960,7 @@ def plot_potential_size() -> None:
         alpha=0.5,
         label=r"$r_a$ [km]",
     )
-    axs[0].set_xlabel(r"$r_1$ [km]")
+    axs[0].set_xlabel(r"$r_3$ [km]")
     axs[1].set_xlabel(r"$r_a$ [km]")
     axs[0].set_ylabel("Count")
     label_subplots(axs)
@@ -1149,7 +1149,7 @@ def plot_normalized_variables() -> None:
         range=(0, 5),
         alpha=0.5,
     )
-    axs[0].set_xlabel(r"Normalized $r_{\mathrm{Obs.}}/r_1$")
+    axs[0].set_xlabel(r"Normalized $r_{\mathrm{Obs.}}/r_3$")
     axs[1].set_xlabel(r"Normalized ${V_{\mathrm{Obs.}}}/{V_{p}}$")
     axs[0].set_ylabel("Count")
 
@@ -1188,7 +1188,7 @@ def plot_normalized_variables() -> None:
     plot_var_on_map(
         axs[1],
         avg_ds["normalized_rmax"],
-        r"Mean Normalized Size, $\frac{r_{\mathrm{Obs.}}}{r_1}$",
+        r"Mean Normalized Size, $\frac{r_{\mathrm{Obs.}}}{r_3}$",
         "viridis",
         shrink=1,
     )
@@ -2046,7 +2046,7 @@ def _plot_tc_track(
     ax_line2.plot(
         times.ravel(),
         tc_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_1$ PS [km]" + "\n" + r"($V=V_{\mathrm{p}}$)",
+        label=r"$r_3$ PS [km]" + "\n" + r"($V=V_{\mathrm{p}}$)",
         color="green",
     )
     ax_line2.plot(
@@ -2058,7 +2058,7 @@ def _plot_tc_track(
     ax_line2.plot(
         times.ravel(),
         tc_ds["ps_cat1"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_3$ PS Cat 1 [km]" + "\n" + r"($V=33$ m s$^{-1}$)",
+        label=r"$r_1$ PS Cat 1 [km]" + "\n" + r"($V=33$ m s$^{-1}$)",
         color="red",
     )
     ax_line2.set_ylabel(r"$r$ [km]")
@@ -2191,7 +2191,7 @@ def vary_v_cps(
         tc_pi_ps_ds.rmax.values / 1000,  # convert m to km
         marker="o",
         color="green",
-        label=r"$r_1$ PS [km]",
+        label=r"$r_3$ PS [km]",
     )
     plt.plot(
         tc_inputs_ds.usa_wind.values * 0.514444,
@@ -2213,7 +2213,7 @@ def vary_v_cps(
         ps_ds.rmax.values[0],  # convert m to km
         marker="o",
         color="orange",
-        label=r"$r_3$ PS @cat1 [km]",
+        label=r"$r_1$ PS @cat1 [km]",
     )
     # I want to grey out the area above the v curve.
     plt.fill_between(
@@ -2450,7 +2450,7 @@ def plot_normalized_quad(
         f"{perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
     )
     axs[1].hist(pi_ps_ds["normalized_size"].values.ravel(), bins=400)
-    axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_1$")
+    axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
     axs[1].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_size'].values):.1f} % exceedance"
     )
@@ -2463,7 +2463,7 @@ def plot_normalized_quad(
     axs[3].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_size_cat1'].values):.1f} % exceedance"
     )
-    axs[3].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
+    axs[3].set_xlabel(r"$r_{\mathrm{Obs.}} / r_1$")
     label_subplots(axs)
     plt.xlim(0, 3)
     plt.savefig(
@@ -2513,7 +2513,7 @@ def plot_normalized_quad(
         - np.arange(1, length_of_array(max_normalized_ps.values) + 1)
         / length_of_array(max_normalized_ps.values),
     )
-    axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
+    axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
     axs[2].plot(
         np.sort(processed_array(max_normalized_cps.values)),
         1
@@ -2527,7 +2527,7 @@ def plot_normalized_quad(
         - np.arange(1, length_of_array(max_normalized_ps_cat1.values) + 1)
         / length_of_array(max_normalized_ps_cat1.values),
     )
-    axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
+    axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
     axs[3].set_title(
         f"{perc_gt_1(max_normalized_ps_cat1.values):.1f} % exceedance"
     )  # add the percentage of exceedance
@@ -2578,7 +2578,7 @@ def plot_normalized_quad(
     )
     plt.colorbar(label="Log Count")
     plt.xlabel(r"Normalized intensity, $V_{\mathrm{Obs.}} / V_{\mathrm{p}}$")
-    plt.ylabel(r"Normalized size, $r_{\mathrm{Obs.}} / r_3$")
+    plt.ylabel(r"Normalized size, $r_{\mathrm{Obs.}} / r_1$")
     plt.savefig(
         os.path.join(FIGURE_PATH, "normalized_2d_hist.pdf"),
         dpi=300,
@@ -2770,8 +2770,8 @@ def compare_normalized_potential_size(
         bins="log",
     )
     plt.colorbar(label="Log Count")
-    plt.xlabel(r"Potential size for cat1 $r_3$ [km]")
-    plt.ylabel(r"Normalized potential size $r_1 / r_3$")
+    plt.xlabel(r"Potential size for cat1 $r_1$ [km]")
+    plt.ylabel(r"Normalized potential size $r_3 / r_1$")
     plt.savefig(os.path.join(FIGURE_PATH, "norm_ps.pdf"))
     plt.clf()
     plt.close()
@@ -2922,7 +2922,7 @@ def vary_limits(num=6):
     ax.plot(
         vp_lower_ds["vp_lower"].values,
         vp_lower_ds["ps_exceedance"].values,
-        label=r"$r_{\mathrm{Obs.}} / r_1$",
+        label=r"$r_{\mathrm{Obs.}} / r_3$",
         color="green",
     )
     ax.plot(
@@ -2934,7 +2934,7 @@ def vary_limits(num=6):
     ax.plot(
         vp_lower_ds["vp_lower"].values,
         vp_lower_ds["ps_cat1_exceedance"].values,
-        label=r"$r_{\mathrm{Obs.}} / r_3$",
+        label=r"$r_{\mathrm{Obs.}} / r_1$",
         color="orange",
     )
     ax.plot(
@@ -2962,7 +2962,7 @@ def vary_limits(num=6):
     ax.plot(
         vobs_lower_ds["vobs_lower"].values,
         vobs_lower_ds["ps_exceedance"].values,
-        label=r"$r_{\mathrm{Obs.}} / r_1$",
+        label=r"$r_{\mathrm{Obs.}} / r_3$",
         color="green",
     )
     ax.plot(
@@ -2974,7 +2974,7 @@ def vary_limits(num=6):
     ax.plot(
         vobs_lower_ds["vobs_lower"].values,
         vobs_lower_ds["ps_obs_exceedance"].values,
-        label=r"$r_{\mathrm{Obs.}} / r_3$",
+        label=r"$r_{\mathrm{Obs.}} / r_1$",
         color="orange",
     )
 
