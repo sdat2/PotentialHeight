@@ -2086,6 +2086,7 @@ def vary_v_cps(
     basin=b"NA",
     subbasin=b"GM",
     timestep: int = 30,
+    steps: int = 60,
 ):
     """
     I want to vary the velocity input to the potential size calculation from the
@@ -2122,42 +2123,50 @@ def vary_v_cps(
     print("tc_inputs_ds", tc_inputs_ds)
     # category 1 to potential intensity
     # go from 33 m/s to the potential intensity vmax
-    vs = np.linspace(33 / v_reduc, tc_pi_ps_ds.vmax.values, num=20)
+    vs = np.linspace(33 / v_reduc, tc_pi_ps_ds.vmax.values, num=steps)
     tc_inputs_ds["vmax"] = ("v", vs)
 
     # trim to get rid of unnecessary dimensions
     trimmed_ds = tc_inputs_ds[["vmax", "msl", "rh", "sst", "t0"]]
 
     # add in default param values
-
     print("trimmed_ds", trimmed_ds)
-
     plot_defaults()
     ps_ds = parallelized_ps(
         trimmed_ds,
     )
+
+    r1 = ps_ds.rmax.values[0] / 1000  # convert m to km
     r2 = scipy.interpolate.interp1d(
         ps_ds.vmax.values * v_reduc,
         ps_ds.rmax.values / 1000,  # convert m to km
     )(tc_inputs_ds.usa_wind.values * 0.514444)
+    radii = ps_ds.rmax.values / 1000  # convert m to km
+    velocities = vs * v_reduc # convert to 10m height
+    r3 = tc_pi_ps_ds.rmax.values / 1000  # convert m to km
+    v33 = 33 # convert to 10m height
+    vp = tc_pi_ps_ds.vmax.values * v_reduc  # convert to 10m height
+    robs = tc_inputs_ds.usa_rmw.values * 1852 / 1000  # convert nautical miles to km
+    vobs = tc_inputs_ds.usa_wind.values * 0.514444  # convert knots to m/s
+
 
     plt.plot(
-        vs * v_reduc,  # tranlate velocity to 10m height
-        ps_ds["rmax"].values / 1000,  # convert m to km
+        velocities,
+        radii,
         label=f"v_reduc={v_reduc} (CPS)",
         color="orange",
     )
     # plot vertical dashed lines as 33 m/s, usa_wind, and  v_p
-    plt.axvline(33, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
+    plt.axvline(v33, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
     plt.axvline(
-        tc_pi_ps_ds.vmax.values * v_reduc,
+        vp,
         color="green",
         linestyle="--",
         linewidth=0.8,
         alpha=0.7,
     )
     plt.axvline(
-        tc_inputs_ds.usa_wind.values * 0.514444,
+        vobs,
         linestyle="--",
         color="blue",
         linewidth=0.8,
@@ -2165,7 +2174,7 @@ def vary_v_cps(
     )  # convert knots to m/s
     # plot horizontal dashed line at cps rmax
     plt.axhline(
-        ps_ds["rmax"].values[0] / 1000,  # convert m to km
+        r1,  # convert m to km
         color="orange",
         linestyle="--",
         linewidth=0.8,
@@ -2179,7 +2188,7 @@ def vary_v_cps(
         alpha=0.7,
     )
     plt.axhline(
-        tc_pi_ps_ds.rmax.values / 1000,  # convert m to km
+        r3,  # convert m to km
         color="green",
         linestyle="--",
         linewidth=0.8,
@@ -2187,79 +2196,94 @@ def vary_v_cps(
     )  # convert knots to m/s
 
     plt.plot(
-        tc_pi_ps_ds.vmax.values * v_reduc,
-        tc_pi_ps_ds.rmax.values / 1000,  # convert m to km
+        vp,
+        r3,
         marker="o",
         color="green",
         label=r"$r_3$ PS [km]",
     )
     plt.plot(
-        tc_inputs_ds.usa_wind.values * 0.514444,
-        tc_inputs_ds.usa_rmw.values * 1852 / 1000,  # convert nautical miles to km
+        vobs,
+        robs,  # convert nautical miles to km
         marker="+",
         color="blue",
         label=r"$V_{\mathrm{Obs.}}, $r_{\mathrm{Obs.}}$ [km]",
     )
 
     plt.plot(
-        tc_inputs_ds.usa_wind.values * 0.514444,
+        vobs,
         r2,  # convert knots to m/s
         marker="o",
         color="blue",
         label=r"$r_2$ CPS [km]",
     )
     plt.plot(
-        ps_ds.vmax.values[0] * v_reduc,
-        ps_ds.rmax.values[0],  # convert m to km
+        v33,
+        r1,  # convert m to km
         marker="o",
         color="orange",
         label=r"$r_1$ PS @cat1 [km]",
     )
     # I want to grey out the area above the v curve.
     plt.fill_between(
-        vs * v_reduc,
-        ps_ds["rmax"].values / 1000,  # upper bound
-        np.nanmax(ps_ds["rmax"].values) / 1000,  # shade until here
+        velocities,
+        radii,  # upper bound
+        np.nanmax(radii),  # shade until here
         color="gray",
         alpha=0.3,
         hatch="///",
         label="Impossible Area",
     )
-    plt.ylim(
-        max(
+    ymin = min(
             [
                 min(
                     [
-                        np.nanmin(ps_ds["rmax"].values / 1000),
-                        tc_inputs_ds.usa_rmw.values * 1852 / 1000 - 50,
+                        np.nanmin(radii),
+                        robs,
                     ],
                 ),
                 0,
             ]
-        ),
-        np.nanmax(ps_ds["rmax"].values / 1000),
+        )
+    ymax = np.nanmax(radii) + 1
+    plt.ylim(
+        ymin,
+        ymax,
     )
-    plt.xlim(np.nanmin(vs * v_reduc), np.nanmax(vs * v_reduc))
+    plt.xlim(np.nanmin(velocities), np.nanmax(velocities))
     # xticks at 33 m/s, V_max Obs, and V_p
     plt.xticks(
         [
-            33,
-            tc_inputs_ds.usa_wind.values * 0.514444,  # convert knots to m/s
-            tc_pi_ps_ds.vmax.values * v_reduc,
+            v33,
+            vobs,  # convert knots to m/s
+            vp,
         ],
         labels=[
-            r"$V \mathrm{cat1}$" + f"={33:.1f}" + r" m s$^{-1}$",
+            r"$V \mathrm{cat1}$" + f"={v33:.1f}" + r" m s$^{-1}$",
             r"$V_{\mathrm{Obs.}}$"
-            + f"={tc_inputs_ds.usa_wind.values * 0.514444:.1f}"
+            + f"={vobs:.1f}"
             + r" m s$^{-1}$",
             r"$V_{\mathrm{p}}$ @10m"
-            + f"={tc_pi_ps_ds.vmax.values * v_reduc:.1f}"
+            + f"={vp:.1f}"
             + r" m s$^{-1}$",
         ],
     )
 
-    plt.xlabel(r"$V$ @ 10m [m s$^{-1}$]")
-    plt.ylabel(r"$r\left(V\right)$ [km]")
+    ax1 = plt.gca()  # Get the current axis
+    ax1.set_ylim([ymin, ymax])
+    ax1.set_xlabel(r"$V$ @ 10m [m s$^{-1}$]")
+    ax1.set_ylabel(r"$r\left(V\right)$ [km]")
+    # 2. Create a secondary axis
+    ax2 = ax1.twinx()
+
+    # 3. CRUCIAL: Synchronize the y-axis limits to maintain a single scale
+    ax2.set_ylim([ymin, ymax])
+    ax2.set_yticks([r1, r2, r3],
+                   labels=["$r_1$", "$r_2$", "$r_3$"])
+    print("r1", ps_ds.rmax.values[0] / 1000)
+    print("r2", r2)
+    print("r3", tc_pi_ps_ds.rmax.values / 1000)
+    ax2.set_ylim([ymin, ymax])
     plt.savefig(
         os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.pdf"),
         dpi=300,
@@ -3209,6 +3233,7 @@ if __name__ == "__main__":
     #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
     # )
     # vary_limits(num=50)
-    run_all_plots()
+    # run_all_plots()
+    vary_v_cps()
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
