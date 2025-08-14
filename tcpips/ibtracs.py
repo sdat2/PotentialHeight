@@ -19,6 +19,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.colors as mcolors
+import imageio
+from datetime import datetime
 
 try:
     import cartopy
@@ -2080,24 +2082,17 @@ def _plot_tc_track(
     plt.close()
 
 
-def vary_v_cps(
-    v_reduc: float = 0.8,
-    name: str = b"KATRINA",
-    basin=b"NA",
-    subbasin=b"GM",
-    timestep: int = 30,
-    steps: int = 60,
-):
+def get_tc_ds(basin: str = b"NA", subbasin: str = b"GM", name: str = b"KATRINA") -> xr.Dataset:
     """
-    I want to vary the velocity input to the potential size calculation from the
-    threshold for category 1 hurricane to the potential intensity, and plot the corresponding potential size in terms of rmax.
+    Get a tropical cyclone from the IBTrACS dataset.
 
     Args:
-        v_reduc (float, optional): Reduction factor for the velocity. Defaults to 0.8.
-        name (str, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
-        basin (str, optional): Basin of the tropical cyclone to plot. Defaults to b"NA".
-        subbasin (str, optional): Subbasin of the tropical cyclone to plot. Defaults to b"GM".
-        timestep (int, optional): Timestep to select for the potential intensity and size calculation. Defaults to 20.
+        basin (str, optional): Basin of the tropical cyclone. Defaults to b"NA".
+        subbasin (str, optional): Subbasin of the tropical cyclone. Defaults to b"GM".
+        name (str, optional): Name of the tropical cyclone. Defaults to b"KATRINA".
+
+    Returns:
+        xr.Dataset: Dataset containing the tropical cyclone data.
     """
     ibtracs_ds = xr.open_dataset(
         os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
@@ -2110,32 +2105,71 @@ def vary_v_cps(
     )
     # add name, basin, subbasin, nature, and usa_record to the cps_inputs
     for var in ["name", "basin", "subbasin", "nature", "usa_record"]:
+        # add in the new variables
         cps_inputs[var] = ibtracs_orig[var]
         ibtracs_ds[var] = ibtracs_orig[var]
     # Select Katrina's data
     tc_pi_ps_ds = select_tc_from_ds(
         ibtracs_ds, name=name, basin=basin, subbasin=subbasin
-    ).isel(date_time=timestep)
+    )
     print("tc_pi_ps_ds", tc_pi_ps_ds)
     tc_inputs_ds = select_tc_from_ds(
         cps_inputs, name=name, basin=basin, subbasin=subbasin
-    ).isel(date_time=timestep)
+    )
     print("tc_inputs_ds", tc_inputs_ds)
-    # category 1 to potential intensity
-    # go from 33 m/s to the potential intensity vmax
-    vs = np.linspace(33 / v_reduc, tc_pi_ps_ds.vmax.values, num=steps)
-    tc_inputs_ds["vmax"] = ("v", vs)
+    return tc_pi_ps_ds, tc_inputs_ds
+
+def calculate_cps_ds(tc_inputs_ds: xr.Dataset) -> xr.Dataset:
+    """ Calculate the potential size dataset from the tropical cyclone inputs.
+    Args:
+        tc_inputs_ds (xr.Dataset): Dataset containing the tropical cyclone inputs.
+    Returns:
+        xr.Dataset: Dataset containing the potential size data.
+    """
 
     # trim to get rid of unnecessary dimensions
     trimmed_ds = tc_inputs_ds[["vmax", "msl", "rh", "sst", "t0"]]
 
     # add in default param values
     print("trimmed_ds", trimmed_ds)
-    plot_defaults()
-    ps_ds = parallelized_ps(
+    return parallelized_ps(
         trimmed_ds,
     )
 
+
+def vary_v_cps(
+    v_reduc: float = 0.8,
+    name: str = b"KATRINA",
+    basin=b"NA",
+    subbasin=b"GM",
+    timestep: int = 30,
+    steps: int = 60,
+    v33 = 33, # m/s, threshold for category 1 hurricane
+) -> None:
+    """
+    I want to vary the velocity input to the potential size calculation from the
+    threshold for category 1 hurricane to the potential intensity, and plot the corresponding potential size in terms of rmax.
+
+    Args:
+        v_reduc (float, optional): Reduction factor for the velocity. Defaults to 0.8.
+        name (str, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
+        basin (str, optional): Basin of the tropical cyclone to plot. Defaults to b"NA".
+        subbasin (str, optional): Subbasin of the tropical cyclone to plot. Defaults to b"GM".
+        timestep (int, optional): Timestep to select for the potential intensity and size calculation. Defaults to 20.
+        steps (int, optional): Number of steps to vary the velocity. Defaults to 60.
+        v33 (float, optional): Threshold for category 1 hurricane in m/s. Defaults to 33.
+    """
+    # category 1 to potential intensity
+    # go from 33 m/s to the potential intensity vmax
+    # at gradient wind height
+    tc_pi_ps_ds, tc_inputs_ds = get_tc_ds(name=name, basin=basin, subbasin=subbasin)
+    tc_pi_ps_ds = tc_pi_ps_ds.isel(date_time=timestep)
+    tc_inputs_ds = tc_inputs_ds.isel(date_time=timestep)
+    vs = np.linspace(v33 / v_reduc, tc_pi_ps_ds.vmax.values, num=steps)
+    tc_inputs_ds["vmax"] = ("v", vs)
+    ps_ds = calculate_cps_ds(tc_inputs_ds)
+
+    # plot the potential size
     r1 = ps_ds.rmax.values[0] / 1000  # convert m to km
     r2 = scipy.interpolate.interp1d(
         ps_ds.vmax.values * v_reduc,
@@ -2144,16 +2178,159 @@ def vary_v_cps(
     radii = ps_ds.rmax.values / 1000  # convert m to km
     velocities = vs * v_reduc # convert to 10m height
     r3 = tc_pi_ps_ds.rmax.values / 1000  # convert m to km
-    v33 = 33 # convert to 10m height
     vp = tc_pi_ps_ds.vmax.values * v_reduc  # convert to 10m height
     robs = tc_inputs_ds.usa_rmw.values * 1852 / 1000  # convert nautical miles to km
     vobs = tc_inputs_ds.usa_wind.values * 0.514444  # convert knots to m/s
+    ymin = min(
+            [
+                min(
+                    [
+                        np.nanmin(radii),
+                        robs,
+                    ],
+                ),
+                0,
+            ]
+        )
+    ymax = np.nanmax(radii) + 1
+    xmin = v33
+    xmax = np.nanmax(ps_ds.vmax.values * v_reduc)
+    _plot_vary_v_cps(velocities, radii, v33, vobs, vp, r1, r2, r3, robs, ymin, ymax, xmin, xmax)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
 
 
+def ani_vary_v_cps(
+    v_reduc: float = 0.8,
+    name: str = b"KATRINA",
+    basin=b"NA",
+    subbasin=b"GM",
+    timestep_end: int = 80,
+    steps: int = 20,
+    v33 = 33, # m/s, threshold for category 1 hurricane
+) -> None:
+    """
+    Animate the potential size trade off for varying velocities.
+
+    Args:
+        v_reduc (float, optional): Reduction factor for the velocity. Defaults to 0.8.
+        name (str, optional): Name of the tropical cyclone to plot. Defaults to b"KATRINA".
+        basin (str, optional): Basin of the tropical cyclone to plot. Defaults to b"NA".
+        subbasin (str, optional): Subbasin of the tropical cyclone to plot. Defaults to b"GM".
+        timestep_end (int, optional): Timestep to select for the potential intensity and size calculation. Defaults to 20.
+        steps (int, optional): Number of steps to vary the velocity. Defaults to 20.
+        v33 (float, optional): Threshold for category 1 hurricane in m/s. Defaults to 33.
+    """
+    # category 1 to potential intensity
+    # go from 33 m/s to the potential intensity vmax
+    # at gradient wind height
+    tc_pi_ps_ds, tc_inputs_ds = get_tc_ds(name=name, basin=basin, subbasin=subbasin)
+    tc_pi_ps_ds = tc_pi_ps_ds.isel(date_time=slice(0, timestep_end))
+    tc_inputs_ds = tc_inputs_ds.isel(date_time=slice(0, timestep_end))
+    vs = np.array([np.linspace(v33 / v_reduc, vmax, num=steps) for vmax in tc_pi_ps_ds.vmax.values])
+    ps_ds_file_path = os.path.join(DATA_PATH, f"vary_v_ps_{name.decode().lower()}.nc")
+    tc_inputs_ds["vmax"] = (("date_time", "v"), vs)
+
+    if os.path.exists(ps_ds_file_path):
+        ps_ds = xr.open_dataset(ps_ds_file_path)
+    else:
+        ps_ds = calculate_cps_ds(tc_inputs_ds)
+        ps_ds.to_netcdf(ps_ds_file_path)
+
+    img_folder = os.path.join(FIGURE_PATH, "vary_v_cps", name.decode().lower())
+    os.makedirs(img_folder, exist_ok=True)
+    figure_name_l = []
+
+    ymin = 0
+    ymax = np.nanmax(ps_ds.rmax.values / 1000) + 1  # convert m to km
+    xmin = min(v33, np.nanmin(tc_inputs_ds.usa_rmw.values * 1852 / 1000 ))
+    xmax = np.nanmax(ps_ds.vmax.values * v_reduc)
+
+    for i in range(timestep_end):
+        ps_ds_i = ps_ds.isel(date_time=i)
+        tc_pi_ps_ds_i = tc_pi_ps_ds.isel(date_time=i)
+        tc_inputs_ds_i = tc_inputs_ds.isel(date_time=i)
+
+        robs = tc_inputs_ds_i.usa_rmw.values * 1852 / 1000  # convert nautical miles
+        vobs = tc_inputs_ds_i.usa_wind.values * 0.514444  # convert knots to m/s
+        # plot the potential size
+        r1 = ps_ds_i.rmax.values[0] / 1000  # convert m to km
+        if vobs >= v33:
+            r2 = scipy.interpolate.interp1d(
+                ps_ds_i.vmax.values * v_reduc,
+                ps_ds_i.rmax.values / 1000,  # convert m to km
+            )(vobs)
+        else:
+            r2 = np.nan
+        radii = ps_ds_i.rmax.values / 1000  # convert m to km
+        velocities = ps_ds_i.vmax.values * v_reduc  # convert to 10m height
+        r3 = tc_pi_ps_ds_i.rmax.values / 1000  # convert m to km
+        vp = tc_pi_ps_ds_i.vmax.values * v_reduc  # convert to 10m height
+        _plot_vary_v_cps(
+            velocities,
+            radii,
+            v33,
+            vobs,  # convert knots to m/s
+            vp,
+            r1,
+            r2,
+            r3,
+            robs,
+            ymin,
+            ymax,
+            xmin,
+            xmax,
+        )
+        figure_name = os.path.join(img_folder, f"vary_v_ps_{name.decode().lower()}_{i:03d}.png")
+        figure_name_l.append(figure_name)
+        time_str = tc_pi_ps_ds_i["time"].dt.strftime('%Y-%m-%d %H').item()
+        plt.title(name.decode().capitalize() + " " + time_str)
+        plt.savefig(
+            figure_name,
+            dpi=300,
+            bbox_inches="tight",
+        )
+        plt.clf()
+        plt.close()
+
+    with imageio.get_writer(
+        os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.gif"),
+        mode="I",
+        duration=0.1,
+    ) as writer:
+        for figure_name in figure_name_l:
+            image = imageio.imread(figure_name)
+            writer.append_data(image)
+
+
+def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r1, r2, r3, robs, ymin, ymax, xmin, xmax) -> None:
+    """
+    Plot the potential size trade off for varying velocities.
+
+    Args:
+        velocities (np.ndarray): Array of velocities.
+        radii (np.ndarray): Array of radii corresponding to the velocities.
+        v33 (float): Threshold for category 1 hurricane in m/s.
+        vobs (float): Observed velocity in m/s.
+        vp (float): Potential intensity velocity in m/s.
+        r1 (float): Radius for category 1 hurricane in km.
+        r2 (float): Radius for observed velocity in km.
+        r3 (float): Radius for potential intensity in km.
+        robs (float): Observed radius in km.
+        ymin (float): Minimum y-axis limit.
+        ymax (float): Maximum y-axis limit.
+    """
+    # plot the potential size trade off
+    plot_defaults()
     plt.plot(
         velocities,
         radii,
-        label=f"v_reduc={v_reduc} (CPS)",
+        label=f"CPS",
         color="orange",
     )
     # plot vertical dashed lines as 33 m/s, usa_wind, and  v_p
@@ -2227,30 +2404,28 @@ def vary_v_cps(
     # I want to grey out the area above the v curve.
     plt.fill_between(
         velocities,
-        radii,  # upper bound
-        np.nanmax(radii),  # shade until here
+        radii,  # lower bound
+        ymax,  # shade until here
         color="gray",
         alpha=0.3,
         hatch="///",
         label="Impossible Area",
     )
-    ymin = min(
-            [
-                min(
-                    [
-                        np.nanmin(radii),
-                        robs,
-                    ],
-                ),
-                0,
-            ]
-        )
-    ymax = np.nanmax(radii) + 1
+    plt.fill_between(
+        [vp, xmax],
+        [ymin, ymin],
+        [ymax, ymax],
+        color="gray",
+        alpha=0.3,
+        hatch="///",
+        # label="Impossible Area",
+    )
+
     plt.ylim(
         ymin,
         ymax,
     )
-    plt.xlim(np.nanmin(velocities), np.nanmax(velocities))
+    plt.xlim(xmin, xmax)
     # xticks at 33 m/s, V_max Obs, and V_p
     plt.xticks(
         [
@@ -2273,22 +2448,14 @@ def vary_v_cps(
     ax1.set_ylim([ymin, ymax])
     ax1.set_xlabel(r"$V$ @ 10m [m s$^{-1}$]")
     ax1.set_ylabel(r"$r\left(V\right)$ [km]")
-    # 2. Create a secondary axis
     ax2 = ax1.twinx()
-
-    # 3. CRUCIAL: Synchronize the y-axis limits to maintain a single scale
     ax2.set_ylim([ymin, ymax])
     ax2.set_yticks([r1, r2, r3],
                    labels=["$r_1$", "$r_2$", "$r_3$"])
-    print("r1", ps_ds.rmax.values[0] / 1000)
+    print("r1", r1)
     print("r2", r2)
-    print("r3", tc_pi_ps_ds.rmax.values / 1000)
+    print("r3", r3)
     ax2.set_ylim([ymin, ymax])
-    plt.savefig(
-        os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.pdf"),
-        dpi=300,
-        bbox_inches="tight",
-    )
 
 
 def check_sizes():
@@ -3234,6 +3401,8 @@ if __name__ == "__main__":
     # )
     # vary_limits(num=50)
     # run_all_plots()
-    vary_v_cps()
+    # vary_v_cps()
+    # ani_vary_v_cps()
+    ani_vary_v_cps(name=b"IRENE")
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.

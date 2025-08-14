@@ -552,3 +552,4 @@ if __name__ == "__main__":
     # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
     # python -c "from w22.ps_runs import new_orleans_10year as no; no()"
     # trimmed_cmip6_example(trial=2, pressure_assumption="isothermal", pi_version=4)
+
