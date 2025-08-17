@@ -2230,6 +2230,20 @@ def ani_vary_v_cps(
     # go from 33 m/s to the potential intensity vmax
     # at gradient wind height
     tc_pi_ps_ds, tc_inputs_ds = get_tc_ds(name=name, basin=basin, subbasin=subbasin)
+    if timestep_end > len(tc_pi_ps_ds.date_time):
+        timestep_end = len(tc_pi_ps_ds.date_time)
+
+    times = tc_pi_ps_ds.date_time.values[:timestep_end]
+    nan_times = np.isnan(times)
+    if np.all(nan_times):
+        print(f"No valid times found for {name.decode()}.")
+        return
+    if np.any(nan_times):
+        last_non_nan_index = np.where(~nan_times)[0][-1]
+        if last_non_nan_index < timestep_end:
+            print(f"Trimming timestep_end from {timestep_end} to {last_non_nan_index + 1} for {name.decode()}.")
+            timestep_end = last_non_nan_index + 1
+
     tc_pi_ps_ds = tc_pi_ps_ds.isel(date_time=slice(0, timestep_end))
     tc_inputs_ds = tc_inputs_ds.isel(date_time=slice(0, timestep_end))
     vs = np.array([np.linspace(v33 / v_reduc, vmax, num=steps) for vmax in tc_pi_ps_ds.vmax.values])
@@ -2251,26 +2265,26 @@ def ani_vary_v_cps(
     xmin = min(v33, np.nanmin(tc_inputs_ds.usa_rmw.values * 1852 / 1000 ))
     xmax = np.nanmax(ps_ds.vmax.values * v_reduc)
 
-    for i in range(timestep_end):
+    for i in [j for j in range(timestep_end) if not np.isnan(ps_ds.isel(date_time=j).time.values[0])]:
         ps_ds_i = ps_ds.isel(date_time=i)
         tc_pi_ps_ds_i = tc_pi_ps_ds.isel(date_time=i)
         tc_inputs_ds_i = tc_inputs_ds.isel(date_time=i)
 
         robs = tc_inputs_ds_i.usa_rmw.values * 1852 / 1000  # convert nautical miles
         vobs = tc_inputs_ds_i.usa_wind.values * 0.514444  # convert knots to m/s
-        # plot the potential size
-        r1 = ps_ds_i.rmax.values[0] / 1000  # convert m to km
-        if vobs >= v33:
-            r2 = scipy.interpolate.interp1d(
-                ps_ds_i.vmax.values * v_reduc,
-                ps_ds_i.rmax.values / 1000,  # convert m to km
-            )(vobs)
-        else:
-            r2 = np.nan
         radii = ps_ds_i.rmax.values / 1000  # convert m to km
         velocities = ps_ds_i.vmax.values * v_reduc  # convert to 10m height
         r3 = tc_pi_ps_ds_i.rmax.values / 1000  # convert m to km
         vp = tc_pi_ps_ds_i.vmax.values * v_reduc  # convert to 10m height
+        r1 = ps_ds_i.rmax.values[0] / 1000  # convert m to km
+        if vobs >= v33 and vobs <= vp:
+            r2 = scipy.interpolate.interp1d(
+                velocities,
+                radii,  # convert m to km
+            )(vobs)
+        else:
+            r2 = np.nan
+
         _plot_vary_v_cps(
             velocities,
             radii,
@@ -2288,8 +2302,21 @@ def ani_vary_v_cps(
         )
         figure_name = os.path.join(img_folder, f"vary_v_ps_{name.decode().lower()}_{i:03d}.png")
         figure_name_l.append(figure_name)
-        time_str = tc_pi_ps_ds_i["time"].dt.strftime('%Y-%m-%d %H').item()
-        plt.title(name.decode().capitalize() + " " + time_str)
+        time_str = str(tc_pi_ps_ds_i["time"].dt.strftime('%Y-%m-%d %H:%M').item())
+        sst = tc_inputs_ds_i.sst.values
+        if np.isnan(sst):
+            ts_str = "-----"
+        else:
+            ts_str = f"{sst:.1f}$^\circ$C"
+        t0 = tc_inputs_ds_i.t0.values
+        if np.isnan(t0):
+            t0_str = "-----"
+        else:
+            t0_str = f"{t0-273.15:.1f}$^\circ$C"
+
+        title = name.decode().capitalize() + " " + time_str + f", $T_s$= {ts_str}, $T_0$={t0_str}"
+
+        plt.title(title)
         plt.savefig(
             figure_name,
             dpi=300,
@@ -2331,10 +2358,10 @@ def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r
         velocities,
         radii,
         label=f"CPS",
-        color="orange",
+        color="black",
     )
     # plot vertical dashed lines as 33 m/s, usa_wind, and  v_p
-    plt.axvline(v33, color="gray", linestyle="--", linewidth=0.8, alpha=0.7)
+    plt.axvline(v33, color="orange", linestyle="--", linewidth=0.8, alpha=0.7)
     plt.axvline(
         vp,
         color="green",
@@ -2376,28 +2403,39 @@ def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r
         vp,
         r3,
         marker="o",
+        markersize=3,
         color="green",
         label=r"$r_3$ PS [km]",
     )
     plt.plot(
         vobs,
         robs,  # convert nautical miles to km
-        marker="+",
+        marker="x",
+        markersize=7,
         color="blue",
         label=r"$V_{\mathrm{Obs.}}, $r_{\mathrm{Obs.}}$ [km]",
+    )
+    plt.axhline(
+        robs,
+        color="blue",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.7,
     )
 
     plt.plot(
         vobs,
-        r2,  # convert knots to m/s
+        r2,
         marker="o",
+        markersize=3,
         color="blue",
         label=r"$r_2$ CPS [km]",
     )
     plt.plot(
         v33,
-        r1,  # convert m to km
+        r1,
         marker="o",
+        markersize=3,
         color="orange",
         label=r"$r_1$ PS @cat1 [km]",
     )
@@ -2450,8 +2488,13 @@ def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r
     ax1.set_ylabel(r"$r\left(V\right)$ [km]")
     ax2 = ax1.twinx()
     ax2.set_ylim([ymin, ymax])
-    ax2.set_yticks([r1, r2, r3],
-                   labels=["$r_1$", "$r_2$", "$r_3$"])
+    significant_radii = np.array([r1, r2, r3])
+    sr_labels = ["$r_1$", "$r_2$", "$r_3$"]
+    if robs is not None and not np.isnan(robs):
+        significant_radii = np.append(significant_radii, robs)
+        sr_labels.append("$r_{\\mathrm{Obs.}}$")
+    ax2.set_yticks(significant_radii,
+                   labels=sr_labels)
     print("r1", r1)
     print("r2", r2)
     print("r3", r3)
@@ -3403,6 +3446,11 @@ if __name__ == "__main__":
     # run_all_plots()
     # vary_v_cps()
     # ani_vary_v_cps()
+    # ani_vary_v_cps(name=b"KATRINA")
     ani_vary_v_cps(name=b"IRENE")
+    ani_vary_v_cps(name=b"IDA", timestep_end=360)
+    ani_vary_v_cps(name=b"HELENE", timestep_end=360)
+    ani_vary_v_cps(name=b"MANGKHUT", basin=b"WP", subbasin=b"WPAC", timestep_end=360)
+    ani_vary_v_cps(name=b"Freddy", basin=b"SI", subbasin=b"SWIO", timestep_end=360)
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
