@@ -819,7 +819,7 @@ def get_era5_combined(
                 chunks=CHUNK_IN[chunk_in],
                 engine="netcdf4",
             )
-        )
+        ).sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
     else:
         fp = []
         years = [str(year) for year in range(start_year, end_year + 1)]
@@ -911,7 +911,7 @@ def get_all_data(
         start_year=start_year, end_year=end_year, chunk_in=chunk_in
     )
     if "valid_time" in era5_ds.dims:
-        era5_dsds = era5_dsds.rename({"valid_time": "time"})
+        era5_ds = era5_ds.rename({"valid_time": "time"})
     # print(era5_ds.sst.values.sel(longitude))
     print(era5_ds)
     era5_pi = get_era5_pi(start_year=start_year, end_year=end_year, chunk_in=chunk_in)
