@@ -209,16 +209,21 @@ def calculate_pi(
     return standard_name_to_long_name(out_ds)
 
 
-def simple_sensitivity(delta_t=1, k=0.07, m=1, avg_to_tropical_ocean=0.8):
+def simple_sensitivity(delta_t: float = 1,
+                       k: float = 0.07,
+                       m: float = 1,
+                       avg_to_tropical_ocean: float = 0.8
+                       ) -> None:
     """
     Simple sensitivity analysis for the change in potential intensity
     based on the change in temperature and humidity.
 
     Args:
-        delta_t (float): Change in temperature in Kelvin.
+        delta_t (float): Change in average global surface temperature in Kelvin.
         k (float): Scaling factor for humidity change based on CC (default 0.07).
         m (float): Scaling factor for the change in outflow temperature (default 1).
-        avg_to_tropical_ocean (float): Average temperature change for tropical ocean compared to global temperature (default 0.8).
+        avg_to_tropical_ocean (float): Average temperature change
+           for tropical ocean compared to global temperature (default 0.8).
     """
     delta_t = (
         delta_t * avg_to_tropical_ocean

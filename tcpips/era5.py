@@ -1346,6 +1346,7 @@ def calculate_potential_sizes(
         print("No ERA5 data found. Please run era5_pi() first.")
         return
     ds = ds.rename({"latitude": "lat", "longitude": "lon"})
+    # currently I'm assuming that the data does not need to be converted
     # delete the unnecessary volume variables
     del ds["t"]
     del ds["q"]
@@ -1571,9 +1572,9 @@ if __name__ == "__main__":
     # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
     # download_era5_data(start_year=1940)
-    era5_pi(
-         [str(year) for year in range(1980, 2025)]  # 2025)]
-    )  # Modify or extend this list as needed.)
+    # era5_pi(
+    #      [str(year) for year in range(1980, 2025)]  # 2025)]
+    # )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
@@ -1626,8 +1627,9 @@ if __name__ == "__main__":
          start_year=DEFAULT_START_YEAR,
          end_year=DEFAULT_START_YEAR + 9,
     )  # This will take a long time to run.
-    # calculate_potential_sizes(
-    #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
-    # )  # This will take a long time to run.
+    # #
     years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
     regrid_all(years)
+    # calculate_potential_sizes(
+    #      start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
+    # )  # This will take a long time to run.

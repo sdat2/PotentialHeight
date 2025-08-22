@@ -1,6 +1,7 @@
 """Dask utilities for parallel processing."""
 
 from typing import Callable
+import os
 import time
 from dask.distributed import Client, LocalCluster
 from sithom.time import hr_time
