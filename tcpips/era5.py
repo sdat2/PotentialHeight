@@ -848,6 +848,7 @@ def trend_with_neweywest_full(
     Returns:
         tuple[float, float, float]: A tuple with (slope, intercept, p-value).
     """
+    print("Calculating trend with Newey-West standard errors...")
     if np.all(np.isnan(y)):
         return np.nan, np.nan, np.nan
 
@@ -929,7 +930,7 @@ def era5_pi_trends(
         # second hatch mask from running significance test on the rise
         results = xr.apply_ufunc(
             trend_with_neweywest_full,
-            pi_vars,
+            ds[var],
             input_core_dims=[["year"]],
             # Add a third empty list for the new intercept output
             output_core_dims=[[], [], []],

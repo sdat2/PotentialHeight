@@ -8,7 +8,7 @@ REQUIRED: List[str] = [
     "h5netcdf",  # to process netCDF4 files (adforce, tcpips).
     "pyproj",  # to process geospatial data (adforce, tcpips).
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
-    "dask_mpi", # to run dask on an MPI cluster (tcpips)
+    "dask_mpi",  # to run dask on an MPI cluster (tcpips)
     "mpi4py",  # to run dask on an MPI cluster (tcpips)
     "uncertainties",  # common utility for linear error propagation
     # "sithom @ git+https://github.com/sdat2/sithom",
@@ -32,6 +32,7 @@ REQUIRED: List[str] = [
     "tcpypi",  # to calculate potential intensity (tcpips)
     "joblib",  # to parallize more easily potential size calculation (tcpips/w22)
     "ujson",  # to read/write json dictionaries more flexibly (tcpips)
+    "statsmodels",  # to calculate trends with Newey-West standard errors (tcpips)
 ]
 
 
