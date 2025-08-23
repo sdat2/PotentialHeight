@@ -7,12 +7,13 @@ import time
 import xarray as xr
 import numpy as np
 import dask
+import dask.array as da
 from dask.distributed import Client
 from dask_mpi import initialize
 from tcpips.era5 import calculate_potential_sizes
 
 
-def process_large_dataset(client: Client, size: int) -> float:
+def process_large_dataset_ex(client: Client, size: int) -> float:
     """
     Process a large dataset using Dask.
     This function creates a large random dataset and performs a mean calculation on it.
@@ -24,16 +25,32 @@ def process_large_dataset(client: Client, size: int) -> float:
     Returns:
         float: The mean of the dataset.
     """
+
     num_workers = len(client.scheduler_info()["workers"])
     print(f"Starting computation on a Dask cluster with {num_workers} workers.")
-    ds = xr.Dataset({"temperature": (("x", "y"), np.random.rand(size, size))}).chunk(
-        {"x": 1000, "y": 1000}
-    )
+
+    random_data = da.random.random((size, size), chunks=(500, 500))
+
+    ds = xr.Dataset({"temperature": (("x", "y"), random_data)})
+
     print(f"Dataset created with {ds.nbytes / 1e9:.2f} GB of data.")
     print("Performing computationally intense operation (mean calculation)...")
     result = ds.temperature.mean().compute()
     print("Computation finished successfully.")
     return result
+
+
+def run_ps_calc(client: Client) -> None:
+    """Run the potential size calculation using Dask.
+
+    Args:
+        client (Client): Dask client connected to the cluster.
+    """
+    num_workers = len(client.scheduler_info()["workers"])
+    print(f"Starting computation on a Dask cluster with {num_workers} workers.")
+    calculate_potential_sizes(start_year=2020, end_year=2024)
+    print("Computation finished successfully.")
+    return None
 
 
 if __name__ == "__main__":
@@ -60,8 +77,9 @@ if __name__ == "__main__":
 
     # Run your main computation
     start_time = time.perf_counter()
-    final_result = process_large_dataset(client, size=50000)
+    # final_result = process_large_dataset(client, size=50000)
+    run_ps_calc(client)
     end_time = time.perf_counter()
 
-    print(f"\nFinal Result: {final_result:.4f}")
+    #print(f"\nFinal Result: {final_result:.4f}")
     print(f"Total execution time: {end_time - start_time:.2f} seconds.")

@@ -1,10 +1,10 @@
 #!/bin/bash --login
 
 #SBATCH --job-name=era5
-#SBATCH --nodes=10
+#SBATCH --nodes=5
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:00
+#SBATCH --time=00:20:00
 
 # slurm job name as output log file name
 #SBATCH --output=logs/%x-%j.out
@@ -13,7 +13,7 @@
 
 #SBATCH --account=n02-bas
 #SBATCH --partition=standard
-#SBATCH --qos=standard
+#SBATCH --qos=short
 
 # emailing for start and end.
 #SBATCH --mail-type=BEGIN
