@@ -15,6 +15,7 @@ import subprocess
 import xarray as xr
 import netCDF4 as nc
 from matplotlib import pyplot as plt
+import statsmodels.api as sm
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
 from sithom.time import timeit
@@ -462,6 +463,7 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
 
     client.close()
 
+
 def assign_coordinate_attributes(file_path: str):
     """Assigns CF-compliant 'coordinates' attributes to data variables.
 
@@ -500,11 +502,11 @@ def assign_coordinate_attributes(file_path: str):
     >>> os.remove(file_name)
     """
     # Define the spatial coordinate variables as named in your file
-    lon_name = 'longitude'
-    lat_name = 'latitude'
+    lon_name = "longitude"
+    lat_name = "latitude"
 
     try:
-        with nc.Dataset(file_path, 'a') as ds:
+        with nc.Dataset(file_path, "a") as ds:
             # Get the names of all coordinate variables
             coord_vars = list(ds.dimensions.keys())
 
@@ -512,21 +514,20 @@ def assign_coordinate_attributes(file_path: str):
             for var_name in ds.variables:
                 # Skip coordinate variables themselves
 
-
                 var_obj = ds.variables[var_name]
                 # Check if the variable has the required dimensions
                 if lon_name in var_obj.dimensions and lat_name in var_obj.dimensions:
                     print(f"Processing variable: {var_name}... ", end="")
                     # Assign the coordinates attribute
-                    var_obj.setncattr('coordinates', f'{lon_name} {lat_name}')
+                    var_obj.setncattr("coordinates", f"{lon_name} {lat_name}")
                     print("Added 'coordinates' attribute.")
 
-            ds[lon_name].setncattr('standard_name', 'longitude')
-            ds[lat_name].setncattr('standard_name', 'latitude')
-            ds[lon_name].setncattr('axis', 'X')
-            ds[lat_name].setncattr('axis', 'Y')
-            ds[lon_name].units = 'degrees_east'
-            ds[lat_name].units = 'degrees_north'
+            ds[lon_name].setncattr("standard_name", "longitude")
+            ds[lat_name].setncattr("standard_name", "latitude")
+            ds[lon_name].setncattr("axis", "X")
+            ds[lat_name].setncattr("axis", "Y")
+            ds[lon_name].units = "degrees_east"
+            ds[lat_name].units = "degrees_north"
 
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
@@ -544,7 +545,7 @@ def fix_era5_pi_decade(output_path: str) -> None:
     )  # Load the dataset to ensure it's processed
     print(ds)
 
-    coords_to_remove = ['number', 'expver']
+    coords_to_remove = ["number", "expver"]
 
     # Use reset_coords with drop=True to completely remove them from the dataset
     # This is the cleanest way to solve the CDO compatibility issue.
@@ -557,7 +558,7 @@ def fix_era5_pi_decade(output_path: str) -> None:
     print()
     os.system(f"ncdump -h '{new_output_path}'")
     print("Now running netcdf4 to change coords.")
-    #os.system(f"ncatted -O -a coordinates,.,d,, '{new_output_path}'")
+    # os.system(f"ncatted -O -a coordinates,.,d,, '{new_output_path}'")
     # print("Final ncdump after ncatted")
     assign_coordinate_attributes(new_output_path)
     os.system(f"ncdump -h '{new_output_path}'")
@@ -578,103 +579,11 @@ def era5_pi(years: List[str]) -> None:
         era5_pi_decade(single_level_path, pressure_level_path)
 
 
-def calculate_trend(
-    da: xr.DataArray,
-    output: Literal["slope", "rise"] = "rise",
-    t_var: str = "T",
-    make_hatch_mask: bool = False,
-    keep_ds: bool = False,
-    uncertainty: bool = False,
-) -> Union[float, ufloat, xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
-    """
-    Returns either the linear trend rise, or the linear trend slope,
-    possibly with the array to hatch out where the trend is not significant.
-
-    Uses `xr.polyfit` order 1 to do everything.
-
-    Args:
-        da (xr.DataArray): the timeseries.
-        output (Literal[, optional): What to return. Defaults to "rise".
-        t_var (str, optional): The time variable name. Defaults to "T".
-            Could be changed to another variable that you want to fit along.
-        make_hatch_mask (bool, optional): Whether or not to also return a DataArray
-            of boolean values to indicate where is not significant.
-            Defaults to False. Will only work if you're passing in an xarray object.
-        uncertainty (bool, optional): Whether to return a ufloat object
-            if doing linear regression on a single timeseries. Defaults to false.
-
-    Returns:
-        Union[float, ufloat, xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
-            The rise/slope over the time period, possibly with the hatch array if
-            that opition is selected for a grid.
-    """
-
-    def length_time(da):
-        return (da.coords[t_var][-1] - da.coords[t_var][0]).values
-
-    def get_float(inp: Union[np.ndarray, list, float]):
-        try:
-            if hasattr(inp, "__iter__"):
-                inp = inp[0]
-        # pylint: disable=bare-except
-        except:
-            print(type(inp))
-        return float(inp)
-
-    if "X" in da.dims or "Y" in da.dims or "member" in da.dims or keep_ds:
-
-        fit_da = da.polyfit(t_var, 1, cov=make_hatch_mask)
-
-        slope = fit_da.polyfit_coefficients.isel(degree=1).drop("degree")
-
-        if make_hatch_mask:
-            frac_error = np.abs(
-                np.sqrt(fit_da.polyfit_covariance.isel(cov_i=0, cov_j=0))
-                / slope  # degree=1 is in the first position
-            )
-            hatch_mask = frac_error >= 1.0
-
-        slope = fit_da.polyfit_coefficients.sel(degree=1).drop("degree")
-    else:
-        if uncertainty:
-            # print("uncertainty running")
-            fit_da = da.polyfit(t_var, 1, cov=True)
-            error = np.sqrt(fit_da.polyfit_covariance.isel(cov_i=0, cov_j=0)).values
-            error = get_float(error)
-            slope = fit_da.polyfit_coefficients.values
-            slope = get_float(slope)
-            slope = ufloat(slope, error)
-        else:
-            slope = da.polyfit(t_var, 1).polyfit_coefficients.values
-            slope = get_float(slope)
-
-    if output == "rise":
-
-        run = length_time(da)
-        rise = slope * run
-
-        if isinstance(rise, xr.DataArray):
-            for pr_name in ["units", "long_name"]:
-                if pr_name in da.attrs:
-                    rise.attrs[pr_name] = da.attrs[pr_name]
-            rise = rise.rename("rise")
-
-        # print("run", run, "slope", slope, "rise = slope * run", rise)
-
-        if make_hatch_mask and not isinstance(rise, float, ufloat):
-            return rise, hatch_mask
-        else:
-            return rise
-
-    elif output == "slope":
-        if make_hatch_mask and not isinstance(slope, float):
-            return slope, hatch_mask
-        else:
-            return slope
-
-
 def select_seasonal_hemispheric_data(
-    ds: xr.Dataset, months_to_average: int = 1, lon: str = "longitude", lat: str = "latitude"
+    ds: xr.Dataset,
+    months_to_average: int = 1,
+    lon: str = "longitude",
+    lat: str = "latitude",
 ) -> xr.Dataset:
     """
     Selects seasonal hemispheric data, with an option to average over peak months.
@@ -745,9 +654,7 @@ def select_seasonal_hemispheric_data(
         nh_annual = nh_data.groupby(nh_data.time.dt.year).mean("time")
 
         # Southern Hemisphere: January-February-March (JFM)
-        sh_data = ds.where(
-            ds.time.dt.month.isin([1, 2, 3]) & (ds[lat] < 0), drop=True
-        )
+        sh_data = ds.where(ds.time.dt.month.isin([1, 2, 3]) & (ds[lat] < 0), drop=True)
         sh_annual = sh_data.groupby(sh_data.time.dt.year).mean("time")
 
         # Merge the two hemispheric, annually-averaged datasets
@@ -764,6 +671,13 @@ def get_era5_coordinates(
     Get the coordinates of the ERA5 data.
 
     Should have coordinates longitude, latitude, valid_time.
+
+    Args:
+        start_year (int): The starting year for the data.
+        end_year (int): The ending year for the data.
+
+    Returns:
+        xr.Dataset: The xarray dataset containing the coordinates.
     """
     sfp = os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")
     if os.path.exists(sfp):
@@ -919,6 +833,40 @@ def get_all_data(
     return xr.merge([era5_ds, era5_pi], compat="override", join="override")
 
 
+def trend_with_neweywest_full(
+    # x: np.darray,
+    y: np.ndarray,
+) -> tuple[float, float, float]:
+    """
+    Calculates the linear trend (slope, intercept) and its p-value
+    using OLS with Newey-West standard errors.
+
+    Args:
+        # x (np.ndarray): A 1D array representing the time variable (e.g., years).
+        y (np.ndarray): A 1D array representing the time series.
+
+    Returns:
+        tuple[float, float, float]: A tuple with (slope, intercept, p-value).
+    """
+    if np.all(np.isnan(y)):
+        return np.nan, np.nan, np.nan
+
+    x = np.arange(len(y))
+    x_const = sm.add_constant(x)
+
+    model = sm.OLS(y, x_const, missing="drop").fit(
+        cov_type="HAC", cov_kwds={"maxlags": 1}
+    )
+
+    # model.params is [intercept, slope]
+    # model.pvalues is [p_value_intercept, p_value_slope]
+    intercept = model.params[0]
+    slope = model.params[1]
+    p_value = model.pvalues[1]
+
+    return slope, intercept, p_value
+
+
 # @dask_cluster_wrapper
 def era5_pi_trends(
     start_year: int = DEFAULT_START_YEAR,
@@ -964,6 +912,7 @@ def era5_pi_trends(
     pi_vars = [x for x in ds.variables]
     trend_ds = ds[pi_vars].polyfit(dim="year", deg=1, cov=True)
     # let's go through and work out the hatch mask for each variable
+
     for var in pi_vars:
         cov_n = var + "_polyfit_covariance"
         trend_n = var + "_polyfit_coefficients"
@@ -977,6 +926,29 @@ def era5_pi_trends(
             trend_ds[var + "_hatch_mask"] = frac_error >= 1.0
             if np.all(trend_ds[var + "_hatch_mask"].astype(int).values == 1):
                 print(f"Warning: All values in the hatch mask for {var} are True (1).")
+        # second hatch mask from running significance test on the rise
+        results = xr.apply_ufunc(
+            trend_with_neweywest_full,
+            pi_vars,
+            input_core_dims=[["year"]],
+            # Add a third empty list for the new intercept output
+            output_core_dims=[[], [], []],
+            exclude_dims=set(("year",)),
+            vectorize=True,
+            dask="parallelized",
+            # Add a third dtype for the intercept
+            output_dtypes=[float, float, float],
+        )
+
+        slope, intercept, p_value = results
+
+        # Create the final Dataset
+        new_trend_ds = xr.Dataset(
+            {"slope": slope, "intercept": intercept, "p_value": p_value}
+        )
+        trend_ds[var + "_p_value"] = new_trend_ds["p_value"]
+        trend_ds[var + "_hatch_mask_p"] = new_trend_ds["p_value"] >= 0.05
+
     # print(trend_ds)
     trend_ds.to_netcdf(
         os.path.join(
@@ -1365,7 +1337,7 @@ def calculate_potential_sizes(
     ds = ds.rename({"lat": "latitude", "lon": "longitude"})
     ds.to_zarr(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
+            ERA5_PS_OG_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
         ),
         mode="w",
         consolidated=True,
@@ -1390,7 +1362,7 @@ def call_cdo(input_path: str, output_path: str) -> None:
     # --- Define the number of threads to use ---
     # You can set this to a specific number or use os.cpu_count() to use all available cores.
     # On an M1 Pro with 10 cores, using 8 or 10 is a good starting point.
-    num_threads = os.cpu_count() or 8 # Fallback to 8 if cpu_count() returns None
+    num_threads = os.cpu_count() or 8  # Fallback to 8 if cpu_count() returns None
 
     # Temporary file for the intermediate step
     tmp_path = output_path + ".tmp"
@@ -1402,15 +1374,27 @@ def call_cdo(input_path: str, output_path: str) -> None:
 
     # --- Step 1: Use ncks to remove unnecessary variables ---
     # This step helps to reduce the file size before regridding.
-    ncks_options = ["-C","-O", "-4"]  # -C: exclude coordinate variables, -O: overwrite, -4: netCDF-4
-    ncks_vars_to_exclude = "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver,ifl"
-    ncks_cmd = [
-        "ncks"] + ncks_options + [
-        "-x", "-v", ncks_vars_to_exclude,
-        "--thr", str(num_threads),
-        input_path,
-        tmp_path
-    ]
+    ncks_options = [
+        "-C",
+        "-O",
+        "-4",
+    ]  # -C: exclude coordinate variables, -O: overwrite, -4: netCDF-4
+    ncks_vars_to_exclude = (
+        "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver,ifl"
+    )
+    ncks_cmd = (
+        ["ncks"]
+        + ncks_options
+        + [
+            "-x",
+            "-v",
+            ncks_vars_to_exclude,
+            "--thr",
+            str(num_threads),
+            input_path,
+            tmp_path,
+        ]
+    )
 
     print(f"\nRunning ncks to create temporary file: {' '.join(ncks_cmd)}")
     # Using subprocess.run is generally safer and more flexible than os.system
@@ -1435,12 +1419,14 @@ def call_cdo(input_path: str, output_path: str) -> None:
     # Added the -P flag to specify the number of parallel threads.
     cdo_cmd = [
         "cdo",
-        "-P", str(num_threads),  # Enable parallel processing with specified threads
-        "-f", "nc4",             # Set output format to netCDF-4
-        "-s",                    # Silent mode
-        f"remapbil,{grid_file}", # The regridding operation
-        tmp_path,                # Input file
-        output_path              # Output file
+        "-P",
+        str(num_threads),  # Enable parallel processing with specified threads
+        "-f",
+        "nc4",  # Set output format to netCDF-4
+        "-s",  # Silent mode
+        f"remapbil,{grid_file}",  # The regridding operation
+        tmp_path,  # Input file
+        output_path,  # Output file
     ]
 
     print(f"\nRunning parallel CDO command: {' '.join(cdo_cmd)}")
@@ -1512,10 +1498,10 @@ def regrid_all(years: List[str]) -> None:
             print(f"Regridding PI data for years {years[i]}-{years[j-1]}")
             call_cdo(pi_path, output_pi_path)
         ps_path = os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
+            ERA5_PS_OG_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
         )
         output_ps_path = os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
+            ERA5_PS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
         )
         if os.path.exists(ps_path) and not os.path.exists(output_ps_path):
             print(f"Regridding potential sizes data for years {years[i]}-{years[j-1]}")
@@ -1538,42 +1524,46 @@ def get_all_regridded_data(
         xr.Dataset: The xarray dataset containing the regridded ERA5 data.
     """
     single_ds = preprocess_single_level_data(
-            xr.open_mfdataset(
-                os.path.join(ERA5_REGRIDDED_PATH,"era5_single*.nc"),# "era5_single_levels_years2*.nc"),
-                combine="by_coords",
-                chunks=CHUNK_IN[chunk_in],
-                engine="netcdf4",)
-        )
-    pressure_ds = preprocess_pressure_level_data(
-            xr.open_mfdataset(
-                os.path.join(ERA5_REGRIDDED_PATH, "era5_pressure*.nc"),#_levels_years2*.nc"),
-                combine="by_coords",
-                chunks=CHUNK_IN[chunk_in],
-                engine="netcdf4",)
-        )
-    pi_ds = xr.open_mfdataset(
-            os.path.join(ERA5_PI_PATH, "era5_pi_years*.nc"),
+        xr.open_mfdataset(
+            os.path.join(
+                ERA5_REGRIDDED_PATH, "era5_single*.nc"
+            ),  # "era5_single_levels_years2*.nc"),
             combine="by_coords",
             chunks=CHUNK_IN[chunk_in],
             engine="netcdf4",
         )
+    )
+    pressure_ds = preprocess_pressure_level_data(
+        xr.open_mfdataset(
+            os.path.join(
+                ERA5_REGRIDDED_PATH, "era5_pressure*.nc"
+            ),  # _levels_years2*.nc"),
+            combine="by_coords",
+            chunks=CHUNK_IN[chunk_in],
+            engine="netcdf4",
+        )
+    )
+    pi_ds = xr.open_mfdataset(
+        os.path.join(ERA5_PI_PATH, "era5_pi_years*.nc"),
+        combine="by_coords",
+        chunks=CHUNK_IN[chunk_in],
+        engine="netcdf4",
+    )
 
     return xr.merge(
         [single_ds, pressure_ds, pi_ds],
         compat="override",
-        join="override",).sel(
-            time=slice(f"{start_year}-01-01", f"{end_year}-12-31"   )
-    )
-
+        join="override",
+    ).sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
 
 
 if __name__ == "__main__":
     # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
     # download_era5_data(start_year=1940)
-    era5_pi(
-         [str(year) for year in range(1980, 2025)]  # 2025)]
-    )  # Modify or extend this list as needed.)
+    # era5_pi(
+    #     [str(year) for year in range(1980, 2025)]  # 2025)]
+    # )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
     # This means that future scripts also need to be able to handle this.
@@ -1581,7 +1571,7 @@ if __name__ == "__main__":
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
     # era5_pi_trends(start_year=1940, months=1)
-    # era5_pi_trends(start_year=1980, months=1)
+    era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
     # find_tropical_m(start_year=1940, months=1)
 
@@ -1621,13 +1611,13 @@ if __name__ == "__main__":
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
-    dask_cluster_wrapper(
-         calculate_potential_sizes,
-         start_year=DEFAULT_START_YEAR,
-         end_year=DEFAULT_START_YEAR + 9,
-    )  # This will take a long time to run.
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR,
+    #     end_year=DEFAULT_START_YEAR + 9,
+    # )  # This will take a long time to run.
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
-    years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
-    regrid_all(years)
+    # years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
+    # regrid_all(years)
