@@ -20,7 +20,7 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
-module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
+# module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
 
 # try to activate micromamba
 source /work/n02/n02/sdat2/.bashrc

@@ -51,9 +51,7 @@ if __name__ == "__main__":
     )
 
     # Initialize the dask-mpi cluster
-    initialize(
-        interface="ib0"
-    )  # 'ib0' is often the InfiniBand interface on HPCs, but letting it auto-detect is usually fine.
+    initialize()  # 'ib0' is often the InfiniBand interface on HPCs, but letting it auto-detect is usually fine.
 
     # Connect to the cluster
     client = Client()
