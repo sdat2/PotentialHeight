@@ -54,7 +54,7 @@ from .constants import (
 )
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
-from .dask import dask_cluster_wrapper
+from .dask_utils import dask_cluster_wrapper
 
 DEFAULT_START_YEAR = 1980
 DEFAULT_END_YEAR = 2024

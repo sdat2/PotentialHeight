@@ -1,7 +1,7 @@
 #!/bin/bash --login
 
 #SBATCH --job-name=era5
-#SBATCH --nodes=1
+#SBATCH --nodes=10
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
 #SBATCH --time=24:00:00
@@ -20,6 +20,8 @@
 #SBATCH --mail-type=END
 #SBATCH --mail-user=sdat2@cam.ac.uk
 
+module load PrgEnv-gnu/8.3.3 cray-hdf5-parallel/1.12.2.1 cray-netcdf-hdf5parallel/4.9.0.1
+
 # try to activate micromamba
 source /work/n02/n02/sdat2/.bashrc
 which micromamba
@@ -33,4 +35,7 @@ which python
 export MPLCONFIGDIR="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/tmp/.matplotlib"
 mkdir -p $MPLCONFIGDIR
 
-python -m tcpips.era5
+# python -m tcpips.era5
+echo "Starting dask-mpi job on 10 nodes..."
+srun python -u /work/n02/n02/sdat2/adcirc-swan/worstsurge/tcpips/era5_ps_calc.py
+echo "Job finished."
