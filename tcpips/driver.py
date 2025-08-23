@@ -19,7 +19,7 @@ from .constants import RAW_PATH, CDO_PATH, PI4_PATH, PS_PATH
 from .pi_driver import pi_cmip6_part
 from .ps_driver import ps_cmip6_part
 from .regrid_cdo import regrid_cmip6_part
-from .dask import dask_cluster_wrapper
+from .dask_utils import dask_cluster_wrapper
 
 
 def loop_through_all() -> None:

@@ -55,7 +55,7 @@ from .constants import (
 )
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
-from .dask import dask_cluster_wrapper
+from .dask_utils import dask_cluster_wrapper
 
 DEFAULT_START_YEAR = 1980
 DEFAULT_END_YEAR = 2024
@@ -733,7 +733,7 @@ def get_era5_combined(
                 chunks=CHUNK_IN[chunk_in],
                 engine="netcdf4",
             )
-        )
+        ).sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
     else:
         fp = []
         years = [str(year) for year in range(start_year, end_year + 1)]
@@ -825,7 +825,7 @@ def get_all_data(
         start_year=start_year, end_year=end_year, chunk_in=chunk_in
     )
     if "valid_time" in era5_ds.dims:
-        era5_dsds = era5_dsds.rename({"valid_time": "time"})
+        era5_ds = era5_ds.rename({"valid_time": "time"})
     # print(era5_ds.sst.values.sel(longitude))
     print(era5_ds)
     era5_pi = get_era5_pi(start_year=start_year, end_year=end_year, chunk_in=chunk_in)
@@ -1318,6 +1318,7 @@ def calculate_potential_sizes(
         print("No ERA5 data found. Please run era5_pi() first.")
         return
     ds = ds.rename({"latitude": "lat", "longitude": "lon"})
+    # currently I'm assuming that the data does not need to be converted
     # delete the unnecessary volume variables
     del ds["t"]
     del ds["q"]
@@ -1563,6 +1564,9 @@ if __name__ == "__main__":
     # download_era5_data(start_year=1940)
     # era5_pi(
     #     [str(year) for year in range(1980, 2025)]  # 2025)]
+    # )  # Modify or extend this list as needed.)
+    # era5_pi(
+    #      [str(year) for year in range(1980, 2025)]  # 2025)]
     # )  # Modify or extend this list as needed.)
     # problem: the era5 pressure level data is too big to save in one file
     # so I have split it into chunks of 10 years.
