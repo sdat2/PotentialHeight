@@ -48,7 +48,7 @@ def run_ps_calc(client: Client) -> None:
     """
     num_workers = len(client.scheduler_info()["workers"])
     print(f"Starting computation on a Dask cluster with {num_workers} workers.")
-    calculate_potential_sizes(start_year=2020, end_year=2024)
+    calculate_potential_sizes(start_year=1980, end_year=2019)
     print("Computation finished successfully.")
     return None
 
