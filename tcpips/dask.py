@@ -44,3 +44,17 @@ def dask_cluster_wrapper(
     print(
         f"Function {func.__name__} for {str(args)}, {str(kwargs)} completed in {hr_time(tock-tick)} seconds using a dask cluster."
     )
+
+
+if __name__ == "__main__":
+    # python -m  tcpips.dask
+
+    time_per_operation = 1
+    lats = 180*2
+    lons = 360*2
+    times = 12 * 10
+    total_operations = lats * lons * times
+    workers = 16
+
+    total_time = total_operations * time_per_operation / workers
+    print(f"Estimated time for {total_operations} operations across {workers} workers: {hr_time(total_time)}")
