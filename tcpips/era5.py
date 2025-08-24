@@ -602,6 +602,7 @@ def select_seasonal_hemispheric_data(
 
     >>> # --- Test Setup ---
     >>> # Create a 2-year dataset where the data value is the month number.
+    >>> import pandas as pd
     >>> time = pd.date_range('2020-01-01', '2021-12-31', freq='MS')
     >>> lats = [-20, 20]  # One SH, one NH point
     >>> lons = [100]

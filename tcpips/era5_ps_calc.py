@@ -40,7 +40,7 @@ def process_large_dataset_ex(client: Client, size: int) -> float:
     return result
 
 
-def run_ps_calc(client: Client) -> None:
+def run_ps_calc(client: Client, start_year=1980, end_year=1989) -> None:
     """Run the potential size calculation using Dask.
 
     Args:
@@ -48,7 +48,7 @@ def run_ps_calc(client: Client) -> None:
     """
     num_workers = len(client.scheduler_info()["workers"])
     print(f"Starting computation on a Dask cluster with {num_workers} workers.")
-    calculate_potential_sizes(start_year=1980, end_year=2019)
+    calculate_potential_sizes(start_year=start_year, end_year=end_year)
     print("Computation finished successfully.")
     return None
 
@@ -78,8 +78,11 @@ if __name__ == "__main__":
     # Run your main computation
     start_time = time.perf_counter()
     # final_result = process_large_dataset(client, size=50000)
-    run_ps_calc(client)
+    # run_ps_calc(client, start_year=1980, end_year=1989)
+    # run_ps_calc(client, start_year=1990, end_year=1999)
+    run_ps_calc(client, start_year=2000, end_year=2009)
+    run_ps_calc(client, start_year=2010, end_year=2019)
     end_time = time.perf_counter()
 
-    #print(f"\nFinal Result: {final_result:.4f}")
+    # print(f"\nFinal Result: {final_result:.4f}")
     print(f"Total execution time: {end_time - start_time:.2f} seconds.")
