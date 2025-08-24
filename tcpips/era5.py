@@ -7,10 +7,11 @@ The script is designed to download the data to calculate potential intensity (PI
 """
 
 import os
+import shutil
 import cdsapi
-from typing import List, Union, Tuple, Literal, Optional
+from typing import List, Literal, Optional
 import numpy as np
-import pandas as pd
+import tempfile
 import subprocess
 import xarray as xr
 import netCDF4 as nc
@@ -847,8 +848,20 @@ def trend_with_neweywest_full(
 
     Returns:
         tuple[float, float, float]: A tuple with (slope, intercept, p-value).
+
+    Doctests:
+    >>> import numpy as np
+    >>> # Test with a simple increasing trend
+    >>> y = np.array([1, 2, 3, 4, 5])
+    >>> slope, intercept, p_value = trend_with_neweywest_full(y)
+    >>> round(slope, 2)
+    1.0
+    >>> round(intercept, 2)
+    1.0
+    >>> round(p_value, 4) < 0.05
+    True
     """
-    print("Calculating trend with Newey-West standard errors...")
+    # print("Calculating trend with Newey-West standard errors...")
     if np.all(np.isnan(y)):
         return np.nan, np.nan, np.nan
 
@@ -907,6 +920,7 @@ def era5_pi_trends(
     new_year = ds.year - ds.year.min()
     assert len(new_year) > 20, "Not enough time points to calculate trends."
     ds = ds.assign_coords(year=new_year)
+    ds = ds.chunk({"year": -1}, inplace=True)  # all time in one chunk
     print("New time coordinates:", ds.year.values)
     print("Calculating trends in potential intensity...")
     # pi_vars = ["vmax", "t0", "otl", "sst"]
@@ -950,14 +964,38 @@ def era5_pi_trends(
         trend_ds[var + "_p_value"] = new_trend_ds["p_value"]
         trend_ds[var + "_hatch_mask_p"] = new_trend_ds["p_value"] >= 0.05
 
-    # print(trend_ds)
-    trend_ds.to_netcdf(
-        os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
-        ),
-        engine="h5netcdf",
-        encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
+    print("Saving to zarr...")
+    temp_path = tempfile.mkdtemp(suffix=".zarr", dir=".") # Write temp file in current dir
+    out_path = os.path.join(
+        ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
     )
+
+    try:
+        with ProgressBar():
+            ds.to_zarr(temp_path, mode="w", consolidated=True)
+
+        if os.path.exists(out_path):
+            shutil.rmtree(out_path)
+
+        os.rename(temp_path, out_path)
+        print(f"Successfully saved to {out_path}")
+
+    except Exception as e:
+        print(f"Failed to save data. Error: {e}")
+        shutil.rmtree(temp_path) # Clean up on failure
+        raise
+
+
+    # # print(trend_ds)
+    # trend_ds.to_zarr(
+    #     os.path.join(
+    #         ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
+    #     ),
+    #     mode="w",
+    #     consolidated=True,
+    #     # engine="h5netcdf",
+    #     # encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
+    # )
 
 
 def find_tropical_m(
@@ -1576,7 +1614,13 @@ if __name__ == "__main__":
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
     # era5_pi_trends(start_year=1940, months=1)
-    era5_pi_trends(start_year=1980, months=1)
+    # dask_cluster_wrapper(
+    #     era5_pi_trends, start_year=1980, end_year=2024, months=1
+    # )
+    dask_cluster_wrapper(
+        era5_pi_trends, start_year=1940, end_year=2024, months=1
+    )
+    # era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
     # find_tropical_m(start_year=1940, months=1)
 
