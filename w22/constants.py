@@ -92,6 +92,6 @@ OFFSET_D = {
     "new_orleans": {"point": NEW_ORLEANS, "lon_offset": 0, "lat_offset": -1},
     # these ones are not checked
     "shanghai": {"point": SHANGHAI, "lon_offset": 0.5, "lat_offset": -0.3},
-    "hong_kong": {"point": HONG_KONG, "lon_offset": 0.5, "lat_offset": -0.5},
-    "hanoi": {"point": HANOI, "lon_offset": 0.5, "lat_offset": -0.1},
+    "hong_kong": {"point": HONG_KONG, "lon_offset": 1, "lat_offset": -1},
+    "hanoi": {"point": HANOI, "lon_offset": 2, "lat_offset": -0.3},
 }

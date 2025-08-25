@@ -1616,9 +1616,20 @@ if __name__ == "__main__":
     # dask_cluster_wrapper(
     #     era5_pi_trends, start_year=1940, end_year=2024, months=1
     # )
-    plot_trend_maps(start_year=1980, months=1)
-    plot_trend_lineplots(360 - 90.0, 29.0, label="new_orleans", start_year=1980)  # New Orleans, USA (30N, 90W)
-    plot_trend_lineplots(360 - 80.0, 25.0, label="miami", start_year=1980)  # Miami, USA (25N, 80W)
+    from w22.constants import OFFSET_D
+
+    new_point_d = {var: (OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"], OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"])
+                   for var in OFFSET_D}
+
+    for point in ["hong_kong"]: #new_point_d:
+        print(f"Plotting trend lineplots for {point} at {new_point_d[point]}")
+        plot_trend_lineplots(
+            (new_point_d[point][0] + 360) % 360,  # ensure in 0-360 range
+            new_point_d[point][1],
+            label=point,
+            start_year=1980,
+        )
+
     # era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
     # find_tropical_m(start_year=1940, months=1)

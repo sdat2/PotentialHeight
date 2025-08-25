@@ -3087,6 +3087,7 @@ def get_vary_vobs_lower_data(
     lower_vobs_min: float = 18,
     lower_vobs_max: float = 83,
     lower_wind_vp: float = 33,
+    regenerate=False,
 ) -> xr.Dataset:
     """
     Get the exceedance of normalized variables for varying lower limits of observed wind speed.
@@ -3099,7 +3100,7 @@ def get_vary_vobs_lower_data(
         xr.Dataset: Dataset containing the exceedance of normalized variables for varying lower limits of observed wind speed.
     """
     file_name = os.path.join(IBTRACS_DATA_PATH, "vary_vobs_lower_exceedance.nc")
-    if os.path.exists(file_name):
+    if os.path.exists(file_name) and not regenerate:
         print(f"Loading existing dataset from {file_name}")
         return xr.open_dataset(os.path.join(file_name))
     else:
@@ -3327,130 +3328,12 @@ def run_all_plots():
 
 
 if __name__ == "__main__":
+
     # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
     plot_defaults()
-    # print("IBTrACS data downloaded and ready for processing.")
-    # ibtracs_to_era5_map()
-    # plot_unique_points()
-    # era5_unique_points_raw()
-    # plot_example_raw()
-    # process_era5_raw()
-    # plot_era5_processed()
-    # calculate_potential_intensity()
-    # plot_potential_intensity()
-    # calculate_potential_size()
-    # plot_potential_size()
-    # add_pi_ps_back_onto_tracks()
-    # create_normalized_variables()
-    # plot_normalized_variables()
-    # ## calculate_cps(v_reduc=0.8, test=True)
-    # #calculate_cps(v_reduc=0.8, test=False)
-    # plot_cps()
-    # plot_normalized_cps()
-    # check_sizes()
-    # plot_tc_example()
-    # plot_tc_example(
-    #     name=b"KATRINA", bbox=(-92.5, -72.5, 22.5, 37.5)
-    # )  # Katrina's landfall in Louisiana
-    # plot_tc_example(
-    #     name=b"IDA", bbox=(-92.5 - 5, -72.5, 22.5 - 5, 37.5)  # bbox=(-90, -80, 25, 35)
-    # )  # Ida's landfall in Louisiana
-    # plot_tc_example(
-    #     name=b"HELENE",
-    #     bbox=(-92.5 - 5, -72.5, 22.5 - 5, 37.5),  # bbox=(-90, -80, 25, 35)
-    # )
-    # plot_tc_example(name=b"IAN", bbox=(-92.5 + 7.5, -72.5 + 10, 22.5 - 10, 37.5 - 5))
-    # plot_tc_example(name=b"HARVEY", bbox=(-92.5 - 7.5, -72.5 + 20, 22.5 - 10, 37.5 + 5))
-    # plot_tc_example(
-    #     name=b"FIONA",
-    #     bbox=None,
-    # )
-    # plot_tc_example(
-    #     name=b"SAOLA",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     bbox=(108, 130, 15, 30),
-    # )
-    # plot_tc_example(
-    #     name=b"MANGKHUT",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     # bbox=None,
-    #     # bbox=None,
-    #     bbox=(100, 170, 10, 30),
-    # )
-    # plot_tc_example(
-    #     name=b"HATO",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     # bbox=None,
-    #     bbox=(90, 135, 10, 30),
-    # )
-    # plot_tc_example(
-    #     name=b"VICENTE",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     bbox=None,
-    # )
-    # plot_tc_example(
-    #     name=b"YORK",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     bbox=None,
-    # )
-    # plot_tc_example(
-    #     name=b"ELLEN",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     bbox=None,
-    # )
-
-    # plot_tc_example(
-    #     name=b"BEBINCA",  # Bebinca
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     # bbox=(100, 170, 10, 30),
-    #     bbox=None,
-    # )
-
-    # plot_tc_example(
-    #     name=b"JEBI",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     bbox=None,
-    # )
-    # plot_tc_example(
-    #     name=b"MERANTI",
-    #     basin=b"WP",
-    #     subbasin=b"WPAC",
-    #     bbox=None,
-    # )
-    # plot_tc_example(
-    #     name=b"FREDDY",
-    #     basin=b"SI",
-    #     bbox=None,
-    # )
-    # save_basin_names()
-    # vary_v_cps()
-    # plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33)
-    # compare_normalized_potential_size()
-    # calculate_potential_size_cat1()
-    # add_pi_ps_back_onto_tracks(
-    #     variables_to_map=("rmax", "vmax", "r0", "pm", "otl", "t0"),
-    #     input_name="IBTrACS.since1980.v04r01.unique.nc",
-    #     era5_name="era5_unique_points_ps_cat1.nc",
-    #     output_name="IBTrACS.since1980.v04r01.ps_cat1.nc",
-    # )
-    # vary_limits(num=50)
     # run_all_plots()
-    # vary_v_cps()
-    # ani_vary_v_cps()
-    # ani_vary_v_cps(name=b"KATRINA")
-    ani_vary_v_cps(name=b"IRENE")
-    ani_vary_v_cps(name=b"IDA", timestep_end=360)
-    ani_vary_v_cps(name=b"HELENE", timestep_end=360)
-    ani_vary_v_cps(name=b"MANGKHUT", basin=b"WP", subbasin=b"WPAC", timestep_end=360)
-    ani_vary_v_cps(name=b"Freddy", basin=b"SI", subbasin=b"SWIO", timestep_end=360)
+    ds = get_vary_vobs_lower_data(num=50, regenerate=True)
+    print(ds)
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
