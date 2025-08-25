@@ -70,6 +70,7 @@ def plot_var_on_map(
     cmap: str,
     shrink: float = 0.8,
     hatch_mask: Optional[xr.DataArray] = None,
+    second_hatch_mask: Optional[xr.DataArray] = None,
     **kwargs,
 ) -> None:
     """Plot a variable on a geographic map.
@@ -156,6 +157,31 @@ def plot_var_on_map(
                 y="latitude",
                 levels=[0, 0.5, 1],  # Define regions for 0s and 1s
                 hatches=[None, "xxxx"],  # Apply hatch ONLY to the region of 1s
+                colors="none",  # Makes the area transparent
+                add_colorbar=False,
+            )
+    if second_hatch_mask is not None:
+        if not isinstance(second_hatch_mask, xr.DataArray):
+            raise ValueError("second_hatch_mask must be an xarray DataArray.")
+        else:
+            plt.rcParams["hatch.linewidth"] = 0.4
+            plt.rcParams["hatch.color"] = "green"
+            if np.all(second_hatch_mask.astype(int).values == 1):
+                warning = "All values in the second hatch mask are True (1)."
+                print(warning)
+            else:
+                ones = np.sum(second_hatch_mask.astype(int).values == 1)
+                zeros = np.sum(second_hatch_mask.astype(int).values == 0)
+                print(
+                    f"{ones/(ones + zeros) * 100:.2f}% of the area for {label} is masked out."
+                )
+            _ = second_hatch_mask.astype(int).plot.contourf(
+                ax=ax,
+                transform=ccrs.PlateCarree(),
+                x="longitude",
+                y="latitude",
+                levels=[0, 0.5, 1],  # Define regions for 0s and 1s
+                hatches=[None, "++++"],  # Apply hatch ONLY to the region of 1s
                 colors="none",  # Makes the area transparent
                 add_colorbar=False,
             )
@@ -898,7 +924,9 @@ def era5_pi_trends(
             - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
     """
     # load all the decades of data for potential intensity
-    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")
+    pi_vars = ["vmax", "t0", "otl", "sst", "msl", "rh"] # [x for x in ds.variables]
+
+    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")[pi_vars]
     if ds is None:
         print("No ERA5 PI data found. Please run era5_pi() first.")
         return
@@ -920,11 +948,13 @@ def era5_pi_trends(
     new_year = ds.year - ds.year.min()
     assert len(new_year) > 20, "Not enough time points to calculate trends."
     ds = ds.assign_coords(year=new_year)
-    ds = ds.chunk({"year": -1}, inplace=True)  # all time in one chunk
+    ds = ds.chunk({"year": -1})  # all time in one chunk
+    print("new rechunked ds", ds)
+
     print("New time coordinates:", ds.year.values)
     print("Calculating trends in potential intensity...")
+
     # pi_vars = ["vmax", "t0", "otl", "sst"]
-    pi_vars = [x for x in ds.variables]
     trend_ds = ds[pi_vars].polyfit(dim="year", deg=1, cov=True)
     # let's go through and work out the hatch mask for each variable
 
@@ -951,7 +981,9 @@ def era5_pi_trends(
             exclude_dims=set(("year",)),
             vectorize=True,
             dask="parallelized",
-            # Add a third dtype for the intercept
+            # rechunk=True,
+            dask_gufunc_kwargs={"allow_rechunk": True},
+            # allow_rechunk=True,
             output_dtypes=[float, float, float],
         )
 
@@ -963,6 +995,8 @@ def era5_pi_trends(
         )
         trend_ds[var + "_p_value"] = new_trend_ds["p_value"]
         trend_ds[var + "_hatch_mask_p"] = new_trend_ds["p_value"] >= 0.05
+        trend_ds[var + "_slope_nw"] = new_trend_ds["slope"]
+        trend_ds[var + "_intercept_nw"] = new_trend_ds["intercept"]
 
     print("Saving to zarr...")
     temp_path = tempfile.mkdtemp(suffix=".zarr", dir=".") # Write temp file in current dir
@@ -972,7 +1006,7 @@ def era5_pi_trends(
 
     try:
         with ProgressBar():
-            ds.to_zarr(temp_path, mode="w", consolidated=True)
+            trend_ds.to_zarr(temp_path, mode="w", consolidated=True)
 
         if os.path.exists(out_path):
             shutil.rmtree(out_path)
@@ -984,18 +1018,6 @@ def era5_pi_trends(
         print(f"Failed to save data. Error: {e}")
         shutil.rmtree(temp_path) # Clean up on failure
         raise
-
-
-    # # print(trend_ds)
-    # trend_ds.to_zarr(
-    #     os.path.join(
-    #         ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
-    #     ),
-    #     mode="w",
-    #     consolidated=True,
-    #     # engine="h5netcdf",
-    #     # encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
-    # )
 
 
 def find_tropical_m(
@@ -1042,7 +1064,7 @@ def find_tropical_m(
         1,
         sharex=True,
         sharey=True,
-        figsize=get_dim(ratio=0.8),
+        figsize=get_dim(ratio=1.0),
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
     plot_var_on_map(
@@ -1089,10 +1111,10 @@ def find_tropical_m(
     print(trend_ds["m"].median())
 
 
-def plot_vmax_trends(
+def plot_trend_maps(
     start_year: int = DEFAULT_START_YEAR,
     end_year: int = DEFAULT_END_YEAR,
-    months: int = 3,
+    months: int = 1,
 ) -> None:
     """Plot trend in vmax, t0 and otl in another 3 panel subplot with no cbar label but
     labels in subplot title instead.
@@ -1104,78 +1126,58 @@ def plot_vmax_trends(
     """
     trend_ds = xr.open_dataset(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
         ),
-        engine="h5netcdf",
     )
+    print(trend_ds)
     trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
-
-    vmax = trend_ds["vmax_polyfit_coefficients"].sel(degree=1)
-    t0 = trend_ds["t0_polyfit_coefficients"].sel(degree=1)
-    otl = trend_ds["otl_polyfit_coefficients"].sel(degree=1)
+    vars = [# "msl", "rh",
+            "sst", "t0", "otl", "vmax"]
+    vlim = [# (-1, 1), (-0.1, 0.1),
+            (-0.5, 0.5), (-0.5, 0.5), (-1, 1), (-5, 5)]
+    labels = [
+        # "$P_s$ trend [hPa decade$^{-1}$]",
+        # r"$\mathcal{H}$ trend [% decade$^{-1}$]",
+        "$T_s$ trend [K decade$^{-1}$]",
+        "$T_o$ trend [K decade$^{-1}$]",
+        "$z_{\mathrm{o}}$ trend [hPa decade$^{-1}$]",
+        "$V_p$ trend [m s$^{-1}$ decade$^{-1}$]",
+    ]
+    trends = [trend_ds[var + "_polyfit_coefficients"].sel(degree=1) for var in vars]
+    hatch_masks = [trend_ds[var + "_hatch_mask"] for var in vars]
 
     plot_defaults()
     fig, axs = plt.subplots(
-        3,
+        len(vars),
         1,
         sharex=True,
         sharey=True,
-        figsize=get_dim(ratio=0.8),
+        figsize=get_dim(ratio=1.0),
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
-    plot_var_on_map(
-        axs[0],
-        vmax * 10,  # convert to m/s/decade
-        label="$V_p$ trend [m s$^{-1}$ decade$^{-1}$]",
-        cmap="cmo.balance",
-        hatch_mask=trend_ds["vmax_hatch_mask"],
-        vmin=-10,
-        vmax=10,
-    )
-    plot_var_on_map(
-        axs[1],
-        t0 * 10,  # convert to K/decade
-        label="$T_o$ trend [K decade$^{-1}$]",
-        cmap="cmo.balance",
-        hatch_mask=trend_ds["t0_hatch_mask"],
-        vmin=-0.5,
-        vmax=0.5,
-    )
-    plot_var_on_map(
-        axs[2],
-        otl * 10,  # convert to m/decade
-        label="$z_{\mathrm{o}}$ trend [hPa decade$^{-1}$]",
-        cmap="cmo.balance",
-        hatch_mask=trend_ds["otl_hatch_mask"],
-        vmin=-1,
-        vmax=1,
-    )
 
-    # vmax.plot(ax=axs[0], cmap="cmo.balance", cbar_kwargs={"label": ""})
-    # axs[0].set_title("Vmax Trend [m/s/decade]")
-    # axs[0].set_ylabel(r"Latitude [$^{\circ}$N]")
-    # axs[0].set_xlabel("")
+    for i, var in  enumerate(vars):
+        print(f"Plotting {var}...")
+        plot_var_on_map(
+            axs[i],
+            trends[i] * 10,  # convert to per decade
+            label=labels[i],
+            cmap="cmo.balance",
+            hatch_mask=hatch_masks[i],
+            second_hatch_mask=trend_ds[var + "_hatch_mask_p"],
+            vmin=vlim[i][0],
+            vmax=vlim[i][1],
+        )
 
-    # t0.plot(ax=axs[1], cmap="cmo.balance", cbar_kwargs={"label": ""})
-    # axs[1].set_title("T0 Trend [K/decade]")
-    # axs[1].set_ylabel(r"Latitude [$^{\circ}$N]")
-    # axs[1].set_xlabel("")
-
-    # otl.plot(ax=axs[2], cmap="cmo.balance", cbar_kwargs={"label": ""})
-    # axs[2].set_title("OTL Trend [m/decade]")
-    # axs[2].set_ylabel(r"Latitude [$^{\circ}$N]")
-    # axs[2].set_xlabel(r"Longitude [$^{\circ}$E]")
-
-    label_subplots(axs)  # , override="outside")
+    label_subplots(axs)
     plt.tight_layout()
-    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_vmax_trends_3m.pdf"), dpi=300)
+    plt.savefig(
+        os.path.join(ERA5_FIGURE_PATH,
+                             f"era5_vmax_trends_{start_year}_{end_year}_{months}m.pdf"),
+                dpi=300)
 
-    print("vmax trend mean:", vmax.mean())
-    print("t0 trend mean:", t0.mean())
-    print("otl trend mean:", otl.mean())
 
-
-def plot_lineplots(
+def plot_trend_lineplots(
     lon: float,
     lat: float,
     label: str = "new_orleans",
@@ -1199,9 +1201,8 @@ def plot_lineplots(
     plot_defaults()
     trend_ds = xr.open_dataset(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
         ),
-        engine="h5netcdf",
     )
     if ds is None:
         era5_ds = get_all_data(start_year=start_year, end_year=end_year)
@@ -1227,8 +1228,30 @@ def plot_lineplots(
     del era5_ds["time"]
     # plot the variables
 
+
+    vars = [# "msl", "rh",
+            "sst", "t0", "otl", "vmax"]
+    labels = [
+        #r"$P_s$ [hPa]",
+        #r"$\mathcal{H}$ [%]",
+        r"$T_s$ [$^{\circ}$C]",
+        r"$T_o$ [K]",
+        r"$z_{\mathrm{o}}$ [hPa]",
+        r"$V_p$ [m s$^{-1}$]",
+    ]
+    units = [# "hPa", "%",
+             r"$^{\circ}$C", "K", "hPa", r"m s$^{-1}$"]
+    colors = [
+        #"tab:purple",
+        #"tab:brown",
+        "tab:blue",
+        "tab:orange",
+        "tab:green",
+        "tab:red",
+    ]
+
     fig, axs = plt.subplots(
-        4,
+        len(vars),
         1,
         sharex=True,
         figsize=get_dim(ratio=0.8),
@@ -1243,10 +1266,6 @@ def plot_lineplots(
         trend = slope * era5_ds["year"].values + intercept
         cov_matrix_unscaled = trend_ds[f"{var}_polyfit_covariance"].values
         coeffs = np.array([slope, intercept])
-        # residuals = ys - np.polyval(coeffs, x)
-        # n_dof = len(x) - len(coeffs)  # Number of degrees of freedom
-        # residual_variance = np.sum(residuals**2) / n_dof
-        # cov_matrix = cov_matrix_unscaled * residual_variance
         cov_matrix = cov_matrix_unscaled
 
         print(f"{var} Fit Coefficients (slope, intercept): {coeffs}")
@@ -1282,54 +1301,27 @@ def plot_lineplots(
         ax.set_title(
             # 0.3,
             # 0.95,
-            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}",
+            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'} (p={trend_ds[f'{var}_p_value'].values:.3f})",
             # transform=ax.transAxes,
             fontsize=10,
             # verticalalignment="top",
             color=color,
         )
 
-    print("sst", era5_ds["sst"].values.tolist())
-    print("t0", era5_ds["t0"].values.tolist())
-    print("otl", era5_ds["otl"].values.tolist())
-    axs[0].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["sst"].values - 273.15,
-        label=r"$T_s$ [$^{\circ}$C]",
-        color="tab:blue",
-    )
-    plot_trend(axs[0], "sst", "tab:blue", r"$T_s$ [$^{\circ}$C]", r"$^{\circ}$C")
-    axs[1].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["t0"].values,
-        label=r"$T_o$ [K]",
-        color="tab:orange",
-    )
-    plot_trend(axs[1], "t0", "tab:orange", r"$T_o$ [K]", "K")
-    axs[2].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["otl"].values,
-        label=r"$z_o$ [m]",
-        color="tab:green",
-    )
-    plot_trend(axs[2], "otl", "tab:green", r"$z_o$ [hPa]", "hPa")
-    axs[3].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["vmax"].values,
-        label=r"$V_p$ [m s$^{-1}$]",
-        color="tab:red",
-    )
-    plot_trend(axs[3], "vmax", "tab:red", r"$V_p$ [m s$^{-1}$]", r"m s$^{-1}$")
-    axs[0].set_ylabel(r"$T_s$ [$^{\circ}$C]")
-    axs[1].set_ylabel(r"$T_o$ [K]")
-    axs[2].set_ylabel(r"$z_o$ [hPa]")
-    axs[3].set_ylabel(r"$V_p$ [m s$^{-1}$]")
-    axs[3].set_xlabel("Year")
-    # era5_ds["sst"].plot(ax=axs[0], x="year", label="SST [C]", color="tab:blue")
-    # era5_pi["t0"].plot(ax=axs[1], x="year", label="T0 [K]", color="tab:orange")
+    for i, ax in enumerate(axs):
+        ax.plot(
+            era5_ds["year"].values + start_year,
+            era5_ds[vars[i]].values,
+            label=labels[i],
+            color=colors[i],
+        )
+        plot_trend(ax, vars[i], colors[i], labels[i], units[i])
+        ax.set_ylabel(labels[i])
+
+    axs[-1].set_xlabel("Year")
     plt.xlim(0 + start_year, end_year)
-    label_subplots(axs)  # , override="outside")
-    # era5_ds["otl"].plot(ax=axs[2], label="OTL [
+    label_subplots(axs)
+
     plt.savefig(
         os.path.join(
             ERA5_FIGURE_PATH, f"era5_pi_{label}_{start_year}_{end_year}_{months}m.pdf"
@@ -1617,34 +1609,40 @@ if __name__ == "__main__":
     # dask_cluster_wrapper(
     #     era5_pi_trends, start_year=1980, end_year=2024, months=1
     # )
-    dask_cluster_wrapper(
-        era5_pi_trends, start_year=1940, end_year=2024, months=1
-    )
+    # dask_cluster_wrapper(
+    #     era5_pi_trends, start_year=1980, end_year=2024, months=1
+    # )
+    # dask_cluster_wrapper(
+    #     era5_pi_trends, start_year=1940, end_year=2024, months=1
+    # )
+    plot_trend_maps(start_year=1980, months=1)
+    plot_trend_lineplots(360 - 90.0, 29.0, label="new_orleans", start_year=1980)  # New Orleans, USA (30N, 90W)
+    plot_trend_lineplots(360 - 80.0, 25.0, label="miami", start_year=1980)  # Miami, USA (25N, 80W)
     # era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
     # find_tropical_m(start_year=1940, months=1)
 
-    # plot_vmax_trends(start_year=1980, months=1)
-    # plot_vmax_trends(start_year=1940, months=1)
-    # plot_lineplots(
+    # plot_trend_maps(start_year=1980, months=1)
+    # plot_trend_maps(start_year=1940, months=1)
+    # plot_trend_lineplots(
     #     360 - 90.0,
     #     29.0,
     #     label="new_orleans",
     #     start_year=1980,
     # )  # New Orleans, USA (30N, 90W)
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 80.0,
     #     25.0,
     #     label="miami",
     #     start_year=1980,
     # )  # Miami, USA (25N, 80W)
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 90.0,
     #     27.0,
     #     label="new_orleans",
     #     start_year=1940,
     # )  # New Orleans, USA (30N, 90W)
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 80.0,
     #     25.0,
     #     label="miami",
@@ -1652,11 +1650,11 @@ if __name__ == "__main__":
     # )  # Miami, USA (25N, 80W)
 
     # ds = get_all_data()
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 90.0, 29.0, label="new_orleans", ds=ds
     # )  # New Orleans, USA (30N, 90W)
-    # plot_lineplots(360 - 80.0, 25.0, label="miami", ds=ds)  # Miami, USA (25N, 80W)
-    # plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
+    # plot_trend_lineplots(360 - 80.0, 25.0, label="miami", ds=ds)  # Miami, USA (25N, 80W)
+    # plot_trend_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
