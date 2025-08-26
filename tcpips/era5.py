@@ -1257,6 +1257,34 @@ def plot_trend_lineplots(
         sharex=True,
         figsize=get_dim(ratio=0.8),
     )
+    def format_p_latex(value: float, sig_figs: int = 2) -> str:
+        """Formats a float into a LaTeX scientific notation string.
+
+        Args:
+            value: The floating-point number to format.
+            sig_figs: The number of significant figures to display.
+
+        Returns:
+            A LaTeX-formatted string for the p-value.
+
+        Doctests:
+        >>> format_p_latex(0.00012345)
+        '$p=1.2 \\\\times 10^{-4}$'
+        >>> format_p_latex(12345.0)
+        '$p=1.2 \\\\times 10^{4}$'
+        >>> format_p_latex(0.051)
+        '$p=5.1 \\\\times 10^{-2}$'
+        """
+        precision = sig_figs - 1
+        sci_notation_str = f"{value:.{precision}e}"
+        mantissa, exponent_str = sci_notation_str.split('e')
+        exponent = int(exponent_str) # Cleans up leading zeros and '+' sign
+
+        # Don't use scientific notation for exponents of 0 or -1
+        if exponent in [0, -1]:
+            return f"$p={value:.{sig_figs}f}$"
+
+        return f"$p={mantissa} \\times 10^{{{exponent}}}$"
 
     def plot_trend(ax: plt.axis, var: str, color: str, label: str, unit: str) -> None:
         """Plot the trend for a specific variable."""
@@ -1289,6 +1317,7 @@ def plot_trend_lineplots(
             linestyle="--",
         )
         # new_ys = unumpy.polyval(np.array(u_coeffs), x)
+        perc_inc = slope / intercept  * 100  # percentage increase
 
         new_ys = u_coeffs[0] * x + u_coeffs[1]
         ax.fill_between(
@@ -1300,12 +1329,8 @@ def plot_trend_lineplots(
             alpha=0.2,
         )
         ax.set_title(
-            # 0.3,
-            # 0.95,
-            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'} (p={trend_ds[f'{var}_p_value'].values:.3f})",
-            # transform=ax.transAxes,
+            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}, {format_p_latex(trend_ds[f'{var}_p_value'].values)}"# , {perc_inc.n*10:.1f} ± {perc_inc.s*10:.1f} % decade{r'$^{-1}$'}",
             fontsize=10,
-            # verticalalignment="top",
             color=color,
         )
 
@@ -1621,7 +1646,7 @@ if __name__ == "__main__":
     new_point_d = {var: (OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"], OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"])
                    for var in OFFSET_D}
 
-    for point in ["hong_kong"]: #new_point_d:
+    for point in new_point_d:
         print(f"Plotting trend lineplots for {point} at {new_point_d[point]}")
         plot_trend_lineplots(
             (new_point_d[point][0] + 360) % 360,  # ensure in 0-360 range
