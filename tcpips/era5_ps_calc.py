@@ -9,7 +9,12 @@ import numpy as np
 import dask
 import dask.array as da
 from dask.distributed import Client
-from dask_mpi import initialize
+try:
+    from dask_mpi import initialize
+except ImportError:
+    print(
+        "dask-mpi is not installed. Please install it with `pip install dask-mpi`."
+    )
 from tcpips.era5 import calculate_potential_sizes
 
 

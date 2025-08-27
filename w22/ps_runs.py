@@ -10,7 +10,7 @@ from tcpips.pi import calculate_pi
 from tcpips.convert import convert
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
-from .ps import parallelized_ps
+from .ps import parallelized_ps, parallelized_ps_dask
 from .constants import DATA_PATH, OFFSET_D
 
 # store offsets for points to get data for.
@@ -113,7 +113,7 @@ def trimmed_cmip6_example(
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
 
-    out_ds = parallelized_ps(in_ds, jobs=20)
+    out_ds = parallelized_ps_dask(in_ds)
     name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in ["new_orleans", "galverston", "miami"]:
@@ -159,7 +159,7 @@ def new_orleans_10year(
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps(in_ds, jobs=20)
+    out_ds = parallelized_ps_dask(in_ds)
     out_ds["q"] = qt_ds["q"]
     out_ds["t"] = qt_ds["t"]
     out_ds["otl"] = qt_ds["otl"]
@@ -220,7 +220,7 @@ def global_cmip6(part="nw", year: int = 2015, pi_version=2) -> None:
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps(in_ds, jobs=30)
+    out_ds = parallelized_ps_dask(in_ds, jobs=30)
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(
@@ -483,73 +483,8 @@ if __name__ == "__main__":
                 pi_version=4,
                 place=place,
             )
+    from tcpips.dask_utils import dask_cluster_wrapper
 
-    # data_for_place(
-    #     "new_orleans",
-    # )
-    # data_for_place(
-    #     "hong_kong",
-    # )
-    for place in ["new_orleans", "hong_kong"]:
-        trimmed_cmip6_example(
-            pressure_assumption="isothermal",
-            trial=1,
-            pi_version=4,
-            place=place,
-        )
-    # point_timeseries(
-    #     member=4,
-    #     place="hong_kong",
-    #     recalculate_pi=True,
-    #     pi_version=4,
-    #     pressure_assumption="isothermal",
-    #     exp="ssp585",
-    # )
-    # data_for_place("hong_kong")
-    # trimmed_cmip6_example(
-    #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"
-    # )
+    dask_cluster_wrapper(data_for_place, "new_orleans")
 
-    # trimmed_cmip6_example(trial=1, pi_version=4, place="hong_kong")
-
-    # for i in [4, 10, 11]:
-    #     for exp in ["historical", "ssp585"]:
-    #         point_timeseries(member=i, place="new_orleans", pi_version=4, exp=exp)
-    # point_timeseries(member=i, place="new_orleans", pi_version=4, exp="historical")
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 1)"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 1)"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 2)"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 2)"
-    # trimmed_cmip6_example()
-    # new_orleans_10year()
-    # global_cmip6()
-    # python -c "from cle.ps_runs import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
-    # python -c "from cle.ps_runs import new_orleans_timeseries as no; no(4); no(10); no(11)"
-    # python -c "from cle.ps_runs import miami_timeseries as mm; mm(4); mm(10); mm(11)"
-    # trimmed_cmip6_example()
-    # point_timeseries(4, "new_orleans")
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, "new_orleans"); pt(10, "new_orleans"); pt(11, "new_orleans")"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'miami'); pt(10, 'miami'); pt(11, 'miami')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
-    #
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'shanghai'); pt(10, 'shanghai'); pt(11, 'shanghai')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hanoi'); pt(10, 'hanoi'); pt(11, 'hanoi')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hong_kong'); pt(10, 'hong_kong'); pt(11, 'hong_kong')"
-    # retry with pi_version = 4 for hong_kong only
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hong_kong', pi_version=4); pt(10, 'hong_kong', pi_version=4); pt(11, 'hong_kong', pi_version=4)"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'shanghai', pi_version=4); pt(10, 'shanghai', pi_version=4); pt(11, 'shanghai', pi_version=4)"
-    # lets do it for New Orleans too
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'new_orleans', pi_version=4); pt(10, 'new_orleans', pi_version=4); pt(11, 'new_orleans', pi_version=4)"
-
-    # set off global
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')" &> ne2.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('nw')" &> nw2.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('sw')" &> sw2.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se2.log
-
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
-    # python -c "from w22.ps_runs import new_orleans_10year as no; no()"
-    # trimmed_cmip6_example(trial=2, pressure_assumption="isothermal", pi_version=4)
 

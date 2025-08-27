@@ -1329,7 +1329,7 @@ def plot_trend_lineplots(
             alpha=0.2,
         )
         ax.set_title(
-            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}, {format_p_latex(trend_ds[f'{var}_p_value'].values)}"# , {perc_inc.n*10:.1f} ± {perc_inc.s*10:.1f} % decade{r'$^{-1}$'}",
+            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}, {format_p_latex(trend_ds[f'{var}_p_value'].values)}", # , {perc_inc.n*10:.1f} ± {perc_inc.s*10:.1f} % decade{r'$^{-1}$'}",
             fontsize=10,
             color=color,
         )

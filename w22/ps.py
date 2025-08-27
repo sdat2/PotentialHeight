@@ -1,6 +1,7 @@
 """Functions to calculate potential size from xarray inputs in parallel."""
 
 import os
+from typing import Literal
 from joblib import Parallel, delayed
 import numpy as np
 import xarray as xr
@@ -52,6 +53,26 @@ def calculate_ps_ufunc(
     """
     Core computation function designed for xr.apply_ufunc.
     Accepts scalar NumPy values and returns a tuple of scalar results.
+
+    Args:
+        vmax (float): Potential intensity in m/s.
+        msl (float): Ambient surface pressure in mbar.
+        sst (float): Sea surface temperature in degC.
+        t0 (float): Outflow temperature in degK.
+        lat (float): Latitude in degrees North.
+        rh (float): Environmental relative humidity (0-1).
+        ck_cd (float): Ratio of exchange coefficients [dimensionless].
+        cd (float): Drag coefficient [dimensionless].
+        w_cool (float): Cooling coefficient in m/s.
+        supergradient_factor (float): Supergradient factor [dimensionless].
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
+
+    Returns:
+        tuple: (r0, pm, pc, rmax) where
+            r0 (float): Potential size in m.
+            pm (float): Pressure at maximum winds in Pa.
+            pc (float): Central pressure for CLE15 profile in Pa.
+            rmax (float): Radius of maximum winds in m.
     """
     # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
     if np.isnan(vmax) or vmax <= 0.01 or np.isnan(sst):
@@ -139,6 +160,38 @@ def calculate_ps_ufunc(
 def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
     """
     Apply point solution to all points using xr.apply_ufunc and Dask.
+
+    Args:
+        ds (xr.Dataset): contains msl, vmax, sst, t0, rh, and lat.
+
+    Returns:
+        xr.Dataset: additionally contains r0, pm, pc, and rmax.
+
+    Doctest::
+        >>> in_ds = xr.Dataset(
+        ...    data_vars={
+        ...        "msl": (("y", "x"), [[1015.0, 1016.0], [1012.0, 1014.0]]),
+        ...        "vmax": (("y", "x"), [[50.0, 0.0], [45.0, 60.0]]), # Includes a zero vmax
+        ...        "sst": (("y", "x"), [[29.0, 30.0], [28.0, 28.5]]),
+        ...        "t0": (("y", "x"), [[200.0, 201.0], [199.0, 200.0]]),
+        ...        "rh": (("y", "x"), [[0.9, 0.85], [0.92, 0.88]]),
+        ...        "ck_cd": 0.9,
+        ...        "cd": 0.0015,
+        ...        "w_cool": 0.002,
+        ...        "supergradient_factor": 1.2,
+        ...    },
+        ...    coords={"lat": (("y", "x"), [[30.0, 25.0], [20.0, 15.0]])},
+        ... )
+        >>> result_joblib = parallelized_ps(in_ds.copy(), jobs=2, autofail=False) # doctest: +ELLIPSIS
+        About to conduct 4 jobs in parallel
+        'parallelized_ps' ... s
+        >>> result_dask = parallelized_ps_dask(in_ds.copy()).compute() # doctest: +ELLIPSIS
+        'parallelized_ps_dask' ... s
+        >>> output_vars = ["r0", "pm", "pc", "rmax"]
+        >>> print(result_joblib, result_dask) # doctest: +ELLIPSIS
+        <xarray.Dataset> ... <xarray.Dataset> ...
+        >>> for var in output_vars:
+        ...    xr.testing.assert_allclose(result_joblib[var], result_dask[var])
     """
     # Ensure input dataset is chunked for Dask
     ds = ds.chunk("auto")
@@ -190,10 +243,20 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
 
     # Assign results to a new dataset
     output_ds = ds.copy()
-    output_ds["r0"] = r0
-    output_ds["pm"] = pm
-    output_ds["pc"] = pc
-    output_ds["rmax"] = rmax
+    output_ds["r0"] = (ds.vmax.dims, r0.data)
+    output_ds["pm"] = (ds.vmax.dims, pm.data)
+    output_ds["pc"] = (ds.vmax.dims, pc.data)
+    output_ds["rmax"] = (ds.vmax.dims, rmax.data)
+
+    # output_ds = xr.Dataset(
+    #     data_vars={
+    #         "r0": (ds.vmax.dims, r0.data),
+    #         "pm": (ds.vmax.dims, pm.data),
+    #         "pc": (ds.vmax.dims, pc.data),
+    #         "rmax": (ds.vmax.dims, rmax.data),
+    #     },
+    #     coords=ds.coords,
+    # )
 
     return output_ds
 
@@ -203,7 +266,7 @@ def point_solution_ps(
     ds: xr.Dataset,
     supergradient_factor: float = SUPERGRADIENT_FACTOR,
     include_profile: bool = False,
-    pressure_assumption="isothermal",
+    pressure_assumption: Literal["isothermal", "isopycnal"] = "isothermal",
 ) -> xr.Dataset:
     """
     Find the solution for a given point in the grid.
@@ -697,6 +760,7 @@ def multi_point_example_2d(autofail=True) -> None:
     # But if we exclude all points where vmax is nan or 0, perhaps it will be much faster (already done implictly in the code).
     # Still, maybe we will be waiting a day to get the ERA5/IBTrACS results
     out_ds = parallelized_ps(in_ds, jobs=10, autofail=autofail)
+    print(out_ds)
 
     # print(out_ds)
 
