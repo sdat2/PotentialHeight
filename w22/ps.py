@@ -1,6 +1,7 @@
 """Functions to calculate potential size from xarray inputs in parallel."""
 
 import os
+import pytest
 from typing import Literal
 from joblib import Parallel, delayed
 import numpy as np
@@ -38,24 +39,24 @@ from .solve import bisection
 
 
 def calculate_ps_ufunc(
-    vmax,
-    msl,
-    sst,
-    t0,
-    lat,
-    rh,
-    ck_cd,
-    cd,
-    w_cool,
-    supergradient_factor,
-    pressure_assumption="isothermal",
+    vmax: float,
+    msl: float,
+    sst: float,
+    t0: float,
+    lat: float,
+    rh: float,
+    ck_cd: float,
+    cd: float,
+    w_cool: float,
+    supergradient_factor: float,
+    pressure_assumption: str = "isothermal",
 ):
     """
     Core computation function designed for xr.apply_ufunc.
     Accepts scalar NumPy values and returns a tuple of scalar results.
 
     Args:
-        vmax (float): Potential intensity in m/s.
+        vmax (float): Potential intensity in m/s. Assume it is as the gradient wind level.
         msl (float): Ambient surface pressure in mbar.
         sst (float): Sea surface temperature in degC.
         t0 (float): Outflow temperature in degK.
@@ -129,6 +130,8 @@ def calculate_ps_ufunc(
 
     # 3. Perform the main calculation (bisection to find r0)
     try:
+        # this is to restrict the search to a smaller space, but do this adaptively
+        # based on rough coriolis parameter scaling
         coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
         lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
         upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
@@ -190,6 +193,8 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
         >>> output_vars = ["r0", "pm", "pc", "rmax"]
         >>> print(result_joblib, result_dask) # doctest: +ELLIPSIS
         <xarray.Dataset> ... <xarray.Dataset> ...
+        >>> if "potential_size_calculated_at_time" in result_joblib: del result_joblib["potential_size_calculated_at_time"]
+        >>> if "potential_size_calculated_at_time" in result_dask: del result_dask["potential_size_calculated_at_time"]
         >>> for var in output_vars:
         ...    xr.testing.assert_allclose(result_joblib[var], result_dask[var])
     """
@@ -233,6 +238,7 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
         ds["cd"],
         ds["w_cool"],
         ds["supergradient_factor"],  # Optional inputs
+        kwargs={"pressure_assumption": "isothermal"},
         input_core_dims=[[] for _ in range(10)],  # All inputs are scalars
         output_core_dims=[[], [], [], []],  # Four scalar outputs
         exclude_dims=set(),
@@ -244,19 +250,25 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
     # Assign results to a new dataset
     output_ds = ds.copy()
     output_ds["r0"] = (ds.vmax.dims, r0.data)
+    output_ds["r0"].attrs = {
+        "units": "m",
+        "long_name": "Potential size of tropical cyclone, $r_a$",
+    }
     output_ds["pm"] = (ds.vmax.dims, pm.data)
+    output_ds["pm"].attrs = {"units": "Pa", "long_name": "Pressure at maximum winds, $p_m$"}
     output_ds["pc"] = (ds.vmax.dims, pc.data)
+    output_ds["pc"].attrs = {"units": "Pa", "long_name": "Central pressure for CLE15 profile"}
     output_ds["rmax"] = (ds.vmax.dims, rmax.data)
+    output_ds["rmax"].attrs = {
+        "units": "m",
+        "long_name": "Radius of maximum winds, $r_{\mathrm{max}}$",
+    }
 
-    # output_ds = xr.Dataset(
-    #     data_vars={
-    #         "r0": (ds.vmax.dims, r0.data),
-    #         "pm": (ds.vmax.dims, pm.data),
-    #         "pc": (ds.vmax.dims, pc.data),
-    #         "rmax": (ds.vmax.dims, rmax.data),
-    #     },
-    #     coords=ds.coords,
-    # )
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_pressure_assumption"] = "isothermal"
 
     return output_ds
 
@@ -630,16 +642,65 @@ def parallelized_ps(
             .set_index(stacked_dim=dims)  # Restore multi-index before unstacking
             .unstack("stacked_dim")
         )
+        output_ds = output_ds.transpose(*ds.dims)  # Reorder dimensions to match input
+        output_ds = output_ds.reset_index(dims, drop=True)
+
     output_ds.attrs["potential_size_pressure_assumption"] = pressure_assumption
-    output_ds.attrs["ps_calculated_at_git_hash"] = get_git_revision_hash(
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
         path=str(PROJECT_PATH)
     )
-    output_ds.attrs["ps_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
 
     assert (
         output_ds.sizes == ds.sizes
     ), "Output dataset sizes do not match input dataset sizes."
     return output_ds
+
+
+def create_test_dataset(shape, dim_names):
+    """Helper function to generate a generic test dataset."""
+    # Ensure there's a non-dimension coordinate to mimic your original data
+    coords = {'lat': (dim_names, np.random.rand(*shape))}
+    data_vars = {
+        'vmax': (dim_names, np.random.rand(*shape) * 50 + 10),
+        'sst': (dim_names, np.random.rand(*shape) * 5 + 25),
+        'msl': (dim_names, np.ones(shape) * 1015),
+        't0': (dim_names, np.ones(shape) * 200),
+        'rh': (dim_names, np.ones(shape) * 0.9),
+    }
+    return xr.Dataset(data_vars, coords)
+
+
+@pytest.mark.parametrize(
+    "shape, dim_names",
+    [
+        ((4,), ('time',)),  # 1D test with a different name
+        ((2, 3), ('lati', 'loni')),  # 2D test with different names
+        ((2, 2, 2), ('level', 'y', 'x')), # 3D test
+    ],
+)
+def test_equivalence_across_dimensionalities(shape, dim_names):
+    """
+    Tests that Joblib and Dask outputs are structurally identical
+    for 1D, 2D, and 3D inputs with arbitrary dimension names.
+    """
+    in_ds = create_test_dataset(shape, dim_names)
+
+    # Run both parallelization functions
+    result_joblib = parallelized_ps(in_ds, jobs=2)
+    result_dask = parallelized_ps_dask(in_ds).compute()
+
+    # We only care about the output variables for this comparison
+    output_vars = ["r0", "pm", "pc", "rmax"]
+    result_joblib_outputs = result_joblib[output_vars]
+    result_dask_outputs = result_dask[output_vars]
+
+    if "potential_size_calculated_at_time" in result_joblib.attrs: del result_joblib.attrs["potential_size_calculated_at_time"]
+    if "potential_size_calculated_at_time" in result_dask.attrs: del result_dask.attrs["potential_size_calculated_at_time"]
+    # assert_identical is a very strict check that verifies that every
+    # aspect of the two datasets (dims, coords, data, attrs) is identical.
+    xr.testing.assert_identical(result_joblib_outputs, result_dask_outputs)
+
 
 
 def single_point_example() -> None:
@@ -769,4 +830,40 @@ if __name__ == "__main__":
     # python -m w22.ps
     # single_point_example()
     # multi_point_example_2d()
-    multi_point_example_1d()
+    # multi_point_example_1d()
+    in_ds = xr.Dataset(
+        data_vars={
+            "msl": (("y", "x"), [[1015.0, 1016.0], [1012.0, 1014.0]]),
+            "vmax": (("y", "x"), [[50.0, 0.0], [45.0, 60.0]]), # Includes a zero vmax
+            "sst": (("y", "x"), [[29.0, 30.0], [28.0, 28.5]]),
+            "t0": (("y", "x"), [[200.0, 201.0], [199.0, 200.0]]),
+            "rh": (("y", "x"), [[0.9, 0.85], [0.92, 0.88]]),
+        },
+        coords={"lat": (("y", "x"), [[30.0, 25.0], [20.0, 15.0]])},
+    )
+    print("Input dataset:", in_ds)
+
+    # 2. Execute both parallelization functions
+    # Run the Joblib-based function
+    result_joblib = parallelized_ps(in_ds.copy(), jobs=2, autofail=False)
+
+    # Run the Dask-based function.
+    # .compute() is crucial to trigger the calculation and get the results.
+    result_dask = parallelized_ps_dask(in_ds.copy()).compute()
+
+    print("joblib results", result_joblib)
+    print("dask results", result_dask)
+
+    # 3. Assert that the outputs are numerically equivalent
+    # List the new variables that both functions are expected to create
+    output_vars = ["r0", "pm", "pc", "rmax"]
+
+    for var in output_vars:
+        # Use xarray's testing function, which is designed to compare
+        # DataArrays. It handles coordinates, dimensions, and NaN values correctly.
+        xr.testing.assert_allclose(result_joblib[var], result_dask[var])
+
+    test_equivalence_across_dimensionalities((2, 3), ('lati', 'loni' ))
+    test_equivalence_across_dimensionalities((4,), ('time', ))
+    test_equivalence_across_dimensionalities((2, 2, 2), ('level', 'y', 'x' ))
+
