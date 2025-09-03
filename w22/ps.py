@@ -1,4 +1,11 @@
-"""Functions to calculate potential size from xarray inputs in parallel."""
+"""Functions to calculate potential size from xarray inputs in parallel.
+
+
+TODO: this seems like a unit nightmare, perhaps we should have a unit checking function,
+and also make sure that everything is in SI units rather than some in hPa and some in Pa,
+some in kelvin, some in celsius.
+
+"""
 
 import os
 import pytest
@@ -76,7 +83,15 @@ def calculate_ps_ufunc(
             rmax (float): Radius of maximum winds in m.
     """
     # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
-    if np.isnan(vmax) or vmax <= 0.01 or np.isnan(sst):
+    # maybe we should add an output that records what failed?
+    if (
+        np.isnan(vmax)
+        or vmax <= 0.01
+        or np.isnan(sst)
+        or np.isnan(rh)
+        or rh < 0
+        or rh > 1
+    ):
         return np.nan, np.nan, np.nan, np.nan
 
     # 2. Define the inner function for bisection (captures the inputs)
@@ -157,6 +172,71 @@ def calculate_ps_ufunc(
     except (ValueError, RuntimeError, AssertionError):
         # Return NaNs if bisection or any other part fails
         return np.nan, np.nan, np.nan, np.nan
+
+
+def calculate_ps13_ufunc(
+    vmax_1: float,
+    vmax_3: float,
+    msl: float,
+    sst: float,
+    t0: float,
+    lat: float,
+    rh: float,
+    ck_cd: float,
+    cd: float,
+    w_cool: float,
+    supergradient_factor: float,
+    pressure_assumption: str = "isothermal",
+):
+    """
+    Core computation function designed for xr.apply_ufunc.
+
+    This calculates both the potential size assuming the intensity is the potential intensity (vmax) and the potential size assuming the intensity is the minimum required for category 1 hurricane (normally 33 m s-1 at 10m height) (vmin).
+
+    TODO: This function is not yet implemented.
+
+    Args:
+        vmax_1 (float): Minimum intensity for category 1 hurricane in m/s. Assume it is as the gradient wind level.
+        vmax_3 (float): Potential intensity in m/s. Assume it is as the gradient wind level.
+        msl (float): Ambient surface pressure in mbar.
+        sst (float): Sea surface temperature in degC.
+        t0 (float): Outflow temperature in degK.
+        lat (float): Latitude in degrees North.
+        rh (float): Environmental relative humidity (0-1).
+        ck_cd (float): Ratio of exchange coefficients [dimensionless].
+        cd (float): Drag coefficient [dimensionless].
+        w_cool (float): Cooling coefficient in m/s.
+        supergradient_factor (float): Supergradient factor [dimensionless].
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
+
+    Returns:
+        tuple: (r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3) where
+            r0_1 (float): Potential size for category 1 hurricane in m.
+            pm_1 (float): Pressure at maximum winds for category 1 hurricane in Pa.
+            pc_1 (float): Central pressure for CLE15 profile for category 1 hurricane in Pa.
+            rmax_1 (float): Radius of maximum winds for category 1 hurricane in m.
+            r0_3 (float): Potential size for potential intensity in m.
+            pm_3 (float): Pressure at maximum winds for potential intensity in Pa.
+            pc_3 (float): Central pressure for CLE15 profile for potential intensity in Pa.
+            rmax_3 (float): Radius of maximum winds for potential intensity in m.
+    """
+
+    # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
+    if (
+        np.isnan(vmax_1)
+        or vmax_1 <= 0.01
+        or np.isnan(vmax_3)
+        or vmax_3 <= 0.01
+        or np.isnan(sst)
+        or np.isnan(rh)
+        or rh < 0
+        or rh > 1
+    ):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+
+    # 2. Define the inner function for bisection (captures the inputs)
+
+    return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
 
 @timeit
@@ -255,9 +335,15 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
         "long_name": "Potential size of tropical cyclone, $r_a$",
     }
     output_ds["pm"] = (ds.vmax.dims, pm.data)
-    output_ds["pm"].attrs = {"units": "Pa", "long_name": "Pressure at maximum winds, $p_m$"}
+    output_ds["pm"].attrs = {
+        "units": "Pa",
+        "long_name": "Pressure at maximum winds, $p_m$",
+    }
     output_ds["pc"] = (ds.vmax.dims, pc.data)
-    output_ds["pc"].attrs = {"units": "Pa", "long_name": "Central pressure for CLE15 profile"}
+    output_ds["pc"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
     output_ds["rmax"] = (ds.vmax.dims, rmax.data)
     output_ds["rmax"].attrs = {
         "units": "m",
@@ -660,13 +746,13 @@ def parallelized_ps(
 def create_test_dataset(shape, dim_names):
     """Helper function to generate a generic test dataset."""
     # Ensure there's a non-dimension coordinate to mimic your original data
-    coords = {'lat': (dim_names, np.random.rand(*shape))}
+    coords = {"lat": (dim_names, np.random.rand(*shape))}
     data_vars = {
-        'vmax': (dim_names, np.random.rand(*shape) * 50 + 10),
-        'sst': (dim_names, np.random.rand(*shape) * 5 + 25),
-        'msl': (dim_names, np.ones(shape) * 1015),
-        't0': (dim_names, np.ones(shape) * 200),
-        'rh': (dim_names, np.ones(shape) * 0.9),
+        "vmax": (dim_names, np.random.rand(*shape) * 50 + 10),
+        "sst": (dim_names, np.random.rand(*shape) * 5 + 25),
+        "msl": (dim_names, np.ones(shape) * 1015),
+        "t0": (dim_names, np.ones(shape) * 200),
+        "rh": (dim_names, np.ones(shape) * 0.9),
     }
     return xr.Dataset(data_vars, coords)
 
@@ -674,9 +760,9 @@ def create_test_dataset(shape, dim_names):
 @pytest.mark.parametrize(
     "shape, dim_names",
     [
-        ((4,), ('time',)),  # 1D test with a different name
-        ((2, 3), ('lati', 'loni')),  # 2D test with different names
-        ((2, 2, 2), ('level', 'y', 'x')), # 3D test
+        ((4,), ("time",)),  # 1D test with a different name
+        ((2, 3), ("lati", "loni")),  # 2D test with different names
+        ((2, 2, 2), ("level", "y", "x")),  # 3D test
     ],
 )
 def test_equivalence_across_dimensionalities(shape, dim_names):
@@ -695,12 +781,13 @@ def test_equivalence_across_dimensionalities(shape, dim_names):
     result_joblib_outputs = result_joblib[output_vars]
     result_dask_outputs = result_dask[output_vars]
 
-    if "potential_size_calculated_at_time" in result_joblib.attrs: del result_joblib.attrs["potential_size_calculated_at_time"]
-    if "potential_size_calculated_at_time" in result_dask.attrs: del result_dask.attrs["potential_size_calculated_at_time"]
+    if "potential_size_calculated_at_time" in result_joblib.attrs:
+        del result_joblib.attrs["potential_size_calculated_at_time"]
+    if "potential_size_calculated_at_time" in result_dask.attrs:
+        del result_dask.attrs["potential_size_calculated_at_time"]
     # assert_identical is a very strict check that verifies that every
     # aspect of the two datasets (dims, coords, data, attrs) is identical.
     xr.testing.assert_identical(result_joblib_outputs, result_dask_outputs)
-
 
 
 def single_point_example() -> None:
@@ -834,7 +921,7 @@ if __name__ == "__main__":
     in_ds = xr.Dataset(
         data_vars={
             "msl": (("y", "x"), [[1015.0, 1016.0], [1012.0, 1014.0]]),
-            "vmax": (("y", "x"), [[50.0, 0.0], [45.0, 60.0]]), # Includes a zero vmax
+            "vmax": (("y", "x"), [[50.0, 0.0], [45.0, 60.0]]),  # Includes a zero vmax
             "sst": (("y", "x"), [[29.0, 30.0], [28.0, 28.5]]),
             "t0": (("y", "x"), [[200.0, 201.0], [199.0, 200.0]]),
             "rh": (("y", "x"), [[0.9, 0.85], [0.92, 0.88]]),
@@ -863,7 +950,6 @@ if __name__ == "__main__":
         # DataArrays. It handles coordinates, dimensions, and NaN values correctly.
         xr.testing.assert_allclose(result_joblib[var], result_dask[var])
 
-    test_equivalence_across_dimensionalities((2, 3), ('lati', 'loni' ))
-    test_equivalence_across_dimensionalities((4,), ('time', ))
-    test_equivalence_across_dimensionalities((2, 2, 2), ('level', 'y', 'x' ))
-
+    test_equivalence_across_dimensionalities((2, 3), ("lati", "loni"))
+    test_equivalence_across_dimensionalities((4,), ("time",))
+    test_equivalence_across_dimensionalities((2, 2, 2), ("level", "y", "x"))
