@@ -9,6 +9,7 @@ from sithom.misc import get_git_revision_hash
 from .constants import PROJECT_PATH
 from .xr_utils import standard_name_to_long_name
 
+
 CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
 PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
 KAPPA: float = 0.286  # R/cp for dry air [dimensionless]

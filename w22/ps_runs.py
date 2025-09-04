@@ -253,6 +253,34 @@ def load_global(year: int = 2015) -> xr.Dataset:
     )
 
 
+def get_processed_data_for_point(place="new_orleans", member="r10i1p1f1", model="CESM2", exp="ssp585"
+):
+    file_names = [
+            os.path.join(CDO_PATH, exp, typ, model, f"{member}.nc")
+            for typ in ["ocean", "atmos"]
+        ]
+
+    ds_list = [
+            xr.open_mfdataset(
+                file_name,
+            )
+            .sel(
+                lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
+                method="nearest",
+            )
+            .compute()
+            for file_name in file_names
+        ]
+    for i, ds in enumerate(ds_list):
+        ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
+
+    ds = xr.merge(ds_list)
+    ds = convert(ds)
+    ds = ds.isel(time=[i for i in range(8, len(ds.time.values), 12)])
+    return ds
+
+
 def point_timeseries(
     member: Union[int, str] = 10,
     model: str = "CESM2",
@@ -277,46 +305,18 @@ def point_timeseries(
     if isinstance(member, int):
         member = f"r{member}i1p1f1"
     if recalculate_pi:
-        file_names = [
-            os.path.join(CDO_PATH, exp, typ, model, f"{member}.nc")
-            for typ in ["ocean", "atmos"]
-        ]
-
-        ds_list = [
-            xr.open_mfdataset(
-                file_name,
-            )
-            .sel(
-                lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
-                method="nearest",
-            )
-            .compute()
-            for file_name in file_names
-        ]
-        for i, ds in enumerate(ds_list):
-            ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
-        print("ds_list", ds_list)
-        ds = xr.merge(ds_list)
-        print("merged ds", ds)
-        ds = convert(ds)
-        ds = ds.isel(time=[i for i in range(8, len(ds.time.values), 12)])
-        print("converted ds", ds)
-
-        # print("point ds intial:", ds)
+        ds = get_processed_data_for_point(place=place, member=member, model=model, exp=exp)
         pi_ds = calculate_pi(
-            ds,
-            dim="p",
-            fix_temp=True,
-        )
+                ds,
+                dim="p",
+                fix_temp=True,
+            )
         print("pi ds", pi_ds)
         trimmed_ds = pi_ds[["vmax", "t0"]]
         trimmed_ds["rh"] = ds["rh"] / 100  # convert to dimensionless
         trimmed_ds["rh"].attrs["units"] = "dimensionless"
         trimmed_ds["sst"] = ds["sst"]
         trimmed_ds["msl"] = ds["msl"]
-
-        # trimmed_ds["rh"] = qtp2rh(pi_ds["q"], pi_ds["t"], pi_ds["msl"])
 
     else:
         if pi_version == 2:
@@ -423,7 +423,7 @@ if __name__ == "__main__":
     # point_timeseries(10, "new_orleans", pi_version=4)
     # point_timeseries(11, "new_orleans", pi_version=4)
 
-    def data_for_place(
+    def ps_for_place(
         place: str,
         pressure_assumption: str = "isothermal",
         models={"CESM2", "MIROC6", "HADGEM3-GC31-MM", "ERA5"},
@@ -485,6 +485,6 @@ if __name__ == "__main__":
             )
     from tcpips.dask_utils import dask_cluster_wrapper
 
-    dask_cluster_wrapper(data_for_place, "new_orleans")
+    dask_cluster_wrapper(ps_for_place, "new_orleans")
 
 
