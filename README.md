@@ -95,15 +95,15 @@ And cite the code as:
 @software{worstsurge_code,
   author = {Thomas, Simon D. A.},
   doi = {10.5281/zenodo.15073504},
-  month = {Mar},
+  month = {Sep},
   title = {{WorstSurge - Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
   url = {https://github.com/sdat2/worstsurge},
-  version = {v0.0.4},
+  version = {v0.1.1},
   year = {2025}
 }
 ```
 
-We also currently use the matlab code from Chavas, Lin, and Emanuel (2015), which should be cited as:
+We used to use the matlab code from Chavas, Lin, and Emanuel (2015), which should be cited as:
 
 ```bibtex
 @software{cle_2015_code,
