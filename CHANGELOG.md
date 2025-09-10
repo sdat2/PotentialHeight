@@ -11,6 +11,7 @@ v0.1.0:
 - Added new python implementation of calculating the CLE15 profile at `w22/cle15.py`, which is at least 10x faster, has trivial parallelization, has less artifacts, but is less numerically stable than original matlab implementation. In practice on archer2, it turns 
 out to be about 10x faster than the matlab implementation, and is now the default.
 - Improved figure 2 in `w22/plot.py` to use `figure_two()` function, which is now more flexible and can be used for different places, and plots using ERA5 data as well as CMIP6 data.
+- Toy example of pathological extrapolation for surgenet.
 
 v0.0.3:
 - Improved `era5` data download script.
