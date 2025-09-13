@@ -1,4 +1,7 @@
-v0.1.0:
+v0.1.2:
+- Improved logic for filling in temperature and humidity profile.
+
+v0.1.1:
 - Added `tcpips/ibtracs.py` script to compare observations with potential sizes and potential intensity calculated from `era5` monthly averages (all post 1980).
 - Added more dual graph functionality in `adforce/dual_graph.py` so that we can train different ML algorithms with ADCIRC output, fixing bugs in imp lementation. Is pretty well tested, but takes around a minute to convert each run of ADCIRC to a dual graph (5GB of data).
 - `pyproj` now an option for all distance calculations. It is a bit slow though, and now takes 6x longer to make the `fort.22.nc` input file for ADCIRC. Fairly well tested, but could be improved. Adds about 2 minutes to the run time of each adforce call on archer2 (to 5 minutes from 3 minutes).
