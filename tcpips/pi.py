@@ -73,8 +73,18 @@ def fix_temp_profile(
         p_hpa = ds.p
 
     if method == "interpolate":
-        # Note: This will not fill NaNs at the boundaries of the dimension
-        ds["t"] = ds["t"].interpolate_na(dim="p", method="linear")
+        # 1. Keep a reference to the original p coordinate
+        original_p_coord = ds.coords["p"]
+
+        # 2. Sort the dataset by 'p' to allow for interpolation
+        ds_sorted = ds.sortby("p")
+
+        # 3. Perform the interpolation on the sorted dataset
+        t_interpolated = ds_sorted["t"].interpolate_na(dim="p", method="linear")
+        ds_sorted["t"] = t_interpolated
+
+        # 4. Reindex the dataset back to the original coordinate order
+        ds = ds_sorted.reindex(p=original_p_coord)
 
     elif method == "lapse_rate":
         # Extrapolate downwards (from low pressure to high pressure)
@@ -210,13 +220,14 @@ def calculate_pi(
     return standard_name_to_long_name(out_ds)
 
 
-def simple_sensitivity(delta_t: float = 1,
-                       k: float = 0.07,
-                       m: float = 1,
-                       avg_to_tropical_ocean: float = 0.8,
-                       T_s0 = 300,
-                       T_00 = 200,
-                       ) -> None:
+def simple_sensitivity(
+    delta_t: float = 1,
+    k: float = 0.07,
+    m: float = 1,
+    avg_to_tropical_ocean: float = 0.8,
+    T_s0=300,
+    T_00=200,
+) -> None:
     """
     Simple sensitivity analysis for the change in potential intensity
     based on the change in temperature and humidity.
@@ -278,6 +289,16 @@ if __name__ == "__main__":
     # simple_sensitivity(1, k=0.07, m=1.2)
     # simple_sensitivity(1, k=0.07, m=1.5)
     import pandas as pd
-    pd.DataFrame(results_l,
-                 columns=["\(T_{s0}\)", "\(T_{o0}\)", "\(\Delta T\)", "\(m\)", "\(n\)", "\(k\)", "\% change in \(V_p\)"]
-                 ).to_latex("pi_sensitivity.tex", index=False, float_format="%.2f")
+
+    pd.DataFrame(
+        results_l,
+        columns=[
+            "\(T_{s0}\)",
+            "\(T_{o0}\)",
+            "\(\Delta T\)",
+            "\(m\)",
+            "\(n\)",
+            "\(k\)",
+            "\% change in \(V_p\)",
+        ],
+    ).to_latex("pi_sensitivity.tex", index=False, float_format="%.2f")
