@@ -13,6 +13,101 @@ from .xr_utils import standard_name_to_long_name
 CKCD: float = 0.9  # Enthalpy exchange coefficient / drag coefficient [dimensionless]
 PTOP: float = 50.0  # Top pressure level for the calculation [hPa]
 KAPPA: float = 0.286  # R/cp for dry air [dimensionless]
+P0_HPA: float = 1000.0  # Reference pressure for potential temperature [hPa]
+
+
+def reconstruct_profile_well_mixed(
+    ds: xr.Dataset,
+    temp_var: str = "t",
+    hum_var: str = "q",
+    p_coord: str = "p",
+    max_temp_c: float = 100.0,
+) -> xr.Dataset:
+    """
+    Reconstructs incomplete atmospheric profiles assuming a well-mixed boundary layer.
+
+    This function fills missing values (NaNs) at the bottom of vertical temperature
+    and humidity profiles. It operates on the principle that the planetary
+    boundary layer is well-mixed, meaning potential temperature (theta) and
+    specific humidity (q) are constant with height in this layer.[1, 2]
+
+    The method proceeds as follows:
+    1. For each vertical profile, it identifies the lowest valid data point (the
+       reference level).
+    2. It assumes that potential temperature and specific humidity are constant
+       from this reference level down to the surface (higher pressures).[2]
+    3. It extrapolates these constant values downward to fill any NaNs.
+    4. The constant potential temperature is then converted back to in-situ
+       temperature at each pressure level.[3, 4]
+
+    This approach is physically principled for climatological studies of the
+    tropical atmosphere and ensures consistent treatment of both temperature and
+    humidity, which is critical for accurate Potential Intensity (PI) calculations.
+
+    Args:
+        ds (xr.Dataset): Xarray dataset containing atmospheric profiles.
+                         Must include temperature, humidity, and a pressure coordinate.
+        temp_var (str): The name of the temperature variable in the dataset (e.g., 't', 'ta').
+                        Units must be Kelvin.
+        hum_var (str): The name of the specific humidity variable (e.g., 'q', 'hus').
+                       Units should be kg/kg or dimensionless.
+        p_coord (str): The name of the vertical pressure coordinate (e.g., 'p', 'plev').
+                       Units must be hPa or Pa.
+        max_temp_c (float): A plausibility check. Temperatures above this value (in Celsius)
+                            are treated as missing data. Defaults to 100.0.
+
+    Returns:
+        xr.Dataset: A new dataset with the temperature and humidity profiles filled.
+    """
+    # --- 1. Input Validation and Preparation ---
+    # Create a copy to avoid modifying the original dataset in place.
+    ds_out = ds.copy(deep=True)
+
+    # Perform a plausibility check on temperature, masking unrealistic values.
+    ds_out[temp_var] = ds_out[temp_var].where(ds_out[temp_var] < (max_temp_c + 273.15))
+
+    # Ensure pressure coordinate is in hPa for the calculation.
+    p_hpa = ds_out[p_coord]
+    if p_hpa.attrs.get("units", "hPa").lower() in ["pa", "pascal"]:
+        # Check if values are already large (suggesting Pa) and convert.
+        if p_hpa.max() > 2000:
+            p_hpa = p_hpa / 100.0
+            p_hpa.attrs["units"] = "hPa"
+
+    # --- 2. Identify Reference Level and Values ---
+    # The 'bfill' (backward fill) operation propagates the first valid value
+    # from the bottom of the profile (low pressure) upwards (to high pressure),
+    # effectively finding the reference value for each column.
+    # This is applied to temperature, humidity, and the pressure at that level.
+
+    # Find the reference temperature (T_ref) for each profile.
+    t_ref = ds_out[temp_var].bfill(dim=p_coord)
+
+    # Find the reference specific humidity (q_ref) for each profile.
+    q_ref = ds_out[hum_var].bfill(dim=p_coord)
+
+    # Find the reference pressure (p_ref) corresponding to the T_ref and q_ref values.
+    # This is done by masking the pressure coordinate where temperature is valid,
+    # then backward filling.
+    p_ref = p_hpa.where(ds_out[temp_var].notnull()).bfill(dim=p_coord)
+
+    # --- 3. Extrapolate Using Well-Mixed Assumption ---
+    # Calculate the potential temperature (theta_ref) at the reference level.
+    theta_ref = t_ref * (P0_HPA / p_ref) ** KAPPA
+
+    # Extrapolate constant potential temperature downward.
+    # For any level p_hpa, the extrapolated temperature T_new is calculated from theta_ref.
+    extrapolated_t = theta_ref * (p_hpa / P0_HPA) ** KAPPA
+
+    # The extrapolated humidity is simply the constant reference humidity.
+    extrapolated_q = q_ref
+
+    # --- 4. Fill Missing Values in the Dataset ---
+    # Use the original NaN mask to fill only the cells that were initially missing.
+    ds_out[temp_var] = ds_out[temp_var].fillna(extrapolated_t)
+    ds_out[hum_var] = ds_out[hum_var].fillna(extrapolated_q)
+
+    return ds_out
 
 
 def fix_temp_profile(
@@ -83,6 +178,11 @@ def fix_temp_profile(
         t_interpolated = ds_sorted["t"].interpolate_na(dim="p", method="linear")
         ds_sorted["t"] = t_interpolated
 
+        # 4. Also perform this for specific humidity.
+        print("Interpolating specific humidity 'q' as well.")
+        q_interpolated = ds_sorted["q"].interpolate_na(dim="p")
+        ds_sorted["q"] = q_interpolated
+
         # 4. Reindex the dataset back to the original coordinate order
         ds = ds_sorted.reindex(p=original_p_coord)
 
@@ -97,6 +197,9 @@ def fix_temp_profile(
         # using the lapse rate formula from the reference level.
         extrapolated_t = t_ref * (p_hpa / p_ref) ** KAPPA
         ds["t"] = ds["t"].fillna(extrapolated_t)
+
+    elif method == "well_mixed":
+        ds = reconstruct_profile_well_mixed(ds, temp_var="t", hum_var="q", p_coord="p")
 
     else:
         raise ValueError(f"Unknown method: {method}")
@@ -156,7 +259,7 @@ def calculate_pi(
             ascent_flag=0,
             diss_flag=1,
             ptop=PTOP,
-            miss_handle=1,
+            miss_handle=0,  # 1,
             V_reduc=V_reduc,
         ),
         input_core_dims=[
@@ -215,90 +318,6 @@ def calculate_pi(
         path=str(PROJECT_PATH)
     )
     ds.attrs["pi_calculated_at_time"] = time_stamp()
-    print("Calculated potential intensity:", out_ds)
+    # print("Calculated potential intensity:", out_ds)
 
     return standard_name_to_long_name(out_ds)
-
-
-def simple_sensitivity(
-    delta_t: float = 1,
-    k: float = 0.07,
-    m: float = 1,
-    avg_to_tropical_ocean: float = 0.8,
-    T_s0=300,
-    T_00=200,
-) -> None:
-    """
-    Simple sensitivity analysis for the change in potential intensity
-    based on the change in temperature and humidity.
-
-    Args:
-        delta_t (float): Change in average global surface temperature in Kelvin.
-        k (float): Scaling factor for humidity change based on CC (default 0.07).
-        m (float): Scaling factor for the change in outflow temperature (default 1).
-        avg_to_tropical_ocean (float): Average temperature change
-           for tropical ocean compared to global temperature (default 0.8).
-    """
-    delta_t_sst = (
-        delta_t * avg_to_tropical_ocean
-    )  # scale to tropical ocean average temperature change
-    # let's start by doing a simple sensitivty for potential intensity
-    T_s0 = 300  # K
-    T_00 = 200  # K
-    # approx as Bister 1998 and use 7% scaling for humidity CC per degree to scale enthalpy change
-    # T_s = T_s0 + delta_t_sst  # K
-    # T_0 = T_00 + m* delta_t_sst  # K
-
-    vp1_div_vp0 = np.sqrt(
-        (T_s0 - T_00 + (1 - m) * delta_t_sst)
-        / (T_00 + m * delta_t_sst)
-        * T_00
-        / (T_s0 - T_00)
-        * (1 + k * delta_t_sst)
-    )
-    print(
-        f"vp1/vp0 = {vp1_div_vp0:.3f} for delta_t_sst = {delta_t_sst} K, T_s0 = {T_s0} K, T_00 = {T_00} K, m = {m}, n = {avg_to_tropical_ocean}, k = {k}"
-    )
-    print(f"fractional change = {(vp1_div_vp0 - 1)* 100:.3f}%")
-    return T_s0, T_00, delta_t, m, avg_to_tropical_ocean, k, (vp1_div_vp0 - 1) * 100
-
-
-# vp1/vp0 = 1.042 for delta_t = 0.8 K, T_s0 = 300 K, T_00 = 200 K, m = -1.7, k = 0.07
-# fractional change = 4.221%
-# vp1/vp0 = 1.038 for delta_t = 0.8 K, T_s0 = 300 K, T_00 = 200 K, m = -1, k = 0.07
-# fractional change = 3.788%
-# vp1/vp0 = 1.026 for delta_t = 0.8 K, T_s0 = 300 K, T_00 = 200 K, m = 1, k = 0.07
-# fractional change = 2.557%
-# vp1/vp0 = 1.024 for delta_t = 0.8 K, T_s0 = 300 K, T_00 = 200 K, m = 1.2, k = 0.07
-# fractional change = 2.434%
-# vp1/vp0 = 1.022 for delta_t = 0.8 K, T_s0 = 300 K, T_00 = 200 K, m = 1.5, k = 0.07
-# fractional change = 2.250%
-
-
-if __name__ == "__main__":
-    # python -m tcpips.pi
-    results_l = []
-    results_l += [simple_sensitivity(1, k=0.07, m=-1.7)]
-    results_l += [simple_sensitivity(1, k=0.07, m=-1)]
-    results_l += [simple_sensitivity(1)]
-    results_l += [simple_sensitivity(1, k=0.07, m=1.2)]
-    results_l += [simple_sensitivity(1, k=0.07, m=1.5)]
-
-    # simple_sensitivity(1, k=0.07, m=-1)
-    # simple_sensitivity(1)
-    # simple_sensitivity(1, k=0.07, m=1.2)
-    # simple_sensitivity(1, k=0.07, m=1.5)
-    import pandas as pd
-
-    pd.DataFrame(
-        results_l,
-        columns=[
-            "\(T_{s0}\)",
-            "\(T_{o0}\)",
-            "\(\Delta T\)",
-            "\(m\)",
-            "\(n\)",
-            "\(k\)",
-            "\% change in \(V_p\)",
-        ],
-    ).to_latex("pi_sensitivity.tex", index=False, float_format="%.2f")
