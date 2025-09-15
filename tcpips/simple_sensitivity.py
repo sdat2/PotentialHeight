@@ -1,3 +1,5 @@
+"""Work out the sensitivity of potential intensity to changes in temperature."""
+
 import numpy as np
 import pandas as pd
 

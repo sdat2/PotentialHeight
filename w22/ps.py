@@ -219,6 +219,22 @@ def calculate_ps13_ufunc(
             pm_3 (float): Pressure at maximum winds for potential intensity in Pa.
             pc_3 (float): Central pressure for CLE15 profile for potential intensity in Pa.
             rmax_3 (float): Radius of maximum winds for potential intensity in m.
+
+    Examples:
+        >>> _ = calculate_ps13_ufunc(
+        ...    vmax_1=33.0,
+        ...    vmax_3=50.0,
+        ...    msl=1015.0,
+        ...    sst=29.0,
+        ...    t0=200.0,
+        ...    lat=20.0,
+        ...    rh=0.9,
+        ...    ck_cd=0.9,
+        ...    cd=0.0015,
+        ...    w_cool=0.002,
+        ...    supergradient_factor=1.2,
+        ...    )  # doctest: +ELLIPSIS
+
     """
 
     # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
@@ -235,8 +251,103 @@ def calculate_ps13_ufunc(
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
     # 2. Define the inner function for bisection (captures the inputs)
+    p_a = msl
+    coriolis_parameter = abs(coriolis_parameter_from_lat(lat))
+    near_surface_air_temperature = sst + TEMP_0K - 1.0
+    water_vapour_pressure = rh * buck_sat_vap_pressure(near_surface_air_temperature)
+    rho_air = (p_a * 100 - water_vapour_pressure) / (
+        GAS_CONSTANT * near_surface_air_temperature
+    ) + water_vapour_pressure / (
+        GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
+    )
 
-    return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+    def try_for_r0_v(r0: float, vmax: float):
+        pm_cle, rmax_cle, _ = run_cle15(
+            inputs={
+                "r0": r0,
+                "Vmax": vmax,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+        ys = bisection(
+            wang_diff(
+                *wang_consts(
+                    radius_of_max_wind=rmax_cle,
+                    radius_of_inflow=r0,
+                    maximum_wind_speed=vmax * supergradient_factor,
+                    coriolis_parameter=coriolis_parameter,
+                    pressure_dry_at_inflow=(p_a * 100)
+                    - (rh * buck_sat_vap_pressure(near_surface_air_temperature)),
+                    near_surface_air_temperature=near_surface_air_temperature,
+                    outflow_temperature=t0,
+                )
+            ),
+            LOWER_Y_WANG_BISECTION,
+            UPPER_Y_WANG_BISECTION,
+            W22_BISECTION_TOLERANCE,
+        )
+        pm_car = (
+            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
+        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
+        return pm_cle - pm_car
+
+    try:
+        # this is to restrict the search to a smaller space, but do this adaptively
+        # based on rough coriolis parameter scaling
+        coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
+        lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
+        upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
+
+        def try_for_r0_1(r0):
+            return try_for_r0_v(r0, vmax_1)
+
+        r0_1 = bisection(
+            try_for_r0_1, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+        )
+        # 4. Final calculation with the solved r0
+        pm_1, rmax_1, pc_1 = run_cle15(
+            inputs={
+                "r0": r0_1,
+                "Vmax": vmax_1,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+
+        def try_for_r0_3(r0):
+            return try_for_r0_v(r0, vmax_3)
+
+        r0_3 = bisection(
+            try_for_r0_3, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+        )
+        pm_3, rmax_3, pc_3 = run_cle15(
+            inputs={
+                "r0": r0_3,
+                "Vmax": vmax_3,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+        return r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3
+
+    except (ValueError, RuntimeError, AssertionError):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
 
 @timeit
@@ -348,6 +459,115 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
     output_ds["rmax"].attrs = {
         "units": "m",
         "long_name": "Radius of maximum winds, $r_{\mathrm{max}}$",
+    }
+
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_pressure_assumption"] = "isothermal"
+
+    return output_ds
+
+
+@timeit
+def paralelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate potential size at category 1 intensity, and at the potential intensity.
+
+    Returns:
+        xr.Dataset:
+    """
+    # Ensure input dataset is chunked for Dask
+    ds = ds.chunk("auto")
+
+    # 1. Define required variables and optional variables with their defaults
+    required_vars = ["vmax_1", "vmax_3", "msl", "sst", "t0", "lat"]
+    optional_vars = {
+        "rh": ENVIRONMENTAL_HUMIDITY_DEFAULT,
+        "ck_cd": CK_CD_DEFAULT,
+        "cd": CD_DEFAULT,
+        "w_cool": W_COOL_DEFAULT,
+        "supergradient_factor": SUPERGRADIENT_FACTOR,
+    }
+
+    # 2. Check for required variables
+    for var in required_vars:
+        if var not in ds:
+            raise KeyError(f"Required variable '{var}' is missing from the dataset.")
+
+    # 3. Check for optional variables and add them with default values if missing
+    for var, default_value in optional_vars.items():
+        if var not in ds:
+            print(f"'{var}' not found in dataset, using default value: {default_value}")
+            # Add a DataArray with the default value. Xarray's broadcasting
+            # will handle matching it to the other dimensions.
+            ds[var] = xr.DataArray(default_value)
+
+    r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3 = xr.apply_ufunc(
+        calculate_ps13_ufunc,  # The core function
+        ds["vmax_1"],
+        ds["vmax_3"],
+        ds["msl"],
+        ds["sst"],
+        ds["t0"],
+        ds["lat"],  # Required inputs
+        ds["rh"],
+        ds["ck_cd"],
+        ds["cd"],
+        ds["w_cool"],
+        ds["supergradient_factor"],  # Optional inputs
+        kwargs={"pressure_assumption": "isothermal"},
+        input_core_dims=[[] for _ in range(10)],  # All inputs are scalars
+        output_core_dims=[[], [], [], []],  # Four scalar outputs
+        exclude_dims=set(),
+        vectorize=True,  # Key for broadcasting
+        dask="parallelized",  # Key for parallel execution
+        output_dtypes=[float, float, float, float],
+    )
+
+    output_ds = ds.copy()
+    # Assume V=V_cat1
+    output_ds["r0_1"] = (ds.vmax_1.dims, r0_1.data)
+    output_ds["r0_1"].attrs = {
+        "units": "m",
+        "long_name": r"Outer radius of tropical cyclone, $r_{a1}$",
+    }
+    output_ds["pm_1"] = (ds.vmax_1.dims, pm_1.data)
+    output_ds["pm_1"].attrs = {
+        "units": "Pa",
+        "long_name": r"Pressure at maximum winds, $p_{m1}$",
+    }
+    output_ds["pc_1"] = (ds.vmax_1.dims, pc_1.data)
+    output_ds["pc_1"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax_1"] = (ds.vmax_1.dims, rmax_1.data)
+    output_ds["rmax_1"].attrs = {
+        "units": "m",
+        "long_name": r"Radius of maximum winds, $r_{1}$",
+    }
+    # assume V = V_p
+    output_ds["r0_3"] = (ds.vmax_1.dims, r0_3.data)
+    output_ds["r0_3"].attrs = {
+        "units": "m",
+        "long_name": r"Outer radius of tropical cyclone, $r_{a3}$",
+    }
+    output_ds["pm_3"] = (ds.vmax_1.dims, pm_3.data)
+    output_ds["pm_3"].attrs = {
+        "units": "Pa",
+        "long_name": r"Pressure at maximum winds, $p_{m3}$",
+    }
+    output_ds["pc_3"] = (ds.vmax_1.dims, pc_3.data)
+    output_ds["pc_3"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax_3"] = (ds.vmax_1.dims, rmax_3.data)
+    output_ds["rmax_3"].attrs = {
+        "units": "m",
+        "long_name": r"Radius of maximum winds, $r_{3}$",
     }
 
     output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(

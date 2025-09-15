@@ -29,16 +29,16 @@ def reconstruct_profile_well_mixed(
     This function fills missing values (NaNs) at the bottom of vertical temperature
     and humidity profiles. It operates on the principle that the planetary
     boundary layer is well-mixed, meaning potential temperature (theta) and
-    specific humidity (q) are constant with height in this layer.[1, 2]
+    specific humidity (q) are constant with height in this layer.
 
     The method proceeds as follows:
     1. For each vertical profile, it identifies the lowest valid data point (the
        reference level).
     2. It assumes that potential temperature and specific humidity are constant
-       from this reference level down to the surface (higher pressures).[2]
+       from this reference level down to the surface (higher pressures).
     3. It extrapolates these constant values downward to fill any NaNs.
     4. The constant potential temperature is then converted back to in-situ
-       temperature at each pressure level.[3, 4]
+       temperature at each pressure level.
 
     This approach is physically principled for climatological studies of the
     tropical atmosphere and ensures consistent treatment of both temperature and
@@ -110,13 +110,13 @@ def reconstruct_profile_well_mixed(
     return ds_out
 
 
-def fix_temp_profile(
+def fix_profile(
     ds: xr.Dataset,
     method: str = "lapse_rate",
     max_temp_c: float = 100.0,
 ) -> xr.Dataset:
     """
-    Fills missing values in a vertical temperature profile using a principled method.
+    Fills missing values in a vertical temperature and specific humdity profile using a principled method.
 
     Methods:
     1.  'interpolate': Fills internal NaNs using linear interpolation. Cannot fill
@@ -149,7 +149,7 @@ def fix_temp_profile(
         ...         "x": (("x",), [1, 2]), "y": (("y",), [1, 2])
         ...     },
         ... )
-        >>> ds_fixed = fix_temp_profile(ds, method='lapse_rate')
+        >>> ds_fixed = fix_profile(ds, method='lapse_rate')
         >>> # For profile 1: T_ref=290K at p_ref=925hPa. T(1000) = 290 * (1000/925)**0.286
         >>> expected_t1 = 290 * (1000/925)**KAPPA
         >>> # For profile 2: T_ref=280K at p_ref=850hPa. T(1000) = 280 * (1000/850)**0.286 etc.
@@ -244,7 +244,7 @@ def calculate_pi(
     if fix_temp:
         print("Fixing temperature profile...")
         print("Before fixing:", ds)
-        ds = fix_temp_profile(ds)
+        ds = fix_profile(ds)
         print("After fixing:", ds)
 
     result = xr.apply_ufunc(
