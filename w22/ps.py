@@ -248,6 +248,7 @@ def calculate_ps13_ufunc(
         or rh < 0
         or rh > 1
     ):
+    
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
     # 2. Define the inner function for bisection (captures the inputs)
@@ -431,7 +432,7 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
         ds["supergradient_factor"],  # Optional inputs
         kwargs={"pressure_assumption": "isothermal"},
         input_core_dims=[[] for _ in range(10)],  # All inputs are scalars
-        output_core_dims=[[], [], [], []],  # Four scalar outputs
+        output_core_dims=[[] for _ in range(4)],
         exclude_dims=set(),
         vectorize=True,  # Key for broadcasting
         dask="parallelized",  # Key for parallel execution
@@ -518,12 +519,12 @@ def paralelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
         ds["w_cool"],
         ds["supergradient_factor"],  # Optional inputs
         kwargs={"pressure_assumption": "isothermal"},
-        input_core_dims=[[] for _ in range(10)],  # All inputs are scalars
-        output_core_dims=[[], [], [], []],  # Four scalar outputs
+        input_core_dims=[[] for _ in range(11)],  # All inputs are scalars
+        output_core_dims=[[] for _ in range(8)],
         exclude_dims=set(),
         vectorize=True,  # Key for broadcasting
         dask="parallelized",  # Key for parallel execution
-        output_dtypes=[float, float, float, float],
+        output_dtypes=[float for _ in range(8)],
     )
 
     output_ds = ds.copy()
