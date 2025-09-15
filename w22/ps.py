@@ -248,7 +248,7 @@ def calculate_ps13_ufunc(
         or rh < 0
         or rh > 1
     ):
-    
+
         return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
 
     # 2. Define the inner function for bisection (captures the inputs)
