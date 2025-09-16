@@ -1,7 +1,7 @@
 """Plot the new potential size calculation results for PIPS chapter/paper"""
 
 import os
-from typing import List, Union
+from typing import List, Union, Tuple
 import math
 import numpy as np
 import numpy.ma as ma
@@ -400,6 +400,17 @@ def place_to_position(place: str) -> tuple:
     )
 
 
+def plot_spatials(
+    axs: np.ndarray,
+    places: str = "new_orleans",
+    vars: Tuple[str, str] = ("vmax", "r0"),
+    pi_version: int = 4,
+    trial=1,
+    pressure_assumption="isothermal",
+) -> None:
+    assert len(axs) == len(vars)
+
+
 def plot_two_spatial(
     axs: np.ndarray,
     place: str = "new_orleans",
@@ -540,6 +551,42 @@ def get_cmip6_timeseries(
     return ds
 
 
+def plot_timeserii(
+    axs: np.ndarray,
+    serii: tuple = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
+    color: str = "black",
+    member: int = 4,
+    model: str = "CESM2",
+    pressure_assumption: str = "isothermal",
+    place: str = "new_orleans",
+    pi_version: int = 4,
+    year_min: int = 2014,
+    year_max: int = 2100,
+) -> None:
+    assert len(axs) == len(serii)
+    ds = get_cmip6_timeseries(
+        place=place,
+        pressure_assumption=pressure_assumption,
+        member=member,
+        model=model,
+        pi_version=pi_version,
+    )
+    for i in range(len(serii)):
+        axs[i].set_title(serii[i])
+        axs[i].plot(
+            np.array([t.astype("datetime64[Y]").astype(int) + 1970 for t in ds.values]),
+            ds[serii[i]].values,
+            color=color,
+            linewidth=0.5,
+        )
+        axs[i].set_xlabel("")
+        if i == len(serii) - 1:
+            axs[i].set_xlabel("Year")
+        axs[i].set_xlim([1850, 2100])
+        # vertical black line at year_min
+        axs[i].axvline(int(year_min), color="black", linestyle="--", linewidth=0.5)
+
+
 def plot_two_timeseries(
     axs: np.ndarray,
     text: bool = True,
@@ -561,8 +608,6 @@ def plot_two_timeseries(
         member (int): The ensemble member to plot (default is 4).
 
     """
-    # /Volumes/s/tcpips/w22/data/new_orleans_august_historical_HADGEM3-GC31-LL_r1i1p1f3_isothermal_pi4new.nc
-    # /Volumes/s/tcpips/w22/data/hong_kong_august_historical_HADGEM3-GC31-MM_r1i1p1f3_isothermal_pi4new.nc
 
     assert len(axs) == 2
     # put historical and ssp585 together

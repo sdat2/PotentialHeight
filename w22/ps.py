@@ -41,26 +41,11 @@ from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
     pressure_from_wind,
+    rho_air_f,
 )
 from .solve import bisection
 
 TEMP_DIFF = 1.0  # difference between sst and near surface air temperature
-
-
-def rho_air_f(total_pressure_hpa, air_temperature, water_vapour_pressure):
-    """Calculate air density given total pressure, temperature, and water vapour pressure.
-
-    Args:
-        total_pressure_hpa (float): Total pressure in hPa.
-        air_temperature (float): Air temperature in K.
-        water_vapour_pressure (float): Water vapour pressure in Pa.
-
-    Returns:
-        float: Air density in kg/m^3.
-    """
-    return (total_pressure_hpa * 100 - water_vapour_pressure) / (
-        GAS_CONSTANT * air_temperature
-    ) + water_vapour_pressure / (GAS_CONSTANT_FOR_WATER_VAPOR * air_temperature)
 
 
 def calculate_ps_ufunc(
@@ -118,7 +103,9 @@ def calculate_ps_ufunc(
     near_surface_air_temperature = sst + TEMP_0K - TEMP_DIFF
 
     # Simplified air density calculation for the wrapper
-    water_vapour_pressure = rh * buck_sat_vap_pressure(near_surface_air_temperature)
+    water_vapour_pressure = rh * buck_sat_vap_pressure(
+        near_surface_air_temperature
+    )  # (Pa)
     rho_air = rho_air_f(p_a, near_surface_air_temperature, water_vapour_pressure)
 
     def try_for_r0(r0: float):
