@@ -472,7 +472,7 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
 
 
 @timeit
-def paralelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
+def parallelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
     """
     Calculate potential size at category 1 intensity, and at the potential intensity.
 

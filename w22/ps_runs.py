@@ -2,6 +2,7 @@
 
 import os
 from typing import Union
+import numpy as np
 import xarray as xr
 from sithom.time import timeit
 from sithom.xr import mon_increase
@@ -10,8 +11,12 @@ from tcpips.pi import calculate_pi
 from tcpips.convert import convert
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
-from .ps import parallelized_ps, parallelized_ps_dask
+from .ps import parallelized_ps, parallelized_ps13_dask
 from .constants import DATA_PATH, OFFSET_D
+
+CAT_1_WIND_SPEED = (
+    33 / 0.8
+)  # m/s at 10m, divided by 0.8 to convert to gradient wind speed
 
 # store offsets for points to get data for.
 
@@ -149,7 +154,12 @@ def trimmed_cmip6_example(
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
 
-    out_ds = parallelized_ps_dask(in_ds)
+    in_ds = in_ds.rename({"vmax": "vmax_3"})
+    in_ds["vmax_1"] = (
+        in_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"]),
+    )
+    out_ds = parallelized_ps13_dask(in_ds)
     name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in ["new_orleans", "galverston", "miami"]:
@@ -195,7 +205,13 @@ def new_orleans_10year(
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps_dask(in_ds)
+
+    in_ds = in_ds.rename({"vmax": "vmax_3"})
+    in_ds["vmax_1"] = (
+        in_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"].values),
+    )
+    out_ds = parallelized_ps13_dask(in_ds)
     out_ds["q"] = qt_ds["q"]
     out_ds["t"] = qt_ds["t"]
     out_ds["otl"] = qt_ds["otl"]
@@ -256,7 +272,12 @@ def global_cmip6(part="nw", year: int = 2015, pi_version=2) -> None:
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps_dask(in_ds, jobs=30)
+    in_ds = in_ds.rename({"vmax": "vmax_3"})
+    in_ds["vmax_1"] = (
+        in_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"]),
+    )
+    out_ds = parallelized_ps13_dask(in_ds)
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(
@@ -390,9 +411,13 @@ def point_timeseries(
             trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
 
     print("trimmed", trimmed_ds)
-    out_ds = parallelized_ps(
-        trimmed_ds, jobs=25, pressure_assumption=pressure_assumption
+    trimmed_ds = trimmed_ds.rename({"vmax": "vmax_3"})
+    trimmed_ds["vmax_1"] = (
+        trimmed_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(trimmed_ds["vmax_3"]),
     )
+
+    out_ds = parallelized_ps13_dask(trimmed_ds)
     print("out_ds", out_ds)
     out_ds.to_netcdf(
         os.path.join(
@@ -447,7 +472,12 @@ def point_era5_timeseries(
     trimmed_ds = trimmed_ds.isel(
         time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
     )
-    out_ds = parallelized_ps(trimmed_ds, jobs=10)
+    trimmed_ds = trimmed_ds.rename({"vmax": "vmax_3"})
+    trimmed_ds["vmax_1"] = (
+        out_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(trimmed_ds["vmax_3"]),
+    )
+    out_ds = parallelized_ps13_dask(trimmed_ds)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
@@ -526,3 +556,4 @@ if __name__ == "__main__":
     from tcpips.dask_utils import dask_cluster_wrapper
 
     dask_cluster_wrapper(ps_for_place, "new_orleans")
+    dask_cluster_wrapper(ps_for_place, "hong_kong")
