@@ -93,7 +93,7 @@ def reconstruct_profile_well_mixed(
 
     # --- 3. Extrapolate Using Well-Mixed Assumption ---
     # Calculate the potential temperature (theta_ref) at the reference level.
-    theta_ref = t_ref * (P0_HPA / p_ref) ** KAPPA
+    theta_ref = (t_ref) * (P0_HPA / p_ref) ** KAPPA
 
     # Extrapolate constant potential temperature downward.
     # For any level p_hpa, the extrapolated temperature T_new is calculated from theta_ref.
@@ -159,13 +159,30 @@ def fix_profile(
         >>> np.testing.assert_almost_equal(ds_fixed.t.values[1, 0, 1], expected_t2_925, decimal=2)
         >>> np.testing.assert_almost_equal(ds_fixed.t.values[1, 0, 0], expected_t2_1000, decimal=2)
     """
-    ds["t"] = ds["t"].where(ds["t"] < (max_temp_c + 273.15), np.nan)
+    ds = ds.copy(deep=True)  # Avoid modifying the original dataset in place.
 
     if ds.p.attrs.get("units", "hPa").lower() in ["pa", "pascal"]:
         if ds.p.max() > 2000:  # Heuristic check if already in Pa
             p_hpa = ds.p / 100.0
     else:  # Assume hPa if not specified or specified otherwise
         p_hpa = ds.p
+
+    # Check if temperature is in Celsius and convert to Kelvin if needed
+    if "units" not in ds.t.attrs or ds.t.attrs["units"].lower() in [
+        "celsius",
+        "degrees_celsius",
+        "degc",
+    ]:
+        in_celsius = True
+        ds["t"] = ds["t"] + 273.15  # Convert to Kelvin
+    else:
+        in_celsius = False
+
+    ds["t"] = ds["t"].where(ds["t"] < (max_temp_c + 273.15), np.nan)
+
+    ds["t"] = ds["t"].where(ds["t"] > 0.0, np.nan)  # Remove non-physical temps
+
+    # print("t", ds.t.min().values, ds.t.max().values)
 
     if method == "interpolate":
         # 1. Keep a reference to the original p coordinate
@@ -203,6 +220,9 @@ def fix_profile(
 
     else:
         raise ValueError(f"Unknown method: {method}")
+
+    if in_celsius:
+        ds["t"] = ds["t"] - 273.15  # Convert back to Celsius if needed
 
     return ds
 
