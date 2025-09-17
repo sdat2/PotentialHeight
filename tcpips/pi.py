@@ -124,6 +124,9 @@ def fix_profile(
     2.  'lapse_rate': Fills NaNs at the bottom of the profile by extrapolating
         downwards from the lowest valid data point using a dry adiabatic lapse rate.
         This is ideal for fixing missing surface-level pressure data.
+    3.  'well_mixed': Fills NaNs at the bottom of the profile by assuming a well-mixed
+        boundary layer. This method fills both temperature and specific humidity
+        profiles consistently and is physically principled for tropical atmospheres.
 
     Args:
         ds (xr.Dataset): Xarray dataset containing temperature 't' with a

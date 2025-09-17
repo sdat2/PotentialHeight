@@ -402,13 +402,42 @@ def place_to_position(place: str) -> tuple:
 
 def plot_spatials(
     axs: np.ndarray,
-    places: str = "new_orleans",
-    vars: Tuple[str, str] = ("vmax", "r0"),
+    place: str = "new_orleans",
+    vars: Tuple[str, str] = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
+    labels: tuple = (
+        "Potential intensity, $V_{p}$ [m s$^{-1}$]",
+        "Corresponding potential outer size, $r_{a3}$ [km]",
+        "Corresponding potential inner size, $r_{3}$ [km]",
+        "Cat1 potential inner size, $r_{1}$ [km]",
+    ),
     pi_version: int = 4,
     trial=1,
     pressure_assumption="isothermal",
 ) -> None:
     assert len(axs) == len(vars)
+
+    name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
+
+    if place in {"new_orleans", "galverston", "miami"}:
+        name = "gom_" + name
+    if place in {"shanghai", "hong_kong", "hanoi"}:
+        name = "scs_" + name
+    ds = xr.open_dataset(os.path.join(DATA_PATH, name))
+    print("spatial ds", ds)
+
+    ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
+    ds["lat"].attrs = {"units": "$^{\circ}N$", "long_name": "Latitude"}
+    for i, var in enumerate(vars):
+        if var in ds:
+            if var in {"r0", "rmax", "rmax_1", "rmax_3", "r0_1", "r0_3"}:
+                (ds[var] / 1000).plot(ax=axs[i], cbar_kwargs={"label": ""})
+            else:
+                ds[var].plot(ax=axs[i], cbar_kwargs={"label": ""})
+            axs[i].set_title(labels[i])
+        point = place_to_position(place)
+        axs[i].scatter(*point, color="black", s=75, marker="x")
+        if i != len(vars) - 1:
+            axs[i].set_xlabel("")
 
 
 def plot_two_spatial(
@@ -553,7 +582,13 @@ def get_cmip6_timeseries(
 
 def plot_timeserii(
     axs: np.ndarray,
-    serii: tuple = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
+    vars: tuple = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
+    labels: tuple = (
+        "Potential intensity, $V_{p}$ [m s$^{-1}$]",
+        "PI potential outer size, $r_{a3}$ [km]",
+        "PI potential inner size, $r_{3}$ [km]",
+        "Cat1 potential inner size, $r_{1}$ [km]",
+    ),
     color: str = "black",
     member: int = 4,
     model: str = "CESM2",
@@ -563,7 +598,8 @@ def plot_timeserii(
     year_min: int = 2014,
     year_max: int = 2100,
 ) -> None:
-    assert len(axs) == len(serii)
+    assert len(axs) == len(vars)
+    assert len(labels) == len(vars)
     ds = get_cmip6_timeseries(
         place=place,
         pressure_assumption=pressure_assumption,
@@ -571,16 +607,25 @@ def plot_timeserii(
         model=model,
         pi_version=pi_version,
     )
-    for i in range(len(serii)):
-        axs[i].set_title(serii[i])
+    for i in range(len(vars)):
+        axs[i].set_title(vars[i])
+        var_np = ds[vars[i]].values
+        if vars[i] in {"r0", "rmax", "rmax_1", "rmax_3", "r0_1", "r0_3"}:
+            var_np /= 1000
+
         axs[i].plot(
-            np.array([t.astype("datetime64[Y]").astype(int) + 1970 for t in ds.values]),
-            ds[serii[i]].values,
+            # np.array(
+            #     [t.astype("datetime64[Y]").astype(int) + 1970 for t in ds.time.values]
+            # ),
+            ds["time"].values,
+            var_np,
             color=color,
             linewidth=0.5,
+            alpha=0.5,
         )
+        axs[i].set_title(labels[i])
         axs[i].set_xlabel("")
-        if i == len(serii) - 1:
+        if i == len(vars) - 1:
             axs[i].set_xlabel("Year")
         axs[i].set_xlim([1850, 2100])
         # vertical black line at year_min
@@ -835,6 +880,73 @@ def figure_two(place: str = "new_orleans") -> None:
     else:
         plt.savefig(os.path.join(FIGURE_PATH, f"figure_two_{place}.pdf"))
 
+    plt.clf()
+    plt.close()
+
+
+def multipanel(
+    place: str = "new_orleans",
+    vars: Tuple[str] = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
+):
+    """Plot the multipanel figure for the CMIP6 timeseries.
+
+    Args:
+        vars (tuple): The variables to plot (default is ("vmax_3", "r0_3", "rmax_3", "rmax_1")).
+    """
+    plot_defaults()
+    _, axs = plt.subplots(
+        len(vars),
+        2,
+        figsize=get_dim(ratio=1.5),
+    )
+    members = [4, 10, 11]
+    colors = ["orange", "green", "grey"]
+    plot_spatials(axs[:, 0], place="new_orleans", vars=vars)
+    for i, member in enumerate(members):
+        plot_timeserii(
+            axs[:, 1],
+            vars=vars,
+            color="orange",
+            member=member,
+            model="CESM2",
+            pressure_assumption="isothermal",
+            place="new_orleans",
+            pi_version=4,
+            year_min=2014,
+            year_max=2100,
+        )
+
+    members = ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3"]
+    for i, member in enumerate(members):
+        plot_timeserii(
+            axs[:, 1],
+            vars=vars,
+            color="green",
+            member=member,
+            model="HADGEM3-GC31-MM",
+            pressure_assumption="isothermal",
+            place="new_orleans",
+            pi_version=4,
+            year_min=2014,
+            year_max=2100,
+        )
+    members = ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"]
+    for i, member in enumerate(members):
+        plot_timeserii(
+            axs[:, 1],
+            vars=vars,
+            color="grey",
+            member=member,
+            model="MIROC6",
+            pressure_assumption="isothermal",
+            place="new_orleans",
+            pi_version=4,
+            year_min=2014,
+            year_max=2100,
+        )
+
+    label_subplots(axs)
+    plt.savefig(os.path.join(FIGURE_PATH, f"{place}_multipanel.pdf"))
     plt.clf()
     plt.close()
 
@@ -1131,8 +1243,8 @@ if __name__ == "__main__":
     # python -m w22.plot
     # plot_panels()
     #
-    figure_two(place="new_orleans")
-    figure_two(place="hong_kong")
+    # figure_two(place="new_orleans")
+    # figure_two(place="hong_kong")
     # temporal_relationship_data(place="new_orleans", pi_version=4)
     # plot_seasonal_profiles()
     # years = [2015, 2100]
@@ -1149,3 +1261,5 @@ if __name__ == "__main__":
     #     years=years,
     #     members=[4, 10],
     # )
+    multipanel(place="new_orleans")
+    multipanel(place="hong_kong")
