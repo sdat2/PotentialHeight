@@ -97,19 +97,57 @@ def spatial_example(
     # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
+
+    def select_region(tds: xr.Dataset, place) -> xr.Dataset:
+        """Select region of interest.
+
+        Args:
+            in_ds (xr.Dataset): input dataset.
+
+        Returns:
+            xr.Dataset: dataset for region of interest.
+        """
+        if place in ["new_orleans", "galverston", "miami"]:
+            tds = tds.sel(
+                lon=slice(-100, -73),
+                lat=slice(17.5, 32.5),
+                time="2015-08",
+                # method="nearest"
+            )
+        elif place in ["shanghai", "hong_kong", "hanoi"]:
+            tds = tds.sel(
+                lon=slice(100, 130),
+                lat=slice(17.5, 32.5),
+                time="2015-08",
+                # method="nearest"
+            )
+        else:
+            raise ValueError(
+                "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
+            )
+        return tds
+
     if recalculate_pi:
         # get the data from the example path
         ds_list = [
             xr.open_dataset(
-                os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc")
+                os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc"),
+                chunks={"time": 24, "lat": 90, "lon": 90},
             )
             for typ in ["ocean", "atmos"]
         ]
         for i, ds in enumerate(ds_list):
             ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
         print("ds_list", ds_list)
-        ds = xr.merge(ds_list)
-        ds = convert(ds)
+        ds = mon_increase(
+            xr.merge(ds_list),
+            x_dim="lon",
+            y_dim="lat",
+        )
+        print("merged ds", ds)
+        ds = select_region(ds, place)
+        print("selected region ds", ds)
+        ds = convert(ds).chunk(dict(p=-1))
         print("converted ds", ds)
         ds_pi = calculate_pi(
             ds,
@@ -120,50 +158,34 @@ def spatial_example(
         ds["t0"] = ds_pi["t0"]
         ds["rh"] = ds["rh"] / 100  # convert to dimensionless
         ds["rh"].attrs["units"] = "dimensionless"
+        in_ds = ds
     else:
         ds = xr.open_dataset(ex_data_path(pi_version=pi_version))
-        in_ds = mon_increase(
-            ds,
-            x_dim="lon",
-            y_dim="lat",
-        ).isel(
-            # lat=slice(215, 245),
-            # lon=slice(160, 205),
-            time=7,  # slice(0, 12) # just august 2015
+        in_ds = select_region(
+            mon_increase(
+                ds,
+                x_dim="lon",
+                y_dim="lat",
+            ),
+            place,
         )
+        if pi_version == 2:
+            # get rid of V_reduc accidentally added in for vmax calculation
+            in_ds["vmax"] = in_ds["vmax"] / 0.8
         print("input cmip6 data", in_ds)
 
-    if place in ["new_orleans", "galverston", "miami"]:
-        in_ds = in_ds.sel(
-            lon=slice(-100, -73),
-            lat=slice(17.5, 32.5),
-            # method="nearest"
-        ).compute()
-    elif place in ["shanghai", "hong_kong", "hanoi"]:
-        in_ds = in_ds.sel(
-            lon=slice(100, 130),
-            lat=slice(17.5, 32.5),
-            # method="nearest"
-        ).compute()
-    else:
-        raise ValueError(
-            "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
-        )
     print("trimmed input data", in_ds)
     if "rh" not in in_ds:
         rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
         in_ds["rh"] = rh
-    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
-
-    if pi_version == 2:
-        # get rid of V_reduc accidentally added in for vmax calculation
-        in_ds["vmax"] = in_ds["vmax"] / 0.8
+    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
 
     in_ds = in_ds.rename({"vmax": "vmax_3"})
     in_ds["vmax_1"] = (
         in_ds["vmax_3"].dims,
         CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"]),
     )
+    in_ds = in_ds.chunk({"lat": 5, "lon": 5})
     out_ds = parallelized_ps13_dask(in_ds)
     name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
@@ -177,7 +199,8 @@ def spatial_example(
         os.path.join(
             DATA_PATH,
             name,
-        )
+        ),
+        engine="h5netcdf",
     )
 
 
@@ -564,7 +587,7 @@ if __name__ == "__main__":
     # dask_cluster_wrapper(ps_for_place, "hong_kong")
     dask_cluster_wrapper(
         spatial_example,
-        place="new_orleans",
+        place="hong_kong",
         pressure_assumption="isothermal",
         trial=1,
         pi_version=4,
