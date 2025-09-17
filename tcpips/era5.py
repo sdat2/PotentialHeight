@@ -42,7 +42,7 @@ except ImportError:
     print("Cartopy is not installed. Some plotting functions will not work.")
     CARTOPY_INSTALLED = False
 
-from w22.ps import parallelized_ps_dask
+from w22.ps import parallelized_ps13_dask
 from .constants import (
     ERA5_RAW_PATH,
     ERA5_PI_OG_PATH,
@@ -619,7 +619,7 @@ def select_seasonal_hemispheric_data(
         ds (xr.Dataset): An xarray Dataset with 'time', 'latitude', and
             'longitude' coordinates. 'time' must be a datetime-like coordinate.
         months_to_average (int): The number of months to average.
-            - 1: Selects August for NH and March for SH.
+            - 1: Selects August for NH and February for SH.
             - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
 
     Returns:
@@ -652,13 +652,13 @@ def select_seasonal_hemispheric_data(
     >>> result_1m = select_seasonal_hemispheric_data(ds_test, months_to_average=1)
     >>> # For NH (lat=20), the value for August (month 8) should be 8.
     >>> assert int(result_1m.sel(year=2021, latitude=20).some_variable) == 8
-    >>> # For SH (lat=-20), the value for March (month 3) should be 3.
-    >>> assert int(result_1m.sel(year=2020, latitude=-20).some_variable) == 3
+    >>> # For SH (lat=-20), the value for February (month 2) should be 2.
+    >>> assert int(result_1m.sel(year=2020, latitude=-20).some_variable) == 2
     """
     if months_to_average == 1:
         # Original logic: Select a single peak month
         nh_data = ds.where((ds.time.dt.month == 8) & (ds[lat] >= 0), drop=True)
-        sh_data = ds.where((ds.time.dt.month == 3) & (ds[lat] < 0), drop=True)
+        sh_data = ds.where((ds.time.dt.month == 2) & (ds[lat] < 0), drop=True)
 
         nh_data = (
             nh_data.assign_coords(year=nh_data.time.dt.year)
@@ -675,13 +675,11 @@ def select_seasonal_hemispheric_data(
 
     elif months_to_average == 3:
         # New logic: Average over 3-month peak season
-        # Northern Hemisphere: August-September-October (ASO)
-        nh_data = ds.where(
-            ds.time.dt.month.isin([8, 9, 10]) & (ds[lat] >= 0), drop=True
-        )
+        # Northern Hemisphere: July-August-September (JAS)
+        nh_data = ds.where(ds.time.dt.month.isin([7, 8, 9]) & (ds[lat] >= 0), drop=True)
         nh_annual = nh_data.groupby(nh_data.time.dt.year).mean("time")
 
-        # Southern Hemisphere: January-February-March (JFM)
+        # Southern Hemisphere: January-February-February (JFM)
         sh_data = ds.where(ds.time.dt.month.isin([1, 2, 3]) & (ds[lat] < 0), drop=True)
         sh_annual = sh_data.groupby(sh_data.time.dt.year).mean("time")
 
@@ -921,13 +919,15 @@ def era5_pi_trends(
         start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
         end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
         months (int, optional): The number of months to average over. Defaults to 1.
-            - 1: Selects August for NH and March for SH.
+            - 1: Selects August for NH and February for SH.
             - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
     """
     # load all the decades of data for potential intensity
-    pi_vars = ["vmax", "t0", "otl", "sst", "msl", "rh"] # [x for x in ds.variables]
+    pi_vars = ["vmax", "t0", "otl", "sst", "msl", "rh"]  # [x for x in ds.variables]
 
-    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")[pi_vars]
+    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")[
+        pi_vars
+    ]
     if ds is None:
         print("No ERA5 PI data found. Please run era5_pi() first.")
         return
@@ -1000,7 +1000,9 @@ def era5_pi_trends(
         trend_ds[var + "_intercept_nw"] = new_trend_ds["intercept"]
 
     print("Saving to zarr...")
-    temp_path = tempfile.mkdtemp(suffix=".zarr", dir=".") # Write temp file in current dir
+    temp_path = tempfile.mkdtemp(
+        suffix=".zarr", dir="."
+    )  # Write temp file in current dir
     out_path = os.path.join(
         ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
     )
@@ -1017,7 +1019,7 @@ def era5_pi_trends(
 
     except Exception as e:
         print(f"Failed to save data. Error: {e}")
-        shutil.rmtree(temp_path) # Clean up on failure
+        shutil.rmtree(temp_path)  # Clean up on failure
         raise
 
 
@@ -1132,10 +1134,8 @@ def plot_trend_maps(
     )
     print(trend_ds)
     trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
-    vars = [# "msl", "rh",
-            "sst", "t0", "otl", "vmax"]
-    vlim = [# (-1, 1), (-0.1, 0.1),
-            (-0.5, 0.5), (-0.5, 0.5), (-1, 1), (-5, 5)]
+    vars = ["sst", "t0", "otl", "vmax"]  # "msl", "rh",
+    vlim = [(-0.5, 0.5), (-0.5, 0.5), (-1, 1), (-5, 5)]  # (-1, 1), (-0.1, 0.1),
     labels = [
         # "$P_s$ trend [hPa decade$^{-1}$]",
         # r"$\mathcal{H}$ trend [% decade$^{-1}$]",
@@ -1157,7 +1157,7 @@ def plot_trend_maps(
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
 
-    for i, var in  enumerate(vars):
+    for i, var in enumerate(vars):
         print(f"Plotting {var}...")
         plot_var_on_map(
             axs[i],
@@ -1173,9 +1173,11 @@ def plot_trend_maps(
     label_subplots(axs)
     plt.tight_layout()
     plt.savefig(
-        os.path.join(ERA5_FIGURE_PATH,
-                             f"era5_vmax_trends_{start_year}_{end_year}_{months}m.pdf"),
-                dpi=300)
+        os.path.join(
+            ERA5_FIGURE_PATH, f"era5_vmax_trends_{start_year}_{end_year}_{months}m.pdf"
+        ),
+        dpi=300,
+    )
 
 
 def plot_trend_lineplots(
@@ -1219,7 +1221,7 @@ def plot_trend_lineplots(
         # get August data (in the Northern Hemisphere)
         era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 8)
     else:
-        # get March data (in the Southern Hemisphere)
+        # get February data (in the Southern Hemisphere)
         era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 3)
     # get the time in years
     era5_ds = era5_ds.assign_coords(
@@ -1229,22 +1231,19 @@ def plot_trend_lineplots(
     del era5_ds["time"]
     # plot the variables
 
-
-    vars = [# "msl", "rh",
-            "sst", "t0", "otl", "vmax"]
+    vars = ["sst", "t0", "otl", "vmax"]  # "msl", "rh",
     labels = [
-        #r"$P_s$ [hPa]",
-        #r"$\mathcal{H}$ [%]",
+        # r"$P_s$ [hPa]",
+        # r"$\mathcal{H}$ [%]",
         r"$T_s$ [$^{\circ}$C]",
         r"$T_o$ [K]",
         r"$z_{\mathrm{o}}$ [hPa]",
         r"$V_p$ [m s$^{-1}$]",
     ]
-    units = [# "hPa", "%",
-             r"$^{\circ}$C", "K", "hPa", r"m s$^{-1}$"]
+    units = [r"$^{\circ}$C", "K", "hPa", r"m s$^{-1}$"]  # "hPa", "%",
     colors = [
-        #"tab:purple",
-        #"tab:brown",
+        # "tab:purple",
+        # "tab:brown",
         "tab:blue",
         "tab:orange",
         "tab:green",
@@ -1257,6 +1256,7 @@ def plot_trend_lineplots(
         sharex=True,
         figsize=get_dim(ratio=0.8),
     )
+
     def format_p_latex(value: float, sig_figs: int = 2) -> str:
         """Formats a float into a LaTeX scientific notation string.
 
@@ -1277,8 +1277,8 @@ def plot_trend_lineplots(
         """
         precision = sig_figs - 1
         sci_notation_str = f"{value:.{precision}e}"
-        mantissa, exponent_str = sci_notation_str.split('e')
-        exponent = int(exponent_str) # Cleans up leading zeros and '+' sign
+        mantissa, exponent_str = sci_notation_str.split("e")
+        exponent = int(exponent_str)  # Cleans up leading zeros and '+' sign
 
         # Don't use scientific notation for exponents of 0 or -1
         if exponent in [0, -1]:
@@ -1317,7 +1317,7 @@ def plot_trend_lineplots(
             linestyle="--",
         )
         # new_ys = unumpy.polyval(np.array(u_coeffs), x)
-        perc_inc = slope / intercept  * 100  # percentage increase
+        perc_inc = slope / intercept * 100  # percentage increase
 
         new_ys = u_coeffs[0] * x + u_coeffs[1]
         ax.fill_between(
@@ -1329,7 +1329,7 @@ def plot_trend_lineplots(
             alpha=0.2,
         )
         ax.set_title(
-            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}, {format_p_latex(trend_ds[f'{var}_p_value'].values)}", # , {perc_inc.n*10:.1f} ± {perc_inc.s*10:.1f} % decade{r'$^{-1}$'}",
+            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}, {format_p_latex(trend_ds[f'{var}_p_value'].values)}",  # , {perc_inc.n*10:.1f} ± {perc_inc.s*10:.1f} % decade{r'$^{-1}$'}",
             fontsize=10,
             color=color,
         )
@@ -1371,6 +1371,15 @@ def calculate_potential_sizes(
         None: This function saves the results to a zarr file.
     """
     ds = get_all_data(start_year=start_year, end_year=end_year)
+
+    # just select -40 to 40 latitude, August for NH and February for SH
+    from sithom.xr import mon_increase
+
+    if "valid_time" in ds.dims:
+        ds = ds.rename({"valid_time": "time"})
+    ds = mon_increase(select_seasonal_hemispheric_data(ds, months_to_average=1)).sel(
+        latitude=slice(-40, 40)
+    )
     if ds is None:
         print("No ERA5 data found. Please run era5_pi() first.")
         return
@@ -1382,15 +1391,19 @@ def calculate_potential_sizes(
     del ds["pressure_level"]
     # ds = convert(ds)
     # call expensive function. There was some issues with chunking
-    ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
+
+    print("input ds", ds)
+
+
+def exp():
+    ds = parallelized_ps13_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
         {"time": 64, "lat": 480, "lon": 480}
     )  # chunk the data for saving
     ds = ds.rename({"r0": "r0_pi", "rmax": "rmax_pi", "vmax": "vmax_pi"})
     ds["vmax"] = 33  # set the vmax to 33 m/s for the lower limit of category 1.
-    ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
+    ds = parallelized_ps13_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
         {"time": 64, "lat": 480, "lon": 480}
     )  # chunk the data for saving
-    ds = ds.rename({"r0": "r0_cat1", "rmax": "rmax_cat1", "vmax": "vmax_cat1"})
 
     ds = ds.rename({"lat": "latitude", "lon": "longitude"})
     ds.to_zarr(
@@ -1643,8 +1656,13 @@ if __name__ == "__main__":
     # )
     from w22.constants import OFFSET_D
 
-    new_point_d = {var: (OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"], OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"])
-                   for var in OFFSET_D}
+    new_point_d = {
+        var: (
+            OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"],
+            OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"],
+        )
+        for var in OFFSET_D
+    }
 
     for point in new_point_d:
         print(f"Plotting trend lineplots for {point} at {new_point_d[point]}")
@@ -1695,11 +1713,11 @@ if __name__ == "__main__":
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
-    # dask_cluster_wrapper(
-    #     calculate_potential_sizes,
-    #     start_year=DEFAULT_START_YEAR,
-    #     end_year=DEFAULT_START_YEAR + 9,
-    # )  # This will take a long time to run.
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR,
+        end_year=DEFAULT_START_YEAR + 9,
+    )  # This will take a long time to run.
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
