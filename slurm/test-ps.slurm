@@ -39,8 +39,9 @@ which python
 # pytest ../w22/ps.py
 # python -m w22.ps
 
-python -m w22.test --name archer2-slurm
+# python -m w22.test --name archer2-slurm
 #python -m w22.ps
+python -m w22.ps_runs
 
 # Time taken by oct2py for 10 loops is 21.8 s
 # Time taken by octave for 10 loops is 7.9 s
