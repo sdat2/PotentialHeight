@@ -78,18 +78,21 @@ def get_regional_processed_data(place="new_orleans") -> xr.Dataset:
 
 
 @timeit
-def trimmed_cmip6_example(
+def spatial_example(
     pressure_assumption="isothermal",
     trial=1,
     pi_version=2,
     recalculate_pi: bool = True,
     place="new_orleans",
 ) -> None:
-    """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
+    """Run potential size calculations on CMIP6 data to get a region.
 
     Args:
-        pressure_assumption (str, optional): pressure assumption. Defaults to "isopycnal".
+        pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
         trial (int, optional): trial number. Defaults to 1.
+        pi_version (int, optional): pi_version of the pi calculation. Defaults to 2.
+        recalculate_pi (bool, optional): whether to recalculate pi. Defaults to True.
+        place (str, optional): place to get data for. Defaults to "new_orleans
     """
     # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
@@ -107,6 +110,7 @@ def trimmed_cmip6_example(
         print("ds_list", ds_list)
         ds = xr.merge(ds_list)
         ds = convert(ds)
+        print("converted ds", ds)
         ds_pi = calculate_pi(
             ds,
             dim="p",
@@ -146,8 +150,9 @@ def trimmed_cmip6_example(
             "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
         )
     print("trimmed input data", in_ds)
-    rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
-    in_ds["rh"] = rh
+    if "rh" not in in_ds:
+        rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
+        in_ds["rh"] = rh
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
 
     if pi_version == 2:
@@ -546,7 +551,7 @@ if __name__ == "__main__":
         if "ERA5" in models:
             point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
         if "CESM2" in models:
-            trimmed_cmip6_example(
+            spatial_example(
                 pressure_assumption=pressure_assumption,
                 trial=1,
                 pi_version=4,
@@ -556,4 +561,17 @@ if __name__ == "__main__":
     from tcpips.dask_utils import dask_cluster_wrapper
 
     # dask_cluster_wrapper(ps_for_place, "new_orleans")
-    dask_cluster_wrapper(ps_for_place, "hong_kong")
+    # dask_cluster_wrapper(ps_for_place, "hong_kong")
+    dask_cluster_wrapper(
+        spatial_example,
+        place="new_orleans",
+        pressure_assumption="isothermal",
+        trial=1,
+        pi_version=4,
+    )
+    # spatial_example(
+    #     pressure_assumption="isothermal",
+    #     trial=1,
+    #     pi_version=4,
+    #     place="hong_kong",
+    # )

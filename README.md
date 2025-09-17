@@ -1,4 +1,4 @@
-# WorstSurge: Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization
+# Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)[![Python package](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml/badge.svg)](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml)[![Documentation Status](https://readthedocs.org/projects/worstsurge/badge/?version=latest)](https://worstsurge.readthedocs.io/en/latest/?badge=latest)[![Code DOI](https://zenodo.org/badge/718141777.svg)](https://doi.org/10.5281/zenodo.15073504)[![EarthArXiv Preprint](https://img.shields.io/badge/EarthArXiv-doi:10.31223/X57T5R-blue?style=flat)](https://doi.org/10.31223/X57T5R)
 
 EarthArxiv preprint now available <https://doi.org/10.31223/X57T5R>!
@@ -92,11 +92,11 @@ If you use this code, please cite the following paper:
 And cite the code as:
 
 ```bibtex
-@software{worstsurge_code,
+@software{potential_height_code,
   author = {Thomas, Simon D. A.},
   doi = {10.5281/zenodo.15073504},
   month = {Sep},
-  title = {{WorstSurge - Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
+  title = {{Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
   url = {https://github.com/sdat2/worstsurge},
   version = {v0.1.1},
   year = {2025}

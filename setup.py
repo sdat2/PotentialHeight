@@ -37,7 +37,7 @@ REQUIRED: List[str] = [
 
 
 setup(
-    name="worstsurge",
+    name="PotentialHeight",
     description="A set of tools to calculate the potential height of tropical cyclone storm surges",
     version="0.1.1",
     author_email="sdat2@cam.ac.uk",
