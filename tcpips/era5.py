@@ -24,6 +24,7 @@ from sithom.xr import mon_increase
 from uncertainties import ufloat, correlated_values, unumpy
 from sithom.plot import plot_defaults, label_subplots, get_dim
 
+
 CARTOPY_INSTALLED = True
 try:
     import cartopy
@@ -640,8 +641,8 @@ def select_seasonal_hemispheric_data(
 
     >>> # --- Test Case 1: 3-Month Average ---
     >>> result_3m = select_seasonal_hemispheric_data(ds_test, months_to_average=3)
-    >>> # For NH (lat=20), average of Aug(8), Sep(9), Oct(10) should be 9.0
-    >>> assert int(result_3m.sel(year=2021, latitude=20).some_variable) == 9
+    >>> # For NH (lat=20), average of Jul(7), Aug(8), Sep(9) should be 8.0
+    >>> assert int(result_3m.sel(year=2021, latitude=20).some_variable) == 8
     >>> # For SH (lat=-20), average of Jan(1), Feb(2), Mar(3) should be 2.0
     >>> assert int(result_3m.sel(year=2020, latitude=-20).some_variable) == 2
     >>> # Check that the dimensions are correct and 'time' is replaced by 'year'.
@@ -1357,7 +1358,9 @@ def plot_trend_lineplots(
 
 
 def calculate_potential_sizes(
-    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    dry_run: bool = False,
 ) -> None:
     """Calculate the potential sizes of tropical cyclones from ERA5 data.
 
@@ -1366,6 +1369,7 @@ def calculate_potential_sizes(
     Args:
         start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
         end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+        dry_run (bool, optional): If True, do not actually run the calculation. Defaults to True.
 
     Returns:
         None: This function saves the results to a zarr file.
@@ -1373,8 +1377,6 @@ def calculate_potential_sizes(
     ds = get_all_data(start_year=start_year, end_year=end_year)
 
     # just select -40 to 40 latitude, August for NH and February for SH
-    from sithom.xr import mon_increase
-
     if "valid_time" in ds.dims:
         ds = ds.rename({"valid_time": "time"})
     ds = mon_increase(select_seasonal_hemispheric_data(ds, months_to_average=1)).sel(
@@ -1390,29 +1392,35 @@ def calculate_potential_sizes(
     del ds["q"]
     del ds["pressure_level"]
     # ds = convert(ds)
-    # call expensive function. There was some issues with chunking
+    ds = ds.rename({"vmax": "vmax_3"})
+    ds["vmax_1"] = (ds.vmax_3.dims, np.ones(ds.vmax_3.shape) * 33 / 0.8)
+    ds = ds.chunk({"lat": 16, "lon": 30, "year": 1})
 
     print("input ds", ds)
-
-
-def exp():
-    ds = parallelized_ps13_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
-        {"time": 64, "lat": 480, "lon": 480}
-    )  # chunk the data for saving
-    ds = ds.rename({"r0": "r0_pi", "rmax": "rmax_pi", "vmax": "vmax_pi"})
-    ds["vmax"] = 33  # set the vmax to 33 m/s for the lower limit of category 1.
-    ds = parallelized_ps13_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
-        {"time": 64, "lat": 480, "lon": 480}
-    )  # chunk the data for saving
-
-    ds = ds.rename({"lat": "latitude", "lon": "longitude"})
-    ds.to_zarr(
-        os.path.join(
-            ERA5_PS_OG_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
-        ),
-        mode="w",
-        consolidated=True,
+    output_file = os.path.join(
+        ERA5_PS_OG_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
     )
+    tmp_file = output_file + ".tmp"
+    if not dry_run:
+        ds = parallelized_ps13_dask(
+            ds  # .chunk({"time": 64, "lat": 480, "lon": 480})
+        )  # .chunk(
+        # {"time": 64, "lat": 480, "lon": 480}
+        # )  # chunk the data for saving
+
+        ds = ds.rename({"lat": "latitude", "lon": "longitude"})
+        ds.to_zarr(
+            tmp_file,
+            mode="w",
+            consolidated=True,
+        )
+        if os.path.exists(output_file):  # get rid of old file
+            shutil.rmtree(output_file)
+        os.rename(tmp_file, output_file)
+        print(f"Successfully saved to {output_file}")
+    else:
+        print("Dry run, not actually calculating potential sizes.")
+        print(f"Would have saved to {output_file}")
     # First potential size corresponding to the potential intensity velocity -- needs vmax, t0, sst, t2
 
     # Then calculate the potential size corresponding to the lower limit of category 1 which is 33 m/s --
@@ -1628,6 +1636,27 @@ def get_all_regridded_data(
     ).sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
 
 
+def plot_trends():
+    from w22.constants import OFFSET_D
+
+    new_point_d = {
+        var: (
+            OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"],
+            OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"],
+        )
+        for var in OFFSET_D
+    }
+
+    for point in new_point_d:
+        print(f"Plotting trend lineplots for {point} at {new_point_d[point]}")
+        plot_trend_lineplots(
+            (new_point_d[point][0] + 360) % 360,  # ensure in 0-360 range
+            new_point_d[point][1],
+            label=point,
+            start_year=1980,
+        )
+
+
 if __name__ == "__main__":
     # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
@@ -1653,25 +1682,8 @@ if __name__ == "__main__":
     # )
     # dask_cluster_wrapper(
     #     era5_pi_trends, start_year=1940, end_year=2024, months=1
-    # )
-    from w22.constants import OFFSET_D
-
-    new_point_d = {
-        var: (
-            OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"],
-            OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"],
-        )
-        for var in OFFSET_D
-    }
-
-    for point in new_point_d:
-        print(f"Plotting trend lineplots for {point} at {new_point_d[point]}")
-        plot_trend_lineplots(
-            (new_point_d[point][0] + 360) % 360,  # ensure in 0-360 range
-            new_point_d[point][1],
-            label=point,
-            start_year=1980,
-        )
+    # # )
+    # from w22.constants import OFFSET_D
 
     # era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
@@ -1717,7 +1729,32 @@ if __name__ == "__main__":
         calculate_potential_sizes,
         start_year=DEFAULT_START_YEAR,
         end_year=DEFAULT_START_YEAR + 9,
+        dry_run=True,
     )  # This will take a long time to run.
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 10,
+        end_year=DEFAULT_START_YEAR + 19,
+        dry_run=True,
+    )
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 20,
+        end_year=DEFAULT_START_YEAR + 29,
+        dry_run=True,
+    )
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 30,
+        end_year=DEFAULT_START_YEAR + 39,
+        dry_run=True,
+    )
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 40,
+        end_year=DEFAULT_END_YEAR,
+        dry_run=True,
+    )
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
