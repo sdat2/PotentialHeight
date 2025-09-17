@@ -34,8 +34,8 @@ from scipy.interpolate import interp1d
 from scipy.optimize import root_scalar
 import warnings
 import matplotlib.pyplot as plt  # Optional: For plotting example
-from sithom.time import timeit
 from sithom.plot import plot_defaults
+from .utils import pressure_from_wind
 from .constants import (
     FIGURE_PATH,
     BACKGROUND_PRESSURE,
@@ -43,8 +43,17 @@ from .constants import (
     CK_CD_DEFAULT,
     CD_DEFAULT,
     RHO_AIR_DEFAULT,
+    CDVARY_DEFAULT,
+    CKCDVARY_DEFAULT,
+    CK_CD_DEFAULT,
+    CD_DEFAULT,
+    VMAX_DEFAULT,
+    RA_DEFAULT,
+    F_COR_DEFAULT,
+    EYE_ADJ_DEFAULT,
+    ALPHA_EYE_DEFAULT,
+    BACKGROUND_PRESSURE,
 )
-from .utils import pressure_from_wind
 
 # --- Constants ---
 # Coefficients for Ck/Cd quadratic fit to Vmax (Chavas et al. 2015)
@@ -1508,18 +1517,9 @@ def process_inputs(inputs: dict) -> dict:
     """
     # load default inputs
     # ins = read_json(os.path.join(DATA_PATH, "inputs.json"))
-    from .constants import (
-        CDVARY_DEFAULT,
-        CKCDVARY_DEFAULT,
-        CK_CD_DEFAULT,
-        CD_DEFAULT,
-        VMAX_DEFAULT,
-        RA_DEFAULT,
-        F_COR_DEFAULT,
-        EYE_ADJ_DEFAULT,
-        ALPHA_EYE_DEFAULT,
-        BACKGROUND_PRESSURE,
-    )
+
+    if inputs is None:
+        inputs = {}
 
     ins = {}
     # ins["Vmax"] = VMAX_DEFAULT
@@ -1564,6 +1564,8 @@ def run_cle15(
     Returns:
         Tuple[float, float, float]: pm [Pa], rmax [m], pc [Pa]
     """
+    if inputs is None:
+        inputs = {}
     ins = process_inputs(inputs)  # find old data.
     o = chavas_et_al_2015_profile(
         ins["Vmax"],

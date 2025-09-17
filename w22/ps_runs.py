@@ -149,6 +149,9 @@ def spatial_example(
         print("selected region ds", ds)
         ds = convert(ds).chunk(dict(p=-1))
         print("converted ds", ds)
+        if "rh" not in ds:
+            rh = qtp2rh(ds["q"], ds["t"], ds["msl"])
+            ds["rh"] = rh * 100
         ds_pi = calculate_pi(
             ds,
             dim="p",
@@ -172,12 +175,13 @@ def spatial_example(
         if pi_version == 2:
             # get rid of V_reduc accidentally added in for vmax calculation
             in_ds["vmax"] = in_ds["vmax"] / 0.8
+
+        if "rh" not in in_ds:
+            rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
+            in_ds["rh"] = rh
         print("input cmip6 data", in_ds)
 
     print("trimmed input data", in_ds)
-    if "rh" not in in_ds:
-        rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
-        in_ds["rh"] = rh
     in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
 
     in_ds = in_ds.rename({"vmax": "vmax_3"})
@@ -185,8 +189,13 @@ def spatial_example(
         in_ds["vmax_3"].dims,
         CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"]),
     )
-    in_ds = in_ds.chunk({"lat": 5, "lon": 5})
+    in_ds = in_ds.chunk(
+        {"lat": 2, "lon": 2}
+    )  # make chunks smaller to improve parallelization over many cores
+    print("input ds for ps calculation", in_ds)
     out_ds = parallelized_ps13_dask(in_ds)
+    print("output ds from ps calculation", out_ds)
+
     name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in ["new_orleans", "galverston", "miami"]:
@@ -194,7 +203,7 @@ def spatial_example(
     if place in ["shanghai", "hong_kong", "hanoi"]:
         name = "scs_" + name
 
-    print(out_ds)
+    print("final output before saving", out_ds)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,

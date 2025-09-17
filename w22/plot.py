@@ -406,8 +406,8 @@ def plot_spatials(
     vars: Tuple[str, str] = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
     labels: tuple = (
         "Potential intensity, $V_{p}$ [m s$^{-1}$]",
-        "Corresponding potential outer size, $r_{a3}$ [km]",
-        "Corresponding potential inner size, $r_{3}$ [km]",
+        "PI potential outer size, $r_{a3}$ [km]",
+        "PI potential inner size, $r_{3}$ [km]",
         "Cat1 potential inner size, $r_{1}$ [km]",
     ),
     pi_version: int = 4,
@@ -422,7 +422,7 @@ def plot_spatials(
         name = "gom_" + name
     if place in {"shanghai", "hong_kong", "hanoi"}:
         name = "scs_" + name
-    ds = xr.open_dataset(os.path.join(DATA_PATH, name))
+    ds = xr.open_dataset(os.path.join(DATA_PATH, name), engine="h5netcdf")
     print("spatial ds", ds)
 
     ds["lon"].attrs = {"units": "$^{\circ}E$", "long_name": "Longitude"}
@@ -901,7 +901,7 @@ def multipanel(
     )
     members = [4, 10, 11]
     colors = ["orange", "green", "grey"]
-    plot_spatials(axs[:, 0], place="new_orleans", vars=vars)
+    plot_spatials(axs[:, 0], place=place, vars=vars)
     for i, member in enumerate(members):
         plot_timeserii(
             axs[:, 1],
@@ -910,7 +910,7 @@ def multipanel(
             member=member,
             model="CESM2",
             pressure_assumption="isothermal",
-            place="new_orleans",
+            place=place,
             pi_version=4,
             year_min=2014,
             year_max=2100,
@@ -925,7 +925,7 @@ def multipanel(
             member=member,
             model="HADGEM3-GC31-MM",
             pressure_assumption="isothermal",
-            place="new_orleans",
+            place=place,
             pi_version=4,
             year_min=2014,
             year_max=2100,
@@ -939,7 +939,7 @@ def multipanel(
             member=member,
             model="MIROC6",
             pressure_assumption="isothermal",
-            place="new_orleans",
+            place=place,
             pi_version=4,
             year_min=2014,
             year_max=2100,

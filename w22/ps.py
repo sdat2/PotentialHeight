@@ -353,6 +353,115 @@ def calculate_ps13_ufunc(
 
 
 @timeit
+def parallelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate potential size at category 1 intensity, and at the potential intensity.
+
+    Returns:
+        xr.Dataset:
+    """
+    # Ensure input dataset is chunked for Dask
+    # ds = ds.chunk("auto")
+
+    # 1. Define required variables and optional variables with their defaults
+    required_vars = ["vmax_1", "vmax_3", "msl", "sst", "t0", "lat"]
+    optional_vars = {
+        "rh": ENVIRONMENTAL_HUMIDITY_DEFAULT,
+        "ck_cd": CK_CD_DEFAULT,
+        "cd": CD_DEFAULT,
+        "w_cool": W_COOL_DEFAULT,
+        "supergradient_factor": SUPERGRADIENT_FACTOR,
+    }
+
+    # 2. Check for required variables
+    for var in required_vars:
+        if var not in ds:
+            raise KeyError(f"Required variable '{var}' is missing from the dataset.")
+
+    # 3. Check for optional variables and add them with default values if missing
+    for var, default_value in optional_vars.items():
+        if var not in ds:
+            print(f"'{var}' not found in dataset, using default value: {default_value}")
+            # Add a DataArray with the default value. Xarray's broadcasting
+            # will handle matching it to the other dimensions.
+            ds[var] = xr.DataArray(default_value)
+
+    r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3 = xr.apply_ufunc(
+        calculate_ps13_ufunc,  # The core function
+        ds["vmax_1"],
+        ds["vmax_3"],
+        ds["msl"],
+        ds["sst"],
+        ds["t0"],
+        ds["lat"],  # Required inputs
+        ds["rh"],
+        ds["ck_cd"],
+        ds["cd"],
+        ds["w_cool"],
+        ds["supergradient_factor"],  # Optional inputs
+        kwargs={"pressure_assumption": "isothermal"},
+        input_core_dims=[[] for _ in range(11)],  # All inputs are scalars
+        output_core_dims=[[] for _ in range(8)],
+        exclude_dims=set(),
+        vectorize=True,  # Key for broadcasting
+        dask="parallelized",  # Key for parallel execution
+        output_dtypes=[float for _ in range(8)],
+    )
+
+    output_ds = ds.copy()
+    # Assume V=V_cat1
+    output_ds["r0_1"] = (ds.vmax_1.dims, r0_1.data)
+    output_ds["r0_1"].attrs = {
+        "units": "m",
+        "long_name": r"Outer radius of tropical cyclone, $r_{a1}$",
+    }
+    output_ds["pm_1"] = (ds.vmax_1.dims, pm_1.data)
+    output_ds["pm_1"].attrs = {
+        "units": "Pa",
+        "long_name": r"Pressure at maximum winds, $p_{m1}$",
+    }
+    output_ds["pc_1"] = (ds.vmax_1.dims, pc_1.data)
+    output_ds["pc_1"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax_1"] = (ds.vmax_1.dims, rmax_1.data)
+    output_ds["rmax_1"].attrs = {
+        "units": "m",
+        "long_name": r"Radius of maximum winds, $r_{1}$",
+    }
+    # assume V = V_p
+    output_ds["r0_3"] = (ds.vmax_1.dims, r0_3.data)
+    output_ds["r0_3"].attrs = {
+        "units": "m",
+        "long_name": r"Outer radius of tropical cyclone, $r_{a3}$",
+    }
+    output_ds["pm_3"] = (ds.vmax_1.dims, pm_3.data)
+    output_ds["pm_3"].attrs = {
+        "units": "Pa",
+        "long_name": r"Pressure at maximum winds, $p_{m3}$",
+    }
+    output_ds["pc_3"] = (ds.vmax_1.dims, pc_3.data)
+    output_ds["pc_3"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax_3"] = (ds.vmax_1.dims, rmax_3.data)
+    output_ds["rmax_3"].attrs = {
+        "units": "m",
+        "long_name": r"Radius of maximum winds, $r_{3}$",
+    }
+
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_pressure_assumption"] = "isothermal"
+
+    return output_ds
+
+
+@timeit
 def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
     """
     Apply point solution to all points using xr.apply_ufunc and Dask.
@@ -461,115 +570,6 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
     output_ds["rmax"].attrs = {
         "units": "m",
         "long_name": "Radius of maximum winds, $r_{\mathrm{max}}$",
-    }
-
-    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
-        path=str(PROJECT_PATH)
-    )
-    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
-    output_ds.attrs["potential_size_pressure_assumption"] = "isothermal"
-
-    return output_ds
-
-
-@timeit
-def parallelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
-    """
-    Calculate potential size at category 1 intensity, and at the potential intensity.
-
-    Returns:
-        xr.Dataset:
-    """
-    # Ensure input dataset is chunked for Dask
-    ds = ds.chunk("auto")
-
-    # 1. Define required variables and optional variables with their defaults
-    required_vars = ["vmax_1", "vmax_3", "msl", "sst", "t0", "lat"]
-    optional_vars = {
-        "rh": ENVIRONMENTAL_HUMIDITY_DEFAULT,
-        "ck_cd": CK_CD_DEFAULT,
-        "cd": CD_DEFAULT,
-        "w_cool": W_COOL_DEFAULT,
-        "supergradient_factor": SUPERGRADIENT_FACTOR,
-    }
-
-    # 2. Check for required variables
-    for var in required_vars:
-        if var not in ds:
-            raise KeyError(f"Required variable '{var}' is missing from the dataset.")
-
-    # 3. Check for optional variables and add them with default values if missing
-    for var, default_value in optional_vars.items():
-        if var not in ds:
-            print(f"'{var}' not found in dataset, using default value: {default_value}")
-            # Add a DataArray with the default value. Xarray's broadcasting
-            # will handle matching it to the other dimensions.
-            ds[var] = xr.DataArray(default_value)
-
-    r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3 = xr.apply_ufunc(
-        calculate_ps13_ufunc,  # The core function
-        ds["vmax_1"],
-        ds["vmax_3"],
-        ds["msl"],
-        ds["sst"],
-        ds["t0"],
-        ds["lat"],  # Required inputs
-        ds["rh"],
-        ds["ck_cd"],
-        ds["cd"],
-        ds["w_cool"],
-        ds["supergradient_factor"],  # Optional inputs
-        kwargs={"pressure_assumption": "isothermal"},
-        input_core_dims=[[] for _ in range(11)],  # All inputs are scalars
-        output_core_dims=[[] for _ in range(8)],
-        exclude_dims=set(),
-        vectorize=True,  # Key for broadcasting
-        dask="parallelized",  # Key for parallel execution
-        output_dtypes=[float for _ in range(8)],
-    )
-
-    output_ds = ds.copy()
-    # Assume V=V_cat1
-    output_ds["r0_1"] = (ds.vmax_1.dims, r0_1.data)
-    output_ds["r0_1"].attrs = {
-        "units": "m",
-        "long_name": r"Outer radius of tropical cyclone, $r_{a1}$",
-    }
-    output_ds["pm_1"] = (ds.vmax_1.dims, pm_1.data)
-    output_ds["pm_1"].attrs = {
-        "units": "Pa",
-        "long_name": r"Pressure at maximum winds, $p_{m1}$",
-    }
-    output_ds["pc_1"] = (ds.vmax_1.dims, pc_1.data)
-    output_ds["pc_1"].attrs = {
-        "units": "Pa",
-        "long_name": "Central pressure for CLE15 profile",
-    }
-    output_ds["rmax_1"] = (ds.vmax_1.dims, rmax_1.data)
-    output_ds["rmax_1"].attrs = {
-        "units": "m",
-        "long_name": r"Radius of maximum winds, $r_{1}$",
-    }
-    # assume V = V_p
-    output_ds["r0_3"] = (ds.vmax_1.dims, r0_3.data)
-    output_ds["r0_3"].attrs = {
-        "units": "m",
-        "long_name": r"Outer radius of tropical cyclone, $r_{a3}$",
-    }
-    output_ds["pm_3"] = (ds.vmax_1.dims, pm_3.data)
-    output_ds["pm_3"].attrs = {
-        "units": "Pa",
-        "long_name": r"Pressure at maximum winds, $p_{m3}$",
-    }
-    output_ds["pc_3"] = (ds.vmax_1.dims, pc_3.data)
-    output_ds["pc_3"].attrs = {
-        "units": "Pa",
-        "long_name": "Central pressure for CLE15 profile",
-    }
-    output_ds["rmax_3"] = (ds.vmax_1.dims, rmax_3.data)
-    output_ds["rmax_3"].attrs = {
-        "units": "m",
-        "long_name": r"Radius of maximum winds, $r_{3}$",
     }
 
     output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
