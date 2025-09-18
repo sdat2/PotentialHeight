@@ -28,7 +28,7 @@ cluster = SLURMCluster(
     # Dask worker configuration
     cores=128,  # Total cores on one ARCHER2 node
     processes=16,  # THE FIX: Launch 16 workers per node
-    memory="240GB",  # Total memory on one ARCHER2 node
+    # memory="240GB",  # Total memory on one ARCHER2 node
     # Other settings
     walltime="24:00:00",
     interface="hsn0",  # High-speed network interface
