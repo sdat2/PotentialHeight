@@ -2,6 +2,7 @@
 
 import os
 from typing import Union
+import numpy as np
 import xarray as xr
 from sithom.time import timeit
 from sithom.xr import mon_increase
@@ -10,8 +11,12 @@ from tcpips.pi import calculate_pi
 from tcpips.convert import convert
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
-from .ps import parallelized_ps
+from .ps import parallelized_ps, parallelized_ps13_dask
 from .constants import DATA_PATH, OFFSET_D
+
+CAT_1_WIND_SPEED = (
+    33 / 0.8
+)  # m/s at 10m, divided by 0.8 to convert to gradient wind speed
 
 # store offsets for points to get data for.
 
@@ -36,36 +41,117 @@ def ex_data_path(pi_version=2, member: int = 4) -> str:
         raise ValueError("pi_version must be 2, 3, or 4")
 
 
+def get_regional_processed_data(place="new_orleans") -> xr.Dataset:
+    """Get processed data for a specific region.
+
+    Args:
+        place (str, optional): place to get data for. Defaults to "new_orleans
+    """
+
+    ds_list = [
+        xr.open_dataset(os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc"))
+        for typ in ["ocean", "atmos"]
+    ]
+    for i, ds in enumerate(ds_list):
+        ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
+    ds = xr.merge(ds_list)
+    ds = convert(ds)
+    if place in ["new_orleans", "galverston", "miami"]:
+        ds = ds.sel(
+            lon=slice(-100, -73),
+            lat=slice(17.5, 32.5),
+            time="2015-08",
+            # method="nearest"
+        ).compute()
+    elif place in ["shanghai", "hong_kong", "hanoi"]:
+        ds = ds.sel(
+            lon=slice(100, 130),
+            lat=slice(17.5, 32.5),
+            time="2015-08",
+            # method="nearest"
+        ).compute()
+    else:
+        raise ValueError(
+            "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
+        )
+    return ds
+
+
 @timeit
-def trimmed_cmip6_example(
+def spatial_example(
     pressure_assumption="isothermal",
     trial=1,
     pi_version=2,
     recalculate_pi: bool = True,
     place="new_orleans",
 ) -> None:
-    """Run potential size calculations on CMIP6 data to get Gulf of Mexico data.
+    """Run potential size calculations on CMIP6 data to get a region.
 
     Args:
-        pressure_assumption (str, optional): pressure assumption. Defaults to "isopycnal".
+        pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
         trial (int, optional): trial number. Defaults to 1.
+        pi_version (int, optional): pi_version of the pi calculation. Defaults to 2.
+        recalculate_pi (bool, optional): whether to recalculate pi. Defaults to True.
+        place (str, optional): place to get data for. Defaults to "new_orleans
     """
     # print("input cmip6 data", xr.open_dataset(EX_DATA_PATH))
     # select roughly gulf of mexico
     # for some reason using the bounding box method doesn't work
+
+    def select_region(tds: xr.Dataset, place) -> xr.Dataset:
+        """Select region of interest.
+
+        Args:
+            in_ds (xr.Dataset): input dataset.
+
+        Returns:
+            xr.Dataset: dataset for region of interest.
+        """
+        if place in ["new_orleans", "galverston", "miami"]:
+            tds = tds.sel(
+                lon=slice(-100, -73),
+                lat=slice(17.5, 32.5),
+                time="2015-08",
+                # method="nearest"
+            )
+        elif place in ["shanghai", "hong_kong", "hanoi"]:
+            tds = tds.sel(
+                lon=slice(100, 130),
+                lat=slice(17.5, 32.5),
+                time="2015-08",
+                # method="nearest"
+            )
+        else:
+            raise ValueError(
+                "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
+            )
+        return tds
+
     if recalculate_pi:
         # get the data from the example path
         ds_list = [
             xr.open_dataset(
-                os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc")
+                os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc"),
+                chunks={"time": 24, "lat": 90, "lon": 90},
             )
             for typ in ["ocean", "atmos"]
         ]
         for i, ds in enumerate(ds_list):
             ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
         print("ds_list", ds_list)
-        ds = xr.merge(ds_list)
-        ds = convert(ds)
+        ds = mon_increase(
+            xr.merge(ds_list),
+            x_dim="lon",
+            y_dim="lat",
+        )
+        print("merged ds", ds)
+        ds = select_region(ds, place)
+        print("selected region ds", ds)
+        ds = convert(ds).chunk(dict(p=-1))
+        print("converted ds", ds)
+        if "rh" not in ds:
+            rh = qtp2rh(ds["q"], ds["t"], ds["msl"])
+            ds["rh"] = rh * 100
         ds_pi = calculate_pi(
             ds,
             dim="p",
@@ -75,45 +161,41 @@ def trimmed_cmip6_example(
         ds["t0"] = ds_pi["t0"]
         ds["rh"] = ds["rh"] / 100  # convert to dimensionless
         ds["rh"].attrs["units"] = "dimensionless"
+        in_ds = ds
     else:
         ds = xr.open_dataset(ex_data_path(pi_version=pi_version))
-        in_ds = mon_increase(
-            ds,
-            x_dim="lon",
-            y_dim="lat",
-        ).isel(
-            # lat=slice(215, 245),
-            # lon=slice(160, 205),
-            time=7,  # slice(0, 12) # just august 2015
+        in_ds = select_region(
+            mon_increase(
+                ds,
+                x_dim="lon",
+                y_dim="lat",
+            ),
+            place,
         )
+        if pi_version == 2:
+            # get rid of V_reduc accidentally added in for vmax calculation
+            in_ds["vmax"] = in_ds["vmax"] / 0.8
+
+        if "rh" not in in_ds:
+            rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
+            in_ds["rh"] = rh
         print("input cmip6 data", in_ds)
 
-    if place in ["new_orleans", "galverston", "miami"]:
-        in_ds = in_ds.sel(
-            lon=slice(-100, -73),
-            lat=slice(17.5, 32.5),
-            # method="nearest"
-        ).compute()
-    elif place in ["shanghai", "hong_kong", "hanoi"]:
-        in_ds = in_ds.sel(
-            lon=slice(100, 130),
-            lat=slice(17.5, 32.5),
-            # method="nearest"
-        ).compute()
-    else:
-        raise ValueError(
-            "place must be one of new_orleans, galverston, miami, shanghai, hong_kong, hanoi"
-        )
     print("trimmed input data", in_ds)
-    rh = qtp2rh(in_ds["q"], in_ds["t"], in_ds["msl"])
-    in_ds["rh"] = rh
-    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh", "otl"]]
+    in_ds = in_ds[["sst", "msl", "vmax", "t0", "rh"]]
 
-    if pi_version == 2:
-        # get rid of V_reduc accidentally added in for vmax calculation
-        in_ds["vmax"] = in_ds["vmax"] / 0.8
+    in_ds = in_ds.rename({"vmax": "vmax_3"})
+    in_ds["vmax_1"] = (
+        in_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"]),
+    )
+    in_ds = in_ds.chunk(
+        {"lat": 2, "lon": 2}
+    )  # make chunks smaller to improve parallelization over many cores
+    print("input ds for ps calculation", in_ds)
+    out_ds = parallelized_ps13_dask(in_ds)
+    print("output ds from ps calculation", out_ds)
 
-    out_ds = parallelized_ps(in_ds, jobs=20)
     name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in ["new_orleans", "galverston", "miami"]:
@@ -121,12 +203,13 @@ def trimmed_cmip6_example(
     if place in ["shanghai", "hong_kong", "hanoi"]:
         name = "scs_" + name
 
-    print(out_ds)
+    print("final output before saving", out_ds)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
             name,
-        )
+        ),
+        engine="h5netcdf",
     )
 
 
@@ -159,7 +242,13 @@ def new_orleans_10year(
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps(in_ds, jobs=20)
+
+    in_ds = in_ds.rename({"vmax": "vmax_3"})
+    in_ds["vmax_1"] = (
+        in_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"].values),
+    )
+    out_ds = parallelized_ps13_dask(in_ds)
     out_ds["q"] = qt_ds["q"]
     out_ds["t"] = qt_ds["t"]
     out_ds["otl"] = qt_ds["otl"]
@@ -220,7 +309,12 @@ def global_cmip6(part="nw", year: int = 2015, pi_version=2) -> None:
     if pi_version == 2:
         # get rid of V_reduc accidentally added in for vmax calculation
         in_ds["vmax"] = in_ds["vmax"] / 0.8
-    out_ds = parallelized_ps(in_ds, jobs=30)
+    in_ds = in_ds.rename({"vmax": "vmax_3"})
+    in_ds["vmax_1"] = (
+        in_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(in_ds["vmax_3"]),
+    )
+    out_ds = parallelized_ps13_dask(in_ds)
     print(out_ds)
     out_ds.to_netcdf(
         os.path.join(
@@ -253,6 +347,35 @@ def load_global(year: int = 2015) -> xr.Dataset:
     )
 
 
+def get_processed_data_for_point(
+    place="new_orleans", member="r10i1p1f1", model="CESM2", exp="ssp585"
+):
+    file_names = [
+        os.path.join(CDO_PATH, exp, typ, model, f"{member}.nc")
+        for typ in ["ocean", "atmos"]
+    ]
+
+    ds_list = [
+        xr.open_mfdataset(
+            file_name,
+        )
+        .sel(
+            lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+            lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
+            method="nearest",
+        )
+        .compute()
+        for file_name in file_names
+    ]
+    for i, ds in enumerate(ds_list):
+        ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
+
+    ds = xr.merge(ds_list)
+    ds = convert(ds)
+    ds = ds.isel(time=[i for i in range(8, len(ds.time.values), 12)])
+    return ds
+
+
 def point_timeseries(
     member: Union[int, str] = 10,
     model: str = "CESM2",
@@ -277,33 +400,9 @@ def point_timeseries(
     if isinstance(member, int):
         member = f"r{member}i1p1f1"
     if recalculate_pi:
-        file_names = [
-            os.path.join(CDO_PATH, exp, typ, model, f"{member}.nc")
-            for typ in ["ocean", "atmos"]
-        ]
-
-        ds_list = [
-            xr.open_mfdataset(
-                file_name,
-            )
-            .sel(
-                lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-                lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
-                method="nearest",
-            )
-            .compute()
-            for file_name in file_names
-        ]
-        for i, ds in enumerate(ds_list):
-            ds_list[i] = ds.drop_vars([x for x in ["time_bounds"] if x in ds])
-        print("ds_list", ds_list)
-        ds = xr.merge(ds_list)
-        print("merged ds", ds)
-        ds = convert(ds)
-        ds = ds.isel(time=[i for i in range(8, len(ds.time.values), 12)])
-        print("converted ds", ds)
-
-        # print("point ds intial:", ds)
+        ds = get_processed_data_for_point(
+            place=place, member=member, model=model, exp=exp
+        )
         pi_ds = calculate_pi(
             ds,
             dim="p",
@@ -315,8 +414,6 @@ def point_timeseries(
         trimmed_ds["rh"].attrs["units"] = "dimensionless"
         trimmed_ds["sst"] = ds["sst"]
         trimmed_ds["msl"] = ds["msl"]
-
-        # trimmed_ds["rh"] = qtp2rh(pi_ds["q"], pi_ds["t"], pi_ds["msl"])
 
     else:
         if pi_version == 2:
@@ -351,9 +448,13 @@ def point_timeseries(
             trimmed_ds["vmax"] = trimmed_ds["vmax"] / 0.8
 
     print("trimmed", trimmed_ds)
-    out_ds = parallelized_ps(
-        trimmed_ds, jobs=25, pressure_assumption=pressure_assumption
+    trimmed_ds = trimmed_ds.rename({"vmax": "vmax_3"})
+    trimmed_ds["vmax_1"] = (
+        trimmed_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(trimmed_ds["vmax_3"]),
     )
+
+    out_ds = parallelized_ps13_dask(trimmed_ds)
     print("out_ds", out_ds)
     out_ds.to_netcdf(
         os.path.join(
@@ -408,7 +509,12 @@ def point_era5_timeseries(
     trimmed_ds = trimmed_ds.isel(
         time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
     )
-    out_ds = parallelized_ps(trimmed_ds, jobs=10)
+    trimmed_ds = trimmed_ds.rename({"vmax": "vmax_3"})
+    trimmed_ds["vmax_1"] = (
+        out_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(trimmed_ds["vmax_3"]),
+    )
+    out_ds = parallelized_ps13_dask(trimmed_ds)
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
@@ -423,7 +529,7 @@ if __name__ == "__main__":
     # point_timeseries(10, "new_orleans", pi_version=4)
     # point_timeseries(11, "new_orleans", pi_version=4)
 
-    def data_for_place(
+    def ps_for_place(
         place: str,
         pressure_assumption: str = "isothermal",
         models={"CESM2", "MIROC6", "HADGEM3-GC31-MM", "ERA5"},
@@ -477,79 +583,27 @@ if __name__ == "__main__":
         if "ERA5" in models:
             point_era5_timeseries(place=place, pressure_assumption=pressure_assumption)
         if "CESM2" in models:
-            trimmed_cmip6_example(
+            spatial_example(
                 pressure_assumption=pressure_assumption,
                 trial=1,
                 pi_version=4,
                 place=place,
             )
 
-    # data_for_place(
-    #     "new_orleans",
-    # )
-    # data_for_place(
-    #     "hong_kong",
-    # )
-    for place in ["new_orleans", "hong_kong"]:
-        trimmed_cmip6_example(
-            pressure_assumption="isothermal",
-            trial=1,
-            pi_version=4,
-            place=place,
-        )
-    # point_timeseries(
-    #     member=4,
-    #     place="hong_kong",
-    #     recalculate_pi=True,
-    #     pi_version=4,
+    from tcpips.dask_utils import dask_cluster_wrapper
+
+    # dask_cluster_wrapper(ps_for_place, "new_orleans")
+    # dask_cluster_wrapper(ps_for_place, "hong_kong")
+    dask_cluster_wrapper(
+        spatial_example,
+        place="hong_kong",
+        pressure_assumption="isothermal",
+        trial=1,
+        pi_version=4,
+    )
+    # spatial_example(
     #     pressure_assumption="isothermal",
-    #     exp="ssp585",
+    #     trial=1,
+    #     pi_version=4,
+    #     place="hong_kong",
     # )
-    # data_for_place("hong_kong")
-    # trimmed_cmip6_example(
-    #     pressure_assumption="isothermal", trial=1, pi_version=4, place="new_orleans"
-    # )
-
-    # trimmed_cmip6_example(trial=1, pi_version=4, place="hong_kong")
-
-    # for i in [4, 10, 11]:
-    #     for exp in ["historical", "ssp585"]:
-    #         point_timeseries(member=i, place="new_orleans", pi_version=4, exp=exp)
-    # point_timeseries(member=i, place="new_orleans", pi_version=4, exp="historical")
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 1)"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 1)"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isopycnal', 2)"
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc('isothermal', 2)"
-    # trimmed_cmip6_example()
-    # new_orleans_10year()
-    # global_cmip6()
-    # python -c "from cle.ps_runs import galverston_timeseries as gt; gt(4); gt(10); gt(11)"
-    # python -c "from cle.ps_runs import new_orleans_timeseries as no; no(4); no(10); no(11)"
-    # python -c "from cle.ps_runs import miami_timeseries as mm; mm(4); mm(10); mm(11)"
-    # trimmed_cmip6_example()
-    # point_timeseries(4, "new_orleans")
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, "new_orleans"); pt(10, "new_orleans"); pt(11, "new_orleans")"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'miami'); pt(10, 'miami'); pt(11, 'miami')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'galverston'); pt(10, 'galverston'); pt(11, 'galverston')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(10, 'new_orleans'); pt(11, 'new_orleans')"
-    #
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'shanghai'); pt(10, 'shanghai'); pt(11, 'shanghai')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hanoi'); pt(10, 'hanoi'); pt(11, 'hanoi')"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hong_kong'); pt(10, 'hong_kong'); pt(11, 'hong_kong')"
-    # retry with pi_version = 4 for hong_kong only
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'hong_kong', pi_version=4); pt(10, 'hong_kong', pi_version=4); pt(11, 'hong_kong', pi_version=4)"
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'shanghai', pi_version=4); pt(10, 'shanghai', pi_version=4); pt(11, 'shanghai', pi_version=4)"
-    # lets do it for New Orleans too
-    # python -c "from w22.ps_runs import point_timeseries as pt; pt(4, 'new_orleans', pi_version=4); pt(10, 'new_orleans', pi_version=4); pt(11, 'new_orleans', pi_version=4)"
-
-    # set off global
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga()"
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('ne')" &> ne2.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('nw')" &> nw2.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('sw')" &> sw2.log
-    # python -c "from w22.ps_runs import global_cmip6 as ga; ga('se')" &> se2.log
-
-    # python -c "from w22.ps_runs import trimmed_cmip6_example as tc; tc()
-    # python -c "from w22.ps_runs import new_orleans_10year as no; no()"
-    # trimmed_cmip6_example(trial=2, pressure_assumption="isothermal", pi_version=4)
-

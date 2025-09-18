@@ -622,10 +622,10 @@ def octave_vs_python(add_name: str = ""):
         os.path.join(DATA_PATH, "cle15", f"octave-vs-python{add_name}.csv"), index=False
     )
 
-    make_plot(add_name=add_name)
+    make_matlab_v_python_plot(add_name=add_name)
 
 
-def make_plot(add_name: str = ""):
+def make_matlab_v_python_plot(add_name: str = ""):
     # read csv test data
     if add_name != "" and add_name[0] != "-":
         add_name = f"-{add_name}"
@@ -713,3 +713,4 @@ if __name__ == "__main__":
     # python -m w22.test
 
     print(v_carnot())
+    make_matlab_v_python_plot()

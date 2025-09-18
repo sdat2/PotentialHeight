@@ -1,4 +1,5 @@
-# WorstSurge: Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization
+# Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)[![Python package](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml/badge.svg)](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml)[![Documentation Status](https://readthedocs.org/projects/worstsurge/badge/?version=latest)](https://worstsurge.readthedocs.io/en/latest/?badge=latest)[![Code DOI](https://zenodo.org/badge/718141777.svg)](https://doi.org/10.5281/zenodo.15073504)[![EarthArXiv Preprint](https://img.shields.io/badge/EarthArXiv-doi:10.31223/X57T5R-blue?style=flat)](https://doi.org/10.31223/X57T5R)
 
 EarthArxiv preprint now available <https://doi.org/10.31223/X57T5R>!
@@ -15,8 +16,8 @@ Uses the `tcpypi` pypi package to calculate potential intensity.
 
 ## w22
 
-Used to calculate tropical cyclone potential size as in Wang et al. (2022). Uses Chavas et al. 2015 profile calculation in matlab (using octave instead).
-Now we have a new python implementation that should work better.
+Used to calculate tropical cyclone potential size as in Wang et al. (2022). Used to use the  Chavas et al. 2015 profile calculation in matlab (using octave instead from `w22/cle5m.py`).
+But now we have a new python implementation that is much faster and more stable, see `w22/cle15.py`. The implementation of Potential Size is in `w22/ps.py`.
 
 ```bash
 # to calculate the example potential size
@@ -28,7 +29,7 @@ python -m w22.test
 
 ## adforce
 
-ADCIRC forcing and processing. Some generic mesh processing. Assumes gradient wind reduction factor V_reduc=0.8 for 10m wind. Runs using `hydra` for config management.
+An ADCIRC wrapper that does ADCIRC forcing and processing. Some generic mesh processing is also included. Assumes gradient wind reduction factor V_reduc=0.8 for 10m wind. Runs using `hydra` for config management.
 
 ```bash
 python -m adforce.wrap
@@ -40,7 +41,7 @@ A repo with our compilation settings for ADCIRC, and small edits, is available a
 
 ## adbo
 
-Bayesian optimization using `adforce` to force ADCIRC with a `trieste` Bayesian optimization loop. Runs using `argparse` for config management, and then calls `adbo` which uses `hydra`.
+Bayesian optimization using `adforce` to force ADCIRC with a `trieste` Bayesian optimization loop. Runs using `argparse` for config management, and then calls `adbo` which uses `hydra` (it was not possible to have two layers of hydra configs for the two modules).
 
 ```bash
 python -m adbo.exp_1d --test True --exp_name test
@@ -92,18 +93,18 @@ If you use this code, please cite the following paper:
 And cite the code as:
 
 ```bibtex
-@software{worstsurge_code,
+@software{potential_height_code,
   author = {Thomas, Simon D. A.},
   doi = {10.5281/zenodo.15073504},
-  month = {Mar},
-  title = {{WorstSurge - Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
-  url = {https://github.com/sdat2/worstsurge},
-  version = {v0.0.4},
+  month = {Sep},
+  title = {{Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
+  url = {https://github.com/sdat2/PotentialHeight},
+  version = {v0.1.1},
   year = {2025}
 }
 ```
 
-We also currently use the matlab code from Chavas, Lin, and Emanuel (2015), which should be cited as:
+We used to use the matlab code from Chavas, Lin, and Emanuel (2015), which should be cited as:
 
 ```bibtex
 @software{cle_2015_code,

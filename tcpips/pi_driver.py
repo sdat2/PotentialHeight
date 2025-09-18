@@ -12,7 +12,7 @@ from .constants import (
     PI4_PATH,
     PROJECT_PATH,
 )
-from .dask import dask_cluster_wrapper
+from .dask_utils import dask_cluster_wrapper
 from .files import locker
 from .convert import convert
 from .pi import calculate_pi

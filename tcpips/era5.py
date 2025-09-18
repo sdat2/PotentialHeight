@@ -7,20 +7,24 @@ The script is designed to download the data to calculate potential intensity (PI
 """
 
 import os
+import uuid
+import shutil
 import cdsapi
-from typing import List, Union, Tuple, Literal, Optional
+from typing import List, Literal, Optional
 import numpy as np
-import pandas as pd
+import tempfile
 import subprocess
 import xarray as xr
 import netCDF4 as nc
 from matplotlib import pyplot as plt
+import statsmodels.api as sm
 from dask.distributed import Client, LocalCluster
 from dask.diagnostics import ProgressBar
 from sithom.time import timeit
 from sithom.xr import mon_increase
 from uncertainties import ufloat, correlated_values, unumpy
 from sithom.plot import plot_defaults, label_subplots, get_dim
+
 
 CARTOPY_INSTALLED = True
 try:
@@ -40,7 +44,7 @@ except ImportError:
     print("Cartopy is not installed. Some plotting functions will not work.")
     CARTOPY_INSTALLED = False
 
-from w22.ps import parallelized_ps_dask
+from w22.ps import parallelized_ps13_dask
 from .constants import (
     ERA5_RAW_PATH,
     ERA5_PI_OG_PATH,
@@ -54,7 +58,7 @@ from .constants import (
 )
 from .pi import calculate_pi
 from .rh import relative_humidity_from_dew_point
-from .dask import dask_cluster_wrapper
+from .dask_utils import dask_cluster_wrapper
 
 DEFAULT_START_YEAR = 1980
 DEFAULT_END_YEAR = 2024
@@ -68,6 +72,7 @@ def plot_var_on_map(
     cmap: str,
     shrink: float = 0.8,
     hatch_mask: Optional[xr.DataArray] = None,
+    second_hatch_mask: Optional[xr.DataArray] = None,
     **kwargs,
 ) -> None:
     """Plot a variable on a geographic map.
@@ -154,6 +159,31 @@ def plot_var_on_map(
                 y="latitude",
                 levels=[0, 0.5, 1],  # Define regions for 0s and 1s
                 hatches=[None, "xxxx"],  # Apply hatch ONLY to the region of 1s
+                colors="none",  # Makes the area transparent
+                add_colorbar=False,
+            )
+    if second_hatch_mask is not None:
+        if not isinstance(second_hatch_mask, xr.DataArray):
+            raise ValueError("second_hatch_mask must be an xarray DataArray.")
+        else:
+            plt.rcParams["hatch.linewidth"] = 0.4
+            plt.rcParams["hatch.color"] = "green"
+            if np.all(second_hatch_mask.astype(int).values == 1):
+                warning = "All values in the second hatch mask are True (1)."
+                print(warning)
+            else:
+                ones = np.sum(second_hatch_mask.astype(int).values == 1)
+                zeros = np.sum(second_hatch_mask.astype(int).values == 0)
+                print(
+                    f"{ones/(ones + zeros) * 100:.2f}% of the area for {label} is masked out."
+                )
+            _ = second_hatch_mask.astype(int).plot.contourf(
+                ax=ax,
+                transform=ccrs.PlateCarree(),
+                x="longitude",
+                y="latitude",
+                levels=[0, 0.5, 1],  # Define regions for 0s and 1s
+                hatches=[None, "++++"],  # Apply hatch ONLY to the region of 1s
                 colors="none",  # Makes the area transparent
                 add_colorbar=False,
             )
@@ -462,6 +492,7 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
 
     client.close()
 
+
 def assign_coordinate_attributes(file_path: str):
     """Assigns CF-compliant 'coordinates' attributes to data variables.
 
@@ -500,11 +531,11 @@ def assign_coordinate_attributes(file_path: str):
     >>> os.remove(file_name)
     """
     # Define the spatial coordinate variables as named in your file
-    lon_name = 'longitude'
-    lat_name = 'latitude'
+    lon_name = "longitude"
+    lat_name = "latitude"
 
     try:
-        with nc.Dataset(file_path, 'a') as ds:
+        with nc.Dataset(file_path, "a") as ds:
             # Get the names of all coordinate variables
             coord_vars = list(ds.dimensions.keys())
 
@@ -512,21 +543,20 @@ def assign_coordinate_attributes(file_path: str):
             for var_name in ds.variables:
                 # Skip coordinate variables themselves
 
-
                 var_obj = ds.variables[var_name]
                 # Check if the variable has the required dimensions
                 if lon_name in var_obj.dimensions and lat_name in var_obj.dimensions:
                     print(f"Processing variable: {var_name}... ", end="")
                     # Assign the coordinates attribute
-                    var_obj.setncattr('coordinates', f'{lon_name} {lat_name}')
+                    var_obj.setncattr("coordinates", f"{lon_name} {lat_name}")
                     print("Added 'coordinates' attribute.")
 
-            ds[lon_name].setncattr('standard_name', 'longitude')
-            ds[lat_name].setncattr('standard_name', 'latitude')
-            ds[lon_name].setncattr('axis', 'X')
-            ds[lat_name].setncattr('axis', 'Y')
-            ds[lon_name].units = 'degrees_east'
-            ds[lat_name].units = 'degrees_north'
+            ds[lon_name].setncattr("standard_name", "longitude")
+            ds[lat_name].setncattr("standard_name", "latitude")
+            ds[lon_name].setncattr("axis", "X")
+            ds[lat_name].setncattr("axis", "Y")
+            ds[lon_name].units = "degrees_east"
+            ds[lat_name].units = "degrees_north"
 
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
@@ -544,7 +574,7 @@ def fix_era5_pi_decade(output_path: str) -> None:
     )  # Load the dataset to ensure it's processed
     print(ds)
 
-    coords_to_remove = ['number', 'expver']
+    coords_to_remove = ["number", "expver"]
 
     # Use reset_coords with drop=True to completely remove them from the dataset
     # This is the cleanest way to solve the CDO compatibility issue.
@@ -557,7 +587,7 @@ def fix_era5_pi_decade(output_path: str) -> None:
     print()
     os.system(f"ncdump -h '{new_output_path}'")
     print("Now running netcdf4 to change coords.")
-    #os.system(f"ncatted -O -a coordinates,.,d,, '{new_output_path}'")
+    # os.system(f"ncatted -O -a coordinates,.,d,, '{new_output_path}'")
     # print("Final ncdump after ncatted")
     assign_coordinate_attributes(new_output_path)
     os.system(f"ncdump -h '{new_output_path}'")
@@ -578,103 +608,11 @@ def era5_pi(years: List[str]) -> None:
         era5_pi_decade(single_level_path, pressure_level_path)
 
 
-def calculate_trend(
-    da: xr.DataArray,
-    output: Literal["slope", "rise"] = "rise",
-    t_var: str = "T",
-    make_hatch_mask: bool = False,
-    keep_ds: bool = False,
-    uncertainty: bool = False,
-) -> Union[float, ufloat, xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
-    """
-    Returns either the linear trend rise, or the linear trend slope,
-    possibly with the array to hatch out where the trend is not significant.
-
-    Uses `xr.polyfit` order 1 to do everything.
-
-    Args:
-        da (xr.DataArray): the timeseries.
-        output (Literal[, optional): What to return. Defaults to "rise".
-        t_var (str, optional): The time variable name. Defaults to "T".
-            Could be changed to another variable that you want to fit along.
-        make_hatch_mask (bool, optional): Whether or not to also return a DataArray
-            of boolean values to indicate where is not significant.
-            Defaults to False. Will only work if you're passing in an xarray object.
-        uncertainty (bool, optional): Whether to return a ufloat object
-            if doing linear regression on a single timeseries. Defaults to false.
-
-    Returns:
-        Union[float, ufloat, xr.DataArray, Tuple[xr.DataArray, xr.DataArray]]:
-            The rise/slope over the time period, possibly with the hatch array if
-            that opition is selected for a grid.
-    """
-
-    def length_time(da):
-        return (da.coords[t_var][-1] - da.coords[t_var][0]).values
-
-    def get_float(inp: Union[np.ndarray, list, float]):
-        try:
-            if hasattr(inp, "__iter__"):
-                inp = inp[0]
-        # pylint: disable=bare-except
-        except:
-            print(type(inp))
-        return float(inp)
-
-    if "X" in da.dims or "Y" in da.dims or "member" in da.dims or keep_ds:
-
-        fit_da = da.polyfit(t_var, 1, cov=make_hatch_mask)
-
-        slope = fit_da.polyfit_coefficients.isel(degree=1).drop("degree")
-
-        if make_hatch_mask:
-            frac_error = np.abs(
-                np.sqrt(fit_da.polyfit_covariance.isel(cov_i=0, cov_j=0))
-                / slope  # degree=1 is in the first position
-            )
-            hatch_mask = frac_error >= 1.0
-
-        slope = fit_da.polyfit_coefficients.sel(degree=1).drop("degree")
-    else:
-        if uncertainty:
-            # print("uncertainty running")
-            fit_da = da.polyfit(t_var, 1, cov=True)
-            error = np.sqrt(fit_da.polyfit_covariance.isel(cov_i=0, cov_j=0)).values
-            error = get_float(error)
-            slope = fit_da.polyfit_coefficients.values
-            slope = get_float(slope)
-            slope = ufloat(slope, error)
-        else:
-            slope = da.polyfit(t_var, 1).polyfit_coefficients.values
-            slope = get_float(slope)
-
-    if output == "rise":
-
-        run = length_time(da)
-        rise = slope * run
-
-        if isinstance(rise, xr.DataArray):
-            for pr_name in ["units", "long_name"]:
-                if pr_name in da.attrs:
-                    rise.attrs[pr_name] = da.attrs[pr_name]
-            rise = rise.rename("rise")
-
-        # print("run", run, "slope", slope, "rise = slope * run", rise)
-
-        if make_hatch_mask and not isinstance(rise, float, ufloat):
-            return rise, hatch_mask
-        else:
-            return rise
-
-    elif output == "slope":
-        if make_hatch_mask and not isinstance(slope, float):
-            return slope, hatch_mask
-        else:
-            return slope
-
-
 def select_seasonal_hemispheric_data(
-    ds: xr.Dataset, months_to_average: int = 1, lon: str = "longitude", lat: str = "latitude"
+    ds: xr.Dataset,
+    months_to_average: int = 1,
+    lon: str = "longitude",
+    lat: str = "latitude",
 ) -> xr.Dataset:
     """
     Selects seasonal hemispheric data, with an option to average over peak months.
@@ -683,7 +621,7 @@ def select_seasonal_hemispheric_data(
         ds (xr.Dataset): An xarray Dataset with 'time', 'latitude', and
             'longitude' coordinates. 'time' must be a datetime-like coordinate.
         months_to_average (int): The number of months to average.
-            - 1: Selects August for NH and March for SH.
+            - 1: Selects August for NH and February for SH.
             - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
 
     Returns:
@@ -692,6 +630,7 @@ def select_seasonal_hemispheric_data(
 
     >>> # --- Test Setup ---
     >>> # Create a 2-year dataset where the data value is the month number.
+    >>> import pandas as pd
     >>> time = pd.date_range('2020-01-01', '2021-12-31', freq='MS')
     >>> lats = [-20, 20]  # One SH, one NH point
     >>> lons = [100]
@@ -703,8 +642,8 @@ def select_seasonal_hemispheric_data(
 
     >>> # --- Test Case 1: 3-Month Average ---
     >>> result_3m = select_seasonal_hemispheric_data(ds_test, months_to_average=3)
-    >>> # For NH (lat=20), average of Aug(8), Sep(9), Oct(10) should be 9.0
-    >>> assert int(result_3m.sel(year=2021, latitude=20).some_variable) == 9
+    >>> # For NH (lat=20), average of Jul(7), Aug(8), Sep(9) should be 8.0
+    >>> assert int(result_3m.sel(year=2021, latitude=20).some_variable) == 8
     >>> # For SH (lat=-20), average of Jan(1), Feb(2), Mar(3) should be 2.0
     >>> assert int(result_3m.sel(year=2020, latitude=-20).some_variable) == 2
     >>> # Check that the dimensions are correct and 'time' is replaced by 'year'.
@@ -715,13 +654,13 @@ def select_seasonal_hemispheric_data(
     >>> result_1m = select_seasonal_hemispheric_data(ds_test, months_to_average=1)
     >>> # For NH (lat=20), the value for August (month 8) should be 8.
     >>> assert int(result_1m.sel(year=2021, latitude=20).some_variable) == 8
-    >>> # For SH (lat=-20), the value for March (month 3) should be 3.
-    >>> assert int(result_1m.sel(year=2020, latitude=-20).some_variable) == 3
+    >>> # For SH (lat=-20), the value for February (month 2) should be 2.
+    >>> assert int(result_1m.sel(year=2020, latitude=-20).some_variable) == 2
     """
     if months_to_average == 1:
         # Original logic: Select a single peak month
         nh_data = ds.where((ds.time.dt.month == 8) & (ds[lat] >= 0), drop=True)
-        sh_data = ds.where((ds.time.dt.month == 3) & (ds[lat] < 0), drop=True)
+        sh_data = ds.where((ds.time.dt.month == 2) & (ds[lat] < 0), drop=True)
 
         nh_data = (
             nh_data.assign_coords(year=nh_data.time.dt.year)
@@ -738,16 +677,12 @@ def select_seasonal_hemispheric_data(
 
     elif months_to_average == 3:
         # New logic: Average over 3-month peak season
-        # Northern Hemisphere: August-September-October (ASO)
-        nh_data = ds.where(
-            ds.time.dt.month.isin([8, 9, 10]) & (ds[lat] >= 0), drop=True
-        )
+        # Northern Hemisphere: July-August-September (JAS)
+        nh_data = ds.where(ds.time.dt.month.isin([7, 8, 9]) & (ds[lat] >= 0), drop=True)
         nh_annual = nh_data.groupby(nh_data.time.dt.year).mean("time")
 
-        # Southern Hemisphere: January-February-March (JFM)
-        sh_data = ds.where(
-            ds.time.dt.month.isin([1, 2, 3]) & (ds[lat] < 0), drop=True
-        )
+        # Southern Hemisphere: January-February-February (JFM)
+        sh_data = ds.where(ds.time.dt.month.isin([1, 2, 3]) & (ds[lat] < 0), drop=True)
         sh_annual = sh_data.groupby(sh_data.time.dt.year).mean("time")
 
         # Merge the two hemispheric, annually-averaged datasets
@@ -764,6 +699,13 @@ def get_era5_coordinates(
     Get the coordinates of the ERA5 data.
 
     Should have coordinates longitude, latitude, valid_time.
+
+    Args:
+        start_year (int): The starting year for the data.
+        end_year (int): The ending year for the data.
+
+    Returns:
+        xr.Dataset: The xarray dataset containing the coordinates.
     """
     sfp = os.path.join(ERA5_RAW_PATH, "era5_single_levels.nc")
     if os.path.exists(sfp):
@@ -919,6 +861,53 @@ def get_all_data(
     return xr.merge([era5_ds, era5_pi], compat="override", join="override")
 
 
+def trend_with_neweywest_full(
+    # x: np.darray,
+    y: np.ndarray,
+) -> tuple[float, float, float]:
+    """
+    Calculates the linear trend (slope, intercept) and its p-value
+    using OLS with Newey-West standard errors.
+
+    Args:
+        # x (np.ndarray): A 1D array representing the time variable (e.g., years).
+        y (np.ndarray): A 1D array representing the time series.
+
+    Returns:
+        tuple[float, float, float]: A tuple with (slope, intercept, p-value).
+
+    Doctests:
+    >>> import numpy as np
+    >>> # Test with a simple increasing trend
+    >>> y = np.array([1, 2, 3, 4, 5])
+    >>> slope, intercept, p_value = trend_with_neweywest_full(y)
+    >>> round(slope, 2)
+    1.0
+    >>> round(intercept, 2)
+    1.0
+    >>> round(p_value, 4) < 0.05
+    True
+    """
+    # print("Calculating trend with Newey-West standard errors...")
+    if np.all(np.isnan(y)):
+        return np.nan, np.nan, np.nan
+
+    x = np.arange(len(y))
+    x_const = sm.add_constant(x)
+
+    model = sm.OLS(y, x_const, missing="drop").fit(
+        cov_type="HAC", cov_kwds={"maxlags": 1}
+    )
+
+    # model.params is [intercept, slope]
+    # model.pvalues is [p_value_intercept, p_value_slope]
+    intercept = model.params[0]
+    slope = model.params[1]
+    p_value = model.pvalues[1]
+
+    return slope, intercept, p_value
+
+
 # @dask_cluster_wrapper
 def era5_pi_trends(
     start_year: int = DEFAULT_START_YEAR,
@@ -932,11 +921,15 @@ def era5_pi_trends(
         start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
         end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
         months (int, optional): The number of months to average over. Defaults to 1.
-            - 1: Selects August for NH and March for SH.
+            - 1: Selects August for NH and February for SH.
             - 3: Averages over Aug-Sep-Oct for NH and Jan-Feb-Mar for SH.
     """
     # load all the decades of data for potential intensity
-    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")
+    pi_vars = ["vmax", "t0", "otl", "sst", "msl", "rh"]  # [x for x in ds.variables]
+
+    ds = get_all_data(start_year=start_year, end_year=end_year, chunk_in="space")[
+        pi_vars
+    ]
     if ds is None:
         print("No ERA5 PI data found. Please run era5_pi() first.")
         return
@@ -958,12 +951,16 @@ def era5_pi_trends(
     new_year = ds.year - ds.year.min()
     assert len(new_year) > 20, "Not enough time points to calculate trends."
     ds = ds.assign_coords(year=new_year)
+    ds = ds.chunk({"year": -1})  # all time in one chunk
+    print("new rechunked ds", ds)
+
     print("New time coordinates:", ds.year.values)
     print("Calculating trends in potential intensity...")
+
     # pi_vars = ["vmax", "t0", "otl", "sst"]
-    pi_vars = [x for x in ds.variables]
     trend_ds = ds[pi_vars].polyfit(dim="year", deg=1, cov=True)
     # let's go through and work out the hatch mask for each variable
+
     for var in pi_vars:
         cov_n = var + "_polyfit_covariance"
         trend_n = var + "_polyfit_coefficients"
@@ -977,14 +974,55 @@ def era5_pi_trends(
             trend_ds[var + "_hatch_mask"] = frac_error >= 1.0
             if np.all(trend_ds[var + "_hatch_mask"].astype(int).values == 1):
                 print(f"Warning: All values in the hatch mask for {var} are True (1).")
-    # print(trend_ds)
-    trend_ds.to_netcdf(
-        os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
-        ),
-        engine="h5netcdf",
-        encoding={var: {"zlib": True, "complevel": 5} for var in trend_ds.variables},
+        # second hatch mask from running significance test on the rise
+        results = xr.apply_ufunc(
+            trend_with_neweywest_full,
+            ds[var],
+            input_core_dims=[["year"]],
+            # Add a third empty list for the new intercept output
+            output_core_dims=[[], [], []],
+            exclude_dims=set(("year",)),
+            vectorize=True,
+            dask="parallelized",
+            # rechunk=True,
+            dask_gufunc_kwargs={"allow_rechunk": True},
+            # allow_rechunk=True,
+            output_dtypes=[float, float, float],
+        )
+
+        slope, intercept, p_value = results
+
+        # Create the final Dataset
+        new_trend_ds = xr.Dataset(
+            {"slope": slope, "intercept": intercept, "p_value": p_value}
+        )
+        trend_ds[var + "_p_value"] = new_trend_ds["p_value"]
+        trend_ds[var + "_hatch_mask_p"] = new_trend_ds["p_value"] >= 0.05
+        trend_ds[var + "_slope_nw"] = new_trend_ds["slope"]
+        trend_ds[var + "_intercept_nw"] = new_trend_ds["intercept"]
+
+    print("Saving to zarr...")
+    temp_path = tempfile.mkdtemp(
+        suffix=".zarr", dir="."
+    )  # Write temp file in current dir
+    out_path = os.path.join(
+        ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
     )
+
+    try:
+        with ProgressBar():
+            trend_ds.to_zarr(temp_path, mode="w", consolidated=True)
+
+        if os.path.exists(out_path):
+            shutil.rmtree(out_path)
+
+        os.rename(temp_path, out_path)
+        print(f"Successfully saved to {out_path}")
+
+    except Exception as e:
+        print(f"Failed to save data. Error: {e}")
+        shutil.rmtree(temp_path)  # Clean up on failure
+        raise
 
 
 def find_tropical_m(
@@ -1031,7 +1069,7 @@ def find_tropical_m(
         1,
         sharex=True,
         sharey=True,
-        figsize=get_dim(ratio=0.8),
+        figsize=get_dim(ratio=1.0),
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
     plot_var_on_map(
@@ -1078,10 +1116,10 @@ def find_tropical_m(
     print(trend_ds["m"].median())
 
 
-def plot_vmax_trends(
+def plot_trend_maps(
     start_year: int = DEFAULT_START_YEAR,
     end_year: int = DEFAULT_END_YEAR,
-    months: int = 3,
+    months: int = 1,
 ) -> None:
     """Plot trend in vmax, t0 and otl in another 3 panel subplot with no cbar label but
     labels in subplot title instead.
@@ -1093,78 +1131,58 @@ def plot_vmax_trends(
     """
     trend_ds = xr.open_dataset(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
         ),
-        engine="h5netcdf",
     )
+    print(trend_ds)
     trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
-
-    vmax = trend_ds["vmax_polyfit_coefficients"].sel(degree=1)
-    t0 = trend_ds["t0_polyfit_coefficients"].sel(degree=1)
-    otl = trend_ds["otl_polyfit_coefficients"].sel(degree=1)
+    vars = ["sst", "t0", "otl", "vmax"]  # "msl", "rh",
+    vlim = [(-0.5, 0.5), (-0.5, 0.5), (-1, 1), (-5, 5)]  # (-1, 1), (-0.1, 0.1),
+    labels = [
+        # "$P_s$ trend [hPa decade$^{-1}$]",
+        # r"$\mathcal{H}$ trend [% decade$^{-1}$]",
+        "$T_s$ trend [K decade$^{-1}$]",
+        "$T_o$ trend [K decade$^{-1}$]",
+        "$z_{\mathrm{o}}$ trend [hPa decade$^{-1}$]",
+        "$V_p$ trend [m s$^{-1}$ decade$^{-1}$]",
+    ]
+    trends = [trend_ds[var + "_polyfit_coefficients"].sel(degree=1) for var in vars]
+    hatch_masks = [trend_ds[var + "_hatch_mask"] for var in vars]
 
     plot_defaults()
     fig, axs = plt.subplots(
-        3,
+        len(vars),
         1,
         sharex=True,
         sharey=True,
-        figsize=get_dim(ratio=0.8),
+        figsize=get_dim(ratio=1.0),
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
-    plot_var_on_map(
-        axs[0],
-        vmax * 10,  # convert to m/s/decade
-        label="$V_p$ trend [m s$^{-1}$ decade$^{-1}$]",
-        cmap="cmo.balance",
-        hatch_mask=trend_ds["vmax_hatch_mask"],
-        vmin=-10,
-        vmax=10,
-    )
-    plot_var_on_map(
-        axs[1],
-        t0 * 10,  # convert to K/decade
-        label="$T_o$ trend [K decade$^{-1}$]",
-        cmap="cmo.balance",
-        hatch_mask=trend_ds["t0_hatch_mask"],
-        vmin=-0.5,
-        vmax=0.5,
-    )
-    plot_var_on_map(
-        axs[2],
-        otl * 10,  # convert to m/decade
-        label="$z_{\mathrm{o}}$ trend [hPa decade$^{-1}$]",
-        cmap="cmo.balance",
-        hatch_mask=trend_ds["otl_hatch_mask"],
-        vmin=-1,
-        vmax=1,
-    )
 
-    # vmax.plot(ax=axs[0], cmap="cmo.balance", cbar_kwargs={"label": ""})
-    # axs[0].set_title("Vmax Trend [m/s/decade]")
-    # axs[0].set_ylabel(r"Latitude [$^{\circ}$N]")
-    # axs[0].set_xlabel("")
+    for i, var in enumerate(vars):
+        print(f"Plotting {var}...")
+        plot_var_on_map(
+            axs[i],
+            trends[i] * 10,  # convert to per decade
+            label=labels[i],
+            cmap="cmo.balance",
+            hatch_mask=hatch_masks[i],
+            second_hatch_mask=trend_ds[var + "_hatch_mask_p"],
+            vmin=vlim[i][0],
+            vmax=vlim[i][1],
+        )
 
-    # t0.plot(ax=axs[1], cmap="cmo.balance", cbar_kwargs={"label": ""})
-    # axs[1].set_title("T0 Trend [K/decade]")
-    # axs[1].set_ylabel(r"Latitude [$^{\circ}$N]")
-    # axs[1].set_xlabel("")
-
-    # otl.plot(ax=axs[2], cmap="cmo.balance", cbar_kwargs={"label": ""})
-    # axs[2].set_title("OTL Trend [m/decade]")
-    # axs[2].set_ylabel(r"Latitude [$^{\circ}$N]")
-    # axs[2].set_xlabel(r"Longitude [$^{\circ}$E]")
-
-    label_subplots(axs)  # , override="outside")
+    label_subplots(axs)
     plt.tight_layout()
-    plt.savefig(os.path.join(ERA5_FIGURE_PATH, "era5_vmax_trends_3m.pdf"), dpi=300)
+    plt.savefig(
+        os.path.join(
+            ERA5_FIGURE_PATH, f"era5_vmax_trends_{start_year}_{end_year}_{months}m.pdf"
+        ),
+        dpi=300,
+    )
 
-    print("vmax trend mean:", vmax.mean())
-    print("t0 trend mean:", t0.mean())
-    print("otl trend mean:", otl.mean())
 
-
-def plot_lineplots(
+def plot_trend_lineplots(
     lon: float,
     lat: float,
     label: str = "new_orleans",
@@ -1188,9 +1206,8 @@ def plot_lineplots(
     plot_defaults()
     trend_ds = xr.open_dataset(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.nc"
+            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
         ),
-        engine="h5netcdf",
     )
     if ds is None:
         era5_ds = get_all_data(start_year=start_year, end_year=end_year)
@@ -1206,7 +1223,7 @@ def plot_lineplots(
         # get August data (in the Northern Hemisphere)
         era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 8)
     else:
-        # get March data (in the Southern Hemisphere)
+        # get February data (in the Southern Hemisphere)
         era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 3)
     # get the time in years
     era5_ds = era5_ds.assign_coords(
@@ -1216,12 +1233,60 @@ def plot_lineplots(
     del era5_ds["time"]
     # plot the variables
 
+    vars = ["sst", "t0", "otl", "vmax"]  # "msl", "rh",
+    labels = [
+        # r"$P_s$ [hPa]",
+        # r"$\mathcal{H}$ [%]",
+        r"$T_s$ [$^{\circ}$C]",
+        r"$T_o$ [K]",
+        r"$z_{\mathrm{o}}$ [hPa]",
+        r"$V_p$ [m s$^{-1}$]",
+    ]
+    units = [r"$^{\circ}$C", "K", "hPa", r"m s$^{-1}$"]  # "hPa", "%",
+    colors = [
+        # "tab:purple",
+        # "tab:brown",
+        "tab:blue",
+        "tab:orange",
+        "tab:green",
+        "tab:red",
+    ]
+
     fig, axs = plt.subplots(
-        4,
+        len(vars),
         1,
         sharex=True,
         figsize=get_dim(ratio=0.8),
     )
+
+    def format_p_latex(value: float, sig_figs: int = 2) -> str:
+        """Formats a float into a LaTeX scientific notation string.
+
+        Args:
+            value: The floating-point number to format.
+            sig_figs: The number of significant figures to display.
+
+        Returns:
+            A LaTeX-formatted string for the p-value.
+
+        Doctests:
+        >>> format_p_latex(0.00012345)
+        '$p=1.2 \\\\times 10^{-4}$'
+        >>> format_p_latex(12345.0)
+        '$p=1.2 \\\\times 10^{4}$'
+        >>> format_p_latex(0.051)
+        '$p=5.1 \\\\times 10^{-2}$'
+        """
+        precision = sig_figs - 1
+        sci_notation_str = f"{value:.{precision}e}"
+        mantissa, exponent_str = sci_notation_str.split("e")
+        exponent = int(exponent_str)  # Cleans up leading zeros and '+' sign
+
+        # Don't use scientific notation for exponents of 0 or -1
+        if exponent in [0, -1]:
+            return f"$p={value:.{sig_figs}f}$"
+
+        return f"$p={mantissa} \\times 10^{{{exponent}}}$"
 
     def plot_trend(ax: plt.axis, var: str, color: str, label: str, unit: str) -> None:
         """Plot the trend for a specific variable."""
@@ -1232,10 +1297,6 @@ def plot_lineplots(
         trend = slope * era5_ds["year"].values + intercept
         cov_matrix_unscaled = trend_ds[f"{var}_polyfit_covariance"].values
         coeffs = np.array([slope, intercept])
-        # residuals = ys - np.polyval(coeffs, x)
-        # n_dof = len(x) - len(coeffs)  # Number of degrees of freedom
-        # residual_variance = np.sum(residuals**2) / n_dof
-        # cov_matrix = cov_matrix_unscaled * residual_variance
         cov_matrix = cov_matrix_unscaled
 
         print(f"{var} Fit Coefficients (slope, intercept): {coeffs}")
@@ -1258,6 +1319,7 @@ def plot_lineplots(
             linestyle="--",
         )
         # new_ys = unumpy.polyval(np.array(u_coeffs), x)
+        perc_inc = slope / intercept * 100  # percentage increase
 
         new_ys = u_coeffs[0] * x + u_coeffs[1]
         ax.fill_between(
@@ -1269,56 +1331,25 @@ def plot_lineplots(
             alpha=0.2,
         )
         ax.set_title(
-            # 0.3,
-            # 0.95,
-            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}",
-            # transform=ax.transAxes,
+            f"{label} Trend: {slope.n*10:.2f} ± {slope.s*10:.2f}  {unit} decade{r'$^{-1}$'}, {format_p_latex(trend_ds[f'{var}_p_value'].values)}",  # , {perc_inc.n*10:.1f} ± {perc_inc.s*10:.1f} % decade{r'$^{-1}$'}",
             fontsize=10,
-            # verticalalignment="top",
             color=color,
         )
 
-    print("sst", era5_ds["sst"].values.tolist())
-    print("t0", era5_ds["t0"].values.tolist())
-    print("otl", era5_ds["otl"].values.tolist())
-    axs[0].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["sst"].values - 273.15,
-        label=r"$T_s$ [$^{\circ}$C]",
-        color="tab:blue",
-    )
-    plot_trend(axs[0], "sst", "tab:blue", r"$T_s$ [$^{\circ}$C]", r"$^{\circ}$C")
-    axs[1].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["t0"].values,
-        label=r"$T_o$ [K]",
-        color="tab:orange",
-    )
-    plot_trend(axs[1], "t0", "tab:orange", r"$T_o$ [K]", "K")
-    axs[2].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["otl"].values,
-        label=r"$z_o$ [m]",
-        color="tab:green",
-    )
-    plot_trend(axs[2], "otl", "tab:green", r"$z_o$ [hPa]", "hPa")
-    axs[3].plot(
-        era5_ds["year"].values + start_year,
-        era5_ds["vmax"].values,
-        label=r"$V_p$ [m s$^{-1}$]",
-        color="tab:red",
-    )
-    plot_trend(axs[3], "vmax", "tab:red", r"$V_p$ [m s$^{-1}$]", r"m s$^{-1}$")
-    axs[0].set_ylabel(r"$T_s$ [$^{\circ}$C]")
-    axs[1].set_ylabel(r"$T_o$ [K]")
-    axs[2].set_ylabel(r"$z_o$ [hPa]")
-    axs[3].set_ylabel(r"$V_p$ [m s$^{-1}$]")
-    axs[3].set_xlabel("Year")
-    # era5_ds["sst"].plot(ax=axs[0], x="year", label="SST [C]", color="tab:blue")
-    # era5_pi["t0"].plot(ax=axs[1], x="year", label="T0 [K]", color="tab:orange")
+    for i, ax in enumerate(axs):
+        ax.plot(
+            era5_ds["year"].values + start_year,
+            era5_ds[vars[i]].values,
+            label=labels[i],
+            color=colors[i],
+        )
+        plot_trend(ax, vars[i], colors[i], labels[i], units[i])
+        ax.set_ylabel(labels[i])
+
+    axs[-1].set_xlabel("Year")
     plt.xlim(0 + start_year, end_year)
-    label_subplots(axs)  # , override="outside")
-    # era5_ds["otl"].plot(ax=axs[2], label="OTL [
+    label_subplots(axs)
+
     plt.savefig(
         os.path.join(
             ERA5_FIGURE_PATH, f"era5_pi_{label}_{start_year}_{end_year}_{months}m.pdf"
@@ -1328,7 +1359,9 @@ def plot_lineplots(
 
 
 def calculate_potential_sizes(
-    start_year: int = DEFAULT_START_YEAR, end_year: int = DEFAULT_END_YEAR
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+    dry_run: bool = False,
 ) -> None:
     """Calculate the potential sizes of tropical cyclones from ERA5 data.
 
@@ -1337,6 +1370,7 @@ def calculate_potential_sizes(
     Args:
         start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
         end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+        dry_run (bool, optional): If True, do not actually run the calculation. Defaults to True.
 
     Returns:
         None: This function saves the results to a zarr file.
@@ -1345,6 +1379,13 @@ def calculate_potential_sizes(
     if ds is None:
         print("No ERA5 data found. Please run era5_pi() first.")
         return
+
+    # just select -40 to 40 latitude, August for NH and February for SH
+    if "valid_time" in ds.dims:
+        ds = ds.rename({"valid_time": "time"})
+    ds = mon_increase(select_seasonal_hemispheric_data(ds, months_to_average=1)).sel(
+        latitude=slice(-40, 40)
+    )
     ds = ds.rename({"latitude": "lat", "longitude": "lon"})
     # currently I'm assuming that the data does not need to be converted
     # delete the unnecessary volume variables
@@ -1352,28 +1393,36 @@ def calculate_potential_sizes(
     del ds["q"]
     del ds["pressure_level"]
     # ds = convert(ds)
-    # call expensive function. There was some issues with chunking
-    ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
-        {"time": 64, "lat": 480, "lon": 480}
-    )  # chunk the data for saving
-    ds = ds.rename({"r0": "r0_pi", "rmax": "rmax_pi", "vmax": "vmax_pi"})
-    ds["vmax"] = 33  # set the vmax to 33 m/s for the lower limit of category 1.
-    ds = parallelized_ps_dask(ds.chunk({"time": 64, "lat": 480, "lon": 480})).chunk(
-        {"time": 64, "lat": 480, "lon": 480}
-    )  # chunk the data for saving
-    ds = ds.rename({"r0": "r0_cat1", "rmax": "rmax_cat1", "vmax": "vmax_cat1"})
+    ds = ds.rename({"vmax": "vmax_3"})
+    ds["vmax_1"] = (ds.vmax_3.dims, np.ones(ds.vmax_3.shape) * 33 / 0.8)
+    ds = ds.chunk({"lat": 5, "lon": 5, "year": 1})
 
-    ds = ds.rename({"lat": "latitude", "lon": "longitude"})
-    ds.to_zarr(
-        os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
-        ),
-        mode="w",
-        consolidated=True,
+    print("input ds", ds)
+    output_file = os.path.join(
+        ERA5_PS_OG_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
     )
-    # First potential size corresponding to the potential intensity velocity -- needs vmax, t0, sst, t2
+    tmp_file = output_file + "." + str(uuid.uuid4().hex) + ".tmp"
+    if not dry_run:
+        ds = parallelized_ps13_dask(
+            ds  # .chunk({"time": 64, "lat": 480, "lon": 480})
+        )  # .chunk(
+        # {"time": 64, "lat": 480, "lon": 480}
+        # )  # chunk the data for saving
+        print("output ds", ds)
 
-    # Then calculate the potential size corresponding to the lower limit of category 1 which is 33 m/s --
+        ds = ds.rename({"lat": "latitude", "lon": "longitude"})
+        ds.to_zarr(
+            tmp_file,
+            mode="w",
+            consolidated=True,
+        )
+        if os.path.exists(output_file):  # get rid of old file (but only if the new one worked)
+            shutil.rmtree(output_file)
+        os.rename(tmp_file, output_file)
+        print(f"Successfully saved to {output_file}")
+    else:
+        print("Dry run, not actually calculating potential sizes.")
+        print(f"Would have saved to {output_file}")
 
 
 @timeit
@@ -1391,7 +1440,7 @@ def call_cdo(input_path: str, output_path: str) -> None:
     # --- Define the number of threads to use ---
     # You can set this to a specific number or use os.cpu_count() to use all available cores.
     # On an M1 Pro with 10 cores, using 8 or 10 is a good starting point.
-    num_threads = os.cpu_count() or 8 # Fallback to 8 if cpu_count() returns None
+    num_threads = os.cpu_count() or 8  # Fallback to 8 if cpu_count() returns None
 
     # Temporary file for the intermediate step
     tmp_path = output_path + ".tmp"
@@ -1403,15 +1452,27 @@ def call_cdo(input_path: str, output_path: str) -> None:
 
     # --- Step 1: Use ncks to remove unnecessary variables ---
     # This step helps to reduce the file size before regridding.
-    ncks_options = ["-C","-O", "-4"]  # -C: exclude coordinate variables, -O: overwrite, -4: netCDF-4
-    ncks_vars_to_exclude = "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver,ifl"
-    ncks_cmd = [
-        "ncks"] + ncks_options + [
-        "-x", "-v", ncks_vars_to_exclude,
-        "--thr", str(num_threads),
-        input_path,
-        tmp_path
-    ]
+    ncks_options = [
+        "-C",
+        "-O",
+        "-4",
+    ]  # -C: exclude coordinate variables, -O: overwrite, -4: netCDF-4
+    ncks_vars_to_exclude = (
+        "lon_verticies,lat_bounds,lon_bounds,lat_verticies,expver,ifl"
+    )
+    ncks_cmd = (
+        ["ncks"]
+        + ncks_options
+        + [
+            "-x",
+            "-v",
+            ncks_vars_to_exclude,
+            "--thr",
+            str(num_threads),
+            input_path,
+            tmp_path,
+        ]
+    )
 
     print(f"\nRunning ncks to create temporary file: {' '.join(ncks_cmd)}")
     # Using subprocess.run is generally safer and more flexible than os.system
@@ -1436,12 +1497,14 @@ def call_cdo(input_path: str, output_path: str) -> None:
     # Added the -P flag to specify the number of parallel threads.
     cdo_cmd = [
         "cdo",
-        "-P", str(num_threads),  # Enable parallel processing with specified threads
-        "-f", "nc4",             # Set output format to netCDF-4
-        "-s",                    # Silent mode
-        f"remapbil,{grid_file}", # The regridding operation
-        tmp_path,                # Input file
-        output_path              # Output file
+        "-P",
+        str(num_threads),  # Enable parallel processing with specified threads
+        "-f",
+        "nc4",  # Set output format to netCDF-4
+        "-s",  # Silent mode
+        f"remapbil,{grid_file}",  # The regridding operation
+        tmp_path,  # Input file
+        output_path,  # Output file
     ]
 
     print(f"\nRunning parallel CDO command: {' '.join(cdo_cmd)}")
@@ -1513,10 +1576,10 @@ def regrid_all(years: List[str]) -> None:
             print(f"Regridding PI data for years {years[i]}-{years[j-1]}")
             call_cdo(pi_path, output_pi_path)
         ps_path = os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
+            ERA5_PS_OG_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
         )
         output_ps_path = os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
+            ERA5_PS_PATH, f"era5_potential_sizes_{years[i]}_{years[j-1]}.zarr"
         )
         if os.path.exists(ps_path) and not os.path.exists(output_ps_path):
             print(f"Regridding potential sizes data for years {years[i]}-{years[j-1]}")
@@ -1539,39 +1602,67 @@ def get_all_regridded_data(
         xr.Dataset: The xarray dataset containing the regridded ERA5 data.
     """
     single_ds = preprocess_single_level_data(
-            xr.open_mfdataset(
-                os.path.join(ERA5_REGRIDDED_PATH,"era5_single*.nc"),# "era5_single_levels_years2*.nc"),
-                combine="by_coords",
-                chunks=CHUNK_IN[chunk_in],
-                engine="netcdf4",)
-        )
-    pressure_ds = preprocess_pressure_level_data(
-            xr.open_mfdataset(
-                os.path.join(ERA5_REGRIDDED_PATH, "era5_pressure*.nc"),#_levels_years2*.nc"),
-                combine="by_coords",
-                chunks=CHUNK_IN[chunk_in],
-                engine="netcdf4",)
-        )
-    pi_ds = xr.open_mfdataset(
-            os.path.join(ERA5_PI_PATH, "era5_pi_years*.nc"),
+        xr.open_mfdataset(
+            os.path.join(
+                ERA5_REGRIDDED_PATH, "era5_single*.nc"
+            ),  # "era5_single_levels_years2*.nc"),
             combine="by_coords",
             chunks=CHUNK_IN[chunk_in],
             engine="netcdf4",
         )
+    )
+    pressure_ds = preprocess_pressure_level_data(
+        xr.open_mfdataset(
+            os.path.join(
+                ERA5_REGRIDDED_PATH, "era5_pressure*.nc"
+            ),  # _levels_years2*.nc"),
+            combine="by_coords",
+            chunks=CHUNK_IN[chunk_in],
+            engine="netcdf4",
+        )
+    )
+    pi_ds = xr.open_mfdataset(
+        os.path.join(ERA5_PI_PATH, "era5_pi_years*.nc"),
+        combine="by_coords",
+        chunks=CHUNK_IN[chunk_in],
+        engine="netcdf4",
+    )
 
     return xr.merge(
         [single_ds, pressure_ds, pi_ds],
         compat="override",
-        join="override",).sel(
-            time=slice(f"{start_year}-01-01", f"{end_year}-12-31"   )
-    )
+        join="override",
+    ).sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
 
+
+def plot_trends():
+    from w22.constants import OFFSET_D
+
+    new_point_d = {
+        var: (
+            OFFSET_D[var]["point"].lon + OFFSET_D[var]["lon_offset"],
+            OFFSET_D[var]["point"].lat + OFFSET_D[var]["lat_offset"],
+        )
+        for var in OFFSET_D
+    }
+
+    for point in new_point_d:
+        print(f"Plotting trend lineplots for {point} at {new_point_d[point]}")
+        plot_trend_lineplots(
+            (new_point_d[point][0] + 360) % 360,  # ensure in 0-360 range
+            new_point_d[point][1],
+            label=point,
+            start_year=1980,
+        )
 
 
 if __name__ == "__main__":
     # hatch_mask.astype(int)
     # python -m tcpips.era5 &> era5_pi_2.log
     # download_era5_data(start_year=1940)
+    # era5_pi(
+    #     [str(year) for year in range(1980, 2025)]  # 2025)]
+    # )  # Modify or extend this list as needed.)
     # era5_pi(
     #      [str(year) for year in range(1980, 2025)]  # 2025)]
     # )  # Modify or extend this list as needed.)
@@ -1582,31 +1673,42 @@ if __name__ == "__main__":
     #     [str(year) for year in range(1980, 2025)]
     # )  # Modify or extend this list as needed.
     # era5_pi_trends(start_year=1940, months=1)
+    # dask_cluster_wrapper(
+    #     era5_pi_trends, start_year=1980, end_year=2024, months=1
+    # )
+    # dask_cluster_wrapper(
+    #     era5_pi_trends, start_year=1980, end_year=2024, months=1
+    # )
+    # dask_cluster_wrapper(
+    #     era5_pi_trends, start_year=1940, end_year=2024, months=1
+    # # )
+    # from w22.constants import OFFSET_D
+
     # era5_pi_trends(start_year=1980, months=1)
     # find_tropical_m(start_year=1980, months=1)
     # find_tropical_m(start_year=1940, months=1)
 
-    # plot_vmax_trends(start_year=1980, months=1)
-    # plot_vmax_trends(start_year=1940, months=1)
-    # plot_lineplots(
+    # plot_trend_maps(start_year=1980, months=1)
+    # plot_trend_maps(start_year=1940, months=1)
+    # plot_trend_lineplots(
     #     360 - 90.0,
     #     29.0,
     #     label="new_orleans",
     #     start_year=1980,
     # )  # New Orleans, USA (30N, 90W)
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 80.0,
     #     25.0,
     #     label="miami",
     #     start_year=1980,
     # )  # Miami, USA (25N, 80W)
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 90.0,
     #     27.0,
     #     label="new_orleans",
     #     start_year=1940,
     # )  # New Orleans, USA (30N, 90W)
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 80.0,
     #     25.0,
     #     label="miami",
@@ -1614,22 +1716,46 @@ if __name__ == "__main__":
     # )  # Miami, USA (25N, 80W)
 
     # ds = get_all_data()
-    # plot_lineplots(
+    # plot_trend_lineplots(
     #     360 - 90.0, 29.0, label="new_orleans", ds=ds
     # )  # New Orleans, USA (30N, 90W)
-    # plot_lineplots(360 - 80.0, 25.0, label="miami", ds=ds)  # Miami, USA (25N, 80W)
-    # plot_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
+    # plot_trend_lineplots(360 - 80.0, 25.0, label="miami", ds=ds)  # Miami, USA (25N, 80W)
+    # plot_trend_lineplots(360 - 90.0, 27.0, label="new_orleans")  # New Orleans, USA (30N, 90W)
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
     dask_cluster_wrapper(
-         calculate_potential_sizes,
-         start_year=DEFAULT_START_YEAR,
-         end_year=DEFAULT_START_YEAR + 9,
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR,
+        end_year=DEFAULT_START_YEAR + 9,
+        dry_run=True,
     )  # This will take a long time to run.
-    # #
-    years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
-    regrid_all(years)
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 10,
+        end_year=DEFAULT_START_YEAR + 19,
+        dry_run=True,
+    )
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 20,
+        end_year=DEFAULT_START_YEAR + 29,
+        dry_run=True,
+    )
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 30,
+        end_year=DEFAULT_START_YEAR + 39,
+        dry_run=True,
+    )
+    dask_cluster_wrapper(
+        calculate_potential_sizes,
+        start_year=DEFAULT_START_YEAR + 40,
+        end_year=DEFAULT_END_YEAR,
+        dry_run=True,
+    )
     # calculate_potential_sizes(
-    #      start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
+    #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
+    # years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
+    # regrid_all(years)

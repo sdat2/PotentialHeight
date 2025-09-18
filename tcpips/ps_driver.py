@@ -15,7 +15,7 @@ import pandas as pd
 from w22.ps import parallelized_ps_dask
 from .constants import CDO_PATH, PI4_PATH, PS_PATH
 from .files import locker
-from .dask import dask_cluster_wrapper
+from .dask_utils import dask_cluster_wrapper
 from .convert import convert
 
 

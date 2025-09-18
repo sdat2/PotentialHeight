@@ -7,7 +7,14 @@ import numpy as np
 import xarray as xr
 from scipy.integrate import cumulative_trapezoid
 from sithom.time import timeit
-from .constants import TEMP_0K, F_COR_DEFAULT, RHO_AIR_DEFAULT, BACKGROUND_PRESSURE
+from .constants import (
+    TEMP_0K,
+    F_COR_DEFAULT,
+    RHO_AIR_DEFAULT,
+    BACKGROUND_PRESSURE,
+    GAS_CONSTANT,
+    GAS_CONSTANT_FOR_WATER_VAPOR,
+)
 
 
 def coriolis_parameter_from_lat(lat: np.ndarray) -> np.ndarray:
@@ -399,3 +406,40 @@ if __name__ == "__main__":
     plt.xlabel("x")
     plt.ylabel("y")
     plt.savefig("test/intersect.pdf")
+
+
+def rho_air_f(total_pressure_hpa, air_temperature_k, water_vapour_pressure_pa):
+    """Calculate air density given total pressure, temperature, and water vapour pressure.
+
+    Args:
+        total_pressure_hpa (float): Total pressure in hPa.
+        air_temperature (float): Air temperature in K.
+        water_vapour_pressure (float): Water vapour pressure in Pa.
+
+    Returns:
+        float: Air density in kg/m^3.
+
+    Doctests:
+    >>> # Test with standard sea level conditions (approx)
+    >>> # P = 1013.25 hPa, T = 15 C = 288.15 K, RH = 50%
+    >>> # Saturated vapor pressure at 15 C is ~1705 Pa. 50% RH -> p_v = 852.5 Pa
+    >>> round(rho_air_f(1013.25, 288.15, 852.5), 3)
+    1.221
+    >>> # Test for dry air (vapor pressure = 0)
+    >>> round(rho_air_f(1013.25, 288.15, 0.0), 3)
+    1.225
+    """
+    total_pressure_pa = total_pressure_hpa * 100
+
+    # Calculate partial pressure of dry air
+    dry_air_pressure_pa = total_pressure_pa - water_vapour_pressure_pa
+
+    # Calculate density of dry air component
+    rho_dry = dry_air_pressure_pa / (GAS_CONSTANT * air_temperature_k)
+
+    # Calculate density of water vapor component
+    rho_vapor = water_vapour_pressure_pa / (
+        GAS_CONSTANT_FOR_WATER_VAPOR * air_temperature_k
+    )
+
+    return rho_dry + rho_vapor

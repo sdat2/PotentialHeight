@@ -4,8 +4,8 @@ authors:
   - family-names: Thomas
     given-names: Simon Donald Alistair
     orcid: https://orcid.org/0000-0001-7911-1659
-title: WorstSurge - Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization
-version: v0.0.3
+title: Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization
+version: v0.1.1
 doi: 10.5281/zenodo.15073504
 url: "https://github.com/sdat2/worstsurge"
-date-released: 2025-04-05
+date-released: 2025-09-15

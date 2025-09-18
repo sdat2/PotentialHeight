@@ -1,6 +1,15 @@
-"""Functions to calculate potential size from xarray inputs in parallel."""
+"""Functions to calculate potential size from xarray inputs in parallel.
+
+
+TODO: this seems like a unit nightmare, perhaps we should have a unit checking function,
+and also make sure that everything is in SI units rather than some in hPa and some in Pa,
+some in kelvin, some in celsius.
+
+"""
 
 import os
+import pytest
+from typing import Literal
 from joblib import Parallel, delayed
 import numpy as np
 import xarray as xr
@@ -32,43 +41,72 @@ from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
     pressure_from_wind,
+    rho_air_f,
 )
 from .solve import bisection
 
+TEMP_DIFF = 1.0  # difference between sst and near surface air temperature
+
 
 def calculate_ps_ufunc(
-    vmax,
-    msl,
-    sst,
-    t0,
-    lat,
-    rh,
-    ck_cd,
-    cd,
-    w_cool,
-    supergradient_factor,
-    pressure_assumption="isothermal",
+    vmax: float,
+    msl: float,
+    sst: float,
+    t0: float,
+    lat: float,
+    rh: float,
+    ck_cd: float,
+    cd: float,
+    w_cool: float,
+    supergradient_factor: float,
+    pressure_assumption: str = "isothermal",
 ):
     """
     Core computation function designed for xr.apply_ufunc.
     Accepts scalar NumPy values and returns a tuple of scalar results.
+
+    Args:
+        vmax (float): Potential intensity in m/s. Assume it is as the gradient wind level.
+        msl (float): Ambient surface pressure in mbar.
+        sst (float): Sea surface temperature in degC.
+        t0 (float): Outflow temperature in degK.
+        lat (float): Latitude in degrees North.
+        rh (float): Environmental relative humidity (0-1).
+        ck_cd (float): Ratio of exchange coefficients [dimensionless].
+        cd (float): Drag coefficient [dimensionless].
+        w_cool (float): Cooling coefficient in m/s.
+        supergradient_factor (float): Supergradient factor [dimensionless].
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
+
+    Returns:
+        tuple: (r0, pm, pc, rmax) where
+            r0 (float): Potential size in m.
+            pm (float): Pressure at maximum winds in Pa.
+            pc (float): Central pressure for CLE15 profile in Pa.
+            rmax (float): Radius of maximum winds in m.
     """
     # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
-    if np.isnan(vmax) or vmax <= 0.01 or np.isnan(sst):
+    # maybe we should add an output that records what failed?
+    if (
+        np.isnan(vmax)
+        or vmax <= 0.01
+        or np.isnan(sst)
+        or np.isnan(rh)
+        or rh < 0
+        or rh > 1
+    ):
         return np.nan, np.nan, np.nan, np.nan
 
     # 2. Define the inner function for bisection (captures the inputs)
     p_a = msl
     coriolis_parameter = abs(coriolis_parameter_from_lat(lat))
-    near_surface_air_temperature = sst + TEMP_0K - 1.0
+    near_surface_air_temperature = sst + TEMP_0K - TEMP_DIFF
 
     # Simplified air density calculation for the wrapper
-    water_vapour_pressure = rh * buck_sat_vap_pressure(near_surface_air_temperature)
-    rho_air = (p_a * 100 - water_vapour_pressure) / (
-        GAS_CONSTANT * near_surface_air_temperature
-    ) + water_vapour_pressure / (
-        GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
-    )
+    water_vapour_pressure = rh * buck_sat_vap_pressure(
+        near_surface_air_temperature
+    )  # (Pa)
+    rho_air = rho_air_f(p_a, near_surface_air_temperature, water_vapour_pressure)
 
     def try_for_r0(r0: float):
         pm_cle, rmax_cle, _ = run_cle15(
@@ -108,6 +146,8 @@ def calculate_ps_ufunc(
 
     # 3. Perform the main calculation (bisection to find r0)
     try:
+        # this is to restrict the search to a smaller space, but do this adaptively
+        # based on rough coriolis parameter scaling
         coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
         lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
         upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
@@ -135,10 +175,330 @@ def calculate_ps_ufunc(
         return np.nan, np.nan, np.nan, np.nan
 
 
+def calculate_ps13_ufunc(
+    vmax_1: float,
+    vmax_3: float,
+    msl: float,
+    sst: float,
+    t0: float,
+    lat: float,
+    rh: float,
+    ck_cd: float,
+    cd: float,
+    w_cool: float,
+    supergradient_factor: float,
+    pressure_assumption: str = "isothermal",
+):
+    """
+    Core computation function designed for xr.apply_ufunc.
+
+    This calculates both the potential size assuming the intensity is the potential intensity (vmax) and the potential size assuming the intensity is the minimum required for category 1 hurricane (normally 33 m s-1 at 10m height) (vmin).
+
+    TODO: This function is not yet implemented.
+
+    Args:
+        vmax_1 (float): Minimum intensity for category 1 hurricane in m/s. Assume it is as the gradient wind level.
+        vmax_3 (float): Potential intensity in m/s. Assume it is as the gradient wind level.
+        msl (float): Ambient surface pressure in mbar.
+        sst (float): Sea surface temperature in degC.
+        t0 (float): Outflow temperature in degK.
+        lat (float): Latitude in degrees North.
+        rh (float): Environmental relative humidity (0-1).
+        ck_cd (float): Ratio of exchange coefficients [dimensionless].
+        cd (float): Drag coefficient [dimensionless].
+        w_cool (float): Cooling coefficient in m/s.
+        supergradient_factor (float): Supergradient factor [dimensionless].
+        pressure_assumption (str, optional): Assumption for pressure calculation. Defaults to "isothermal". Alternative is "isopycnal".
+
+    Returns:
+        tuple: (r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3) where
+            r0_1 (float): Potential size for category 1 hurricane in m.
+            pm_1 (float): Pressure at maximum winds for category 1 hurricane in Pa.
+            pc_1 (float): Central pressure for CLE15 profile for category 1 hurricane in Pa.
+            rmax_1 (float): Radius of maximum winds for category 1 hurricane in m.
+            r0_3 (float): Potential size for potential intensity in m.
+            pm_3 (float): Pressure at maximum winds for potential intensity in Pa.
+            pc_3 (float): Central pressure for CLE15 profile for potential intensity in Pa.
+            rmax_3 (float): Radius of maximum winds for potential intensity in m.
+
+    Examples:
+        >>> _ = calculate_ps13_ufunc(
+        ...    vmax_1=33.0,
+        ...    vmax_3=50.0,
+        ...    msl=1015.0,
+        ...    sst=29.0,
+        ...    t0=200.0,
+        ...    lat=20.0,
+        ...    rh=0.9,
+        ...    ck_cd=0.9,
+        ...    cd=0.0015,
+        ...    w_cool=0.002,
+        ...    supergradient_factor=1.2,
+        ...    )  # doctest: +ELLIPSIS
+
+    """
+
+    # 1. Handle NaN inputs (Dask will process all points, including invalid ones)
+    if (
+        np.isnan(vmax_1)
+        or vmax_1 <= 0.01
+        or np.isnan(vmax_3)
+        or vmax_3 <= 0.01
+        or np.isnan(sst)
+        or np.isnan(rh)
+        or rh < 0
+        or rh > 1
+    ):
+
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+
+    # 2. Define the inner function for bisection (captures the inputs)
+    p_a = msl
+    coriolis_parameter = abs(coriolis_parameter_from_lat(lat))
+    near_surface_air_temperature = sst + TEMP_0K - TEMP_DIFF
+    water_vapour_pressure = rh * buck_sat_vap_pressure(near_surface_air_temperature)
+    rho_air = (p_a * 100 - water_vapour_pressure) / (
+        GAS_CONSTANT * near_surface_air_temperature
+    ) + water_vapour_pressure / (
+        GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
+    )
+
+    def try_for_r0_v(r0: float, vmax: float):
+        pm_cle, rmax_cle, _ = run_cle15(
+            inputs={
+                "r0": r0,
+                "Vmax": vmax,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+        ys = bisection(
+            wang_diff(
+                *wang_consts(
+                    radius_of_max_wind=rmax_cle,
+                    radius_of_inflow=r0,
+                    maximum_wind_speed=vmax * supergradient_factor,
+                    coriolis_parameter=coriolis_parameter,
+                    pressure_dry_at_inflow=(p_a * 100)
+                    - (rh * buck_sat_vap_pressure(near_surface_air_temperature)),
+                    near_surface_air_temperature=near_surface_air_temperature,
+                    outflow_temperature=t0,
+                )
+            ),
+            LOWER_Y_WANG_BISECTION,
+            UPPER_Y_WANG_BISECTION,
+            W22_BISECTION_TOLERANCE,
+        )
+        pm_car = (
+            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
+        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
+        return pm_cle - pm_car
+
+    try:
+        # this is to restrict the search to a smaller space, but do this adaptively
+        # based on rough coriolis parameter scaling
+        coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
+        lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
+        upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
+
+        def try_for_r0_1(r0):
+            return try_for_r0_v(r0, vmax_1)
+
+        r0_1 = bisection(
+            try_for_r0_1, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+        )
+        # 4. Final calculation with the solved r0
+        pm_1, rmax_1, pc_1 = run_cle15(
+            inputs={
+                "r0": r0_1,
+                "Vmax": vmax_1,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+
+        def try_for_r0_3(r0):
+            return try_for_r0_v(r0, vmax_3)
+
+        r0_3 = bisection(
+            try_for_r0_3, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+        )
+        pm_3, rmax_3, pc_3 = run_cle15(
+            inputs={
+                "r0": r0_3,
+                "Vmax": vmax_3,
+                "p0": p_a,
+                "fcor": coriolis_parameter,
+                "CkCd": ck_cd,
+                "Cd": cd,
+                "w_cool": w_cool,
+            },
+            rho0=rho_air,
+            pressure_assumption=pressure_assumption,
+        )
+        return r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3
+
+    except (ValueError, RuntimeError, AssertionError):
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+
+
+@timeit
+def parallelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
+    """
+    Calculate potential size at category 1 intensity, and at the potential intensity.
+
+    Returns:
+        xr.Dataset:
+    """
+    # Ensure input dataset is chunked for Dask
+    # ds = ds.chunk("auto")
+
+    # 1. Define required variables and optional variables with their defaults
+    required_vars = ["vmax_1", "vmax_3", "msl", "sst", "t0", "lat"]
+    optional_vars = {
+        "rh": ENVIRONMENTAL_HUMIDITY_DEFAULT,
+        "ck_cd": CK_CD_DEFAULT,
+        "cd": CD_DEFAULT,
+        "w_cool": W_COOL_DEFAULT,
+        "supergradient_factor": SUPERGRADIENT_FACTOR,
+    }
+
+    # 2. Check for required variables
+    for var in required_vars:
+        if var not in ds:
+            raise KeyError(f"Required variable '{var}' is missing from the dataset.")
+
+    # 3. Check for optional variables and add them with default values if missing
+    for var, default_value in optional_vars.items():
+        if var not in ds:
+            print(f"'{var}' not found in dataset, using default value: {default_value}")
+            # Add a DataArray with the default value. Xarray's broadcasting
+            # will handle matching it to the other dimensions.
+            ds[var] = xr.DataArray(default_value)
+
+    r0_1, pm_1, pc_1, rmax_1, r0_3, pm_3, pc_3, rmax_3 = xr.apply_ufunc(
+        calculate_ps13_ufunc,  # The core function
+        ds["vmax_1"],
+        ds["vmax_3"],
+        ds["msl"],
+        ds["sst"],
+        ds["t0"],
+        ds["lat"],  # Required inputs
+        ds["rh"],
+        ds["ck_cd"],
+        ds["cd"],
+        ds["w_cool"],
+        ds["supergradient_factor"],  # Optional inputs
+        kwargs={"pressure_assumption": "isothermal"},
+        input_core_dims=[[] for _ in range(11)],  # All inputs are scalars
+        output_core_dims=[[] for _ in range(8)],
+        exclude_dims=set(),
+        vectorize=True,  # Key for broadcasting
+        dask="parallelized",  # Key for parallel execution
+        output_dtypes=[float for _ in range(8)],
+    )
+
+    output_ds = ds.copy()
+    # Assume V=V_cat1
+    output_ds["r0_1"] = (ds.vmax_1.dims, r0_1.data)
+    output_ds["r0_1"].attrs = {
+        "units": "m",
+        "long_name": r"Outer radius of tropical cyclone, $r_{a1}$",
+    }
+    output_ds["pm_1"] = (ds.vmax_1.dims, pm_1.data)
+    output_ds["pm_1"].attrs = {
+        "units": "Pa",
+        "long_name": r"Pressure at maximum winds, $p_{m1}$",
+    }
+    output_ds["pc_1"] = (ds.vmax_1.dims, pc_1.data)
+    output_ds["pc_1"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax_1"] = (ds.vmax_1.dims, rmax_1.data)
+    output_ds["rmax_1"].attrs = {
+        "units": "m",
+        "long_name": r"Radius of maximum winds, $r_{1}$",
+    }
+    # assume V = V_p
+    output_ds["r0_3"] = (ds.vmax_1.dims, r0_3.data)
+    output_ds["r0_3"].attrs = {
+        "units": "m",
+        "long_name": r"Outer radius of tropical cyclone, $r_{a3}$",
+    }
+    output_ds["pm_3"] = (ds.vmax_1.dims, pm_3.data)
+    output_ds["pm_3"].attrs = {
+        "units": "Pa",
+        "long_name": r"Pressure at maximum winds, $p_{m3}$",
+    }
+    output_ds["pc_3"] = (ds.vmax_1.dims, pc_3.data)
+    output_ds["pc_3"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax_3"] = (ds.vmax_1.dims, rmax_3.data)
+    output_ds["rmax_3"].attrs = {
+        "units": "m",
+        "long_name": r"Radius of maximum winds, $r_{3}$",
+    }
+
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_pressure_assumption"] = "isothermal"
+
+    return output_ds
+
+
 @timeit
 def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
     """
     Apply point solution to all points using xr.apply_ufunc and Dask.
+
+    Args:
+        ds (xr.Dataset): contains msl, vmax, sst, t0, rh, and lat.
+
+    Returns:
+        xr.Dataset: additionally contains r0, pm, pc, and rmax.
+
+    Doctest::
+        >>> in_ds = xr.Dataset(
+        ...    data_vars={
+        ...        "msl": (("y", "x"), [[1015.0, 1016.0], [1012.0, 1014.0]]),
+        ...        "vmax": (("y", "x"), [[50.0, 0.0], [45.0, 60.0]]), # Includes a zero vmax
+        ...        "sst": (("y", "x"), [[29.0, 30.0], [28.0, 28.5]]),
+        ...        "t0": (("y", "x"), [[200.0, 201.0], [199.0, 200.0]]),
+        ...        "rh": (("y", "x"), [[0.9, 0.85], [0.92, 0.88]]),
+        ...        "ck_cd": 0.9,
+        ...        "cd": 0.0015,
+        ...        "w_cool": 0.002,
+        ...        "supergradient_factor": 1.2,
+        ...    },
+        ...    coords={"lat": (("y", "x"), [[30.0, 25.0], [20.0, 15.0]])},
+        ... )
+        >>> result_joblib = parallelized_ps(in_ds.copy(), jobs=2, autofail=False) # doctest: +ELLIPSIS
+        About to conduct 4 jobs in parallel
+        'parallelized_ps' ... s
+        >>> result_dask = parallelized_ps_dask(in_ds.copy()).compute() # doctest: +ELLIPSIS
+        'parallelized_ps_dask' ... s
+        >>> output_vars = ["r0", "pm", "pc", "rmax"]
+        >>> print(result_joblib, result_dask) # doctest: +ELLIPSIS
+        <xarray.Dataset> ... <xarray.Dataset> ...
+        >>> if "potential_size_calculated_at_time" in result_joblib: del result_joblib["potential_size_calculated_at_time"]
+        >>> if "potential_size_calculated_at_time" in result_dask: del result_dask["potential_size_calculated_at_time"]
+        >>> for var in output_vars:
+        ...    xr.testing.assert_allclose(result_joblib[var], result_dask[var])
     """
     # Ensure input dataset is chunked for Dask
     ds = ds.chunk("auto")
@@ -180,8 +540,9 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
         ds["cd"],
         ds["w_cool"],
         ds["supergradient_factor"],  # Optional inputs
+        kwargs={"pressure_assumption": "isothermal"},
         input_core_dims=[[] for _ in range(10)],  # All inputs are scalars
-        output_core_dims=[[], [], [], []],  # Four scalar outputs
+        output_core_dims=[[] for _ in range(4)],
         exclude_dims=set(),
         vectorize=True,  # Key for broadcasting
         dask="parallelized",  # Key for parallel execution
@@ -190,10 +551,32 @@ def parallelized_ps_dask(ds: xr.Dataset) -> xr.Dataset:
 
     # Assign results to a new dataset
     output_ds = ds.copy()
-    output_ds["r0"] = r0
-    output_ds["pm"] = pm
-    output_ds["pc"] = pc
-    output_ds["rmax"] = rmax
+    output_ds["r0"] = (ds.vmax.dims, r0.data)
+    output_ds["r0"].attrs = {
+        "units": "m",
+        "long_name": "Potential size of tropical cyclone, $r_a$",
+    }
+    output_ds["pm"] = (ds.vmax.dims, pm.data)
+    output_ds["pm"].attrs = {
+        "units": "Pa",
+        "long_name": "Pressure at maximum winds, $p_m$",
+    }
+    output_ds["pc"] = (ds.vmax.dims, pc.data)
+    output_ds["pc"].attrs = {
+        "units": "Pa",
+        "long_name": "Central pressure for CLE15 profile",
+    }
+    output_ds["rmax"] = (ds.vmax.dims, rmax.data)
+    output_ds["rmax"].attrs = {
+        "units": "m",
+        "long_name": "Radius of maximum winds, $r_{\mathrm{max}}$",
+    }
+
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
+        path=str(PROJECT_PATH)
+    )
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_pressure_assumption"] = "isothermal"
 
     return output_ds
 
@@ -203,7 +586,7 @@ def point_solution_ps(
     ds: xr.Dataset,
     supergradient_factor: float = SUPERGRADIENT_FACTOR,
     include_profile: bool = False,
-    pressure_assumption="isothermal",
+    pressure_assumption: Literal["isothermal", "isopycnal"] = "isothermal",
 ) -> xr.Dataset:
     """
     Find the solution for a given point in the grid.
@@ -279,11 +662,7 @@ def point_solution_ps(
         water_vapour_pressure = env_humidity * buck_sat_vap_pressure(
             near_surface_air_temperature
         )
-        rho_air = (p_a * 100 - water_vapour_pressure) / (
-            GAS_CONSTANT * near_surface_air_temperature
-        ) + water_vapour_pressure / (
-            GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
-        )
+        rho_air = rho_air_f(p_a, near_surface_air_temperature, water_vapour_pressure)
     else:
         rho_air = float(ds["rho_air"].values)
 
@@ -567,16 +946,66 @@ def parallelized_ps(
             .set_index(stacked_dim=dims)  # Restore multi-index before unstacking
             .unstack("stacked_dim")
         )
+        output_ds = output_ds.transpose(*ds.dims)  # Reorder dimensions to match input
+        output_ds = output_ds.reset_index(dims, drop=True)
+
     output_ds.attrs["potential_size_pressure_assumption"] = pressure_assumption
-    output_ds.attrs["ps_calculated_at_git_hash"] = get_git_revision_hash(
+    output_ds.attrs["potential_size_calculated_at_git_hash"] = get_git_revision_hash(
         path=str(PROJECT_PATH)
     )
-    output_ds.attrs["ps_calculated_at_time"] = time_stamp()
+    output_ds.attrs["potential_size_calculated_at_time"] = time_stamp()
 
     assert (
         output_ds.sizes == ds.sizes
     ), "Output dataset sizes do not match input dataset sizes."
     return output_ds
+
+
+def create_test_dataset(shape, dim_names):
+    """Helper function to generate a generic test dataset."""
+    # Ensure there's a non-dimension coordinate to mimic your original data
+    coords = {"lat": (dim_names, np.random.rand(*shape))}
+    data_vars = {
+        "vmax": (dim_names, np.random.rand(*shape) * 50 + 10),
+        "sst": (dim_names, np.random.rand(*shape) * 5 + 25),
+        "msl": (dim_names, np.ones(shape) * 1015),
+        "t0": (dim_names, np.ones(shape) * 200),
+        "rh": (dim_names, np.ones(shape) * 0.9),
+    }
+    return xr.Dataset(data_vars, coords)
+
+
+@pytest.mark.parametrize(
+    "shape, dim_names",
+    [
+        ((4,), ("time",)),  # 1D test with a different name
+        ((2, 3), ("lati", "loni")),  # 2D test with different names
+        ((2, 2, 2), ("level", "y", "x")),  # 3D test
+    ],
+)
+def test_equivalence_across_dimensionalities(shape, dim_names):
+    """
+    Tests that Joblib and Dask outputs are structurally identical
+    for 1D, 2D, and 3D inputs with arbitrary dimension names.
+    """
+    in_ds = create_test_dataset(shape, dim_names)
+
+    # Run both parallelization functions
+    result_joblib = parallelized_ps(in_ds, jobs=2)
+    result_dask = parallelized_ps_dask(in_ds).compute()
+
+    # We only care about the output variables for this comparison
+    output_vars = ["r0", "pm", "pc", "rmax"]
+    result_joblib_outputs = result_joblib[output_vars]
+    result_dask_outputs = result_dask[output_vars]
+
+    if "potential_size_calculated_at_time" in result_joblib.attrs:
+        del result_joblib.attrs["potential_size_calculated_at_time"]
+    if "potential_size_calculated_at_time" in result_dask.attrs:
+        del result_dask.attrs["potential_size_calculated_at_time"]
+    # assert_identical is a very strict check that verifies that every
+    # aspect of the two datasets (dims, coords, data, attrs) is identical.
+    xr.testing.assert_identical(result_joblib_outputs, result_dask_outputs)
 
 
 def single_point_example() -> None:
@@ -697,6 +1126,7 @@ def multi_point_example_2d(autofail=True) -> None:
     # But if we exclude all points where vmax is nan or 0, perhaps it will be much faster (already done implictly in the code).
     # Still, maybe we will be waiting a day to get the ERA5/IBTrACS results
     out_ds = parallelized_ps(in_ds, jobs=10, autofail=autofail)
+    print(out_ds)
 
     # print(out_ds)
 
@@ -705,4 +1135,39 @@ if __name__ == "__main__":
     # python -m w22.ps
     # single_point_example()
     # multi_point_example_2d()
-    multi_point_example_1d()
+    # multi_point_example_1d()
+    in_ds = xr.Dataset(
+        data_vars={
+            "msl": (("y", "x"), [[1015.0, 1016.0], [1012.0, 1014.0]]),
+            "vmax": (("y", "x"), [[50.0, 0.0], [45.0, 60.0]]),  # Includes a zero vmax
+            "sst": (("y", "x"), [[29.0, 30.0], [28.0, 28.5]]),
+            "t0": (("y", "x"), [[200.0, 201.0], [199.0, 200.0]]),
+            "rh": (("y", "x"), [[0.9, 0.85], [0.92, 0.88]]),
+        },
+        coords={"lat": (("y", "x"), [[30.0, 25.0], [20.0, 15.0]])},
+    )
+    print("Input dataset:", in_ds)
+
+    # 2. Execute both parallelization functions
+    # Run the Joblib-based function
+    result_joblib = parallelized_ps(in_ds.copy(), jobs=2, autofail=False)
+
+    # Run the Dask-based function.
+    # .compute() is crucial to trigger the calculation and get the results.
+    result_dask = parallelized_ps_dask(in_ds.copy()).compute()
+
+    print("joblib results", result_joblib)
+    print("dask results", result_dask)
+
+    # 3. Assert that the outputs are numerically equivalent
+    # List the new variables that both functions are expected to create
+    output_vars = ["r0", "pm", "pc", "rmax"]
+
+    for var in output_vars:
+        # Use xarray's testing function, which is designed to compare
+        # DataArrays. It handles coordinates, dimensions, and NaN values correctly.
+        xr.testing.assert_allclose(result_joblib[var], result_dask[var])
+
+    test_equivalence_across_dimensionalities((2, 3), ("lati", "loni"))
+    test_equivalence_across_dimensionalities((4,), ("time",))
+    test_equivalence_across_dimensionalities((2, 2, 2), ("level", "y", "x"))
