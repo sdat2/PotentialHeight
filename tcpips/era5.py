@@ -1395,7 +1395,7 @@ def calculate_potential_sizes(
     # ds = convert(ds)
     ds = ds.rename({"vmax": "vmax_3"})
     ds["vmax_1"] = (ds.vmax_3.dims, np.ones(ds.vmax_3.shape) * 33 / 0.8)
-    ds = ds.chunk({"lat": 1, "lon": 2, "year": 1})
+    ds = ds.chunk({"lat": 5, "lon": 5, "year": 1})
 
     print("input ds", ds)
     output_file = os.path.join(
@@ -1408,6 +1408,7 @@ def calculate_potential_sizes(
         )  # .chunk(
         # {"time": 64, "lat": 480, "lon": 480}
         # )  # chunk the data for saving
+        print("output ds", ds)
 
         ds = ds.rename({"lat": "latitude", "lon": "longitude"})
         ds.to_zarr(
