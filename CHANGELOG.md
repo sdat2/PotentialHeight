@@ -1,5 +1,6 @@
 v0.1.2:
 - Improved logic for filling in temperature and humidity profile.
+- Improved the potential size calculation in `w22.ps` so that both potential sizes can be calculated together.
 
 v0.1.1:
 - Added `tcpips/ibtracs.py` script to compare observations with potential sizes and potential intensity calculated from `era5` monthly averages (all post 1980).
