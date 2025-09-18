@@ -1376,6 +1376,9 @@ def calculate_potential_sizes(
         None: This function saves the results to a zarr file.
     """
     ds = get_all_data(start_year=start_year, end_year=end_year)
+    if ds is None:
+        print("No ERA5 data found. Please run era5_pi() first.")
+        return
 
     # just select -40 to 40 latitude, August for NH and February for SH
     if "valid_time" in ds.dims:
@@ -1383,9 +1386,6 @@ def calculate_potential_sizes(
     ds = mon_increase(select_seasonal_hemispheric_data(ds, months_to_average=1)).sel(
         latitude=slice(-40, 40)
     )
-    if ds is None:
-        print("No ERA5 data found. Please run era5_pi() first.")
-        return
     ds = ds.rename({"latitude": "lat", "longitude": "lon"})
     # currently I'm assuming that the data does not need to be converted
     # delete the unnecessary volume variables
@@ -1395,7 +1395,7 @@ def calculate_potential_sizes(
     # ds = convert(ds)
     ds = ds.rename({"vmax": "vmax_3"})
     ds["vmax_1"] = (ds.vmax_3.dims, np.ones(ds.vmax_3.shape) * 33 / 0.8)
-    ds = ds.chunk({"lat": 16, "lon": 30, "year": 1})
+    ds = ds.chunk({"lat": 1, "lon": 2, "year": 1})
 
     print("input ds", ds)
     output_file = os.path.join(
