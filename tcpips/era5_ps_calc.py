@@ -80,14 +80,22 @@ if __name__ == "__main__":
     # Connect to the cluster
     client = Client()
 
+    print(f"Dask dashboard link: {client.dashboard_link}")
+    print(f"Client info: {client}")
+    print(f"Cluster info: {client.cluster}")
+    print(f"Scheduler info: {client.scheduler_info()}")
+    print(f"Workers info: {client.scheduler_info()['workers']}")
+
+    print("\n--- Starting main computation ---")
+
     # Run your main computation
     start_time = time.perf_counter()
     # final_result = process_large_dataset(client, size=50000)
     # run_ps_calc(client, start_year=1980, end_year=1989)
     # run_ps_calc(client, start_year=1990, end_year=1999)
-    run_ps_calc(client, start_year=2000, end_year=2009)
-    run_ps_calc(client, start_year=2010, end_year=2019)
+    # run_ps_calc(client, start_year=2000, end_year=2009)
+    # run_ps_calc(client, start_year=2010, end_year=2019)
+    run_ps_calc(client, start_year=2020, end_year=2024, dry_run=False)
     end_time = time.perf_counter()
-
     # print(f"\nFinal Result: {final_result:.4f}")
     print(f"Total execution time: {end_time - start_time:.2f} seconds.")

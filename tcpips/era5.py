@@ -7,6 +7,7 @@ The script is designed to download the data to calculate potential intensity (PI
 """
 
 import os
+import uuid
 import shutil
 import cdsapi
 from typing import List, Literal, Optional
@@ -1400,7 +1401,7 @@ def calculate_potential_sizes(
     output_file = os.path.join(
         ERA5_PS_OG_PATH, f"era5_potential_sizes_{start_year}_{end_year}.zarr"
     )
-    tmp_file = output_file + ".tmp"
+    tmp_file = output_file + "." + str(uuid.uuid4().hex) + ".tmp"
     if not dry_run:
         ds = parallelized_ps13_dask(
             ds  # .chunk({"time": 64, "lat": 480, "lon": 480})
@@ -1414,16 +1415,13 @@ def calculate_potential_sizes(
             mode="w",
             consolidated=True,
         )
-        if os.path.exists(output_file):  # get rid of old file
+        if os.path.exists(output_file):  # get rid of old file (but only if the new one worked)
             shutil.rmtree(output_file)
         os.rename(tmp_file, output_file)
         print(f"Successfully saved to {output_file}")
     else:
         print("Dry run, not actually calculating potential sizes.")
         print(f"Would have saved to {output_file}")
-    # First potential size corresponding to the potential intensity velocity -- needs vmax, t0, sst, t2
-
-    # Then calculate the potential size corresponding to the lower limit of category 1 which is 33 m/s --
 
 
 @timeit
