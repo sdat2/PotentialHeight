@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=era5-00s-big
+#SBATCH --job-name=era5-20s-big
 #SBATCH --nodes=10
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1

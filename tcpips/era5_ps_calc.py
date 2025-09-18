@@ -53,7 +53,7 @@ def run_ps_calc(client: Client, start_year=1980, end_year=1989) -> None:
     """
     num_workers = len(client.scheduler_info()["workers"])
     print(f"Starting computation on a Dask cluster with {num_workers} workers.")
-    calculate_potential_sizes(start_year=start_year, end_year=end_year)
+    calculate_potential_sizes(start_year=start_year, end_year=end_year, dry_run=False)
     print("Computation finished successfully.")
     return None
 
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     # run_ps_calc(client, start_year=1990, end_year=1999)
     # run_ps_calc(client, start_year=2000, end_year=2009)
     # run_ps_calc(client, start_year=2010, end_year=2019)
-    run_ps_calc(client, start_year=2020, end_year=2024, dry_run=False)
+    run_ps_calc(client, start_year=2020, end_year=2024)
     end_time = time.perf_counter()
     # print(f"\nFinal Result: {final_result:.4f}")
     print(f"Total execution time: {end_time - start_time:.2f} seconds.")
