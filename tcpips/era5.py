@@ -1440,7 +1440,7 @@ def calculate_potential_sizes(
     # ds = convert(ds)
     ds = ds.rename({"vmax": "vmax_3"})
     ds["vmax_1"] = (ds.vmax_3.dims, np.ones(ds.vmax_3.shape) * 33 / 0.8)
-    ds = ds.chunk({"lat": 5, "lon": 5, "year": 1})
+    ds = ds.chunk({"lat": 16, "lon": 30, "year": 1})
 
     print("input ds", ds)
     output_file = os.path.join(
