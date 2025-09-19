@@ -3,7 +3,6 @@ import dask
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 
-# Assuming this function is in your project and does the actual work
 from tcpips.era5 import calculate_potential_sizes
 
 # --- Dask Memory Configuration ---
