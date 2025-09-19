@@ -1374,18 +1374,27 @@ def rechunk_file(
     """
     ds = xr.open_zarr(file_name, chunks="auto")
     print("Original chunks:", ds.chunks)
-    ds = ds.chunk(new_chunks)
-    print("New chunks:", ds.chunks)
+    ds_rechunked = ds.chunk(new_chunks)
+
+    # 3. **THE FIX**: Loop through all variables and remove the old chunk encoding
+    for var in ds_rechunked.variables:
+        if "chunks" in ds_rechunked[var].encoding:
+            del ds_rechunked[var].encoding["chunks"]
+
+    print("New chunks:", ds_rechunked.chunks)
     temp_path = file_name + "." + str(uuid.uuid4().hex) + ".tmp"
     print(f"Rechunking and saving to temporary file {temp_path}...")
     try:
         with ProgressBar():
-            ds.to_zarr(temp_path, mode="w", consolidated=True)
+            ds_rechunked.to_zarr(temp_path, mode="w", consolidated=True)
 
         if os.path.exists(file_name):
+            print(f"Removing old file {file_name}...")
             shutil.rmtree(file_name)
+            print(f"Removed old file {file_name}.")
 
-        os.rename(temp_path, file_name + ".new")
+        print(f"Renaming {temp_path} to {file_name}...")
+        os.rename(temp_path, file_name)
         print(f"Successfully rechunked and saved to {file_name}")
 
     except Exception as e:
