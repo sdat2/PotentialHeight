@@ -39,7 +39,7 @@ cluster = SLURMCluster(
 )
 
 print("Scaling cluster to 50 nodes...")
-cluster.scale(nodes=10)
+cluster.scale(jobs=10)
 
 # Connect a client to the cluster
 client = Client(cluster)

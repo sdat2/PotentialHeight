@@ -1358,6 +1358,42 @@ def plot_trend_lineplots(
     )
 
 
+def rechunk_file(
+    file_name,
+    new_chunks={
+        "year": -1,  # Keep all years in one chunk
+        "latitude": 321,  # Keep all latitudes in one chunk
+        "longitude": 720,  # Split longitude into 2 chunks (1440/720=2)
+    },
+):
+    """Rechunk a zarr file to have larger chunks for latitude and longitude.
+
+    Args:
+        file_name (str): The path to the zarr file to rechunk.
+        new_chunks (dict, optional): The new chunk sizes. Defaults to {"year": -1, "latitude": 321, "longitude": 720}.
+    """
+    ds = xr.open_zarr(file_name, chunks="auto")
+    print("Original chunks:", ds.chunks)
+    ds = ds.chunk(new_chunks)
+    print("New chunks:", ds.chunks)
+    temp_path = file_name + "." + str(uuid.uuid4().hex) + ".tmp"
+    print(f"Rechunking and saving to temporary file {temp_path}...")
+    try:
+        with ProgressBar():
+            ds.to_zarr(temp_path, mode="w", consolidated=True)
+
+        if os.path.exists(file_name):
+            shutil.rmtree(file_name)
+
+        os.rename(temp_path, file_name)
+        print(f"Successfully rechunked and saved to {file_name}")
+
+    except Exception as e:
+        print(f"Failed to rechunk data. Error: {e}")
+        shutil.rmtree(temp_path)  # Clean up on failure
+        raise
+
+
 def calculate_potential_sizes(
     start_year: int = DEFAULT_START_YEAR,
     end_year: int = DEFAULT_END_YEAR,
@@ -1416,10 +1452,25 @@ def calculate_potential_sizes(
             mode="w",
             consolidated=True,
         )
-        if os.path.exists(output_file):  # get rid of old file (but only if the new one worked)
+        print(f"Successfully saved to temporary file {tmp_file}")
+        if os.path.exists(
+            output_file
+        ):  # get rid of old file (but only if the new one worked)
+            print(f"Removing old file {output_file}...")
             shutil.rmtree(output_file)
+            print(f"Removed old file {output_file}.")
+        print(f"Renaming {tmp_file} to {output_file}...")
         os.rename(tmp_file, output_file)
         print(f"Successfully saved to {output_file}")
+
+        rechunk_file(
+            output_file,
+            new_chunks={
+                "year": -1,  # Keep all years in one chunk
+                "latitude": 321,  # Keep all latitudes in one chunk
+                "longitude": 720,  # Split longitude into 2 chunks (1440/720=2
+            },
+        )
     else:
         print("Dry run, not actually calculating potential sizes.")
         print(f"Would have saved to {output_file}")
@@ -1724,38 +1775,46 @@ if __name__ == "__main__":
     # time to emergence - signal to noise  - variable record with nonstationarity - how long until new properties are 2 sigma. Perhaps you need to assume standard deviation constant.
     # Ed Hawkins?
     #
-    dask_cluster_wrapper(
-        calculate_potential_sizes,
-        start_year=DEFAULT_START_YEAR,
-        end_year=DEFAULT_START_YEAR + 9,
-        dry_run=True,
-    )  # This will take a long time to run.
-    dask_cluster_wrapper(
-        calculate_potential_sizes,
-        start_year=DEFAULT_START_YEAR + 10,
-        end_year=DEFAULT_START_YEAR + 19,
-        dry_run=True,
-    )
-    dask_cluster_wrapper(
-        calculate_potential_sizes,
-        start_year=DEFAULT_START_YEAR + 20,
-        end_year=DEFAULT_START_YEAR + 29,
-        dry_run=True,
-    )
-    dask_cluster_wrapper(
-        calculate_potential_sizes,
-        start_year=DEFAULT_START_YEAR + 30,
-        end_year=DEFAULT_START_YEAR + 39,
-        dry_run=True,
-    )
-    dask_cluster_wrapper(
-        calculate_potential_sizes,
-        start_year=DEFAULT_START_YEAR + 40,
-        end_year=DEFAULT_END_YEAR,
-        dry_run=True,
-    )
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR,
+    #     end_year=DEFAULT_START_YEAR + 9,
+    #     dry_run=True,
+    # )  # This will take a long time to run.
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR + 10,
+    #     end_year=DEFAULT_START_YEAR + 19,
+    #     dry_run=True,
+    # )
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR + 20,
+    #     end_year=DEFAULT_START_YEAR + 29,
+    #     dry_run=True,
+    # )
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR + 30,
+    #     end_year=DEFAULT_START_YEAR + 39,
+    #     dry_run=True,
+    # )
+    # dask_cluster_wrapper(
+    #     calculate_potential_sizes,
+    #     start_year=DEFAULT_START_YEAR + 40,
+    #     end_year=DEFAULT_END_YEAR,
+    #     dry_run=True,
+    # )
     # calculate_potential_sizes(
     #     start_year=DEFAULT_START_YEAR, end_year=DEFAULT_START_YEAR + 9
     # )  # This will take a long time to run.
     # years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
     # regrid_all(years)
+    rechunk_file(
+        os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_2020_2024.zarr"),
+        new_chunks={
+            "year": -1,
+            "latitude": 321,  # Keep all latitudes in one chunk
+            "longitude": 720,  # Split longitude into 2 chunks (1440/720=2)
+        },
+    )
