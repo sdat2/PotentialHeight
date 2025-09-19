@@ -4,6 +4,7 @@ so we use dask to parallelize the work,
 ideally across many nodes on the Archer2 cluster.
 """
 import time
+import argparse
 import xarray as xr
 import numpy as np
 import dask
@@ -59,7 +60,25 @@ def run_ps_calc(client: Client, start_year=1980, end_year=1989) -> None:
 
 
 if __name__ == "__main__":
-    # python -m tcpips.era5_ps_calc
+    # python -m tcpips.era5_ps_calc --start_year 2000 --end_year 2009
+    # srun python -u /work/n02/n02/sdat2/adcirc-swan/worstsurge/tcpips/era5_ps_calc.py --start_year 2000 --end_year 2009
+    parser = argparse.ArgumentParser(
+        description="Run potential size calculation with Dask."
+    )
+    parser.add_argument(
+        "--start_year",
+        type=int,
+        default=2000,
+        help="Start year for the calculation (default: 2000)",
+    )
+    parser.add_argument(
+        "--end_year",
+        type=int,
+        default=2009,
+        help="End year for the calculation (default: 2009)",
+    )
+    args = parser.parse_args()
+    print(f"Running potential size calculation from {args.start_year} to {args.end_year}")
     # --- Dask Memory Configuration ---
     # This is the key to preventing memory issues with Lustre.
     # We tell Dask to leave a 30-40% buffer for the OS file cache.
@@ -93,7 +112,7 @@ if __name__ == "__main__":
     # final_result = process_large_dataset(client, size=50000)
     # run_ps_calc(client, start_year=1980, end_year=1989)
     # run_ps_calc(client, start_year=1990, end_year=1999)
-    run_ps_calc(client, start_year=2000, end_year=2009)
+    run_ps_calc(client, start_year=args.start_year, end_year=args.end_year)
     # run_ps_calc(client, start_year=2010, end_year=2019)
     # run_ps_calc(client, start_year=2010, end_year=2024)
     end_time = time.perf_counter()

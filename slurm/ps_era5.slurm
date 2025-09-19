@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=era5-00s-big
+#SBATCH --job-name=era5-80s-big
 #SBATCH --nodes=20
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -36,5 +36,5 @@ export MPLCONFIGDIR="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/tmp/.matplotlib"
 mkdir -p $MPLCONFIGDIR
 
 echo "Starting dask-mpi job on nodes..."
-srun python -u /work/n02/n02/sdat2/adcirc-swan/worstsurge/tcpips/era5_ps_calc.py
+srun python -u /work/n02/n02/sdat2/adcirc-swan/worstsurge/tcpips/era5_ps_calc.py --start_year 1980 --end_year 1989
 echo "Job finished."
