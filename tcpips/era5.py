@@ -1359,13 +1359,13 @@ def plot_trend_lineplots(
 
 
 def rechunk_file(
-    file_name,
-    new_chunks={
+    file_name: str,
+    new_chunks: dict = {
         "year": -1,  # Keep all years in one chunk
         "latitude": 321,  # Keep all latitudes in one chunk
         "longitude": 720,  # Split longitude into 2 chunks (1440/720=2)
     },
-):
+) -> None:
     """Rechunk a zarr file to have larger chunks for latitude and longitude.
 
     Args:
@@ -1385,7 +1385,7 @@ def rechunk_file(
         if os.path.exists(file_name):
             shutil.rmtree(file_name)
 
-        os.rename(temp_path, file_name)
+        os.rename(temp_path, file_name + ".new")
         print(f"Successfully rechunked and saved to {file_name}")
 
     except Exception as e:
