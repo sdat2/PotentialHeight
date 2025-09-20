@@ -1123,21 +1123,38 @@ def plot_snapshot_map(year=2020) -> None:
     )
     ds = ds.sel(year=year)
     ds = ds.chunk({"latitude": -1, "longitude": -1}).compute()
-    vars = ["sst", "vmax_3", "r0_3", "rmax_3", "rmax_1"]
-    long_names = ["$T_s$", "$V_p$", "$r_{a3}$", "$r_{3}$", "$r_{1}$"]
+    vars = [
+        "sst",
+        "t0",
+        "otl",
+        "vmax_3",
+        # "r0_3",
+        "rmax_3",
+        "rmax_1",
+    ]
+    long_names = [
+        "Sea surface temperature, $T_s$",
+        "Outflow temperature, $T_o$",
+        "Outflow level, $z_{o}$",
+        "Potential intensity, $V_p$",
+        "PI potential inner size, $r_{3}$",
+        "Cat1 potential inner size, $r_{1}$",
+    ]  # "$r_{a3}$",
     plot_defaults()
     fig, axs = plt.subplots(
         len(vars),
         1,
         sharex=True,
         sharey=True,
-        figsize=get_dim(ratio=1.0),
+        figsize=get_dim(ratio=1.5),
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
     for i, var in enumerate(vars):
         if "r" in var:
             ds[var] = ds[var] / 1000.0  # convert to km
             ds[var].attrs["units"] = "km"
+        if var == "sst":
+            ds[var].attrs["units"] = "$^\circ$C"
         print(f"Plotting {var}...")
         plot_var_on_map(
             axs[vars.index(var)],
