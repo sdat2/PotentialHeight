@@ -1116,6 +1116,46 @@ def find_tropical_m(
     print(trend_ds["m"].median())
 
 
+def plot_snapshot_map(year=2020) -> None:
+    """Plot a snapshot map of sst, vmax_3, rmax_3, r0_3, rmax_1, from the processed ERA5 potential sizes data."""
+    ds = xr.open_zarr(
+        os.path.join(ERA5_PS_OG_PATH, "era5_potential_sizes_2020_2024.zarr")
+    )
+    ds = ds.sel(year=year)
+    ds = ds.chunk({"latitude": -1, "longitude": -1}).compute()
+    vars = ["sst", "vmax_3", "r0_3", "rmax_3", "rmax_1"]
+    long_names = ["$T_s$", "$V_p$", "$r_{a3}$", "$r_{3}$", "$r_{1}$"]
+    plot_defaults()
+    fig, axs = plt.subplots(
+        len(vars),
+        1,
+        sharex=True,
+        sharey=True,
+        figsize=get_dim(ratio=1.0),
+        subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
+    )
+    for i, var in enumerate(vars):
+        if "r" in var:
+            ds[var] = ds[var] / 1000.0  # convert to km
+            ds[var].attrs["units"] = "km"
+        print(f"Plotting {var}...")
+        plot_var_on_map(
+            axs[vars.index(var)],
+            ds[var],
+            label=f"{long_names[i]} [{ds[var].attrs.get('units', '')}]",
+            cmap="cmo.thermal" if var == "sst" else "cmo.haline",
+            vmin=ds[var].quantile(0.01),
+            vmax=ds[var].quantile(0.90),
+        )
+    label_subplots(axs)  # , override="outside")
+    plt.tight_layout()
+    plt.savefig(
+        os.path.join(ERA5_FIGURE_PATH, f"era5_potential_sizes_{year}.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+
+
 def plot_trend_maps(
     start_year: int = DEFAULT_START_YEAR,
     end_year: int = DEFAULT_END_YEAR,
@@ -1819,11 +1859,13 @@ if __name__ == "__main__":
     # )  # This will take a long time to run.
     # years = [str(year) for year in range(1940, DEFAULT_END_YEAR + 1)]
     # regrid_all(years)
-    rechunk_file(
-        os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_2020_2024.zarr"),
-        new_chunks={
-            "year": -1,
-            "latitude": 321,  # Keep all latitudes in one chunk
-            "longitude": 720,  # Split longitude into 2 chunks (1440/720=2)
-        },
-    )
+    # rechunk_file(
+    #     os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_2020_2024.zarr"),
+    #     new_chunks={
+    #         "year": -1,
+    #         "latitude": 321,  # Keep all latitudes in one chunk
+    #         "longitude": 720,  # Split longitude into 2 chunks (1440/720=2)
+    #     },
+    # )
+
+    plot_snapshot_map(year=2020)
