@@ -413,10 +413,12 @@ def plot_spatials(
     pi_version: int = 4,
     trial=1,
     pressure_assumption="isothermal",
+    model: str = "HADGEM3-GC31-MM",
+    member: str = "r1i1p1f3",
 ) -> None:
     assert len(axs) == len(vars)
 
-    name = f"august_cmip6_{'MIROC6'}_{'r1i1p1f1'}_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
+    name = f"august_cmip6_{model}_{member}_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in {"new_orleans", "galverston", "miami"}:
         name = "gom_" + name
@@ -589,6 +591,7 @@ def plot_timeserii(
         "PI potential inner size, $r_{3}$ [km]",
         "Cat1 potential inner size, $r_{1}$ [km]",
     ),
+    linewidth: float = 0.5,
     color: str = "black",
     member: int = 4,
     model: str = "CESM2",
@@ -600,13 +603,16 @@ def plot_timeserii(
 ) -> None:
     assert len(axs) == len(vars)
     assert len(labels) == len(vars)
-    ds = get_cmip6_timeseries(
-        place=place,
-        pressure_assumption=pressure_assumption,
-        member=member,
-        model=model,
-        pi_version=pi_version,
-    )
+    if model == "ERA5":
+        ds = get_era5_timeseries(place=place, pi_version=pi_version)
+    else:
+        ds = get_cmip6_timeseries(
+            place=place,
+            pressure_assumption=pressure_assumption,
+            member=member,
+            model=model,
+            pi_version=pi_version,
+        )
     for i in range(len(vars)):
         axs[i].set_title(vars[i])
         var_np = ds[vars[i]].values
@@ -620,7 +626,7 @@ def plot_timeserii(
             ds["time"].values,
             var_np,
             color=color,
-            linewidth=0.5,
+            linewidth=linewidth,
             alpha=0.5,
         )
         axs[i].set_title(labels[i])
@@ -732,10 +738,9 @@ def get_era5_timeseries(place: str = "new_orleans", pi_version: int = 4) -> xr.D
         return times.astype("datetime64[Y]").astype(int) + 1970
 
     timeseries_ds = xr.open_dataset(
-        os.path.join(
-            DATA_PATH, f"{place}_august_era5_{'isothermal'}_pi{pi_version}new.nc"
-        )
+        os.path.join(DATA_PATH, f"{place}_august_era5_{'isothermal'}.nc")
     )
+    print("loading era5 timeseries", timeseries_ds)
     return timeseries_ds.assign_coords(
         time=_years_from_times(timeseries_ds["time"].values)
     )
@@ -758,17 +763,17 @@ def plot_era5_timeseries(
     assert len(axs) == 2
     timeseries_ds = get_era5_timeseries(place, pi_version)
     axs[0].set_title("Potential intensity, $V_{p}$ [m s$^{-1}$]")
-    axs[1].set_title("Potential size, $r_a$ [km]")
+    axs[1].set_title("Potential size, $r_{a3}$ [km]")
     ## work out correlation between time and vmax between 2000 and 2099
     axs[0].plot(
         timeseries_ds["time"].values,
-        timeseries_ds["vmax"].values,
+        timeseries_ds["vmax_3"].values,
         color=color,
         linewidth=1,
     )
     axs[1].plot(
         timeseries_ds["time"].values,
-        timeseries_ds["r0"].values / 1000,
+        timeseries_ds["r0_3"].values / 1000,
         color=color,
         linewidth=1,
     )
@@ -887,6 +892,7 @@ def figure_two(place: str = "new_orleans") -> None:
 def multipanel(
     place: str = "new_orleans",
     vars: Tuple[str] = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
+    models: set = {"CESM2", "HADGEM3-GC31-MM", "MIROC6", "ERA5"},
 ):
     """Plot the multipanel figure for the CMIP6 timeseries.
 
@@ -899,50 +905,63 @@ def multipanel(
         2,
         figsize=get_dim(ratio=1.5),
     )
-    members = [4, 10, 11]
-    colors = ["orange", "green", "grey"]
     plot_spatials(axs[:, 0], place=place, vars=vars)
-    for i, member in enumerate(members):
-        plot_timeserii(
-            axs[:, 1],
-            vars=vars,
-            color="orange",
-            member=member,
-            model="CESM2",
-            pressure_assumption="isothermal",
-            place=place,
-            pi_version=4,
-            year_min=2014,
-            year_max=2100,
-        )
+    if "CESM2" in models:
+        members = [4, 10, 11]
+        for i, member in enumerate(members):
+            plot_timeserii(
+                axs[:, 1],
+                vars=vars,
+                color="orange",
+                member=member,
+                model="CESM2",
+                pressure_assumption="isothermal",
+                place=place,
+                pi_version=4,
+                year_min=2014,
+                year_max=2100,
+            )
+    if "HADGEM3-GC31-MM" in models:
+        members = ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3"]
+        for i, member in enumerate(members):
+            plot_timeserii(
+                axs[:, 1],
+                vars=vars,
+                color="green",
+                member=member,
+                model="HADGEM3-GC31-MM",
+                pressure_assumption="isothermal",
+                place=place,
+                pi_version=4,
+                year_min=2014,
+                year_max=2100,
+            )
+    if "MIROC6" in models:
+        members = ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"]
+        for i, member in enumerate(members):
+            plot_timeserii(
+                axs[:, 1],
+                vars=vars,
+                color="grey",
+                member=member,
+                model="MIROC6",
+                pressure_assumption="isothermal",
+                place=place,
+                pi_version=4,
+                year_min=2014,
+                year_max=2100,
+            )
 
-    members = ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3"]
-    for i, member in enumerate(members):
+    if "ERA5" in models:
         plot_timeserii(
             axs[:, 1],
             vars=vars,
-            color="green",
-            member=member,
-            model="HADGEM3-GC31-MM",
-            pressure_assumption="isothermal",
+            color="blue",
+            member="era5",
+            model="ERA5",
+            linewidth=1,
             place=place,
             pi_version=4,
-            year_min=2014,
-            year_max=2100,
-        )
-    members = ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"]
-    for i, member in enumerate(members):
-        plot_timeserii(
-            axs[:, 1],
-            vars=vars,
-            color="grey",
-            member=member,
-            model="MIROC6",
-            pressure_assumption="isothermal",
-            place=place,
-            pi_version=4,
-            year_min=2014,
-            year_max=2100,
         )
 
     label_subplots(axs)
@@ -1262,4 +1281,4 @@ if __name__ == "__main__":
     #     members=[4, 10],
     # )
     multipanel(place="new_orleans")
-    multipanel(place="hong_kong")
+    multipanel(place="hong_kong", models={"HADGEM3-GC31-MM", "MIROC6", "ERA5"})

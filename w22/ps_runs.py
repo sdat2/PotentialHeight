@@ -491,51 +491,59 @@ def point_era5_timeseries(
         place (str, optional): location. Defaults to "new_orleans".
         pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
     """
-    point_ds = (
-        get_all_regridded_data(
-            start_year=1940,
-            end_year=2024,
-        )
-        .sel(
-            lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
-            lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
-            method="nearest",
-        )
-        .compute()
+    point_ds = get_all_regridded_data(
+        start_year=1940,
+        end_year=2024,
+    ).sel(
+        lon=OFFSET_D[place]["point"].lon + OFFSET_D[place]["lon_offset"],
+        lat=OFFSET_D[place]["point"].lat + OFFSET_D[place]["lat_offset"],
+        method="nearest",
     )
-    print("point ds era5", point_ds)
-    point_ds = point_ds.rename({"pressure_level": "p"})
-    print("point ds", point_ds)
-    if point_ds["t"].max().values > 100:
-        point_ds["t"].attrs["units"] = "K"
-    elif point_ds["t"].max().values <= 100:
-        point_ds["t"].attrs["units"] = "degC"
-    point_ds["t"].attrs["units"] = "K"
-    if point_ds["q"].max().values > 10:
-        point_ds["q"].attrs["units"] = "g/kg"
-    elif point_ds["q"].max().values <= 1:
-        point_ds["q"].attrs["units"] = "kg/kg"
-
+    print("point ds era5 after load", point_ds)
+    point_ds = point_ds.rename({"pressure_level": "p"}).isel(
+        time=[i for i in range(7, len(point_ds.time.values), 12)]
+    )
     if "rh" not in point_ds:
         rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
         point_ds["rh"] = rh
 
-    print("trimmed_ds", trimmed_ds)
+    print("point ds era5 after selecting august", point_ds)
+    #         .compute()
+    # print("point ds", point_ds)
+    # if point_ds["t"].max().values > 100:
+    #     point_ds["t"].attrs["units"] = "K"
+    # elif point_ds["t"].max().values <= 100:
+    #     point_ds["t"].attrs["units"] = "degC"
+    # point_ds["t"].attrs["units"] = "K"
+    # if point_ds["q"].max().values > 10:
+    #     point_ds["q"].attrs["units"] = "g/kg"
+    # elif point_ds["q"].max().values <= 1:
+    #     point_ds["q"].attrs["units"] = "kg/kg"
+
     # select august data from every year of timeseries xarray
-    trimmed_ds = trimmed_ds.isel(
-        time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
+    # point_ds = point_ds  # .isel(
+    # time=[i for i in range(7, len(trimmed_ds.time.values), 12)]
+    # )
+    point_ds = point_ds.rename({"vmax": "vmax_3"})
+    point_ds["vmax_1"] = (
+        point_ds["vmax_3"].dims,
+        CAT_1_WIND_SPEED * np.ones_like(point_ds["vmax_3"]),
     )
-    trimmed_ds = trimmed_ds.rename({"vmax": "vmax_3"})
-    trimmed_ds["vmax_1"] = (
-        out_ds["vmax_3"].dims,
-        CAT_1_WIND_SPEED * np.ones_like(trimmed_ds["vmax_3"]),
-    )
-    out_ds = parallelized_ps13_dask(trimmed_ds)
+    del point_ds["t"]
+    del point_ds["q"]
+    del point_ds["p"]
+    print("point ds before ps calculation", point_ds)
+    point_ds = point_ds.chunk({"time": 1})
+    print("point ds after chunking", point_ds)
+    out_ds = parallelized_ps13_dask(point_ds)  # expensive function
+    print("out_ds", out_ds)
+
     out_ds.to_netcdf(
         os.path.join(
             DATA_PATH,
-            f"{place}_august_era5_{pressure_assumption}_pi4new.nc",
-        )
+            f"{place}_august_era5_{pressure_assumption}.nc",
+        ),
+        engine="h5netcdf",
     )
 
 
@@ -628,15 +636,18 @@ if __name__ == "__main__":
     #     model="HADGEM3-GC31-MM",
     #     member="r1i1p1f3",
     # )
-    dask_cluster_wrapper(
-        spatial_example,
-        place="new_orleans",
-        pressure_assumption="isothermal",
-        trial=1,
-        pi_version=4,
-        model="HADGEM3-GC31-MM",
-        member="r1i1p1f3",
-    )
+    # dask_cluster_wrapper(
+    #     spatial_example,
+    #     place="new_orleans",
+    #     pressure_assumption="isothermal",
+    #     trial=1,
+    #     pi_version=4,
+    #     model="HADGEM3-GC31-MM",
+    #     member="r1i1p1f3",
+    # )
+
+    dask_cluster_wrapper(point_era5_timeseries, place="hong_kong")
+    dask_cluster_wrapper(point_era5_timeseries, place="new_orleans")
     # spatial_example(
     #     pressure_assumption="isothermal",
     #     trial=1,
