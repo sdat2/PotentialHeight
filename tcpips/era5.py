@@ -1242,8 +1242,8 @@ def find_tropical_m(
 
 def plot_snapshot_map(year=2020) -> None:
     """Plot a snapshot map of sst, vmax_3, rmax_3, r0_3, rmax_1, from the processed ERA5 potential sizes data."""
-    ds = xr.open_zarr(
-        os.path.join(ERA5_PS_OG_PATH, "era5_potential_sizes_2020_2024.zarr")
+    ds = xr.open_mfdataset(
+        os.path.join(ERA5_PS_OG_PATH, "era5_potential_sizes_*.zarr"), engine="zarr"
     )
     ds = ds.sel(year=year)
     ds = ds.chunk({"latitude": -1, "longitude": -1}).compute()
@@ -1289,11 +1289,11 @@ def plot_snapshot_map(year=2020) -> None:
             vmax=ds[var].quantile(0.90),
         )
     label_subplots(axs)  # , override="outside")
-    plt.tight_layout()
+    # plt.tight_layout()
     plt.savefig(
         os.path.join(ERA5_FIGURE_PATH, f"era5_potential_sizes_{year}.pdf"),
         dpi=300,
-        bbox_inches="tight",
+        # bbox_inches="tight",
     )
 
 
@@ -2042,7 +2042,7 @@ if __name__ == "__main__":
     #     },
     # )
 
-    # plot_snapshot_map(year=2020)
+    plot_snapshot_map(year=2020)
     # "../data/era5/ps_og/*.zarr"
     # ds = xr.open_mfdataset(
     #     os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_*.zarr"),

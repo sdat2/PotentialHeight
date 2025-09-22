@@ -357,8 +357,25 @@ def parallelized_ps13_dask(ds: xr.Dataset) -> xr.Dataset:
     """
     Calculate potential size at category 1 intensity, and at the potential intensity.
 
+    Args:
+        ds (xr.Dataset): Must constain:
+            - "vmax_1": Minimum intensity for category 1 hurricane in m/s. Assume it is as the gradient wind level.
+            - "vmax_3": Potential intensity in m/s. Assume it is as the gradient wind level.
+            - "msl": Ambient surface pressure in mbar.
+            - "sst": Sea surface temperature in degrees Celsius.
+            - "t0": Outflow temperature in degK.
+            - "lat": Latitude in degrees North.
+
     Returns:
-        xr.Dataset:
+        xr.Dataset: Additionally contains:
+            - "r0_1": Potential outer size for category 1 hurricane in m.
+            - "pm_1": Pressure at maximum winds for minimum category 1 hurricane intensity in Pa.
+            - "pc_1": Central pressure for CLE15 profile for category 1 hurricane in Pa.
+            - "rmax_1": Potential inner size for category 1 hurricane in m.
+            - "r0_3": Potential outer size for potential intensity in m.
+            - "pm_3": Pressure at maximum winds for the potential intensity in Pa.
+            - "pc_3": Central pressure for CLE15 profile for potential intensity in Pa.
+            - "rmax_3": Potential inner size for the potential intensity in m.
     """
     # Ensure input dataset is chunked for Dask
     # ds = ds.chunk("auto")

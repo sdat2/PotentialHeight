@@ -416,7 +416,7 @@ def plot_spatials(
 ) -> None:
     assert len(axs) == len(vars)
 
-    name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
+    name = f"august_cmip6_{'MIROC6'}_{'r1i1p1f1'}_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in {"new_orleans", "galverston", "miami"}:
         name = "gom_" + name

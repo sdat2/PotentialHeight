@@ -11,7 +11,7 @@ from tcpips.pi import calculate_pi
 from tcpips.convert import convert
 from tcpips.era5 import get_all_regridded_data
 from .utils import qtp2rh
-from .ps import parallelized_ps, parallelized_ps13_dask
+from .ps import parallelized_ps13_dask
 from .constants import DATA_PATH, OFFSET_D
 
 CAT_1_WIND_SPEED = (
@@ -80,8 +80,10 @@ def get_regional_processed_data(place="new_orleans") -> xr.Dataset:
 @timeit
 def spatial_example(
     pressure_assumption="isothermal",
+    model="CESM2",
     trial=1,
     pi_version=2,
+    member: str = "r4i1p1f1",
     recalculate_pi: bool = True,
     place="new_orleans",
 ) -> None:
@@ -89,6 +91,8 @@ def spatial_example(
 
     Args:
         pressure_assumption (str, optional): pressure assumption. Defaults to "isothermal".
+        model (str, optional): model name. Defaults to "CESM2".
+        member (str, optional): member number. Defaults to "r4i1p1f1".
         trial (int, optional): trial number. Defaults to 1.
         pi_version (int, optional): pi_version of the pi calculation. Defaults to 2.
         recalculate_pi (bool, optional): whether to recalculate pi. Defaults to True.
@@ -131,7 +135,7 @@ def spatial_example(
         # get the data from the example path
         ds_list = [
             xr.open_dataset(
-                os.path.join(CDO_PATH, "ssp585", typ, "CESM2", "r4i1p1f1.nc"),
+                os.path.join(CDO_PATH, "ssp585", typ, model, member + ".nc"),
                 chunks={"time": 24, "lat": 90, "lon": 90},
             )
             for typ in ["ocean", "atmos"]
@@ -159,7 +163,8 @@ def spatial_example(
         )
         ds["vmax"] = ds_pi["vmax"]
         ds["t0"] = ds_pi["t0"]
-        ds["rh"] = ds["rh"] / 100  # convert to dimensionless
+        if ds["rh"].max().values > 1:
+            ds["rh"] = ds["rh"] / 100  # convert to dimensionless
         ds["rh"].attrs["units"] = "dimensionless"
         in_ds = ds
     else:
@@ -196,7 +201,7 @@ def spatial_example(
     out_ds = parallelized_ps13_dask(in_ds)
     print("output ds from ps calculation", out_ds)
 
-    name = f"august_cmip6_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
+    name = f"august_cmip6_{model}_{member}_pi{pi_version}_{pressure_assumption}_trial{trial}.nc"
 
     if place in ["new_orleans", "galverston", "miami"]:
         name = "gom_" + name
@@ -348,8 +353,19 @@ def load_global(year: int = 2015) -> xr.Dataset:
 
 
 def get_processed_data_for_point(
-    place="new_orleans", member="r10i1p1f1", model="CESM2", exp="ssp585"
+    place: str = "new_orleans",
+    member: str = "r10i1p1f1",
+    model: str = "CESM2",
+    exp: str = "ssp585",
 ):
+    """Get processed data for a specific point.
+
+    Args:
+        place (str, optional): place to get data for. Defaults to "new_orleans".
+        member (str, optional): member number. Defaults to "r10i1p1f1".
+        model (str, optional): model name. Defaults to "CESM2".
+        exp (str, optional): experiment name. Defaults to "ssp585".
+    """
     file_names = [
         os.path.join(CDO_PATH, exp, typ, model, f"{member}.nc")
         for typ in ["ocean", "atmos"]
@@ -500,9 +516,9 @@ def point_era5_timeseries(
     elif point_ds["q"].max().values <= 1:
         point_ds["q"].attrs["units"] = "kg/kg"
 
-    rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
-    trimmed_ds = point_ds[["sst", "msl", "vmax", "t0"]]
-    trimmed_ds["rh"] = rh
+    if "rh" not in point_ds:
+        rh = qtp2rh(point_ds["q"], point_ds["t"], point_ds["msl"])
+        point_ds["rh"] = rh
 
     print("trimmed_ds", trimmed_ds)
     # select august data from every year of timeseries xarray
@@ -594,12 +610,32 @@ if __name__ == "__main__":
 
     # dask_cluster_wrapper(ps_for_place, "new_orleans")
     # dask_cluster_wrapper(ps_for_place, "hong_kong")
+    # dask_cluster_wrapper(
+    #     spatial_example,
+    #     place="new_orleans",
+    #     pressure_assumption="isothermal",
+    #     trial=1,
+    #     pi_version=4,
+    #     model="MIROC6",
+    #     member="r1i1p1f1",
+    # )
+    # dask_cluster_wrapper(
+    #     spatial_example,
+    #     place="hong_kong",
+    #     pressure_assumption="isothermal",
+    #     trial=1,
+    #     pi_version=4,
+    #     model="HADGEM3-GC31-MM",
+    #     member="r1i1p1f3",
+    # )
     dask_cluster_wrapper(
         spatial_example,
-        place="hong_kong",
+        place="new_orleans",
         pressure_assumption="isothermal",
         trial=1,
         pi_version=4,
+        model="HADGEM3-GC31-MM",
+        member="r1i1p1f3",
     )
     # spatial_example(
     #     pressure_assumption="isothermal",
