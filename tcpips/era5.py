@@ -908,6 +908,130 @@ def trend_with_neweywest_full(
     return slope, intercept, p_value
 
 
+def era5_ps_trends(
+    start_year: int = DEFAULT_START_YEAR,
+    end_year: int = DEFAULT_END_YEAR,
+) -> None:
+    """
+    Let's find the linear trends in the potential intensity
+
+    Args:
+        start_year (int, optional): The start year for the analysis. Defaults to DEFAULT_START
+        end_year (int, optional): The end year for the analysis. Defaults to DEFAULT_END_YEAR.
+    """
+    # load all the decades of data for potential intensity
+    pi_vars = [
+        "vmax_3",
+        "t0",
+        "otl",
+        "sst",
+        "msl",
+        "rh",
+        "rmax_1",
+        "rmax_3",
+        "r0_1",
+        "r0_3",
+    ]  # [x for x in ds.variables]
+
+    ds = xr.open_mfdataset(
+        os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_*.zarr"),
+        chunks="auto",
+        engine="zarr",
+    )
+    if ds is None:
+        print("No ERA5 PI data found. Please run era5_pi() first.")
+        return
+
+    # print(ds)
+    # sst_ds = preprocess_single_level_data(
+    #     get_era5_combined(start_year=start_year, end_year=end_year)
+    # )["sst"]
+    # print("sst_ds", sst_ds)
+    # # ds["sst"] = sst_ds["sst"]
+    # # lets just select the augusts in the northern hemisphere
+    # ds["sst"] = sst_ds
+    # ds = mon_increase(ds.sel(time=ds.time.dt.month == 8))  # .sel(latitude=slice(0, 30))
+    print("Calculating trends in potential intensity...")
+    print(ds)
+    # calculate the linear trends in potential intensity
+    # let's replace the time axis with the year
+    new_year = ds.year - ds.year.min()
+    assert len(new_year) > 20, "Not enough time points to calculate trends."
+    ds = ds.assign_coords(year=new_year)
+    ds = ds.chunk({"year": -1})  # all time in one chunk
+    print("new rechunked ds", ds)
+
+    print("New time coordinates:", ds.year.values)
+    print("Calculating trends in potential intensity...")
+
+    # pi_vars = ["vmax", "t0", "otl", "sst"]
+    trend_ds = ds[pi_vars].polyfit(dim="year", deg=1, cov=True)
+    # let's go through and work out the hatch mask for each variable
+
+    for var in pi_vars:
+        cov_n = var + "_polyfit_covariance"
+        trend_n = var + "_polyfit_coefficients"
+        if var + "_polyfit_covariance" in trend_ds:
+            frac_error = np.abs(
+                np.sqrt(
+                    trend_ds[cov_n].isel(cov_i=0, cov_j=0)
+                )  # degree=1 is in the first position
+                / trend_ds[trend_n].sel(degree=1)
+            )
+            trend_ds[var + "_hatch_mask"] = frac_error >= 1.0
+            if np.all(trend_ds[var + "_hatch_mask"].astype(int).values == 1):
+                print(f"Warning: All values in the hatch mask for {var} are True (1).")
+        # second hatch mask from running significance test on the rise
+        results = xr.apply_ufunc(
+            trend_with_neweywest_full,
+            ds[var],
+            input_core_dims=[["year"]],
+            # Add a third empty list for the new intercept output
+            output_core_dims=[[], [], []],
+            exclude_dims=set(("year",)),
+            vectorize=True,
+            dask="parallelized",
+            # rechunk=True,
+            dask_gufunc_kwargs={"allow_rechunk": True},
+            # allow_rechunk=True,
+            output_dtypes=[float, float, float],
+        )
+
+        slope, intercept, p_value = results
+
+        # Create the final Dataset
+        new_trend_ds = xr.Dataset(
+            {"slope": slope, "intercept": intercept, "p_value": p_value}
+        )
+        trend_ds[var + "_p_value"] = new_trend_ds["p_value"]
+        trend_ds[var + "_hatch_mask_p"] = new_trend_ds["p_value"] >= 0.05
+        trend_ds[var + "_slope_nw"] = new_trend_ds["slope"]
+        trend_ds[var + "_intercept_nw"] = new_trend_ds["intercept"]
+
+    print("Saving to zarr...")
+    temp_path = tempfile.mkdtemp(
+        suffix=".zarr", dir="."
+    )  # Write temp file in current dir
+    out_path = os.path.join(
+        ERA5_PRODUCTS_PATH, f"era5_ps_trends_{start_year}_{end_year}_{1}m.zarr"
+    )
+
+    try:
+        with ProgressBar():
+            trend_ds.to_zarr(temp_path, mode="w", consolidated=True)
+
+        if os.path.exists(out_path):
+            shutil.rmtree(out_path)
+
+        os.rename(temp_path, out_path)
+        print(f"Successfully saved to {out_path}")
+
+    except Exception as e:
+        print(f"Failed to save data. Error: {e}")
+        shutil.rmtree(temp_path)  # Clean up on failure
+        raise
+
+
 # @dask_cluster_wrapper
 def era5_pi_trends(
     start_year: int = DEFAULT_START_YEAR,
@@ -1188,13 +1312,20 @@ def plot_trend_maps(
     """
     trend_ds = xr.open_dataset(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
+            ERA5_PRODUCTS_PATH, f"era5_ps_trends_{start_year}_{end_year}_{months}m.zarr"
         ),
     )
     print(trend_ds)
-    trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
-    vars = ["sst", "t0", "otl", "vmax"]  # "msl", "rh",
-    vlim = [(-0.5, 0.5), (-0.5, 0.5), (-1, 1), (-5, 5)]  # (-1, 1), (-0.1, 0.1),
+    # trend_ds = mon_increase(trend_ds).sel(latitude=slice(-40, 40))
+    vars = ["sst", "t0", "otl", "vmax_3", "rmax_3", "rmax_1"]  # "msl", "rh",
+    vlim = [
+        (-0.5, 0.5),
+        (-0.5, 0.5),
+        (-1, 1),
+        (-5, 5),
+        (-10, 10),
+        (-20, 20),
+    ]  # (-1, 1), (-0.1, 0.1),
     labels = [
         # "$P_s$ trend [hPa decade$^{-1}$]",
         # r"$\mathcal{H}$ trend [% decade$^{-1}$]",
@@ -1202,6 +1333,8 @@ def plot_trend_maps(
         "$T_o$ trend [K decade$^{-1}$]",
         "$z_{\mathrm{o}}$ trend [hPa decade$^{-1}$]",
         "$V_p$ trend [m s$^{-1}$ decade$^{-1}$]",
+        "$r_{3}$ trend [km decade$^{-1}$]",
+        "$r_{1}$ trend [km decade$^{-1}$]",
     ]
     trends = [trend_ds[var + "_polyfit_coefficients"].sel(degree=1) for var in vars]
     hatch_masks = [trend_ds[var + "_hatch_mask"] for var in vars]
@@ -1212,12 +1345,15 @@ def plot_trend_maps(
         1,
         sharex=True,
         sharey=True,
-        figsize=get_dim(ratio=1.0),
+        figsize=get_dim(ratio=1.5),
         subplot_kw={"projection": ccrs.PlateCarree(central_longitude=180)},
     )
 
     for i, var in enumerate(vars):
         print(f"Plotting {var}...")
+        if "rmax" in var:
+            trends[i] = trends[i] / 1000.0  # convert to km
+
         plot_var_on_map(
             axs[i],
             trends[i] * 10,  # convert to per decade
@@ -1233,7 +1369,7 @@ def plot_trend_maps(
     plt.tight_layout()
     plt.savefig(
         os.path.join(
-            ERA5_FIGURE_PATH, f"era5_vmax_trends_{start_year}_{end_year}_{months}m.pdf"
+            ERA5_FIGURE_PATH, f"era5_trends_{start_year}_{end_year}_{months}m.pdf"
         ),
         dpi=300,
     )
@@ -1243,7 +1379,6 @@ def plot_trend_lineplots(
     lon: float,
     lat: float,
     label: str = "new_orleans",
-    ds: Optional[xr.Dataset] = None,
     start_year: int = DEFAULT_START_YEAR,
     end_year: int = DEFAULT_END_YEAR,
     months: int = 1,
@@ -1255,7 +1390,6 @@ def plot_trend_lineplots(
         lon (float): Longitude of the point to plot.
         lat (float): Latitude of the point to plot.
         label (str, optional): Label for the plot. Defaults to "new_orleans".
-        ds (Optional[xr.Dataset], optional): If provided, use this dataset instead of loading it.
         start_year (int, optional): Start year for the data. Defaults to 1980.
         end_year (int, optional): End year for the data. Defaults to 2020
         months (int, optional): Number of months to average over. Defaults to 1.
@@ -1263,34 +1397,45 @@ def plot_trend_lineplots(
     plot_defaults()
     trend_ds = xr.open_dataset(
         os.path.join(
-            ERA5_PRODUCTS_PATH, f"era5_pi_trends_{start_year}_{end_year}_{months}m.zarr"
+            ERA5_PRODUCTS_PATH, f"era5_ps_trends_{start_year}_{end_year}_{months}m.zarr"
         ),
     )
-    if ds is None:
-        era5_ds = get_all_data(start_year=start_year, end_year=end_year)
-    else:
-        era5_ds = ds
+    era5_ds = xr.open_mfdataset(
+        os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_*.zarr"),
+        engine="zarr",
+    )
+    # if ds is None:
+    #     era5_ds = get_all_data(start_year=start_year, end_year=end_year)
+    # else:
+    #     era5_ds = ds
     era5_ds = mon_increase(era5_ds).sel(latitude=lat, longitude=lon, method="nearest")
     trend_ds = mon_increase(trend_ds).sel(latitude=lat, longitude=lon, method="nearest")
     print("era5_ds", era5_ds.sst.values)
 
     print("era5_ds", era5_ds)
     print("trend_ds", trend_ds)
-    if lat > 0:
-        # get August data (in the Northern Hemisphere)
-        era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 8)
-    else:
-        # get February data (in the Southern Hemisphere)
-        era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 3)
-    # get the time in years
-    era5_ds = era5_ds.assign_coords(
-        year=era5_ds.time.dt.year - era5_ds.time.dt.year.min()
-    )
-    print("era5_ds", era5_ds)
-    del era5_ds["time"]
-    # plot the variables
+    # if lat > 0:
+    #     # get August data (in the Northern Hemisphere)
+    #     era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 8)
+    # else:
+    #     # get February data (in the Southern Hemisphere)
+    #     era5_ds = era5_ds.sel(time=era5_ds.time.dt.month == 3)
+    # # get the time in years
+    # era5_ds = era5_ds.assign_coords(
+    #     year=era5_ds.time.dt.year - era5_ds.time.dt.year.min()
+    # )
+    # print("era5_ds", era5_ds)
+    # del era5_ds["time"]
+    # # plot the variables
 
-    vars = ["sst", "t0", "otl", "vmax"]  # "msl", "rh",
+    vars = [
+        "sst",
+        "t0",
+        "otl",
+        "vmax_3",
+        "rmax_3",
+        "rmax_1",
+    ]  # "msl", "rh",
     labels = [
         # r"$P_s$ [hPa]",
         # r"$\mathcal{H}$ [%]",
@@ -1298,8 +1443,10 @@ def plot_trend_lineplots(
         r"$T_o$ [K]",
         r"$z_{\mathrm{o}}$ [hPa]",
         r"$V_p$ [m s$^{-1}$]",
+        r"$r_{3}$ [km]",
+        r"$r_{1}$ [km]",
     ]
-    units = [r"$^{\circ}$C", "K", "hPa", r"m s$^{-1}$"]  # "hPa", "%",
+    units = [r"$^{\circ}$C", "K", "hPa", r"m s$^{-1}$", "km", "km"]  # "hPa", "%",
     colors = [
         # "tab:purple",
         # "tab:brown",
@@ -1307,13 +1454,15 @@ def plot_trend_lineplots(
         "tab:orange",
         "tab:green",
         "tab:red",
+        "tab:cyan",
+        "tab:pink",
     ]
 
-    fig, axs = plt.subplots(
+    _, axs = plt.subplots(
         len(vars),
         1,
         sharex=True,
-        figsize=get_dim(ratio=0.8),
+        figsize=get_dim(ratio=1.5),
     )
 
     def format_p_latex(value: float, sig_figs: int = 2) -> str:
@@ -1351,10 +1500,15 @@ def plot_trend_lineplots(
         x = era5_ds["year"].values
         slope = trend_ds[f"{var}_polyfit_coefficients"].sel(degree=1).values
         intercept = trend_ds[f"{var}_polyfit_coefficients"].sel(degree=0).values
-        trend = slope * era5_ds["year"].values + intercept
+        if "rmax" in var:
+            slope = slope / 1000.0  # convert to km
+            intercept = intercept / 1000.0
+        trend = slope * (x - start_year) + intercept
         cov_matrix_unscaled = trend_ds[f"{var}_polyfit_covariance"].values
         coeffs = np.array([slope, intercept])
         cov_matrix = cov_matrix_unscaled
+        if "rmax" in var:
+            cov_matrix = cov_matrix_unscaled / 1000.0**2  # convert to km
 
         print(f"{var} Fit Coefficients (slope, intercept): {coeffs}")
         print(f"{var} Covariance Matrix:\n{cov_matrix}\n")
@@ -1369,7 +1523,7 @@ def plot_trend_lineplots(
         print("-" * 30)
 
         ax.plot(
-            era5_ds["year"].values + start_year,
+            era5_ds["year"].values,  # + start_year
             trend,
             label=f"{label} Trend",
             color=color,
@@ -1378,9 +1532,9 @@ def plot_trend_lineplots(
         # new_ys = unumpy.polyval(np.array(u_coeffs), x)
         perc_inc = slope / intercept * 100  # percentage increase
 
-        new_ys = u_coeffs[0] * x + u_coeffs[1]
+        new_ys = u_coeffs[0] * (x - start_year) + u_coeffs[1]
         ax.fill_between(
-            x + start_year,
+            x,
             [y.n - y.s for y in new_ys],
             [y.n + y.s for y in new_ys],
             # new_ys.n - new_ys.s,
@@ -1394,8 +1548,10 @@ def plot_trend_lineplots(
         )
 
     for i, ax in enumerate(axs):
+        if "rmax" in vars[i]:
+            era5_ds[vars[i]] = era5_ds[vars[i]] / 1000.0  # convert to km
         ax.plot(
-            era5_ds["year"].values + start_year,
+            era5_ds["year"].values,  # + start_year,
             era5_ds[vars[i]].values,
             label=labels[i],
             color=colors[i],
@@ -1404,12 +1560,13 @@ def plot_trend_lineplots(
         ax.set_ylabel(labels[i])
 
     axs[-1].set_xlabel("Year")
-    plt.xlim(0 + start_year, end_year)
+    # plt.xlim(0 + start_year, end_year)
+    plt.xlim(start_year, end_year)
     label_subplots(axs)
 
     plt.savefig(
         os.path.join(
-            ERA5_FIGURE_PATH, f"era5_pi_{label}_{start_year}_{end_year}_{months}m.pdf"
+            ERA5_FIGURE_PATH, f"era5_{label}_{start_year}_{end_year}_{months}m.pdf"
         ),
         dpi=300,
     )
@@ -1752,7 +1909,7 @@ def get_all_regridded_data(
     ).sel(time=slice(f"{start_year}-01-01", f"{end_year}-12-31"))
 
 
-def plot_trends():
+def plot_trends_all_lineplots():
     from w22.constants import OFFSET_D
 
     new_point_d = {
@@ -1885,4 +2042,15 @@ if __name__ == "__main__":
     #     },
     # )
 
-    plot_snapshot_map(year=2020)
+    # plot_snapshot_map(year=2020)
+    # "../data/era5/ps_og/*.zarr"
+    # ds = xr.open_mfdataset(
+    #     os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_*.zarr"),
+    #     chunks="auto",
+    #     engine="zarr",
+    # )
+    # print(ds)
+    # print(ds["year"].values)
+    # era5_ps_trends()
+    plot_trends_all_lineplots()
+    # plot_trend_maps(start_year=1980, end_year=2024, months=1)
