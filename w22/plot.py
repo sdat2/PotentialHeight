@@ -582,6 +582,23 @@ def get_cmip6_timeseries(
     return ds
 
 
+def get_timeseries(model="CESM2",
+                   place="new_orleans",
+                   pi_version=4, pressure_assumption="isothermal",
+                   member=4) -> xr.Dataset:
+    if model == "ERA5":
+        ds = get_era5_timeseries(place=place, pi_version=pi_version)
+    else:
+        ds = get_cmip6_timeseries(
+            place=place,
+            pressure_assumption=pressure_assumption,
+            member=member,
+            model=model,
+            pi_version=pi_version,
+        )
+    return ds
+
+
 def plot_timeserii(
     axs: np.ndarray,
     vars: tuple = ("vmax_3", "r0_3", "rmax_3", "rmax_1"),
@@ -603,16 +620,11 @@ def plot_timeserii(
 ) -> None:
     assert len(axs) == len(vars)
     assert len(labels) == len(vars)
-    if model == "ERA5":
-        ds = get_era5_timeseries(place=place, pi_version=pi_version)
-    else:
-        ds = get_cmip6_timeseries(
-            place=place,
-            pressure_assumption=pressure_assumption,
-            member=member,
-            model=model,
-            pi_version=pi_version,
-        )
+    ds = get_timeseries(model=model,
+                        place=place,
+                        pi_version=pi_version,
+                        pressure_assumption=pressure_assumption,
+                        member=member)
     for i in range(len(vars)):
         axs[i].set_title(vars[i])
         var_np = ds[vars[i]].values
@@ -1054,8 +1066,11 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
         df[[col for col in df.columns if not col.startswith("fit_")]]
     )
     print(df_str)
+    file_name = os.path.join(
+        DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}new.tex"
+    )
     with open(
-        os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}new.tex"),
+        file_name,
         "w",
     ) as f:
         f.write(df_str)
@@ -1065,8 +1080,11 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
         df[[col for col in df.columns if not col.startswith("rho_")]]
     )
     print(df_str)
+    file_name = os.path.join(
+        DATA_PATH, f"{place}_temporal_fits_pi{pi_version}new.tex"
+    )
     with open(
-        os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}new.tex"), "w"
+        file_name, "w"
     ) as f:
         f.write(df_str)
     print("Saved temporal relationships data to LaTeX table.")
@@ -1252,7 +1270,11 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
 
     col_format = "l" * len(df_proc.columns)
     latex_str = df_proc.to_latex(
-        index=False, escape=False, header=True, column_format=col_format, caption=" "
+        index=False,
+        escape=False,
+        header=True,
+        column_format=col_format,
+        caption=" "
     )
 
     return latex_str

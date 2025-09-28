@@ -4,6 +4,15 @@ We only want tracks from 1980-2024 (inclusive). We currently calculate the poten
 
 wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/netcdf/IBTrACS.since1980.v04r01.nc
 
+
+TODO: change to corresponding potential size for top 10 supersize cyclones.
+
+TODO: test the effect of excluding e.g. colder water or higher latitudes.
+
+TODO: standardize all the terminology to Cat1 Potential Inner Size (r_1), Corresponding Potential Inner Size (r_2), PI Potential Innner size (r_3).
+
+TODO: make a table for CMIP6 trends and biases.
+
 """
 
 from typing import Optional, Tuple, Union, List
