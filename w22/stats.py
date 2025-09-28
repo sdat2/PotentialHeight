@@ -118,6 +118,63 @@ def calculate_detrended_cv(timeseries_data: np.ndarray) -> Tuple[np.ndarray, flo
     return residuals, std_residuals, detrended_cv
 
 
+def analyze_bias(ground_truth: np.ndarray, model: np.ndarray) -> dict:
+    """
+    Analyzes the bias between a model and ground truth data.
+
+    Calculates the mean of the bias and the trend in the bias, and determines
+    if they are statistically significant from zero.
+
+    Args:
+        ground_truth: A 1D numpy array of the true values.
+        model: A 1D numpy array of the modeled values.
+
+    Returns:
+        A dictionary containing the mean bias, the p-value for the mean bias,
+        the trend of the bias (slope), and the p-value for the trend.
+
+    Doctests:
+    >>> truth = np.linspace(0, 10, 10)
+    >>> # Model has a constant bias of +2 and a slight upward trend in bias
+    >>> model_data = truth + 2 + np.linspace(0, 0.5, 10)
+    >>> results = analyze_bias(truth, model_data)
+    >>> round(results['mean_bias'], 4)
+    2.25
+    >>> # p-value should be very small, indicating significance
+    >>> results['mean_bias_p_value'] < 0.001
+    True
+    >>> round(results['bias_trend'], 4)
+    0.0556
+    >>> # p-value should be very small, indicating significance
+    >>> results['bias_trend_p_value'] < 0.001
+    True
+    """
+    if ground_truth.shape != model.shape:
+        raise ValueError("Input arrays must have the same shape.")
+
+    # 1. Calculate the bias series
+    bias = model - ground_truth
+
+    # 2. Analyze the mean of the bias
+    # A one-sample t-test checks if the mean of the sample is likely to be zero.
+    t_stat_mean, p_value_mean = ss.ttest_1samp(bias, 0.0)
+
+    # 3. Analyze the trend in the bias
+    # A linear regression finds the slope of the bias over time.
+    # The p-value for the slope tests the null hypothesis that the slope is zero.
+    time_axis = np.arange(len(bias))
+    lin_reg_result = ss.linregress(time_axis, bias)
+    slope = lin_reg_result.slope
+    p_value_trend = lin_reg_result.pvalue
+
+    return {
+        'mean_bias': np.mean(bias),
+        'mean_bias_p_value': p_value_mean,
+        'bias_trend': slope,
+        'bias_trend_p_value': p_value_trend,
+    }
+
+
 def timeseries_relationships(
     timeseries_ds: xr.Dataset,
     place: str,
