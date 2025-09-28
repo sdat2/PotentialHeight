@@ -1,4 +1,18 @@
-"""Generate tables of results."""
+"""Generate tables of results.
+
+TODO: Add in ability to process HadGEM3-GC31-MM r1i1p1f3, r2i1p1f3, r3i1p1f3, and MIROC6 r1i1p1f1, r2i1p1f1, r3i1p1f1.
+
+TODO: Add in tables to assess biases, variability etc. for the different models compared to ERA5.
+
+TODO: Add in ability to process new variables and for it to be more extensible.
+     New variables include:
+        - rmax_3  (should be labeled \(r_{3})\)
+        - rmax_1  (should be labeled \(r_{1})\)
+        - r0_1    (should be labeled \(r_{a1})\)
+        - r0_3    (should be labeled \(r_{a3})\)
+        - vmax_3  (should be labeled \(V_{p})\)
+
+"""
 import os
 from typing import Tuple
 import numpy as np
