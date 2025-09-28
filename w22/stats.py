@@ -1,7 +1,9 @@
 """Generate tables of results."""
 import os
+from typing import Tuple
 import numpy as np
 import numpy.ma as ma
+import scipy.stats as ss
 from uncertainties import ufloat
 import math
 import xarray as xr
@@ -50,6 +52,70 @@ def safe_corr(xt: np.ndarray, yt: np.ndarray) -> float:
     corr = ma.corrcoef(ma.masked_invalid(xt), ma.masked_invalid(yt))
     return corr[0, 1]
 
+
+def calculate_detrended_cv(timeseries_data: np.ndarray) -> Tuple[np.ndarray, float, float]:
+    """Calculates the detrended standard deviation and coefficient of variation.
+
+    This function performs a linear regression on the input time series to
+    remove the trend. It then calculates the standard deviation of the
+    residuals (the detrended data) and the coefficient of variation (CV)
+    relative to the mean of the original, non-detrended data.
+
+    Args:
+        timeseries_data: A 1-dimensional numpy array of numerical data
+                         representing the time series.
+
+    Returns:
+        A tuple containing:
+        - residuals (np.ndarray): The detrended time series.
+        - std_residuals (float): The standard deviation of the residuals.
+        - detrended_cv (float): The coefficient of variation of the detrended
+                                data, normalized by the original mean.
+
+    Doctests:
+    >>> # Test with a perfect linear trend and no noise
+    >>> perfect_series = np.arange(10) * 2 + 50
+    >>> res, std_res, cv = calculate_detrended_cv(perfect_series)
+    >>> np.allclose(std_res, 0.0)
+    True
+    >>> np.allclose(cv, 0.0)
+    True
+    >>> # Test with some noise - CORRECTED VALUE
+    >>> noisy_series = np.array([51, 51, 54, 55, 56, 59, 60, 62, 63, 65])
+    >>> res, std_res, cv = calculate_detrended_cv(noisy_series)
+    >>> round(std_res, 4)
+    0.5865
+    >>> round(cv, 4)
+    0.0102
+    """
+    timeseries_data = np.asarray(timeseries_data)
+    n = len(timeseries_data)
+    if timeseries_data.ndim != 1:
+        raise ValueError("Input must be a 1-dimensional array.")
+    if n < 3:
+        # Cannot compute with N-2 degrees of freedom
+        return np.array([]), np.nan, np.nan
+
+    time_axis = np.arange(n)
+
+    # 1. Detrend the data
+    slope, intercept, _, _, _ = ss.linregress(time_axis, timeseries_data)
+    trend_line = slope * time_axis + intercept
+    residuals = timeseries_data - trend_line
+
+    # 2. Calculate variability of the detrended data
+    # For residuals from a simple linear regression, degrees of freedom = N-2.
+    # This is the Residual Standard Error.
+    sum_of_squared_residuals = np.sum(residuals**2)
+    std_residuals = np.sqrt(sum_of_squared_residuals / (n - 2))
+
+    original_mean = np.mean(timeseries_data)
+    if original_mean == 0:
+        detrended_cv = np.nan
+    else:
+        detrended_cv = std_residuals / np.abs(original_mean)
+
+    return residuals, std_residuals, detrended_cv
 
 
 def timeseries_relationships(
