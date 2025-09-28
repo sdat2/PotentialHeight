@@ -285,7 +285,13 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
     Doctest:
         >>> print(format_error_latex_sci(12345, 67))
         \(\left(1.234 \pm 0.007\\right)\\times 10^{4}\)
+        >>> print(format_error_latex_sci(0.0012345, float('inf')))
+        \(1.234 \pm \infty\)
     """
+
+    assert isinstance(nominal, (int, float)), "nominal must be a number"
+    assert isinstance(error, (int, float)), "error must be a number"
+
     if error == 0 or not math.isfinite(error) or not math.isfinite(nominal):
         return format_single_latex_sci(nominal) + " \\pm 0"
 
@@ -306,11 +312,15 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
     else:
         rounding_decimals = -math.floor(math.log10(abs(error_rescaled)))
 
+    if rounding_decimals < 0:
+        rounding_decimals = 1
+
     # Round the rescaled numbers to the determined decimal place
     nominal_rounded = round(nominal_rescaled, rounding_decimals)
     error_rounded = round(error_rescaled, rounding_decimals)
 
     fmt_str = f"{{:.{rounding_decimals}f}}"
+    # error here?
     nominal_str = fmt_str.format(nominal_rounded)
     error_str = fmt_str.format(error_rounded)
     if exponent == 0:
