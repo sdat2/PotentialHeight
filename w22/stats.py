@@ -285,8 +285,12 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
     Doctest:
         >>> print(format_error_latex_sci(12345, 67))
         \(\left(1.234 \pm 0.007\\right)\\times 10^{4}\)
-        >>> print(format_error_latex_sci(0.0012345, float('inf')))
-        \(1.2 \\times 10^{-3}\)\( \pm \infty \)
+        >>> print(format_error_latex_sci(0.0012345, float('inf'))) # previous behaviour\(1.2 \\times 10^{-3}\)\( \pm \infty \)
+        --
+        >>> print(format_error_latex_sci(0, 0))
+        \(0.0\)
+        >>> print(format_error_latex_sci(float('nan'), 1))
+        --
     """
 
     assert isinstance(nominal, (int, float)), "nominal must be a number"
@@ -295,9 +299,12 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
     if error == 0:
         return format_single_latex_sci(nominal)
     elif not math.isfinite(error):
-        return format_single_latex_sci(nominal) + "\\( \\pm \\infty \\)"
+        return "--"
+        #return format_single_latex_sci(nominal) + "\\( \\pm \\infty \\)"
     elif not math.isfinite(nominal):
         return "--"
+
+
     # Determine the common exponent from the nominal value
     exponent = (
             math.floor(math.log10(abs(nominal)))
