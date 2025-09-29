@@ -9,9 +9,10 @@ TODO: change to corresponding potential size for top 10 supersize cyclones.
 
 TODO: test the effect of excluding e.g. colder water or higher latitudes.
 
+- I.e. hypotheses: supersize storms are caused by storms that have extratropical components, or through inertial effects as the potential size rapidly decreases over a patch of cold water.
+
 TODO: standardize all the terminology to Cat1 Potential Inner Size (r_1), Corresponding Potential Inner Size (r_2), PI Potential Innner size (r_3).
 
-TODO: make a table for CMIP6 trends and biases.
 
 """
 
@@ -2057,7 +2058,7 @@ def _plot_tc_track(
     ax_line2.plot(
         times.ravel(),
         tc_ds["rmax"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_3$ PS [km]" + "\n" + r"($V=V_{\mathrm{p}}$)",
+        label=r"$r_3$ PIPS [km]" + "\n" + r"($V=V_{\mathrm{p}}$)",
         color="green",
     )
     ax_line2.plot(
@@ -2069,7 +2070,7 @@ def _plot_tc_track(
     ax_line2.plot(
         times.ravel(),
         tc_ds["ps_cat1"].values.ravel() / 1000,  # convert m to km
-        label=r"$r_1$ PS Cat 1 [km]" + "\n" + r"($V=33$ m s$^{-1}$)",
+        label=r"$r_1$ Cat1 PS [km]" + "\n" + r"($V=33$ m s$^{-1}$)",
         color="red",
     )
     ax_line2.set_ylabel(r"$r$ [km]")
@@ -2128,8 +2129,10 @@ def get_tc_ds(basin: str = b"NA", subbasin: str = b"GM", name: str = b"KATRINA")
     print("tc_inputs_ds", tc_inputs_ds)
     return tc_pi_ps_ds, tc_inputs_ds
 
+
 def calculate_cps_ds(tc_inputs_ds: xr.Dataset) -> xr.Dataset:
     """ Calculate the potential size dataset from the tropical cyclone inputs.
+
     Args:
         tc_inputs_ds (xr.Dataset): Dataset containing the tropical cyclone inputs.
     Returns:
@@ -2578,7 +2581,11 @@ def save_basin_names():
 
 @timeit
 def get_normalized_data(
-    lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0, v_reduc: float = 0.8
+    lower_wind_vp: float = 33.0, # m/s at 10m
+    lower_wind_obs: float = 33.0, # m/s at 10m
+    v_reduc: float = 0.8, # reduction factor from gradient wind to 10m
+    max_abs_lat: Optional[float] = None, # degrees
+    min_sst_c: Optional[float] = None, # degrees C
 ) -> xr.Dataset:
     """
     Get the normalized data from the IBTrACS dataset.
@@ -2587,65 +2594,56 @@ def get_normalized_data(
         lower_wind_vp (float, optional): Lower wind speed threshold for potential intensity. Defaults to 33.0 m/s.
         lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed. Defaults to 33.0 m/s.
         v_reduc (float, optional): Reduction factor for the potential intensity. Defaults to 0.8.
+        max_abs_lat (float, optional): Maximum absolute latitude for filtering. Defaults to None.
+        min_sst_c (float, optional): Minimum sea surface temperature in Celsius for filtering. Defaults to None.
 
     Returns:
         xr.Dataset: The normalized dataset.
     """
+    file_names = {"ibtracs_ds": "IBTrACS.since1980.v04r01.nc",
+                  "pi_ps_ds": "IBTrACS.since1980.v04r01.pi_ps.nc",
+                  "cps_ds": "IBTrACS.since1980.v04r01.cps.nc",
+                  "ps_cat1_ds": "IBTrACS.since1980.v04r01.ps_cat1.nc"}
+    file_paths = {key: os.path.join(IBTRACS_DATA_PATH, file_name) for key, file_name in file_names.items()}
+    datasets = {key: xr.open_dataset(path) if os.path.exists(path) else None for key, path in file_paths.items()}
+    print("Datasets loaded:", datasets)
 
-    ibtracs_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
-    )
-    pi_ps_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.pi_ps.nc")
-    )
-    cps_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.cps.nc")
-    )
-    ps_cat1_ds = xr.open_dataset(
-        os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.ps_cat1.nc")
-    )
-    # only count where vp > lower_wind_vp
-    cps_ds = cps_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
-    ibtracs_ds = ibtracs_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
-    pi_ps_ds = pi_ps_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
-    ps_cat1_ds = ps_cat1_ds.where(pi_ps_ds.vmax * v_reduc > lower_wind_vp, drop=False)
-    # only count where usa_wind > lower_wind_obs
-    ibtracs_ds = ibtracs_ds.where(
-        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
-    )
-    pi_ps_ds = pi_ps_ds.where(
-        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
-    )
-    cps_ds = cps_ds.where(
-        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
-    )
-    ps_cat1_ds = ps_cat1_ds.where(
-        ibtracs_ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False
-    )
-    # calculate normalized variables
-    pi_ps_ds["normalized_intensity"] = (
+    if max_abs_lat is not None:
+        for key, ds in datasets.items():
+            if ds is not None:
+                datasets[key] = ds.where(np.abs(ds["lat"]) <= max_abs_lat, drop=False)
+    if min_sst_c is not None:
+        for key, ds in datasets.items():
+            if ds is not None and "sst" in ds:
+                datasets[key] = ds.where(ds["sst"] >= min_sst_c, drop=False)
+
+    for key, ds in datasets.items():
+        if ds is not None:
+            print(f"{key} loaded from {file_paths[key]} with sizes: {ds.sizes}")
+            datasets[key] = ds.where(datasets["ibtracs_ds"]["usa_wind"] * 0.514444 > lower_wind_obs, drop=False) if key != "ibtracs_ds" else ds.where(ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False)
+            datasets[key] = datasets[key].where(datasets["pi_ps_ds"].vmax * v_reduc > lower_wind_vp, drop=False) if key != "pi_ps_ds" else ds.where(ds["vmax"] * v_reduc > lower_wind_vp, drop=False)
+
+    output_ds = datasets["pi_ps_ds"]
+    output_ds["normalized_intensity"] = (
         ("storm", "date_time"),
-        ibtracs_ds["usa_wind"].values * 0.514444 / pi_ps_ds.vmax.values / 0.8,
+        datasets["ibtracs_ds"]["usa_wind"].values * 0.514444 / output_ds.vmax.values / v_reduc,
     )  # normalized intensity
-    pi_ps_ds["normalized_size"] = (
-        ("storm", "date_time"),
-        ibtracs_ds["usa_rmw"].values * 1852 / pi_ps_ds.rmax.values,
-    )
-    pi_ps_ds["normalized_size_obs"] = (
-        ("storm", "date_time"),
-        ibtracs_ds["usa_rmw"].values * 1852 / cps_ds.rmax.values,
-    )
-    pi_ps_ds["normalized_size_cat1"] = (
-        ("storm", "date_time"),
-        ibtracs_ds["usa_rmw"].values * 1852 / ps_cat1_ds.rmax.values,
-    )
-    # adding the potential size variables back in
-    pi_ps_ds["potential_size_cat1"] = ps_cat1_ds["rmax"]
-    pi_ps_ds["potential_size_vp"] = pi_ps_ds["rmax"]
-    pi_ps_ds["vmax_obs_10m"] = ibtracs_ds["usa_wind"] * 0.514444
-    pi_ps_ds["vmax_vp_10m"] = pi_ps_ds["vmax"] * v_reduc
-    pi_ps_ds = before_2025(pi_ps_ds)
-    return pi_ps_ds
+
+    ds_to_var = {"normalized_size_pips": "pi_ps_ds",
+                 "normalized_size_cps": "cps_ds",
+                 "normalized_size_cat1": "ps_cat1_ds",
+                 }
+    for var_name, ds_key in ds_to_var.items():
+        if datasets[ds_key] is not None:
+            output_ds[var_name] = (
+                ("storm", "date_time"),
+                datasets["ibtracs_ds"]["usa_rmw"].values * 1852 / datasets[ds_key].rmax.values,
+            )
+
+    output_ds["vmax_obs_10m"] = datasets["ibtracs_ds"]["usa_wind"] * 0.514444
+    output_ds["vmax_vp_10m"] = output_ds["vmax"] * v_reduc
+    output_ds = before_2025(output_ds)
+    return output_ds
 
 
 def perc_gt_1(x: np.ndarray) -> float:
@@ -2692,14 +2690,14 @@ def plot_normalized_quad(
     axs[0].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
     )
-    axs[1].hist(pi_ps_ds["normalized_size"].values.ravel(), bins=400)
+    axs[1].hist(pi_ps_ds["normalized_size_pips"].values.ravel(), bins=400)
     axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
     axs[1].set_title(
-        f"{perc_gt_1(pi_ps_ds['normalized_size'].values):.1f} % exceedance"
+        f"{perc_gt_1(pi_ps_ds['normalized_size_pips'].values):.1f} % exceedance"
     )
-    axs[2].hist(pi_ps_ds["normalized_size_obs"].values.ravel(), bins=600)
+    axs[2].hist(pi_ps_ds["normalized_size_cps"].values.ravel(), bins=600)
     axs[2].set_title(
-        f"{perc_gt_1(pi_ps_ds['normalized_size_obs'].values):.1f} % exceedance"
+        f"{perc_gt_1(pi_ps_ds['normalized_size_cps'].values):.1f} % exceedance"
     )
     axs[2].set_xlabel(r"$r_{\mathrm{Obs.}} / r_2$")
     axs[3].hist(pi_ps_ds["normalized_size_cat1"].values.ravel(), bins=600)
@@ -2719,8 +2717,8 @@ def plot_normalized_quad(
 
     # let's get the highest normalized intenisity and size for each storm
     max_normalized_intensity = pi_ps_ds["normalized_intensity"].max(dim="date_time")
-    max_normalized_ps = pi_ps_ds["normalized_size"].max(dim="date_time")
-    max_normalized_cps = pi_ps_ds["normalized_size_obs"].max(dim="date_time")
+    max_normalized_ps = pi_ps_ds["normalized_size_pips"].max(dim="date_time")
+    max_normalized_cps = pi_ps_ds["normalized_size_cps"].max(dim="date_time")
     max_normalized_ps_cat1 = pi_ps_ds["normalized_size_cat1"].max(dim="date_time")
     # let's plot the CDFs for these arrays
     fig, axs = plt.subplots(
@@ -2831,7 +2829,7 @@ def plot_normalized_quad(
     # let's find the most extreme values in this normalized space.
     super_storms = np.any(
         (pi_ps_ds["normalized_intensity"].values > 1)
-        & (pi_ps_ds["normalized_size_cat1"].values > 1),
+        & (pi_ps_ds["normalized_size_cps"].values > 1),
         axis=1,
     )
     print(
@@ -2874,15 +2872,15 @@ def plot_normalized_quad(
             )
 
     top_size_storms = np.argsort(
-        -pi_ps_ds["normalized_size_cat1"].max(dim="date_time").values
+        -pi_ps_ds["normalized_size_cps"].max(dim="date_time").values
     )[:10]
     # Get indices of top 10 storms
     top_size_names = [ibtracs_ds.name.values[i].decode() for i in top_size_storms]
     print(f"Top 10 storms by normalized size: {', '.join(top_size_names)}")
     print(
-        f"Top 10 storms normalized sizes: {', '.join([str(x) for x in pi_ps_ds['normalized_size_cat1'].max(dim='date_time').values[top_size_storms]])}"
+        f"Top 10 storms normalized sizes: {', '.join([str(x) for x in pi_ps_ds['normalized_size_cps'].max(dim='date_time').values[top_size_storms]])}"
     )
-    dir = os.path.join(FIGURE_PATH, "top_10_supersize")
+    dir = os.path.join(FIGURE_PATH, "top_10_supersize_new")
     os.makedirs(dir, exist_ok=True)
     if plot_storms:
         for i, storm in enumerate(top_size_storms):
@@ -2950,12 +2948,12 @@ def plot_normalized_quad(
         "Time (UTC)",
         "Name",
         "Basin",
-        r"Longitude [$^\circ$]",
-        r"Latitude [$^\circ$]",
-        r"\(V_{{ \mathrm{{max}} }} / V_{{ \mathrm{{p}} }}\)",  # CORRECTED
-        r"\(r_{{ \mathrm{{max}} }} / r'''_{{ \mathrm{{max}} }}\)",  # CORRECTED
-        r"\(V_{{ \mathrm{{max}} }}\) [m s$^{{-1}}$]",  # CORRECTED
-        r"\(r_{{ \mathrm{{max}} }}\) [km]",  # CORRECTED
+        r"Longitude [\(^\circ\)]",
+        r"Latitude [\(^\circ\)]",
+        r"\(V_{{ \mathrm{{Obs.}} }} / V_{{ \mathrm{{p}} }}\)",  # CORRECTED
+        r"\(r_{{ \mathrm{{Obs.}} }} / r_{{ 2 }}\)",  # CORRECTED
+        r"\(V_{{ \mathrm{{Obs.}} }}\) [m s\(^{{ -1 }}\)]",  # CORRECTED
+        r"\(r_{{ \mathrm{{Obs.}} }}\) [km]",  # CORRECTED
     ]
     # save to latex files
     max_normalized_intensity_storms_df.to_latex(
@@ -2965,7 +2963,7 @@ def plot_normalized_quad(
         formatters=formatters,
         header=publication_headers,
         # booktabs=True,
-        caption=r"Top storms by maximum normalized intensity, \(V_{{ \mathrm{{max}} }} / V_{{ \mathrm{{p}}}}\), selected at the point of their maximum normalized intensity.",
+        caption=r"Top storms by maximum normalized intensity, \(V_{{ \mathrm{{Obs.}} }} / V_{{ \mathrm{{p}} }}\), selected at the point of their maximum normalized intensity.",
         label="tab:norm_intensity_storms",
         # column_format="lcccccc",
     )
@@ -2975,7 +2973,7 @@ def plot_normalized_quad(
         float_format="%.2f",
         formatters=formatters,
         header=publication_headers,
-        caption=r"Top storms by normalized size \(r_{{ \mathrm{{max}} }} / r'''_{{ \mathrm{{max}}}}\), selected at the point of their maximum normalized intensity.",
+        caption=r"Top storms by normalized size \(r_{{ \mathrm{{ max }} }} / r_{{ 2 }}\), selected at the point of their maximum normalized intensity.",
         label="tab:norm_size_storms",
     )
 
@@ -3061,9 +3059,9 @@ def get_vary_vp_lower_data(
             pi_ps_ds = get_normalized_data(
                 lower_wind_vp=vp_lower, lower_wind_obs=lower_wind_obs
             )
-            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
+            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
             ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
-            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
+            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
             intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
 
         # save the data to a xarray dataset
@@ -3124,9 +3122,9 @@ def get_vary_vobs_lower_data(
                 lower_wind_vp=lower_wind_vp, lower_wind_obs=vobs_lower
             )
             pi_ps_ds = before_2025(pi_ps_ds)
-            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size"].values)
+            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
             ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
-            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_obs"].values)
+            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
             intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
 
         # save the data to a xarray dataset
@@ -3342,7 +3340,8 @@ if __name__ == "__main__":
     # download_ibtracs_data()
     plot_defaults()
     # run_all_plots()
-    ds = get_vary_vobs_lower_data(num=50, regenerate=True)
-    print(ds)
+    # ds = get_vary_vobs_lower_data(num=50, regenerate=True)
+    # print(ds)
+    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33, plot_storms=True)
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
