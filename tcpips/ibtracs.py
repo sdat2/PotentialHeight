@@ -2660,7 +2660,11 @@ def perc_gt_1(x: np.ndarray) -> float:
 
 
 def plot_normalized_quad(
-    lower_wind_vp: float = 33.0, lower_wind_obs: float = 33.0, plot_storms: bool = False
+    lower_wind_vp: float = 33.0,
+    lower_wind_obs: float = 33.0,
+    min_sst_c: Optional[float] = None,
+    max_abs_lat: Optional[float] = None,
+    plot_storms: bool = False
 ) -> None:
     """
     Plot the normalized variables from the IBTrACS dataset:
@@ -2668,13 +2672,15 @@ def plot_normalized_quad(
     Args:
         lower_wind_vp (float, optional): Lower wind speed threshold for filtering. Defaults to 33.0 m/s.
         lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed filtering. Defaults to 33.0 m/s.
+        min_sst_c (Optional[float], optional): Minimum sea surface temperature in Celsius for filtering. Defaults to None.
+        max_abs_lat (Optional[float], optional): Maximum absolute latitude for filtering. Defaults to None.
         plot_storms (bool, optional): If True, plot the storms with their normalized variables. Defaults to False.
     """
 
     # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
     plot_defaults()
     pi_ps_ds = get_normalized_data(
-        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs
+        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs, min_sst_c=min_sst_c, max_abs_lat=max_abs_lat
     )
 
     fig, axs = plt.subplots(
@@ -2685,7 +2691,7 @@ def plot_normalized_quad(
         sharex=True,
     )
     axs[0].hist(pi_ps_ds["normalized_intensity"].values.ravel(), bins=100)
-    axs[0].set_xlabel(r"$V_{\mathrm{Obs.}} / V_{\mathrm{p}}$")
+    axs[0].set_xlabel(r"$V_{\mathrm{Obs.}} / V_{p}$")
     axs[0].set_ylabel("Count")
     axs[0].set_title(
         f"{perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
@@ -2777,14 +2783,29 @@ def plot_normalized_quad(
     plt.ylim(0, 1)
 
     def calcuate_survival_function(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Calculate the survival function."""
+        """Calculate the survival function.
+
+        Args:
+            x (np.ndarray): Input array to calculate the survival function from
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Sorted input array and survival function values
+        """
         x = processed_array(x)
         sorted_x = np.sort(x)
         survival_function = 1 - np.arange(1, len(sorted_x) + 1) / len(sorted_x)
         return sorted_x, survival_function
 
     def find_survival_value_at_norm(x: np.ndarray, threshold: float = 1.0) -> float:
-        """Find the value at which the survival function is equal to 1."""
+        """Find the value at which the survival function is equal to 1.
+
+        Args:
+            x (np.ndarray): Input array to calculate the survival function from.
+            threshold (float, optional): Threshold value to find the survival function at. Defaults to 1.0.
+
+        Returns:
+            float: Value of the survival function at the threshold.
+        """
         sorted_x, survival_function = calcuate_survival_function(x)
         return scipy.interpolate.interp1d(
             sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
@@ -2897,10 +2918,6 @@ def plot_normalized_quad(
     # let's select and argmax those storms so we can make a latex table summary
     top_size_storms_ds = pi_ps_ds.isel(storm=top_size_storms)
     top_intensity_storms_ds = pi_ps_ds.isel(storm=top_intensity_storms)
-
-    # print(top_intensity_storms_ds)
-    # print(top_size_storms_ds)
-    # take max indexes
     max_normalized_intensity_indices_da = top_intensity_storms_ds[
         "normalized_intensity"
     ].argmax(dim="date_time")
@@ -2950,10 +2967,10 @@ def plot_normalized_quad(
         "Basin",
         r"Longitude [\(^\circ\)]",
         r"Latitude [\(^\circ\)]",
-        r"\(V_{{ \mathrm{{Obs.}} }} / V_{{ \mathrm{{p}} }}\)",  # CORRECTED
-        r"\(r_{{ \mathrm{{Obs.}} }} / r_{{ 2 }}\)",  # CORRECTED
-        r"\(V_{{ \mathrm{{Obs.}} }}\) [m s\(^{{ -1 }}\)]",  # CORRECTED
-        r"\(r_{{ \mathrm{{Obs.}} }}\) [km]",  # CORRECTED
+        r"\(V_{{ \mathrm{{Obs.}} }} / V_{{ \mathrm{{ p }} }}\)",
+        r"\(r_{{ \mathrm{{Obs.}} }} / r_{{ 2 }}\)",
+        r"\(V_{{ \mathrm{{Obs.}} }}\) [m s\(^{{ -1 }}\)]",
+        r"\(r_{{ \mathrm{{Obs.}} }}\) [km]",
     ]
     # save to latex files
     max_normalized_intensity_storms_df.to_latex(
@@ -3335,13 +3352,14 @@ def run_all_plots():
 
 
 if __name__ == "__main__":
-
     # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
     plot_defaults()
     # run_all_plots()
     # ds = get_vary_vobs_lower_data(num=50, regenerate=True)
     # print(ds)
-    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33, plot_storms=True)
+    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33,
+                         min_sst_c=26.5, max_abs_lat=30,
+                         plot_storms=True)
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
