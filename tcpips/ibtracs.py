@@ -2669,7 +2669,6 @@ def _processed_array(x: np.ndarray) -> np.ndarray:
     return x[~np.isnan(x.ravel())]
 
 
-
 def _calcuate_survival_function(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate the survival function.
 
@@ -2699,6 +2698,12 @@ def _find_survival_value_at_thresh(x: np.ndarray, threshold: float = 1.0) -> flo
     return scipy.interpolate.interp1d(
             sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
         )(threshold)
+
+
+def _proc_to_sf(x: np.ndarray) -> np.ndarray:
+    """Process the input array to return the survival function."""
+    return 1 - np.arange(1, _length_of_array(x) + 1) / _length_of_array(x)
+
 
 def plot_normalized_quad(
     lower_wind_vp: float = 33.0,
@@ -2778,9 +2783,7 @@ def plot_normalized_quad(
 
     axs[0].plot(
         np.sort(_processed_array(max_normalized_intensity.values)),
-        1
-        - np.arange(1, _length_of_array(max_normalized_intensity.values) + 1)
-        / _length_of_array(max_normalized_intensity.values),
+        _proc_to_sf(max_normalized_intensity.values),
     )
     axs[0].set_xlabel(
         r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$"
@@ -2789,23 +2792,17 @@ def plot_normalized_quad(
 
     axs[1].plot(
         np.sort(_processed_array(max_normalized_ps.values)),
-        1
-        - np.arange(1, _length_of_array(max_normalized_ps.values) + 1)
-        / _length_of_array(max_normalized_ps.values),
+        _proc_to_sf(max_normalized_ps.values)
     )
     axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
     axs[2].plot(
         np.sort(_processed_array(max_normalized_cps.values)),
-        1
-        - np.arange(1, _length_of_array(max_normalized_cps.values) + 1)
-        / _length_of_array(max_normalized_cps.values),
+        _proc_to_sf(max_normalized_cps.values)
     )
     axs[2].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
     axs[3].plot(
         np.sort(_processed_array(max_normalized_ps_cat1.values)),
-        1
-        - np.arange(1, _length_of_array(max_normalized_ps_cat1.values) + 1)
-        / _length_of_array(max_normalized_ps_cat1.values),
+        _proc_to_sf(max_normalized_ps_cat1.values)
     )
     axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
     axs[3].set_title(
@@ -2833,7 +2830,7 @@ def plot_normalized_quad(
     plt.close()
     # I want to plot a 2d histogram of the normalized intensity and normalized size
     # using category 1 potential size
-    fig, ax = plt.subplots(1, 1, figsize=get_dim())
+    _, _ = plt.subplots(1, 1, figsize=get_dim())
     plt.hexbin(
         pi_ps_ds["normalized_intensity"].values.ravel(),
         pi_ps_ds["normalized_size_cat1"].values.ravel(),
