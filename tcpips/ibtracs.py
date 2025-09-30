@@ -2646,7 +2646,7 @@ def get_normalized_data(
     return output_ds
 
 
-def perc_gt_1(x: np.ndarray) -> float:
+def _perc_gt_1(x: np.ndarray) -> float:
     """Calculate the percentage of values greater than 1.
     Args:
         x (np.ndarray): Input array to calculate the percentage from.
@@ -2658,6 +2658,47 @@ def perc_gt_1(x: np.ndarray) -> float:
     x = x[~np.isnan(x)]  # Remove NaN values
     return np.sum(x > 1) / len(x) * 100
 
+
+def _length_of_array(x: np.ndarray) -> int:
+    """Return the length of the array, ignoring NaNs."""
+    return np.sum(~np.isnan(x.ravel()))
+
+
+def _processed_array(x: np.ndarray) -> np.ndarray:
+    """Return the array with NaNs removed."""
+    return x[~np.isnan(x.ravel())]
+
+
+
+def _calcuate_survival_function(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Calculate the survival function.
+
+    Args:
+        x (np.ndarray): Input array to calculate the survival function from
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Sorted input array and survival function values
+    """
+    x = _processed_array(x)
+    sorted_x = np.sort(x)
+    survival_function = 1 - np.arange(1, len(sorted_x) + 1) / len(sorted_x)
+    return sorted_x, survival_function
+
+
+def _find_survival_value_at_thresh(x: np.ndarray, threshold: float = 1.0) -> float:
+    """Find the value at which the survival function is equal to 1.
+
+    Args:
+        x (np.ndarray): Input array to calculate the survival function from.
+        threshold (float, optional): Threshold value to find the survival function at. Defaults to 1.0.
+
+    Returns:
+        float: Value of the survival function at the threshold.
+    """
+    sorted_x, survival_function = _calcuate_survival_function(x)
+    return scipy.interpolate.interp1d(
+            sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
+        )(threshold)
 
 def plot_normalized_quad(
     lower_wind_vp: float = 33.0,
@@ -2694,21 +2735,21 @@ def plot_normalized_quad(
     axs[0].set_xlabel(r"$V_{\mathrm{Obs.}} / V_{p}$")
     axs[0].set_ylabel("Count")
     axs[0].set_title(
-        f"{perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
+        f"{_perc_gt_1(pi_ps_ds['normalized_intensity'].values):.1f} % exceedance"
     )
     axs[1].hist(pi_ps_ds["normalized_size_pips"].values.ravel(), bins=400)
     axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
     axs[1].set_title(
-        f"{perc_gt_1(pi_ps_ds['normalized_size_pips'].values):.1f} % exceedance"
+        f"{_perc_gt_1(pi_ps_ds['normalized_size_pips'].values):.1f} % exceedance"
     )
     axs[2].hist(pi_ps_ds["normalized_size_cps"].values.ravel(), bins=600)
     axs[2].set_title(
-        f"{perc_gt_1(pi_ps_ds['normalized_size_cps'].values):.1f} % exceedance"
+        f"{_perc_gt_1(pi_ps_ds['normalized_size_cps'].values):.1f} % exceedance"
     )
     axs[2].set_xlabel(r"$r_{\mathrm{Obs.}} / r_2$")
     axs[3].hist(pi_ps_ds["normalized_size_cat1"].values.ravel(), bins=600)
     axs[3].set_title(
-        f"{perc_gt_1(pi_ps_ds['normalized_size_cat1'].values):.1f} % exceedance"
+        f"{_perc_gt_1(pi_ps_ds['normalized_size_cat1'].values):.1f} % exceedance"
     )
     axs[3].set_xlabel(r"$r_{\mathrm{Obs.}} / r_1$")
     label_subplots(axs)
@@ -2735,19 +2776,11 @@ def plot_normalized_quad(
         sharex=True,
     )
 
-    def length_of_array(x: np.ndarray) -> int:
-        """Return the length of the array, ignoring NaNs."""
-        return np.sum(~np.isnan(x.ravel()))
-
-    def processed_array(x: np.ndarray) -> np.ndarray:
-        """Return the array with NaNs removed."""
-        return x[~np.isnan(x.ravel())]
-
     axs[0].plot(
-        np.sort(processed_array(max_normalized_intensity.values)),
+        np.sort(_processed_array(max_normalized_intensity.values)),
         1
-        - np.arange(1, length_of_array(max_normalized_intensity.values) + 1)
-        / length_of_array(max_normalized_intensity.values),
+        - np.arange(1, _length_of_array(max_normalized_intensity.values) + 1)
+        / _length_of_array(max_normalized_intensity.values),
     )
     axs[0].set_xlabel(
         r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$"
@@ -2755,70 +2788,41 @@ def plot_normalized_quad(
     axs[0].set_ylabel("Survival Function (1 - CDF)")
 
     axs[1].plot(
-        np.sort(processed_array(max_normalized_ps.values)),
+        np.sort(_processed_array(max_normalized_ps.values)),
         1
-        - np.arange(1, length_of_array(max_normalized_ps.values) + 1)
-        / length_of_array(max_normalized_ps.values),
+        - np.arange(1, _length_of_array(max_normalized_ps.values) + 1)
+        / _length_of_array(max_normalized_ps.values),
     )
     axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
     axs[2].plot(
-        np.sort(processed_array(max_normalized_cps.values)),
+        np.sort(_processed_array(max_normalized_cps.values)),
         1
-        - np.arange(1, length_of_array(max_normalized_cps.values) + 1)
-        / length_of_array(max_normalized_cps.values),
+        - np.arange(1, _length_of_array(max_normalized_cps.values) + 1)
+        / _length_of_array(max_normalized_cps.values),
     )
     axs[2].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
     axs[3].plot(
-        np.sort(processed_array(max_normalized_ps_cat1.values)),
+        np.sort(_processed_array(max_normalized_ps_cat1.values)),
         1
-        - np.arange(1, length_of_array(max_normalized_ps_cat1.values) + 1)
-        / length_of_array(max_normalized_ps_cat1.values),
+        - np.arange(1, _length_of_array(max_normalized_ps_cat1.values) + 1)
+        / _length_of_array(max_normalized_ps_cat1.values),
     )
     axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
     axs[3].set_title(
-        f"{perc_gt_1(max_normalized_ps_cat1.values):.1f} % exceedance"
+        f"{_perc_gt_1(max_normalized_ps_cat1.values):.1f} % exceedance"
     )  # add the percentage of exceedance
     label_subplots(axs, override="outside")
     plt.xlim(0, 3)
     plt.ylim(0, 1)
 
-    def calcuate_survival_function(x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Calculate the survival function.
-
-        Args:
-            x (np.ndarray): Input array to calculate the survival function from
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: Sorted input array and survival function values
-        """
-        x = processed_array(x)
-        sorted_x = np.sort(x)
-        survival_function = 1 - np.arange(1, len(sorted_x) + 1) / len(sorted_x)
-        return sorted_x, survival_function
-
-    def find_survival_value_at_norm(x: np.ndarray, threshold: float = 1.0) -> float:
-        """Find the value at which the survival function is equal to 1.
-
-        Args:
-            x (np.ndarray): Input array to calculate the survival function from.
-            threshold (float, optional): Threshold value to find the survival function at. Defaults to 1.0.
-
-        Returns:
-            float: Value of the survival function at the threshold.
-        """
-        sorted_x, survival_function = calcuate_survival_function(x)
-        return scipy.interpolate.interp1d(
-            sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
-        )(threshold)
-
     axs[0].set_title(
-        f"{find_survival_value_at_norm(max_normalized_intensity.values)*100:.1f} % exceedance"
+        f"{_find_survival_value_at_thresh(max_normalized_intensity.values)*100:.1f} % exceedance"
     )
     axs[1].set_title(
-        f"{find_survival_value_at_norm(max_normalized_ps.values)*100:.1f} % exceedance"
+        f"{_find_survival_value_at_thresh(max_normalized_ps.values)*100:.1f} % exceedance"
     )
     axs[2].set_title(
-        f"{find_survival_value_at_norm(max_normalized_cps.values)*100:.1f} % exceedance"
+        f"{_find_survival_value_at_thresh(max_normalized_cps.values)*100:.1f} % exceedance"
     )
     plt.savefig(
         os.path.join(FIGURE_PATH, "normalized_quad_cdf.pdf"),
@@ -3076,10 +3080,10 @@ def get_vary_vp_lower_data(
             pi_ps_ds = get_normalized_data(
                 lower_wind_vp=vp_lower, lower_wind_obs=lower_wind_obs
             )
-            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
-            ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
-            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
-            intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+            ps_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
+            ps_cat1_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
+            ps_obs_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
+            intensity_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_intensity"].values)
 
         # save the data to a xarray dataset
         vp_lower_ds = xr.Dataset(
@@ -3139,10 +3143,10 @@ def get_vary_vobs_lower_data(
                 lower_wind_vp=lower_wind_vp, lower_wind_obs=vobs_lower
             )
             pi_ps_ds = before_2025(pi_ps_ds)
-            ps_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
-            ps_cat1_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
-            ps_obs_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
-            intensity_exceedance[i] = perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+            ps_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
+            ps_cat1_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
+            ps_obs_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
+            intensity_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_intensity"].values)
 
         # save the data to a xarray dataset
         vobs_lower_ds = xr.Dataset(
