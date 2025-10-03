@@ -20,6 +20,7 @@ from typing import Optional, Tuple, Union, List
 import os
 import numpy as np
 from numpy.typing import ArrayLike
+import pandas as pd
 import scipy
 import scipy.interpolate
 import xarray as xr
@@ -68,6 +69,9 @@ IBTRACS_DATA_URL = "https://www.ncei.noaa.gov/data/international-best-track-arch
 IBTRACS_DATA_FILE = os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc")
 FIGURE_PATH = os.path.join(PROJECT_PATH, "img", "ibtracs")
 os.makedirs(FIGURE_PATH, exist_ok=True)
+
+LOWER_VP_DEFAULT = 33 # m/s
+LOWER_WIND_OBS_DEFAULT = 33 # m/s
 
 
 def download_ibtracs_data() -> None:
@@ -2581,8 +2585,8 @@ def save_basin_names():
 
 @timeit
 def get_normalized_data(
-    lower_wind_vp: float = 33.0, # m/s at 10m
-    lower_wind_obs: float = 33.0, # m/s at 10m
+    lower_wind_vp: float = LOWER_VP_DEFAULT, # m/s at 10m
+    lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT, # m/s at 10m
     v_reduc: float = 0.8, # reduction factor from gradient wind to 10m
     max_abs_lat: Optional[float] = None, # degrees
     min_sst_c: Optional[float] = None, # degrees C
@@ -2706,8 +2710,8 @@ def _proc_to_sf(x: np.ndarray) -> np.ndarray:
 
 
 def plot_normalized_quad(
-    lower_wind_vp: float = 33.0,
-    lower_wind_obs: float = 33.0,
+    lower_wind_vp: float = LOWER_VP_DEFAULT,
+    lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
     min_sst_c: Optional[float] = None,
     max_abs_lat: Optional[float] = None,
     plot_storms: bool = False
@@ -3027,6 +3031,82 @@ def plot_normalized_quad(
         caption=r"Top storms by normalized size \(r_{{ \mathrm{{ max }} }} / r_{{ 2 }}\), selected at the point of their maximum normalized intensity.",
         label="tab:norm_size_storms",
     )
+
+
+def get_exceedance_val(
+        lower_wind_vp: float = LOWER_VP_DEFAULT,
+        lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
+        min_sst_c: Optional[float] = None,
+        max_abs_lat: Optional[float] = None,
+) -> dict:
+    """Get the exceedance values for the normalized variables.
+
+    Args:
+        lower_wind_vp (float, optional): Lower wind speed threshold for potential intensity. Defaults to 33 m/s.
+        lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed. Defaults to 33 m/s.
+        min_sst_c (Optional[float], optional): Minimum sea surface temperature in Celsius for filtering. Defaults to None.
+        max_abs_lat (Optional[float], optional): Maximum absolute latitude for filtering. Defaults to None.
+
+    Returns:
+        dict: Dictionary containing the exceedance values for the normalized variables.
+    """
+    pips_ds = get_normalized_data(
+        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs, min_sst_c=min_sst_c, max_abs_lat=max_abs_lat
+    )
+    return {var: _find_survival_value_at_thresh(pips_ds[var].max(dim="date_time").values) * 100  for var in
+        ["normalized_intensity",
+        "normalized_size_pips",
+        "normalized_size_cps",
+        "normalized_size_cat1"]}
+
+
+def create_exceedance_table(lower_wind_vp=LOWER_VP_DEFAULT,
+                            lower_wind_obs=LOWER_WIND_OBS_DEFAULT) -> None:
+    """Try and impose different filters and see how the exceedance changes."""
+    print("ok")
+    d = None
+    for min_sst_c in [None, 26.5]:
+        for max_abs_lat in [None, 30, 40]:
+            res = get_exceedance_val(
+                lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs, min_sst_c=min_sst_c, max_abs_lat=max_abs_lat)
+            # could make this simpler with collections.defaultdict
+            if d is None:
+                d = {key: [val] for key, val in res.items()}
+                d["min_sst_c"] = [min_sst_c if min_sst_c is not None else np.nan]
+                d["max_abs_lat"] = [max_abs_lat if max_abs_lat is not None else np.nan]
+            else:
+                for key, val in res.items():
+                    d[key].append(val)
+                d["min_sst_c"].append(min_sst_c if min_sst_c is not None else np.nan)
+                d["max_abs_lat"].append(max_abs_lat if max_abs_lat is not None else np.nan)
+    df = pd.DataFrame(d, columns=[
+        "min_sst_c",
+        "max_abs_lat",
+        "normalized_intensity",
+        "normalized_size_pips",
+        "normalized_size_cps",
+        "normalized_size_cat1",
+    ])
+
+    df.to_latex(
+        os.path.join(DATA_PATH, "exceedance_table.tex"),
+        index=False,
+        float_format="%.2f",
+        na_rep="--", # Explicitly represent NaN as '--'
+        header=[
+            "Min SST [\(^\circ\)C]",
+            "Max Lat [\(^\circ\)]",
+            r"\(\max_{{\mathrm{{ Storm }} }}\left(V_{{ \mathrm{{Obs.}} }} / V_{{\mathrm{{p}}}}\right)\) [\%]",
+            r"\(\max_{{\mathrm{{ Storm }} }}\left(r_{{ \mathrm{{Obs.}} }} / r_{{3}}\right)\) [\%]",
+            r"\(\max_{{\mathrm{{ Storm }} }}\left(r_{{ \mathrm{{Obs.}} }} / r_{{2}}\right)\) [\%]",
+            r"\(\max_{{\mathrm{{ Storm }} }}\left(r_{{ \mathrm{{Obs.}} }} / r_{{1}}\right)\) [\%]",
+        ],
+        caption="The fraction of storms that whose normalized variables exceed one under different filtering conditions.",
+        label="tab:exceedance_conditions",
+    )
+    # check it looks ok
+    with open(os.path.join(DATA_PATH, "exceedance_table.tex"), "r") as f:
+        print(f.read())
 
 
 # Question: does the velocity size tradeoff look the same shape for all storms in this normalized space?
@@ -3390,8 +3470,9 @@ def run_all_plots():
 if __name__ == "__main__":
     # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
-    plot_defaults()
-    run_all_plots()
+    #plot_defaults()
+    # run_all_plots()
+    create_exceedance_table()
     # ds = get_vary_vobs_lower_data(num=50, regenerate=True)
     # print(ds)
     #plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33,
