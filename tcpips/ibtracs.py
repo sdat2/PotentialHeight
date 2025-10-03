@@ -2828,6 +2828,39 @@ def plot_normalized_quad(
     )
     plt.clf()
     plt.close()
+
+    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=0.5), sharey=True, sharex=True)
+    # just plot norm VP norm CPS and  CDF for simplicity for presentation
+    axs[0].plot(
+        np.sort(_processed_array(max_normalized_intensity.values)),
+        _proc_to_sf(max_normalized_intensity.values),
+        label=r"$V_{\mathrm{Obs.}} / V_{\mathrm{p}}$",
+    )
+    axs[1].plot(
+        np.sort(_processed_array(max_normalized_cps.values)),
+        _proc_to_sf(max_normalized_cps.values),
+        label=r"$r_{\mathrm{Obs.}} / r_2$",
+    )
+    axs[0].set_ylabel("Survival Function (1 - CDF)")
+    axs[0].set_xlabel(r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$")
+    axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
+    axs[0].set_title(
+        f"{_find_survival_value_at_thresh(max_normalized_intensity.values)*100:.1f} % exceedance"
+    )
+    axs[1].set_title(
+        f"{_find_survival_value_at_thresh(max_normalized_cps.values)*100:.1f} % exceedance"
+    )
+    label_subplots(axs, override="outside")
+    plt.xlim(0, 2)
+    plt.ylim(0, 1)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_vp_cps_cdf.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
     # I want to plot a 2d histogram of the normalized intensity and normalized size
     # using category 1 potential size
     _, _ = plt.subplots(1, 1, figsize=get_dim())
@@ -3017,11 +3050,11 @@ def compare_normalized_potential_size(
         lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs
     )
     pi_ps_ds["norm_potential_size"] = (
-        pi_ps_ds["potential_size_vp"] / pi_ps_ds["potential_size_cat1"]
+        pi_ps_ds["normalized_size_pips"] / pi_ps_ds["normalized_size_cat1"]
     )
     before_2025(pi_ps_ds)
     plt.hexbin(
-        pi_ps_ds["potential_size_cat1"].values.ravel() / 1000,
+        pi_ps_ds["normalized_size_cat1"].values.ravel() / 1000,
         pi_ps_ds["norm_potential_size"].values.ravel(),
         gridsize=100,
         cmap="cmo.thermal",
@@ -3029,8 +3062,8 @@ def compare_normalized_potential_size(
         bins="log",
     )
     plt.colorbar(label="Log Count")
-    plt.xlabel(r"Potential size for cat1 $r_1$ [km]")
-    plt.ylabel(r"Normalized potential size $r_3 / r_1$")
+    plt.xlabel(r"Cat1 potential inner size $r_1$ [km]")
+    plt.ylabel(r"Normalized potential inner size $r_3 / r_1$")
     plt.savefig(os.path.join(FIGURE_PATH, "norm_ps.pdf"))
     plt.clf()
     plt.close()
@@ -3121,6 +3154,8 @@ def get_vary_vobs_lower_data(
         lower_vobs_min (float, optional): Minimum lower limit for observed wind speed. Defaults to 18 m/s.
         lower_vobs_max (float, optional): Maximum lower limit for observed wind speed. Defaults to 83 m/s.
         lower_wind_vp (float, optional): Lower limit for potential intensity wind speed. Defaults to 33 m/s.
+        regenerate (bool, optional): If True, regenerate the dataset even if it exists. Defaults to False.
+
     Returns:
         xr.Dataset: Dataset containing the exceedance of normalized variables for varying lower limits of observed wind speed.
     """
@@ -3356,11 +3391,11 @@ if __name__ == "__main__":
     # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
     plot_defaults()
-    # run_all_plots()
+    run_all_plots()
     # ds = get_vary_vobs_lower_data(num=50, regenerate=True)
     # print(ds)
-    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33,
-                         min_sst_c=26.5, max_abs_lat=30,
-                         plot_storms=True)
+    #plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33,
+    #                     min_sst_c=26.5, max_abs_lat=30,
+    #                     plot_storms=False)
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
