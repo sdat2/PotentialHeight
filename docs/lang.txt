@@ -1,18 +1,20 @@
-github.com/AlDanial/cloc v 2.04  T=0.14 s (1021.1 files/s, 166561.5 lines/s)
+cloc --report-file=docs/lang.txt  $(git ls-files) --exclude-ext=json,ya
+ml,csv
+github.com/AlDanial/cloc v 2.06  T=0.29 s (499.2 files/s, 111257.0 lines/s)
 --------------------------------------------------------------------------------
 Language                      files          blank        comment           code
 --------------------------------------------------------------------------------
-Python                           62           2318           4349          11947
+Python                           68           3298           6524          17264
 MATLAB                           19            430           1207           1132
-YAML                             18             10             19            315
-Bourne Again Shell               23            289            611            313
-Markdown                         10            119              0            251
-reStructuredText                  8            143            277            163
-Text                              3              3              0             38
+Bourne Again Shell               28            350            716            393
+Markdown                         10            124              0            263
+reStructuredText                  9            154            298            177
+Text                              5              3              0             75
+YAML                              3              9             10             67
 TeX                               1              0              0             14
 make                              1              4              7              9
 INI                               1              2              0              5
 Bourne Shell                      1              0              1              2
 --------------------------------------------------------------------------------
-SUM:                            147           3318           6471          14189
+SUM:                            146           4374           8763          19401
 --------------------------------------------------------------------------------
