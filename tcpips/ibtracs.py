@@ -16,7 +16,7 @@ TODO: standardize all the terminology to Cat1 Potential Inner Size (r_1), Corres
 
 """
 
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple, Union, List, Literal
 import os
 import numpy as np
 from numpy.typing import ArrayLike
@@ -2582,6 +2582,226 @@ def save_basin_names():
     with open(os.path.join(IBTRACS_DATA_PATH, "basin_names.yaml"), "w") as f:
         yaml.dump(basin_names_d, f, default_flow_style=False, allow_unicode=True)
 
+import xarray as xr
+import numpy as np
+import pandas as pd
+
+def _run_doctests():
+    """
+    Runs doctests for the vectorized functional implementation.
+
+    This function contains the setup for a sample dataset and executes the
+    doctest module to verify that all functions produce the expected output.
+    It serves as a self-contained unit test for the script.
+
+    Doctests:
+        >>> # --- Setup a comprehensive sample dataset ---
+        >>> times = pd.date_range('2025-01-01', periods=8, freq='6H')
+        >>> storm_ids = ["UNLIMITED", "COLD_WATER", "LANDFALL", "TRUNCATE_ME"]
+        >>> data = {
+        ...     'vmax_obs_10m': (('storm', 'date_time'), [
+        ...         [30, 40, 50, 48, 46, 44, 42, 40], # UNLIMITED
+        ...         [30, 40, 50, 48, 46, 44, 42, 40], # COLD_WATER
+        ...         [30, 40, 50, 48, 46, 44, 42, 40], # LANDFALL
+        ...         [30, 40, 50, 52, 53, 50, 48, 45]  # TRUNCATE_ME
+        ...     ]),
+        ...     'vmax_vp_10m': (('storm', 'date_time'), [
+        ...         [70, 65, 60, 55, 52, 51, 51, 50], # Stays >= 50
+        ...         [70, 65, 60, 45, 40, 38, 35, 30], # Drops to 45 < 50
+        ...         [70, 65, 60,  0,  0,  0,  0,  0], # Drops to 0
+        ...         [60, 55, 52, 51, 55, 56, 54, 50]  # Actual > potential at t=3
+        ...     ])
+        ... }
+        >>> coords = {'storm': storm_ids, 'date_time': times}
+        >>> sample_ds = xr.Dataset(data, coords=coords)
+        >>>
+        >>> # --- Step 1: Vectorized LMI pre-computation ---
+        >>> lmi_info = precompute_lmi_info_vectorized(sample_ds)
+        >>>
+        >>> # --- Step 2: Pass LMI info to vectorized filter functions ---
+        >>> unlimited = filter_unlimited_storms_vectorized(sample_ds, lmi_info)
+        >>> print(f"Unlimited: {list(unlimited.storm.values)}")
+        Unlimited: ['UNLIMITED', 'TRUNCATE_ME']
+        >>> cold_water = filter_cold_water_limited_storms_vectorized(sample_ds, lmi_info)
+        >>> print(f"Cold Water Limited: {list(cold_water.storm.values)}")
+        Cold Water Limited: ['COLD_WATER']
+        >>> landfall = filter_landfall_limited_storms_vectorized(sample_ds, lmi_info)
+        >>> print(f"Landfall Limited: {list(landfall.storm.values)}")
+        Landfall Limited: ['LANDFALL']
+        >>>
+        >>> # --- Test the truncation function (NaNing out data) ---
+        >>> truncated_ds = truncate_records_vectorized(sample_ds)
+        >>> storm_to_check = truncated_ds.sel(storm='TRUNCATE_ME')
+        >>> print(f"Original length: {sample_ds.sizes['date_time']}, Truncated length: {storm_to_check.sizes['date_time']}")
+        Original length: 8, Truncated length: 8
+        >>> print(f"NaN count in truncated data: {int(storm_to_check.vmax_obs_10m.isnull().sum())}")
+        NaN count in truncated data: 4
+    """
+    import doctest
+    doctest.testmod()
+
+
+def precompute_lmi_info_vectorized(
+    ds: xr.Dataset,
+    obs_wind_var: str = "vmax_obs_10m"
+) -> xr.Dataset:
+    """
+    Vectorized calculation of Lifetime Maximum Intensity (LMI) info.
+
+    This function uses efficient groupby operations to find the peak wind speed
+    and the time of that peak for every storm in the dataset.
+
+    Args:
+        ds (xr.Dataset): The input dataset with storm and date_time dimensions.
+        obs_wind_var (str, optional): The name of the variable for observed
+            maximum wind speed. Defaults to "vmax_obs_10m".
+
+    Returns:
+        xr.Dataset: A dataset with 'storm' as the only dimension, containing
+                    'lmi_wind' and 't_lmi' DataArrays for each storm.
+    """
+    lmi_wind = ds[obs_wind_var].groupby('storm').max(skipna=True)
+    t_lmi = ds[obs_wind_var].groupby('storm').idxmax(dim='date_time')
+    return xr.Dataset({'lmi_wind': lmi_wind, 't_lmi': t_lmi})
+
+
+def _get_time_window_mask(ds: xr.Dataset, lmi_info: xr.Dataset, window_hours: int) -> xr.DataArray:
+    """
+    Helper to create a boolean mask for the time window after LMI.
+
+    Args:
+        ds (xr.Dataset): The full storm dataset with a 'date_time' coordinate.
+        lmi_info (xr.Dataset): The pre-computed LMI dataset from
+            `precompute_lmi_info_vectorized`.
+        window_hours (int): The duration of the window in hours.
+
+    Returns:
+        xr.DataArray: A boolean DataArray with the same dimensions as `ds` that
+                      is True for each storm within its specific time window.
+    """
+    start_times = lmi_info['t_lmi']
+    end_times = lmi_info['t_lmi'] + pd.Timedelta(hours=window_hours)
+    return (ds.date_time >= start_times) & (ds.date_time <= end_times)
+
+
+def filter_unlimited_storms_vectorized(
+    ds: xr.Dataset,
+    lmi_info: xr.Dataset,
+    potential_wind_var: str = "vmax_vp_10m"
+) -> xr.Dataset:
+    """
+    Vectorized filter for storms not limited by declining PI (Section 3).
+
+    This function identifies storms where the potential intensity does not fall
+    below the storm's lifetime maximum intensity within a 72-hour window
+    after the peak.
+
+    Args:
+        ds (xr.Dataset): The full storm dataset.
+        lmi_info (xr.Dataset): Pre-computed LMI data.
+        potential_wind_var (str, optional): Variable name for potential
+            intensity. Defaults to "vmax_vp_10m".
+
+    Returns:
+        xr.Dataset: A new dataset containing only the "unlimited" storms.
+    """
+    time_mask = _get_time_window_mask(ds, lmi_info, 72)
+    pi_drops_mask = ds[potential_wind_var] < lmi_info['lmi_wind']
+    is_limited = (pi_drops_mask & time_mask).groupby('storm').any()
+    sids_to_keep = is_limited.where(~is_limited, drop=True).storm
+    return ds.sel(storm=sids_to_keep)
+
+
+def filter_cold_water_limited_storms_vectorized(
+    ds: xr.Dataset,
+    lmi_info: xr.Dataset,
+    potential_wind_var: str = "vmax_vp_10m",
+    landfall_pi_threshold: float = 0.0
+) -> xr.Dataset:
+    """
+    Vectorized filter for storms limited by cold water (Section 4).
+
+    Identifies storms where PI drops below LMI within 24 hours of the peak,
+    but does not drop to the landfall threshold.
+
+    Args:
+        ds (xr.Dataset): The full storm dataset.
+        lmi_info (xr.Dataset): Pre-computed LMI data.
+        potential_wind_var (str, optional): Variable name for potential
+            intensity. Defaults to "vmax_vp_10m".
+        landfall_pi_threshold (float, optional): The PI value (m/s) that
+            signifies landfall. Defaults to 0.0.
+
+    Returns:
+        xr.Dataset: A new dataset with only storms limited by cold water.
+    """
+    time_mask = _get_time_window_mask(ds, lmi_info, 24)
+    pi_drops_mask = ds[potential_wind_var] < lmi_info['lmi_wind']
+    storm_is_limited = (pi_drops_mask & time_mask).groupby('storm').any()
+    not_landfall_mask = ds[potential_wind_var] > landfall_pi_threshold
+    storm_is_not_landfall = not_landfall_mask.where(time_mask).groupby('storm').all(skipna=True)
+    sids_to_keep = (storm_is_limited & storm_is_not_landfall).where(lambda x: x, drop=True).storm
+    return ds.sel(storm=sids_to_keep)
+
+
+def filter_landfall_limited_storms_vectorized(
+    ds: xr.Dataset,
+    lmi_info: xr.Dataset,
+    potential_wind_var: str = "vmax_vp_10m",
+    landfall_pi_threshold: float = 0.0
+) -> xr.Dataset:
+    """
+    Vectorized filter for storms limited by landfall (Section 5).
+
+    Identifies storms where PI drops to the landfall threshold within 24 hours
+    of reaching its LMI.
+
+    Args:
+        ds (xr.Dataset): The full storm dataset.
+        lmi_info (xr.Dataset): Pre-computed LMI data.
+        potential_wind_var (str, optional): Variable name for potential
+            intensity. Defaults to "vmax_vp_10m".
+        landfall_pi_threshold (float, optional): The PI value (m/s) that
+            signifies landfall. Defaults to 0.0.
+
+    Returns:
+        xr.Dataset: A new dataset containing only storms limited by landfall.
+    """
+    time_mask = _get_time_window_mask(ds, lmi_info, 24)
+    landfall_mask = ds[potential_wind_var] <= landfall_pi_threshold
+    storm_makes_landfall = (landfall_mask & time_mask).groupby('storm').any()
+    sids_to_keep = storm_makes_landfall.where(storm_makes_landfall, drop=True).storm
+    return ds.sel(storm=sids_to_keep)
+
+
+def truncate_records_vectorized(
+    ds: xr.Dataset,
+    obs_wind_var: str = "vmax_obs_10m",
+    potential_wind_var: str = "vmax_vp_10m"
+) -> xr.Dataset:
+    """
+    Vectorized truncation of storm records, replacing invalid data with NaN.
+
+    This function invalidates all data points for a storm after the first time
+    its actual intensity exceeds its potential intensity. Instead of dropping these
+    time steps, it fills them with NaN, preserving the original time dimension.
+
+    Args:
+        ds (xr.Dataset): The full storm dataset.
+        obs_wind_var (str, optional): Variable name for observed wind speed.
+            Defaults to "vmax_obs_10m".
+        potential_wind_var (str, optional): Variable name for potential
+            intensity. Defaults to "vmax_vp_10m".
+
+    Returns:
+        xr.Dataset: A new dataset of the same size as the input, where data
+                    violating the condition has been replaced by NaN.
+    """
+    is_below_potential = ds[obs_wind_var] < ds[potential_wind_var]
+    violation_count = (~is_below_potential).groupby('storm').cumsum()
+    mask_to_keep = (violation_count <= 1) if (~is_below_potential).any() else violation_count == 0
+    return ds.where(mask_to_keep)
+
 
 @timeit
 def get_normalized_data(
@@ -2590,6 +2810,8 @@ def get_normalized_data(
     v_reduc: float = 0.8, # reduction factor from gradient wind to 10m
     max_abs_lat: Optional[float] = None, # degrees
     min_sst_c: Optional[float] = None, # degrees C
+    emanuel_filter: Optional[Literal["landfall_limited", "cold_water_limited", "unlimited"]] = None,
+
 ) -> xr.Dataset:
     """
     Get the normalized data from the IBTrACS dataset.
@@ -2600,6 +2822,7 @@ def get_normalized_data(
         v_reduc (float, optional): Reduction factor for the potential intensity. Defaults to 0.8.
         max_abs_lat (float, optional): Maximum absolute latitude for filtering. Defaults to None.
         min_sst_c (float, optional): Minimum sea surface temperature in Celsius for filtering. Defaults to None.
+        emanuel_filter (Optional[Literal["landfall_limited", "cold_water_limited", "unlimited"]], optional): Defaults to None
 
     Returns:
         xr.Dataset: The normalized dataset.
@@ -2647,6 +2870,17 @@ def get_normalized_data(
     output_ds["vmax_obs_10m"] = datasets["ibtracs_ds"]["usa_wind"] * 0.514444
     output_ds["vmax_vp_10m"] = output_ds["vmax"] * v_reduc
     output_ds = before_2025(output_ds)
+    if emanuel_filter is not None:
+        lmi_info = precompute_lmi_info_vectorized(datasets["ibtracs_ds"])
+        if emanuel_filter == "landfall_limited":
+            output_ds = filter_landfall_limited_storms_vectorized(output_ds, lmi_info)
+        elif emanuel_filter == "cold_water_limited":
+            output_ds = filter_cold_water_limited_storms_vectorized(output_ds, lmi_info)
+        elif emanuel_filter == "unlimited":
+            output_ds = filter_unlimited_storms_vectorized(output_ds, lmi_info)
+        else:
+            raise ValueError(f"Invalid emanuel_filter value: {emanuel_filter}. Must be one of 'landfall_limited', 'cold_water_limited', or 'unlimited'.")
+        output_ds = truncate_records_vectorized(output_ds)
     return output_ds
 
 
