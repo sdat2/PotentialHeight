@@ -70,8 +70,8 @@ IBTRACS_DATA_FILE = os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc
 FIGURE_PATH = os.path.join(PROJECT_PATH, "img", "ibtracs")
 os.makedirs(FIGURE_PATH, exist_ok=True)
 
-LOWER_VP_DEFAULT = 33 # m/s
-LOWER_WIND_OBS_DEFAULT = 33 # m/s
+LOWER_VP_DEFAULT = 33  # m/s
+LOWER_WIND_OBS_DEFAULT = 33  # m/s
 
 
 def download_ibtracs_data() -> None:
@@ -1474,6 +1474,25 @@ def _intersection(lst1: list, lst2: list) -> list:
     return list(set(lst1).intersection(set(lst2)))
 
 
+def na_landing_tcs() -> xr.Dataset:
+    """
+    Get North Atlantic tropical storms that made landfall in the USA.
+
+    Returns:
+        xr.Dataset: Filtered dataset.
+    """
+    ds = xr.open_dataset(os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc"))
+    filtered_ds = filter_by_labels(
+        ds,
+        filter=[
+            ("basin", [b"NA"]),
+            ("nature", [b"TS"]),
+            ("usa_record", [b"L"]),
+        ],
+    )
+    return filtered_ds
+
+
 def filter_by_labels(
     ds: xr.Dataset,
     filter: List[Tuple[str, List[str]]] = [
@@ -2096,7 +2115,9 @@ def _plot_tc_track(
     plt.close()
 
 
-def get_tc_ds(basin: str = b"NA", subbasin: str = b"GM", name: str = b"KATRINA") -> xr.Dataset:
+def get_tc_ds(
+    basin: str = b"NA", subbasin: str = b"GM", name: str = b"KATRINA"
+) -> xr.Dataset:
     """
     Get a tropical cyclone from the IBTrACS dataset.
 
@@ -2135,7 +2156,7 @@ def get_tc_ds(basin: str = b"NA", subbasin: str = b"GM", name: str = b"KATRINA")
 
 
 def calculate_cps_ds(tc_inputs_ds: xr.Dataset) -> xr.Dataset:
-    """ Calculate the potential size dataset from the tropical cyclone inputs.
+    """Calculate the potential size dataset from the tropical cyclone inputs.
 
     Args:
         tc_inputs_ds (xr.Dataset): Dataset containing the tropical cyclone inputs.
@@ -2160,7 +2181,7 @@ def vary_v_cps(
     subbasin=b"GM",
     timestep: int = 30,
     steps: int = 60,
-    v33 = 33, # m/s, threshold for category 1 hurricane
+    v33=33,  # m/s, threshold for category 1 hurricane
 ) -> None:
     """
     I want to vary the velocity input to the potential size calculation from the
@@ -2192,26 +2213,28 @@ def vary_v_cps(
         ps_ds.rmax.values / 1000,  # convert m to km
     )(tc_inputs_ds.usa_wind.values * 0.514444)
     radii = ps_ds.rmax.values / 1000  # convert m to km
-    velocities = vs * v_reduc # convert to 10m height
+    velocities = vs * v_reduc  # convert to 10m height
     r3 = tc_pi_ps_ds.rmax.values / 1000  # convert m to km
     vp = tc_pi_ps_ds.vmax.values * v_reduc  # convert to 10m height
     robs = tc_inputs_ds.usa_rmw.values * 1852 / 1000  # convert nautical miles to km
     vobs = tc_inputs_ds.usa_wind.values * 0.514444  # convert knots to m/s
     ymin = min(
-            [
-                min(
-                    [
-                        np.nanmin(radii),
-                        robs,
-                    ],
-                ),
-                0,
-            ]
-        )
+        [
+            min(
+                [
+                    np.nanmin(radii),
+                    robs,
+                ],
+            ),
+            0,
+        ]
+    )
     ymax = np.nanmax(radii) + 1
     xmin = v33
     xmax = np.nanmax(ps_ds.vmax.values * v_reduc)
-    _plot_vary_v_cps(velocities, radii, v33, vobs, vp, r1, r2, r3, robs, ymin, ymax, xmin, xmax)
+    _plot_vary_v_cps(
+        velocities, radii, v33, vobs, vp, r1, r2, r3, robs, ymin, ymax, xmin, xmax
+    )
     plt.savefig(
         os.path.join(FIGURE_PATH, f"vary_v_ps_{name.decode().lower()}.pdf"),
         dpi=300,
@@ -2228,7 +2251,7 @@ def ani_vary_v_cps(
     subbasin=b"GM",
     timestep_end: int = 80,
     steps: int = 20,
-    v33 = 33, # m/s, threshold for category 1 hurricane
+    v33=33,  # m/s, threshold for category 1 hurricane
 ) -> None:
     """
     Animate the potential size trade off for varying velocities.
@@ -2257,12 +2280,19 @@ def ani_vary_v_cps(
     if np.any(nan_times):
         last_non_nan_index = np.where(~nan_times)[0][-1]
         if last_non_nan_index < timestep_end:
-            print(f"Trimming timestep_end from {timestep_end} to {last_non_nan_index + 1} for {name.decode()}.")
+            print(
+                f"Trimming timestep_end from {timestep_end} to {last_non_nan_index + 1} for {name.decode()}."
+            )
             timestep_end = last_non_nan_index + 1
 
     tc_pi_ps_ds = tc_pi_ps_ds.isel(date_time=slice(0, timestep_end))
     tc_inputs_ds = tc_inputs_ds.isel(date_time=slice(0, timestep_end))
-    vs = np.array([np.linspace(v33 / v_reduc, vmax, num=steps) for vmax in tc_pi_ps_ds.vmax.values])
+    vs = np.array(
+        [
+            np.linspace(v33 / v_reduc, vmax, num=steps)
+            for vmax in tc_pi_ps_ds.vmax.values
+        ]
+    )
     ps_ds_file_path = os.path.join(DATA_PATH, f"vary_v_ps_{name.decode().lower()}.nc")
     tc_inputs_ds["vmax"] = (("date_time", "v"), vs)
 
@@ -2278,10 +2308,14 @@ def ani_vary_v_cps(
 
     ymin = 0
     ymax = np.nanmax(ps_ds.rmax.values / 1000) + 1  # convert m to km
-    xmin = min(v33, np.nanmin(tc_inputs_ds.usa_rmw.values * 1852 / 1000 ))
+    xmin = min(v33, np.nanmin(tc_inputs_ds.usa_rmw.values * 1852 / 1000))
     xmax = np.nanmax(ps_ds.vmax.values * v_reduc)
 
-    for i in [j for j in range(timestep_end) if not np.isnan(ps_ds.isel(date_time=j).time.values[0])]:
+    for i in [
+        j
+        for j in range(timestep_end)
+        if not np.isnan(ps_ds.isel(date_time=j).time.values[0])
+    ]:
         ps_ds_i = ps_ds.isel(date_time=i)
         tc_pi_ps_ds_i = tc_pi_ps_ds.isel(date_time=i)
         tc_inputs_ds_i = tc_inputs_ds.isel(date_time=i)
@@ -2316,9 +2350,11 @@ def ani_vary_v_cps(
             xmin,
             xmax,
         )
-        figure_name = os.path.join(img_folder, f"vary_v_ps_{name.decode().lower()}_{i:03d}.png")
+        figure_name = os.path.join(
+            img_folder, f"vary_v_ps_{name.decode().lower()}_{i:03d}.png"
+        )
         figure_name_l.append(figure_name)
-        time_str = str(tc_pi_ps_ds_i["time"].dt.strftime('%Y-%m-%d %H:%M').item())
+        time_str = str(tc_pi_ps_ds_i["time"].dt.strftime("%Y-%m-%d %H:%M").item())
         sst = tc_inputs_ds_i.sst.values
         if np.isnan(sst):
             ts_str = "-----"
@@ -2330,7 +2366,12 @@ def ani_vary_v_cps(
         else:
             t0_str = f"{t0-273.15:.1f}$^\circ$C"
 
-        title = name.decode().capitalize() + " " + time_str + f", $T_s$= {ts_str}, $T_0$={t0_str}"
+        title = (
+            name.decode().capitalize()
+            + " "
+            + time_str
+            + f", $T_s$= {ts_str}, $T_0$={t0_str}"
+        )
 
         plt.title(title)
         plt.savefig(
@@ -2351,7 +2392,21 @@ def ani_vary_v_cps(
             writer.append_data(image)
 
 
-def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r1, r2, r3, robs, ymin, ymax, xmin, xmax) -> None:
+def _plot_vary_v_cps(
+    velocities: np.ndarray,
+    radii: np.ndarray,
+    v33,
+    vobs,
+    vp,
+    r1,
+    r2,
+    r3,
+    robs,
+    ymin,
+    ymax,
+    xmin,
+    xmax,
+) -> None:
     """
     Plot the potential size trade off for varying velocities.
 
@@ -2489,12 +2544,8 @@ def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r
         ],
         labels=[
             r"$V \mathrm{cat1}$" + f"={v33:.1f}" + r" m s$^{-1}$",
-            r"$V_{\mathrm{Obs.}}$"
-            + f"={vobs:.1f}"
-            + r" m s$^{-1}$",
-            r"$V_{\mathrm{p}}$ @10m"
-            + f"={vp:.1f}"
-            + r" m s$^{-1}$",
+            r"$V_{\mathrm{Obs.}}$" + f"={vobs:.1f}" + r" m s$^{-1}$",
+            r"$V_{\mathrm{p}}$ @10m" + f"={vp:.1f}" + r" m s$^{-1}$",
         ],
     )
 
@@ -2509,8 +2560,7 @@ def _plot_vary_v_cps(velocities: np.ndarray, radii: np.ndarray, v33, vobs, vp, r
     if robs is not None and not np.isnan(robs):
         significant_radii = np.append(significant_radii, robs)
         sr_labels.append("$r_{\\mathrm{Obs.}}$")
-    ax2.set_yticks(significant_radii,
-                   labels=sr_labels)
+    ax2.set_yticks(significant_radii, labels=sr_labels)
     print("r1", r1)
     print("r2", r2)
     print("r3", r3)
@@ -2585,13 +2635,14 @@ def save_basin_names():
 
 @timeit
 def get_normalized_data(
-    lower_wind_vp: float = LOWER_VP_DEFAULT, # m/s at 10m
-    lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT, # m/s at 10m
-    v_reduc: float = 0.8, # reduction factor from gradient wind to 10m
-    max_abs_lat: Optional[float] = None, # degrees
-    min_sst_c: Optional[float] = None, # degrees C
-    emanuel_filter: Optional[Literal["landfall_limited", "cold_water_limited", "unlimited"]] = None,
-
+    lower_wind_vp: float = LOWER_VP_DEFAULT,  # m/s at 10m
+    lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,  # m/s at 10m
+    v_reduc: float = 0.8,  # reduction factor from gradient wind to 10m
+    max_abs_lat: Optional[float] = None,  # degrees
+    min_sst_c: Optional[float] = None,  # degrees C
+    emanuel_filter: Optional[
+        Literal["landfall_limited", "cold_water_limited", "unlimited"]
+    ] = None,
 ) -> xr.Dataset:
     """
     Get the normalized data from the IBTrACS dataset.
@@ -2607,12 +2658,20 @@ def get_normalized_data(
     Returns:
         xr.Dataset: The normalized dataset.
     """
-    file_names = {"ibtracs_ds": "IBTrACS.since1980.v04r01.nc",
-                  "pi_ps_ds": "IBTrACS.since1980.v04r01.pi_ps.nc",
-                  "cps_ds": "IBTrACS.since1980.v04r01.cps.nc",
-                  "ps_cat1_ds": "IBTrACS.since1980.v04r01.ps_cat1.nc"}
-    file_paths = {key: os.path.join(IBTRACS_DATA_PATH, file_name) for key, file_name in file_names.items()}
-    datasets = {key: xr.open_dataset(path) if os.path.exists(path) else None for key, path in file_paths.items()}
+    file_names = {
+        "ibtracs_ds": "IBTrACS.since1980.v04r01.nc",
+        "pi_ps_ds": "IBTrACS.since1980.v04r01.pi_ps.nc",
+        "cps_ds": "IBTrACS.since1980.v04r01.cps.nc",
+        "ps_cat1_ds": "IBTrACS.since1980.v04r01.ps_cat1.nc",
+    }
+    file_paths = {
+        key: os.path.join(IBTRACS_DATA_PATH, file_name)
+        for key, file_name in file_names.items()
+    }
+    datasets = {
+        key: xr.open_dataset(path) if os.path.exists(path) else None
+        for key, path in file_paths.items()
+    }
     print("Datasets loaded:", datasets)
 
     if max_abs_lat is not None:
@@ -2627,24 +2686,43 @@ def get_normalized_data(
     for key, ds in datasets.items():
         if ds is not None:
             print(f"{key} loaded from {file_paths[key]} with sizes: {ds.sizes}")
-            datasets[key] = ds.where(datasets["ibtracs_ds"]["usa_wind"] * 0.514444 > lower_wind_obs, drop=False) if key != "ibtracs_ds" else ds.where(ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False)
-            datasets[key] = datasets[key].where(datasets["pi_ps_ds"].vmax * v_reduc > lower_wind_vp, drop=False) if key != "pi_ps_ds" else ds.where(ds["vmax"] * v_reduc > lower_wind_vp, drop=False)
+            datasets[key] = (
+                ds.where(
+                    datasets["ibtracs_ds"]["usa_wind"] * 0.514444 > lower_wind_obs,
+                    drop=False,
+                )
+                if key != "ibtracs_ds"
+                else ds.where(ds["usa_wind"] * 0.514444 > lower_wind_obs, drop=False)
+            )
+            datasets[key] = (
+                datasets[key].where(
+                    datasets["pi_ps_ds"].vmax * v_reduc > lower_wind_vp, drop=False
+                )
+                if key != "pi_ps_ds"
+                else ds.where(ds["vmax"] * v_reduc > lower_wind_vp, drop=False)
+            )
 
     output_ds = datasets["pi_ps_ds"]
     output_ds["normalized_intensity"] = (
         ("storm", "date_time"),
-        datasets["ibtracs_ds"]["usa_wind"].values * 0.514444 / output_ds.vmax.values / v_reduc,
+        datasets["ibtracs_ds"]["usa_wind"].values
+        * 0.514444
+        / output_ds.vmax.values
+        / v_reduc,
     )  # normalized intensity
 
-    ds_to_var = {"normalized_size_pips": "pi_ps_ds",
-                 "normalized_size_cps": "cps_ds",
-                 "normalized_size_cat1": "ps_cat1_ds",
-                 }
+    ds_to_var = {
+        "normalized_size_pips": "pi_ps_ds",
+        "normalized_size_cps": "cps_ds",
+        "normalized_size_cat1": "ps_cat1_ds",
+    }
     for var_name, ds_key in ds_to_var.items():
         if datasets[ds_key] is not None:
             output_ds[var_name] = (
                 ("storm", "date_time"),
-                datasets["ibtracs_ds"]["usa_rmw"].values * 1852 / datasets[ds_key].rmax.values,
+                datasets["ibtracs_ds"]["usa_rmw"].values
+                * 1852
+                / datasets[ds_key].rmax.values,
             )
 
     output_ds["vmax_obs_10m"] = datasets["ibtracs_ds"]["usa_wind"] * 0.514444
@@ -2714,8 +2792,8 @@ def _find_survival_value_at_thresh(x: np.ndarray, threshold: float = 1.0) -> flo
     """
     sorted_x, survival_function = _calcuate_survival_function(x)
     return scipy.interpolate.interp1d(
-            sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
-        )(threshold)
+        sorted_x, survival_function, bounds_error=False, fill_value="extrapolate"
+    )(threshold)
 
 
 def _proc_to_sf(x: np.ndarray) -> np.ndarray:
@@ -2728,7 +2806,7 @@ def plot_normalized_quad(
     lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
     min_sst_c: Optional[float] = None,
     max_abs_lat: Optional[float] = None,
-    plot_storms: bool = False
+    plot_storms: bool = False,
 ) -> None:
     """
     Plot the normalized variables from the IBTrACS dataset:
@@ -2744,7 +2822,10 @@ def plot_normalized_quad(
     # vmax/vp, rmax/r'max (size/PS), and rmax/r''max (size/CPS)
     plot_defaults()
     pi_ps_ds = get_normalized_data(
-        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs, min_sst_c=min_sst_c, max_abs_lat=max_abs_lat
+        lower_wind_vp=lower_wind_vp,
+        lower_wind_obs=lower_wind_obs,
+        min_sst_c=min_sst_c,
+        max_abs_lat=max_abs_lat,
     )
 
     fig, axs = plt.subplots(
@@ -2810,17 +2891,17 @@ def plot_normalized_quad(
 
     axs[1].plot(
         np.sort(_processed_array(max_normalized_ps.values)),
-        _proc_to_sf(max_normalized_ps.values)
+        _proc_to_sf(max_normalized_ps.values),
     )
     axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
     axs[2].plot(
         np.sort(_processed_array(max_normalized_cps.values)),
-        _proc_to_sf(max_normalized_cps.values)
+        _proc_to_sf(max_normalized_cps.values),
     )
     axs[2].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
     axs[3].plot(
         np.sort(_processed_array(max_normalized_ps_cat1.values)),
-        _proc_to_sf(max_normalized_ps_cat1.values)
+        _proc_to_sf(max_normalized_ps_cat1.values),
     )
     axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
     axs[3].set_title(
@@ -2860,7 +2941,9 @@ def plot_normalized_quad(
         label=r"$r_{\mathrm{Obs.}} / r_2$",
     )
     axs[0].set_ylabel("Survival Function (1 - CDF)")
-    axs[0].set_xlabel(r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$")
+    axs[0].set_xlabel(
+        r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$"
+    )
     axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
     axs[0].set_title(
         f"{_find_survival_value_at_thresh(max_normalized_intensity.values)*100:.1f} % exceedance"
@@ -3031,7 +3114,7 @@ def plot_normalized_quad(
         float_format="%.2f",
         formatters=formatters,
         header=publication_headers,
-        na_rep="--", # Explicitly represent NaN as '--'
+        na_rep="--",  # Explicitly represent NaN as '--'
         caption=r"Top storms by maximum normalized intensity, \(V_{{ \mathrm{{Obs.}} }} / V_{{ \mathrm{{p}} }}\), selected at the point of their maximum normalized intensity.",
         label="tab:norm_intensity_storms",
         # column_format="lcccccc",
@@ -3040,7 +3123,7 @@ def plot_normalized_quad(
         os.path.join(DATA_PATH, "max_normalized_size_storms.tex"),
         index=False,
         float_format="%.2f",
-        na_rep="--", # Explicitly represent NaN as '--'
+        na_rep="--",  # Explicitly represent NaN as '--'
         formatters=formatters,
         header=publication_headers,
         caption=r"Top storms by maximum normalized corresponding size \(r_{{ \mathrm{{ max }} }} / r_{{ 2 }}\), selected at the point of their maximum normalized corresponding size.",
@@ -3049,10 +3132,10 @@ def plot_normalized_quad(
 
 
 def get_exceedance_val(
-        lower_wind_vp: float = LOWER_VP_DEFAULT,
-        lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
-        min_sst_c: Optional[float] = None,
-        max_abs_lat: Optional[float] = None,
+    lower_wind_vp: float = LOWER_VP_DEFAULT,
+    lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
+    min_sst_c: Optional[float] = None,
+    max_abs_lat: Optional[float] = None,
 ) -> dict:
     """Get the exceedance values for the normalized variables.
 
@@ -3066,24 +3149,37 @@ def get_exceedance_val(
         dict: Dictionary containing the exceedance values for the normalized variables.
     """
     pips_ds = get_normalized_data(
-        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs, min_sst_c=min_sst_c, max_abs_lat=max_abs_lat
+        lower_wind_vp=lower_wind_vp,
+        lower_wind_obs=lower_wind_obs,
+        min_sst_c=min_sst_c,
+        max_abs_lat=max_abs_lat,
     )
-    return {var: _find_survival_value_at_thresh(pips_ds[var].max(dim="date_time").values) * 100  for var in
-        ["normalized_intensity",
-        "normalized_size_pips",
-        "normalized_size_cps",
-        "normalized_size_cat1"]}
+    return {
+        var: _find_survival_value_at_thresh(pips_ds[var].max(dim="date_time").values)
+        * 100
+        for var in [
+            "normalized_intensity",
+            "normalized_size_pips",
+            "normalized_size_cps",
+            "normalized_size_cat1",
+        ]
+    }
 
 
-def create_exceedance_table(lower_wind_vp=LOWER_VP_DEFAULT,
-                            lower_wind_obs=LOWER_WIND_OBS_DEFAULT) -> None:
+def create_exceedance_table(
+    lower_wind_vp=LOWER_VP_DEFAULT, lower_wind_obs=LOWER_WIND_OBS_DEFAULT
+) -> None:
     """Try and impose different filters and see how the exceedance changes."""
     print("ok")
     d = None
     for min_sst_c in [None, 26.5]:
         for max_abs_lat in [None, 30, 40]:
             res = get_exceedance_val(
-                lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs, min_sst_c=min_sst_c, max_abs_lat=max_abs_lat)
+                lower_wind_vp=lower_wind_vp,
+                lower_wind_obs=lower_wind_obs,
+                min_sst_c=min_sst_c,
+                max_abs_lat=max_abs_lat,
+            )
             # could make this simpler with collections.defaultdict
             if d is None:
                 d = {key: [val] for key, val in res.items()}
@@ -3093,21 +3189,26 @@ def create_exceedance_table(lower_wind_vp=LOWER_VP_DEFAULT,
                 for key, val in res.items():
                     d[key].append(val)
                 d["min_sst_c"].append(min_sst_c if min_sst_c is not None else np.nan)
-                d["max_abs_lat"].append(max_abs_lat if max_abs_lat is not None else np.nan)
-    df = pd.DataFrame(d, columns=[
-        "min_sst_c",
-        "max_abs_lat",
-        "normalized_intensity",
-        "normalized_size_pips",
-        "normalized_size_cps",
-        "normalized_size_cat1",
-    ])
+                d["max_abs_lat"].append(
+                    max_abs_lat if max_abs_lat is not None else np.nan
+                )
+    df = pd.DataFrame(
+        d,
+        columns=[
+            "min_sst_c",
+            "max_abs_lat",
+            "normalized_intensity",
+            "normalized_size_pips",
+            "normalized_size_cps",
+            "normalized_size_cat1",
+        ],
+    )
 
     df.to_latex(
         os.path.join(DATA_PATH, "exceedance_table.tex"),
         index=False,
         float_format="%.2f",
-        na_rep="--", # Explicitly represent NaN as '--'
+        na_rep="--",  # Explicitly represent NaN as '--'
         header=[
             "Min SST [\(^\circ\)C]",
             "Max Lat [\(^\circ\)]",
@@ -3208,7 +3309,9 @@ def get_vary_vp_lower_data(
             ps_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
             ps_cat1_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
             ps_obs_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
-            intensity_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+            intensity_exceedance[i] = _perc_gt_1(
+                pi_ps_ds["normalized_intensity"].values
+            )
 
         # save the data to a xarray dataset
         vp_lower_ds = xr.Dataset(
@@ -3273,7 +3376,9 @@ def get_vary_vobs_lower_data(
             ps_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_pips"].values)
             ps_cat1_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cat1"].values)
             ps_obs_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_size_cps"].values)
-            intensity_exceedance[i] = _perc_gt_1(pi_ps_ds["normalized_intensity"].values)
+            intensity_exceedance[i] = _perc_gt_1(
+                pi_ps_ds["normalized_intensity"].values
+            )
 
         # save the data to a xarray dataset
         vobs_lower_ds = xr.Dataset(
@@ -3485,13 +3590,16 @@ def run_all_plots():
 if __name__ == "__main__":
     # python -m tcpips.ibtracs &> helene_debug.txt
     # download_ibtracs_data()
-    #plot_defaults()
+    # plot_defaults()
     # run_all_plots()
     # create_exceedance_table()
     # ds = get_vary_vobs_lower_data(num=50, regenerate=True)
     # print(ds)
-    plot_normalized_quad(lower_wind_vp=33, lower_wind_obs=33,
-                         # min_sst_c=26.5, max_abs_lat=30,
-                         plot_storms=False)
+    plot_normalized_quad(
+        lower_wind_vp=33,
+        lower_wind_obs=33,
+        # min_sst_c=26.5, max_abs_lat=30,
+        plot_storms=False,
+    )
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
