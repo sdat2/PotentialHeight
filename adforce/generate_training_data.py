@@ -3,6 +3,7 @@
 # --- MASTER SCRIPT: 01_generate_inputs.py ---
 from typing import Tuple
 import os
+import traceback
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -10,7 +11,10 @@ import shutil
 from datetime import datetime, timedelta
 from adcircpy import AdcircMesh, AdcircRun, Tides
 from adcircpy.forcing.winds import BestTrackForcing
+from stormevents.nhc import VortexTrack
+
 from tcpips.ibtracs import na_landing_tcs
+
 
 # --- Configuration ---
 # BASE_MODEL_DIR = './base_model/'
@@ -59,10 +63,27 @@ def generate_adcirc_inputs(storm, output_dir):
 
     # 2. Add Forcings
     tidal_forcing = Tides()
-    tidal_forcing.use_all()
+    # tidal_forcing.use_all()
     mesh.add_forcing(tidal_forcing)
 
-    wind_forcing = BestTrackForcing(storm.id, nws=20)  # NWS=20 for GAHM
+    # --- Inside your generate_adcirc_inputs function ---
+
+    # 1. Use the parent class to find the storm and create a track object
+    # This step converts ('NICOLE', 2022) into a track object with the correct ID ('AL152022')
+    try:
+        track = VortexTrack.from_storm_name(name=storm.name.lower(), year=storm.year)
+    except Exception as e:
+        print(f"Could not find NHC data for {storm.name} {storm.year}: {e}")
+        import traceback
+
+        traceback.print_exc()
+        # Decide how to handle this - skip the storm or raise the error
+        return
+
+    # 2. Pass the track object to the BestTrackForcing constructor
+    # Now you can correctly specify the 'nws' parameter
+    wind_forcing = BestTrackForcing(storm=track, nws=20)
+    # wind_forcing = BestTrackForcing(storm.id, nws=20)  # NWS=20 for GAHM
     mesh.add_forcing(wind_forcing)
 
     # 3. Calculate Simulation Window
@@ -82,10 +103,12 @@ def generate_adcirc_inputs(storm, output_dir):
     # 5. Write files
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
     driver.write(output_dir, overwrite=True)
 
     # 6. Copy static files
     shutil.copy(FORT14_PATH, output_dir)
+    shutil.copy(FORT13_PATH, output_dir)
 
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"
@@ -94,6 +117,7 @@ def generate_adcirc_inputs(storm, output_dir):
 
 # Assuming your Storm class is defined as before:
 class Storm:
+    # I hate classes, but this was to mirror tropycal
     def __init__(self, sid, name, time):
         self.id = sid.decode()
         self.name = name.decode()
@@ -107,9 +131,13 @@ class Storm:
 # --- DEBUGGING CODE ---
 # We will just check the first storm to see what's happening.
 
-if __name__ == "__main__":
+
+def generate_all_storm_inputs():
+    # python -m adforce.generate_training_data
+
     target_storms_ds = na_landing_tcs()
     target_storms = []
+
     for i in range(len(target_storms_ds.sid)):
         # Isolate the raw numpy array of times for the storm
         raw_times = target_storms_ds.time[i].values
@@ -130,10 +158,21 @@ if __name__ == "__main__":
         )
         target_storms.append(storm)
 
+    outputs = {"storm_id": [], "storm_name": [], "year": [], "num_timepoints": []}
+
+    for storm in target_storms:
+        outputs["storm_id"].append(storm.id)
+        outputs["storm_name"].append(storm.name)
+        outputs["year"].append(storm.year)
+        outputs["num_timepoints"].append(len(storm.time))
+
+    outputs_df = pd.DataFrame(outputs)
+    outputs_df.to_csv("debug_storms.csv", index=False)
+
     print(f"Found {len(target_storms)} U.S. landfalling storms in IBTrACS.")
 
     # 2. Loop and generate inputs for each storm
-    for storm in target_storms:
+    for storm in target_storms[1:2]:
         storm_name_safe = storm.name.upper().replace(" ", "_")
         run_directory = os.path.join(RUNS_PARENT_DIR, f"{storm_name_safe}_{storm.year}")
 
@@ -145,6 +184,11 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"!!! FAILED to generate inputs for {storm.name} {storm.year}: {e}")
             print(" traceback:")
-            import traceback
-
             traceback.print_exc()
+
+
+if __name__ == "__main__":
+    # python -m adforce.generate_training_data
+    # generate_all_storm_inputs()
+    track = VortexTrack('AL112017')
+    print(track)

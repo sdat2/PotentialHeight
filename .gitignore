@@ -8,6 +8,7 @@ data/
 
 # Distribution / packaging
 .Python
+StormEvents/
 build/
 slurm-*/
 develop-eggs/
