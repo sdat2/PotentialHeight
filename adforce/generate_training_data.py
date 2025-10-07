@@ -66,103 +66,107 @@ def calculate_simulation_window(
     return simulation_start_date, simulation_end_date, spinup_duration
 
 
+def _decode_char_array(char_da: xr.DataArray) -> str:
+    """
+    Helper function to convert an xarray DataArray of characters into a
+    clean, stripped Python string.
+    """
+    # .values gets the numpy array, .tobytes() joins the characters,
+    # .decode() converts to string, and .strip() cleans whitespace.
+    return char_da.values.tobytes().decode('utf-8').strip()
 
-def convert_ibtracs_netcdf_to_enriched_atcf(
+def convert_ibtracs_storm_to_atcf(
     ds: xr.Dataset,
-    output_atcf_path: str,
-    storm_name: str,
-    storm_year: int
+    output_atcf_path: str
 ):
     """
-    Loads IBTrACS NetCDF data and creates a complete ATCF file, including
+    Loads IBTrACS ds for one tropical cyclone and creates a complete ATCF file, including
     asymmetry (wind radii) and size (RMW, POCI, ROCI) information.
 
     Args:
-        netcdf_path (Path): Path to the IBTrACS .nc file.
-        output_atcf_path (Path): Path to save the new .txt ATCF file.
-        storm_name (str): The name of the storm to extract (e.g., 'KATRINA').
-        storm_year (int): The year/season of the storm (e.g., 2005).
+        ds (xr.Dataset): xarray.Dataset for a single storm from IBTrACS.
+        output_atcf_path (str): Path to save the new .txt ATCF file.
     """
-
-    # Define all the variables we want to keep for the enriched format
-    keep_vars = [
-        'name', 'season', 'number', 'basin', 'time',
-        'usa_lat', 'usa_lon', 'usa_wind', 'usa_pres', 'usa_status',
-        'usa_r34', 'usa_r50', 'usa_r64',  # Wind Radii for asymmetry
-        'usa_rmw', 'usa_poci', 'usa_roci'   # Storm structure/size
-    ]
-
-
-    filtered_ds = ds[keep_vars]
-    df_all = filtered_ds.to_dataframe()
-
-    df_all.reset_index(inplace=True)
-
-    # Decode byte strings and strip whitespace
-    for col in ['name', 'basin', 'usa_status']:
-        if col in df_all.columns:
-            df_all[col] = df_all[col].str.decode('utf-8').str.strip().str.replace('\x00', '')
-
-    storm_df = df_all
-
-    print("Formatting data into enriched ATCF structure...")
     atcf_lines = []
-    storm_number = storm_df['number'].iloc[0]
 
-    for _, row in storm_df.iterrows():
-        # --- Part 1: Basic Identifiers (same as before) ---
-        atcf_basin = row['basin'].ljust(2)
+    # Find all valid time steps by checking where the 'time' variable is not a fill value
+    valid_time_indices = np.where(~np.isnat(ds['time'].values))[0]
+
+    # Get static storm information once
+    storm_number = int(ds['number'].values)
+
+    print(f"Processing {len(valid_time_indices)} valid time steps...")
+
+    # Loop through only the valid indices
+    for time_idx in valid_time_indices:
+        # Select a single time slice using .isel()
+        row = ds.isel(date_time=time_idx)
+
+        # --- Part 1: Basic Identifiers ---
+        # Use the helper function to decode character arrays
+        atcf_basin = _decode_char_array(row['basin']).ljust(2)
         atcf_cyclone_num = str(storm_number).zfill(2)
-        atcf_datetime = row['time'].strftime('%Y%m%d%H')
+        atcf_datetime = pd.to_datetime(row['time'].values).strftime('%Y%m%d%H')
         atcf_technique = 'BEST'.rjust(4)
 
-        # --- Part 2: Core Storm State (same as before) ---
-        lat_val = int(abs(row['usa_lat']) * 10)
-        lat_hem = 'N' if row['usa_lat'] >= 0 else 'S'
+        # --- Part 2: Core Storm State ---
+        # .item() cleanly extracts the scalar value from a 0-dimensional array
+        lat = row['usa_lat'].item()
+        lon = row['usa_lon'].item()
+
+        lat_val = int(abs(lat) * 10)
+        lat_hem = 'N' if lat >= 0 else 'S'
         atcf_lat = f"{lat_val}{lat_hem}".rjust(5)
 
-        lon_val = int(abs(row['usa_lon']) * 10)
-        lon_hem = 'W' if row['usa_lon'] < 0 else 'E'
+        lon_val = int(abs(lon) * 10)
+        lon_hem = 'W' if lon < 0 else 'E'
         atcf_lon = f"{lon_val}{lon_hem}".rjust(6)
 
-        atcf_wind = str(int(np.nan_to_num(row['usa_wind']))).rjust(4)
-        atcf_pres = str(int(np.nan_to_num(row['usa_pres']))).rjust(5)
-        atcf_status = row['usa_status'].ljust(3)
+        atcf_wind = str(int(np.nan_to_num(row['usa_wind'].item()))).rjust(4)
+        atcf_pres = str(int(np.nan_to_num(row['usa_pres'].item()))).rjust(5)
+        atcf_status = _decode_char_array(row['usa_status']).ljust(3)
 
         # --- Part 3: Enriched Data for Asymmetry and Size ---
-        # The 'quadrant' dimension becomes an index (0, 1, 2, 3) in the DataFrame
-        # We extract them in NE, SE, SW, NW order
-        r34_ne = int(np.nan_to_num(row['usa_r34'].iloc[0]))
-        r34_se = int(np.nan_to_num(row['usa_r34'].iloc[1]))
-        r34_sw = int(np.nan_to_num(row['usa_r34'].iloc[2]))
-        r34_nw = int(np.nan_to_num(row['usa_r34'].iloc[3]))
+        # Select quadrant data using .isel() and get scalar with .item()
+        # r34_ne = int(np.nan_to_num(row['usa_r34'].isel(quadrant=0).item()))
+        # r34_se = int(np.nan_to_num(row['usa_r34'].isel(quadrant=1).item()))
+        # r34_sw = int(np.nan_to_num(row['usa_r34'].isel(quadrant=2).item()))
+        # r34_nw = int(np.nan_to_num(row['usa_r34'].isel(quadrant=3).item()))
 
-        r50_ne = int(np.nan_to_num(row['usa_r50'].iloc[0]))
-        r50_se = int(np.nan_to_num(row['usa_r50'].iloc[1]))
-        r50_sw = int(np.nan_to_num(row['usa_r50'].iloc[2]))
-        r50_nw = int(np.nan_to_num(row['usa_r50'].iloc[3]))
+        # r50_ne = int(np.nan_to_num(row['usa_r50'].isel(quadrant=0).item()))
+        # r50_se = int(np.nan_to_num(row['usa_r50'].isel(quadrant=1).item()))
+        # r50_sw = int(np.nan_to_num(row['usa_r50'].isel(quadrant=2).item()))
+        # r50_nw = int(np.nan_to_num(row['usa_r50'].isel(quadrant=3).item()))
 
-        r64_ne = int(np.nan_to_num(row['usa_r64'].iloc[0]))
-        r64_se = int(np.nan_to_num(row['usa_r64'].iloc[1]))
-        r64_sw = int(np.nan_to_num(row['usa_r64'].iloc[2]))
-        r64_nw = int(np.nan_to_num(row['usa_r64'].iloc[3]))
+        # r64_ne = int(np.nan_to_num(row['usa_r64'].isel(quadrant=0).item()))
+        # r64_se = int(np.nan_to_num(row['usa_r64'].isel(quadrant=1).item()))
+        # r64_sw = int(np.nan_to_num(row['usa_r64'].isel(quadrant=2).item()))
+        # r64_nw = int(np.nan_to_num(row['usa_r64'].isel(quadrant=3).item()))
 
-        atcf_poci = str(int(np.nan_to_num(row['usa_poci']))).rjust(5)
-        atcf_roci = str(int(np.nan_to_num(row['usa_roci']))).rjust(4)
-        atcf_rmw = str(int(np.nan_to_num(row['usa_rmw']))).rjust(4)
+        atcf_poci = str(int(np.nan_to_num(row['usa_poci'].item()))).rjust(5)
+        atcf_roci = str(int(np.nan_to_num(row['usa_roci'].item()))).rjust(4)
+        atcf_rmw = str(int(np.nan_to_num(row['usa_rmw'].item()))).rjust(4)
+        radii_data = {
+            '34': [int(np.nan_to_num(row['usa_r34'].isel(quadrant=q).item())) for q in range(4)],
+            '50': [int(np.nan_to_num(row['usa_r50'].isel(quadrant=q).item())) for q in range(4)],
+            '64': [int(np.nan_to_num(row['usa_r64'].isel(quadrant=q).item())) for q in range(4)]
+        }
 
-        # --- Part 4: Build the full ATCF line ---
-        # Note the extra fields for RADII, RMW, POCI, ROCI etc.
-        line = (f"{atcf_basin}, {atcf_cyclone_num}, {atcf_datetime},{atcf_technique},"
-                f"{atcf_lat},{atcf_lon},{atcf_wind},{atcf_pres}, {atcf_status}, "
-                f"{'34'.rjust(3)}, {'NEQ'.rjust(4)}, {str(r34_ne).rjust(4)}, "
-                f"{str(r34_se).rjust(4)}, {str(r34_sw).rjust(4)}, {str(r34_nw).rjust(4)},"
-                f"{atcf_poci},{atcf_roci},{atcf_rmw}, "
-                f"{'50'.rjust(3)}, {'NEQ'.rjust(4)}, {str(r50_ne).rjust(4)}, "
-                f"{str(r50_se).rjust(4)}, {str(r50_sw).rjust(4)}, {str(r50_nw).rjust(4)}, "
-                f"{'64'.rjust(3)}, {'NEQ'.rjust(4)}, {str(r64_ne).rjust(4)}, "
-                f"{str(r64_se).rjust(4)}, {str(r64_sw).rjust(4)}, {str(r64_nw).rjust(4)}")
-        atcf_lines.append(line)
+        for rad, rad_values in radii_data.items():
+            # Only write a line if there is actual radii data (sum > 0)
+            if sum(rad_values) > 0:
+                # --- Part 3: Build the correctly formatted ATCF line ---
+                # This line now includes all required placeholder commas
+                line = (
+                    f"{atcf_basin}, {atcf_cyclone_num}, {atcf_datetime}, {'00'.rjust(3)}, {'BEST'.rjust(4)}, {'0'.rjust(4)},"
+                    f"{atcf_lat},{atcf_lon},{atcf_wind},{atcf_pres}, {atcf_status}, "
+                    f"{rad.rjust(3)}, {'NEQ'.rjust(4)}, {str(rad_values[0]).rjust(4)}, "
+                    f"{str(rad_values[1]).rjust(4)}, {str(rad_values[2]).rjust(4)}, {str(rad_values[3]).rjust(4)},"
+                    f"{atcf_poci},{atcf_roci},{atcf_rmw}, "
+                    f", , , , , , , {'katrina'}"  # Placeholder commas for unused fields
+                )
+                atcf_lines.append(line)
+
 
     with open(output_atcf_path, 'w') as f:
         f.write('\n'.join(atcf_lines))
@@ -194,12 +198,11 @@ def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
     #     traceback.print_exc()
     #     # Decide how to handle this - skip the storm or raise the error
     #     return
+    os.makedirs(output_dir, exist_ok=True)
 
-    convert_ibtracs_netcdf_to_enriched_atcf(
-        ds=na_landing_tcs(),
+    convert_ibtracs_storm_to_atcf(
+        ds=storm_ds,
         output_atcf_path=os.path.join(output_dir, "atcf.txt"),
-        storm_name=storm.name,
-        storm_year=storm.year
     )
     # 2. Pass the track object to the BestTrackForcing constructor
     # Now you can correctly specify the 'nws' parameter
