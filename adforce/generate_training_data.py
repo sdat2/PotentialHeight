@@ -27,6 +27,7 @@ os.makedirs(RUNS_PARENT_DIR, exist_ok=True)
 FORT14_PATH = os.path.join(SETUP_PATH, "fort.14.mid")
 FORT13_PATH = os.path.join(SETUP_PATH, "fort.13.mid")
 
+
 # --- Function Definitions (from Section 2) ---
 # Assuming your Storm class is defined as before:
 class Storm:
@@ -73,12 +74,10 @@ def _decode_char_array(char_da: xr.DataArray) -> str:
     """
     # .values gets the numpy array, .tobytes() joins the characters,
     # .decode() converts to string, and .strip() cleans whitespace.
-    return char_da.values.tobytes().decode('utf-8').strip()
+    return char_da.values.tobytes().decode("utf-8").strip()
 
-def convert_ibtracs_storm_to_atcf(
-    ds: xr.Dataset,
-    output_atcf_path: str
-):
+
+def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
     """
     Loads IBTrACS ds for one tropical cyclone and creates a complete ATCF file, including
     asymmetry (wind radii) and size (RMW, POCI, ROCI) information.
@@ -90,10 +89,10 @@ def convert_ibtracs_storm_to_atcf(
     atcf_lines = []
 
     # Find all valid time steps by checking where the 'time' variable is not a fill value
-    valid_time_indices = np.where(~np.isnat(ds['time'].values))[0]
+    valid_time_indices = np.where(~np.isnat(ds["time"].values))[0]
 
     # Get static storm information once
-    storm_number = int(ds['number'].values)
+    storm_number = int(ds["number"].values)
 
     print(f"Processing {len(valid_time_indices)} valid time steps...")
 
@@ -104,27 +103,27 @@ def convert_ibtracs_storm_to_atcf(
 
         # --- Part 1: Basic Identifiers ---
         # Use the helper function to decode character arrays
-        atcf_basin = _decode_char_array(row['basin']).ljust(2)
+        atcf_basin = _decode_char_array(row["basin"]).ljust(2)
         atcf_cyclone_num = str(storm_number).zfill(2)
-        atcf_datetime = pd.to_datetime(row['time'].values).strftime('%Y%m%d%H')
-        atcf_technique = 'BEST'.rjust(4)
+        atcf_datetime = pd.to_datetime(row["time"].values).strftime("%Y%m%d%H")
+        atcf_technique = "BEST".rjust(4)
 
         # --- Part 2: Core Storm State ---
         # .item() cleanly extracts the scalar value from a 0-dimensional array
-        lat = row['usa_lat'].item()
-        lon = row['usa_lon'].item()
+        lat = row["usa_lat"].item()
+        lon = row["usa_lon"].item()
 
         lat_val = int(abs(lat) * 10)
-        lat_hem = 'N' if lat >= 0 else 'S'
+        lat_hem = "N" if lat >= 0 else "S"
         atcf_lat = f"{lat_val}{lat_hem}".rjust(5)
 
         lon_val = int(abs(lon) * 10)
-        lon_hem = 'W' if lon < 0 else 'E'
+        lon_hem = "W" if lon < 0 else "E"
         atcf_lon = f"{lon_val}{lon_hem}".rjust(6)
 
-        atcf_wind = str(int(np.nan_to_num(row['usa_wind'].item()))).rjust(4)
-        atcf_pres = str(int(np.nan_to_num(row['usa_pres'].item()))).rjust(5)
-        atcf_status = _decode_char_array(row['usa_status']).ljust(3)
+        atcf_wind = str(int(np.nan_to_num(row["usa_wind"].item()))).rjust(4)
+        atcf_pres = str(int(np.nan_to_num(row["usa_pres"].item()))).rjust(5)
+        atcf_status = _decode_char_array(row["usa_status"]).ljust(3)
 
         # --- Part 3: Enriched Data for Asymmetry and Size ---
         # Select quadrant data using .isel() and get scalar with .item()
@@ -143,18 +142,28 @@ def convert_ibtracs_storm_to_atcf(
         # r64_sw = int(np.nan_to_num(row['usa_r64'].isel(quadrant=2).item()))
         # r64_nw = int(np.nan_to_num(row['usa_r64'].isel(quadrant=3).item()))
 
-        atcf_poci = str(int(np.nan_to_num(row['usa_poci'].item()))).rjust(5)
-        atcf_roci = str(int(np.nan_to_num(row['usa_roci'].item()))).rjust(4)
-        atcf_rmw = str(int(np.nan_to_num(row['usa_rmw'].item()))).rjust(4)
+        atcf_poci = str(int(np.nan_to_num(row["usa_poci"].item()))).rjust(5)
+        atcf_roci = str(int(np.nan_to_num(row["usa_roci"].item()))).rjust(4)
+        atcf_rmw = str(int(np.nan_to_num(row["usa_rmw"].item()))).rjust(4)
         radii_data = {
-            '34': [int(np.nan_to_num(row['usa_r34'].isel(quadrant=q).item())) for q in range(4)],
-            '50': [int(np.nan_to_num(row['usa_r50'].isel(quadrant=q).item())) for q in range(4)],
-            '64': [int(np.nan_to_num(row['usa_r64'].isel(quadrant=q).item())) for q in range(4)]
+            "34": [
+                int(np.nan_to_num(row["usa_r34"].isel(quadrant=q).item()))
+                for q in range(4)
+            ],
+            "50": [
+                int(np.nan_to_num(row["usa_r50"].isel(quadrant=q).item()))
+                for q in range(4)
+            ],
+            "64": [
+                int(np.nan_to_num(row["usa_r64"].isel(quadrant=q).item()))
+                for q in range(4)
+            ],
         }
 
         for rad, rad_values in radii_data.items():
             # Only write a line if there is actual radii data (sum > 0)
-            if sum(rad_values) > 0:
+            # if sum(rad_values) > 0:
+            if True:
                 # --- Part 3: Build the correctly formatted ATCF line ---
                 # This line now includes all required placeholder commas
                 line = (
@@ -167,9 +176,8 @@ def convert_ibtracs_storm_to_atcf(
                 )
                 atcf_lines.append(line)
 
-
-    with open(output_atcf_path, 'w') as f:
-        f.write('\n'.join(atcf_lines))
+    with open(output_atcf_path, "w") as f:
+        f.write("\n".join(atcf_lines))
     print(f"✅ Successfully created ENRICHED ATCF file at '{output_atcf_path}'")
 
 
@@ -206,8 +214,10 @@ def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
     )
     # 2. Pass the track object to the BestTrackForcing constructor
     # Now you can correctly specify the 'nws' parameter
-    wind_forcing = BestTrackForcing(Path(os.path.join(output_dir, "atcf.txt")), nws=20)  # NWS=20 for GAHM
-    #wind_forcing = BestTrackForcing(storm=track, nws=20
+    wind_forcing = BestTrackForcing(
+        Path(os.path.join(output_dir, "atcf.txt")), nws=20
+    )  # NWS=20 for GAHM
+    # wind_forcing = BestTrackForcing(storm=track, nws=20
     # wind_forcing = BestTrackForcing(storm.id, nws=20)  # NWS=20 for GAHM
     mesh.add_forcing(wind_forcing)
 
@@ -216,7 +226,9 @@ def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
 
     # 4. Configure AdcircRun Driver
     driver = AdcircRun(
-        mesh=mesh, start_date=sim_start, end_date=sim_end, #spinup_duration=spinup
+        mesh=mesh,
+        start_date=sim_start,
+        end_date=sim_end,  # spinup_duration=spinup
     )
 
     # --- Customize fort.15 parameters ---
@@ -238,7 +250,6 @@ def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"
     )
-
 
 
 # --- DEBUGGING CODE ---
@@ -293,7 +304,7 @@ def generate_all_storm_inputs():
             print(
                 f"Generating inputs for {storm.name} {storm.year}, {storm.id} {type(storm.id)}..."
             )
-            generate_adcirc_inputs(storm, target_storms_ds.isel(storm=i),run_directory)
+            generate_adcirc_inputs(storm, target_storms_ds.isel(storm=i), run_directory)
         except Exception as e:
             print(f"!!! FAILED to generate inputs for {storm.name} {storm.year}: {e}")
             print(" traceback:")
