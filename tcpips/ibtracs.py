@@ -3598,7 +3598,7 @@ if __name__ == "__main__":
     plot_normalized_quad(
         lower_wind_vp=33,
         lower_wind_obs=33,
-        # min_sst_c=26.5, max_abs_lat=30,
+        min_sst_c=26.5, max_abs_lat=30,
         plot_storms=False,
     )
 
