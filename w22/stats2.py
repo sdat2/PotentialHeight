@@ -420,7 +420,7 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
         return f"\\({nominal_str} \\pm {error_str}\\)"
     return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
 
-# TODO 3: Updated function to handle new variables and table types
+
 def dataframe_to_latex_table(df: pd.DataFrame) -> str:
     """
     Converts a pandas DataFrame to a publication-quality LaTeX table string.
@@ -459,6 +459,10 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
         })
         return header_map
 
+    # TODO: we need to get the calculate the bias over the three model members for each model,
+    # we need to have the columns as the variables and the rows as the models with proper latex names e.g. \(V_p\)
+    # and we need to seperate different properties into different tables
+
     header_map = _generate_header_map(list(df_proc.columns))
     err_cols_to_drop = []
 
@@ -481,14 +485,186 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
     return df_proc.to_latex(index=False, escape=False, header=True, column_format=col_format, caption=" ")
 
 
+def wide_dataframe_to_latex(
+    df: pd.DataFrame, caption: str, label: str, filename: str
+) -> None:
+    """
+    Converts a wide-format pandas DataFrame to a publication-quality LaTeX table.
+
+    This function handles DataFrames with multi-level columns (metric, variable)
+    and formats them into a clean LaTeX table with grouped headers.
+
+    Args:
+        df (pd.DataFrame): The wide-format DataFrame to convert.
+        caption (str): The LaTeX table caption.
+        label (str): The LaTeX label for cross-referencing.
+        filename (str): The full path to save the .tex file.
+    """
+    # Symbol and name mapping for variables and metrics
+    symbol_map = {
+        "vmax_3": "$V_p$", "rmax_3": "$r_3$", "rmax_1": "$r_1$",
+        "r0_1": "$r_{a1}$", "r0_3": "$r_{a3}$", "sst": "$T_s$",
+    }
+    metric_map = {
+        "mean_bias": "Mean Bias", "rmse": "RMSE",
+        "variability_ratio": "Variability Ratio",
+        "corr_variability": "Variability Corr. ($\\rho$)",
+    }
+
+    # Create a copy to avoid modifying the original DataFrame
+    df_latex = df.copy()
+
+    # Create new multi-level column headers from the existing ones
+    new_cols = []
+    current_cols = df_latex.columns.to_flat_index()
+    for metric, var in current_cols:
+        metric_name = metric_map.get(metric, metric)
+        var_symbol = symbol_map.get(var, var)
+        new_cols.append((var_symbol, metric_name)) # Group by variable symbol first
+    df_latex.columns = pd.MultiIndex.from_tuples(new_cols)
+
+    # Convert to LaTeX string
+    latex_string = df_latex.to_latex(
+        escape=False,
+        column_format="l" + "c" * len(df_latex.columns),
+        multicolumn_format="c",
+        caption=caption,
+        label=label,
+        position="!htbp"
+    )
+
+    # Save to file
+    with open(filename, "w") as f:
+        f.write(latex_string)
+    print(f"Saved LaTeX table to {filename}")
+
+
+def generate_wide_assessment_tables(
+    place: str = "new_orleans",
+    pi_version: int = 4,
+    comparison_period: Tuple[int, int] = (1980, 2014)
+) -> None:
+    """
+    Generates wide-format assessment tables with aggregated model statistics.
+
+    This function calculates bias, RMSE, and variability metrics for CMIP models
+    against ERA5. It then aggregates results across ensemble members for each
+    model and pivots the data to create publication-ready 'wide' format tables
+    for mean state assessment and variability assessment.
+
+    Args:
+        place (str): The place for which to generate the assessment.
+        pi_version (int): The potential intensity version to use.
+        comparison_period (Tuple[int, int]): The (start, end) year for comparison.
+    """
+    print(f"\n--- Generating Wide Assessment Tables for {place} ---")
+    results = []
+    start_yr, end_yr = str(comparison_period[0]), str(comparison_period[1])
+
+    try:
+        era5_ds = get_timeseries(model="ERA5", place=place, pi_version=pi_version)
+        era5_ds_period = era5_ds.sel(time=slice(start_yr, end_yr))
+    except Exception as e:
+        print(f"Could not load ERA5 data. Skipping assessment. Error: {e}")
+        return
+
+    for model, members in MODELS_TO_PROCESS.items():
+        for member_str in members:
+            try:
+                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_ds_period = model_ds.sel(time=slice(start_yr, end_yr))
+
+                # Align timestamps
+                common_time = np.intersect1d(era5_ds_period.time, model_ds_period.time)
+                if len(common_time) < 5:
+                    continue
+                era5_aligned = era5_ds_period.sel(time=common_time)
+                model_aligned = model_ds_period.sel(time=common_time)
+
+                for var in VARIABLES_TO_PROCESS:
+                    if var not in model_aligned or var not in era5_aligned: continue
+
+                    era5_data = era5_aligned[var].values
+                    model_data = model_aligned[var].values
+                    valid_mask = ~np.isnan(era5_data) & ~np.isnan(model_data)
+                    if np.sum(valid_mask) < 5: continue
+
+                    era5_valid, model_valid = era5_data[valid_mask], model_data[valid_mask]
+                    bias_res = analyze_bias(era5_valid, model_valid)
+                    model_residuals, _, model_cv = calculate_detrended_cv(model_valid)
+                    era5_residuals, _, era5_cv = calculate_detrended_cv(era5_valid)
+                    rmse = np.sqrt(np.mean((model_valid - era5_valid)**2))
+                    corr_variability = safe_corr(model_residuals, era5_residuals)
+
+                    results.append({
+                        "model": model, "member": member_str, "variable": var,
+                        "mean_bias": bias_res['mean_bias'], "rmse": rmse,
+                        "variability_ratio": model_cv / era5_cv if era5_cv != 0 else np.nan,
+                        "corr_variability": corr_variability,
+                    })
+            except Exception as e:
+                print(f"Could not assess {model}/{member_str}. Skipping. Error: {e}")
+
+    if not results:
+        print("No assessment results generated.")
+        return
+
+    df_long = pd.DataFrame(results)
+    agg_funcs = {
+        'mean_bias': ['mean', 'std'], 'rmse': ['mean', 'std'],
+        'variability_ratio': ['mean', 'std'], 'corr_variability': ['mean', 'std']
+    }
+    df_agg = df_long.groupby(['model', 'variable']).agg(agg_funcs).reset_index()
+    df_agg.columns = ['_'.join(col).strip('_') for col in df_agg.columns.values]
+
+    for metric in agg_funcs.keys():
+        mean_col, std_col = f'{metric}_mean', f'{metric}_std'
+        df_agg[metric] = df_agg.apply(
+            lambda r: f"${r[mean_col]:.2f} \\pm {r[std_col]:.2f}$"
+            if pd.notnull(r[mean_col]) else "NaN", axis=1
+        )
+        df_agg.drop(columns=[mean_col, std_col], inplace=True)
+
+    # --- Create and Save Bias/RMSE Table ---
+    df_bias_rmse = df_agg.pivot(index='model', columns='variable', values=['mean_bias', 'rmse'])
+    df_bias_rmse.index.name = "Model"
+    csv_path_br = os.path.join(DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.csv")
+    tex_path_br = os.path.join(DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.tex")
+    df_bias_rmse.to_csv(csv_path_br)
+    print(f"\nSaved Bias and RMSE data to {csv_path_br}")
+    wide_dataframe_to_latex(
+        df=df_bias_rmse,
+        caption=f"Model Mean State Assessment for {place.replace('_', ' ').title()} (1980-2014)",
+        label=f"tab:{place}_bias_rmse",
+        filename=tex_path_br
+    )
+
+    # --- Create and Save Variability Table ---
+    df_variability = df_agg.pivot(index='model', columns='variable', values=['variability_ratio', 'corr_variability'])
+    df_variability.index.name = "Model"
+    csv_path_var = os.path.join(DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.csv")
+    tex_path_var = os.path.join(DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.tex")
+    df_variability.to_csv(csv_path_var)
+    print(f"\nSaved Variability data to {csv_path_var}")
+    wide_dataframe_to_latex(
+        df=df_variability,
+        caption=f"Model Variability Assessment for {place.replace('_', ' ').title()} (1980-2014)",
+        label=f"tab:{place}_variability",
+        filename=tex_path_var
+    )
+
+
 if __name__ == "__main__":
+    # python -m w22.stats2
     # Example usage for one location
     #LOCATION = "new_orleans"
     LOCATION = "hong_kong"
     PI_VERSION = 4
 
     # Generate tables for temporal trends and correlations
-    temporal_relationship_data(place=LOCATION, pi_version=PI_VERSION)
+    #temporal_relationship_data(place=LOCATION, pi_version=PI_VERSION)
 
     # Generate tables for bias and variability assessment
-    generate_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
+    # generate_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
+    generate_wide_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
+    generate_wide_assessment_tables(place="new_orleans", pi_version=PI_VERSION)

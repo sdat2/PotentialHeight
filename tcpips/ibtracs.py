@@ -5,8 +5,6 @@ We only want tracks from 1980-2024 (inclusive). We currently calculate the poten
 wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate-stewardship-ibtracs/v04r01/access/netcdf/IBTrACS.since1980.v04r01.nc
 
 
-TODO: change to corresponding potential size for top 10 supersize cyclones.
-
 TODO: test the effect of excluding e.g. colder water or higher latitudes.
 
 - I.e. hypotheses: supersize storms are caused by storms that have extratropical components, or through inertial effects as the potential size rapidly decreases over a patch of cold water.
@@ -3598,7 +3596,8 @@ if __name__ == "__main__":
     plot_normalized_quad(
         lower_wind_vp=33,
         lower_wind_obs=33,
-        min_sst_c=26.5, max_abs_lat=30,
+        min_sst_c=26.5,
+        max_abs_lat=30,
         plot_storms=False,
     )
 
