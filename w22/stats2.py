@@ -2,28 +2,30 @@
 """
 import os
 from typing import Tuple, List, Dict
+import math
 import numpy as np
 import numpy.ma as ma
-import scipy.stats as ss
-from uncertainties import ufloat
-import math
 import xarray as xr
 import pandas as pd
+import scipy.stats as ss
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from uncertainties import ufloat
 from sithom.curve import fit
 from .plot import get_timeseries
 from .constants import DATA_PATH
 
 
 # CONFIGURATION: Models and variables to process
-# TODO 1: Added new models and members
 MODELS_TO_PROCESS = {
     "HadGEM3-GC31-MM": ["r1i1p1f3", "r2i1p1f3", "r3i1p1f3"],
     "MIROC6": ["r1i1p1f1", "r2i1p1f1", "r3i1p1f1"],
     "CESM2": ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"],
 }
 
-# TODO 3: Added new variables
-VARIABLES_TO_PROCESS = ["sst", "vmax_3", "r0_3", "rmax_3", "r0_1", "rmax_1"]
+VARIABLES_TO_PROCESS = [# "sst", ""
+"vmax_3", "r0_3", "rmax_3", # "r0_1",
+"rmax_1"]
 
 
 def safe_grad(xt: np.ndarray, yt: np.ndarray) -> ufloat:
@@ -209,7 +211,7 @@ def timeseries_relationships(
     ts = {var: ds_period[var].values for var in variables if var in ds_period}
     if not ts: return pd.DataFrame()
 
-    years = ds_period["time"].dt.year.values
+    years = ds_period["time"]# .dt.year.values
 
     # Correlations and gradients with time (years)
     for var in ts:
@@ -542,7 +544,7 @@ def wide_dataframe_to_latex(
 def generate_wide_assessment_tables(
     place: str = "new_orleans",
     pi_version: int = 4,
-    comparison_period: Tuple[int, int] = (1980, 2014)
+    comparison_period: Tuple[int, int] = (1980, 2024)
 ) -> None:
     """
     Generates wide-format assessment tables with aggregated model statistics.
@@ -586,6 +588,9 @@ def generate_wide_assessment_tables(
 
                     era5_data = era5_aligned[var].values
                     model_data = model_aligned[var].values
+                    if "r" in var:
+                        era5_data = era5_data / 1000.0  # Convert from m to km
+                        model_data = model_data / 1000.0
                     valid_mask = ~np.isnan(era5_data) & ~np.isnan(model_data)
                     if np.sum(valid_mask) < 5: continue
 
@@ -600,6 +605,7 @@ def generate_wide_assessment_tables(
                         "model": model, "member": member_str, "variable": var,
                         "mean_bias": bias_res['mean_bias'], "rmse": rmse,
                         "variability_ratio": model_cv / era5_cv if era5_cv != 0 else np.nan,
+                        "model_cv": model_cv,
                         "corr_variability": corr_variability,
                     })
             except Exception as e:
@@ -612,7 +618,8 @@ def generate_wide_assessment_tables(
     df_long = pd.DataFrame(results)
     agg_funcs = {
         'mean_bias': ['mean', 'std'], 'rmse': ['mean', 'std'],
-        'variability_ratio': ['mean', 'std'], 'corr_variability': ['mean', 'std']
+        'variability_ratio': ['mean', 'std'], 'corr_variability': ['mean', 'std'],
+        'model_cv': ['mean', 'std'],
     }
     df_agg = df_long.groupby(['model', 'variable']).agg(agg_funcs).reset_index()
     df_agg.columns = ['_'.join(col).strip('_') for col in df_agg.columns.values]
@@ -626,7 +633,7 @@ def generate_wide_assessment_tables(
         df_agg.drop(columns=[mean_col, std_col], inplace=True)
 
     # --- Create and Save Bias/RMSE Table ---
-    df_bias_rmse = df_agg.pivot(index='model', columns='variable', values=['mean_bias', 'rmse'])
+    df_bias_rmse = df_agg.pivot(index='model', columns='variable', values=['mean_bias']) # 'rmse'
     df_bias_rmse.index.name = "Model"
     csv_path_br = os.path.join(DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.csv")
     tex_path_br = os.path.join(DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.tex")
@@ -640,7 +647,7 @@ def generate_wide_assessment_tables(
     )
 
     # --- Create and Save Variability Table ---
-    df_variability = df_agg.pivot(index='model', columns='variable', values=['variability_ratio', 'corr_variability'])
+    df_variability = df_agg.pivot(index='model', columns='variable', values=['model_cv']) # 'variability_ratio', 'corr_variability'
     df_variability.index.name = "Model"
     csv_path_var = os.path.join(DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.csv")
     tex_path_var = os.path.join(DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.tex")
@@ -651,6 +658,246 @@ def generate_wide_assessment_tables(
         caption=f"Model Variability Assessment for {place.replace('_', ' ').title()} (1980-2014)",
         label=f"tab:{place}_variability",
         filename=tex_path_var
+    )
+
+
+import statsmodels.api as sm
+from tcpips.era5 import trend_with_neweywest_full
+
+def analyze_bias_newey_west_ensemble(
+    model_aligned_ds: xr.Dataset, era5_aligned_ds: xr.Dataset, var: str
+) -> dict:
+    """
+    Analyzes bias using OLS with Newey-West standard errors on the ensemble mean.
+
+    This function first calculates the bias for a given variable, then computes the
+    mean across the ensemble members, and finally calculates the trend of this
+    ensemble-mean bias time series.
+
+    Args:
+        model_aligned_ds (xr.Dataset): Dataset with multiple members, aligned to ERA5.
+        era5_aligned_ds (xr.Dataset): ERA5 dataset, aligned to the model.
+        var (str): The variable to analyze.
+
+    Returns:
+        A dictionary containing the mean bias, bias trend, and the trend's p-value.
+    """
+    # Calculate bias against ERA5 (retains the 'member' dimension)
+    bias_ds = model_aligned_ds[var] - era5_aligned_ds[var]
+
+    # Calculate the mean across the ensemble members to get a single time series
+    ensemble_mean_bias = bias_ds.mean(dim="member").values
+
+    # Analyze this single time series for its trend
+    bias_trend, bias_intercept, bias_trend_p = trend_with_neweywest_full(ensemble_mean_bias)
+
+    return {
+        'mean_bias': np.nanmean(ensemble_mean_bias),
+        'bias_trend': bias_trend,
+        'bias_trend_p_value': bias_trend_p,
+    }
+
+
+def generate_newey_west_assessment_tables(
+    place: str = "new_orleans",
+    pi_version: int = 4,
+    comparison_period: Tuple[int, int] = (1980, 2024)
+) -> None:
+    """
+    Generates assessment tables using an ensemble-mean Newey-West approach.
+    """
+    print(f"\n--- Generating Newey-West Ensemble Assessment for {place} ---")
+    results = []
+    start_yr, end_yr = str(comparison_period[0]), str(comparison_period[1])
+
+    try:
+        era5_ds = get_timeseries(model="ERA5", place=place, pi_version=pi_version)
+        era5_ds_period = era5_ds.sel(time=slice(start_yr, end_yr))
+    except Exception as e:
+        print(f"Could not load ERA5 data. Skipping assessment. Error: {e}")
+        return
+
+    for model, members in MODELS_TO_PROCESS.items():
+        model_data_all_members = []
+        for member_str in members:
+            try:
+                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_data_all_members.append(model_ds)
+            except Exception as e:
+                print(f"Could not load data for {model}/{member_str}. Skipping member.")
+
+        if not model_data_all_members: continue
+
+        full_model_ds = xr.concat(model_data_all_members, dim=pd.Index(members, name="member"))
+        full_model_ds_period = full_model_ds.sel(time=slice(start_yr, end_yr))
+
+        common_time = np.intersect1d(era5_ds_period.time, full_model_ds_period.time)
+        if len(common_time) < 5: continue
+        era5_aligned = era5_ds_period.sel(time=common_time)
+        model_aligned = full_model_ds_period.sel(time=common_time)
+
+        for var in VARIABLES_TO_PROCESS:
+            if var not in model_aligned or var not in era5_aligned: continue
+            if "r" in var:
+                era5_aligned[var] = era5_aligned[var] / 1000.0  # Convert from m to km
+                model_aligned[var] = model_aligned[var] / 1000.0
+
+            # --- Analyze with the Newey-West ensemble function ---
+            analysis_res = analyze_bias_newey_west_ensemble(model_aligned, era5_aligned, var)
+
+            # (CV and RMSE would still be calculated per-member then averaged/ranged)
+
+            # Helper for significance stars
+            def p_to_star(p):
+                return '***' if p < 0.001 else '**' if p < 0.01 else '*' if p < 0.05 else ''
+
+            results.append({
+                "model": model, "variable": var,
+                "mean_bias": f"${analysis_res['mean_bias']:.2f}$",
+                "bias_trend": f"${analysis_res['bias_trend']:.3f}${p_to_star(analysis_res['bias_trend_p_value'])}",
+            })
+
+    if not results:
+        print("No assessment results generated.")
+        return
+
+    df = pd.DataFrame(results)
+    df_pivot = df.pivot(index='model', columns='variable', values=['mean_bias', 'bias_trend'])
+    df_pivot.index.name = "Model"
+
+    tex_path = os.path.join(DATA_PATH, f"{place}_assessment_neweywest_pi{pi_version}.tex")
+
+    wide_dataframe_to_latex(
+        df=df_pivot,
+        caption=f"Model Bias Assessment for {place.replace('_', ' ').title()} (1980-2024). Trends computed on the ensemble mean with Newey-West standard errors.",
+        label=f"tab:{place}_bias_neweywest",
+        filename=tex_path
+    )
+
+
+def analyze_bias_mixed_model(model_df: pd.DataFrame) -> dict:
+    """
+    Analyzes bias using a linear mixed-effects model.
+
+    This treats 'member' as a random effect to account for non-independence,
+    providing a robust estimate of the overall mean bias (fixed intercept) and
+    the trend in bias (fixed slope for time).
+
+    Args:
+        model_df: DataFrame with columns ['time', 'bias', 'member'].
+
+    Returns:
+        A dictionary with the mean bias and trend, their standard errors,
+        p-values, and the variance of the inter-member variability.
+    """
+    # Ensure time is a numerical predictor (e.g., years from start)
+    model_df['time_idx'] = model_df['time']  - model_df['time'].min()
+
+    # Fit the mixed-effects model.
+    # Fixed effects: Intercept (mean bias) + time_idx (bias trend)
+    # Random effect: A random intercept for each member
+    md = smf.mixedlm("bias ~ 1 + time_idx", model_df, groups=model_df["member"])
+    mdf = md.fit(reml=False) # Use ML for better p-values
+
+    # Extract results
+    fixed_effects = mdf.params
+    p_values = mdf.pvalues
+    std_errs = mdf.bse
+    random_effects_var = mdf.cov_re.iloc[0, 0] # Variance of the random intercept
+
+    return {
+        'mean_bias': fixed_effects['Intercept'],
+        'mean_bias_se': std_errs['Intercept'],
+        'mean_bias_p': p_values['Intercept'],
+        'bias_trend': fixed_effects['time_idx'],
+        'bias_trend_se': std_errs['time_idx'],
+        'bias_trend_p': p_values['time_idx'],
+        'inter_member_variance': random_effects_var,
+    }
+
+
+def generate_mixed_model_assessment_tables(
+    place: str = "new_orleans",
+    pi_version: int = 4,
+    comparison_period: Tuple[int, int] = (1980, 2024)
+) -> None:
+    """
+    Generates assessment tables using a robust mixed-effects model approach.
+    """
+    print(f"\n--- Generating Mixed-Effects Model Assessment for {place} ---")
+    results = []
+    start_yr, end_yr = str(comparison_period[0]), str(comparison_period[1])
+
+    try:
+        era5_ds = get_timeseries(model="ERA5", place=place, pi_version=pi_version)
+        era5_ds_period = era5_ds.sel(time=slice(start_yr, end_yr))
+    except Exception as e:
+        print(f"Could not load ERA5 data. Skipping assessment. Error: {e}")
+        return
+
+    for model, members in MODELS_TO_PROCESS.items():
+        # --- Collect data from all members of a model ---
+        model_data_all_members = []
+        for member_str in members:
+            try:
+                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_data_all_members.append(model_ds)
+            except Exception as e:
+                print(f"Could not load data for {model}/{member_str}. Skipping member.")
+
+        if not model_data_all_members: continue
+
+        # Concatenate datasets from all members
+        full_model_ds = xr.concat(model_data_all_members, dim=pd.Index(members, name="member"))
+        full_model_ds_period = full_model_ds.sel(time=slice(start_yr, end_yr))
+
+        # Align with ERA5
+        common_time = np.intersect1d(era5_ds_period.time, full_model_ds_period.time)
+        if len(common_time) < 5: continue
+        era5_aligned = era5_ds_period.sel(time=common_time)
+        model_aligned = full_model_ds_period.sel(time=common_time)
+
+        for var in VARIABLES_TO_PROCESS:
+            if var not in model_aligned or var not in era5_aligned: continue
+
+
+            # Create a DataFrame suitable for the mixed model
+            bias_df = (model_aligned[var] - era5_aligned[var]).to_dataframe(name='bias').reset_index()
+            if "r" in var:
+                bias_df['bias'] = bias_df['bias'] / 1000.0  # Convert from m to km
+            bias_df.dropna(inplace=True)
+            if bias_df.shape[0] < 10: continue
+
+            # --- Analyze with the new function ---
+            bias_res = analyze_bias_mixed_model(bias_df)
+
+            # (Note: CV calculation would still be done per-member then averaged, as it's a property of each timeseries)
+
+            results.append({
+                "model": model, "variable": var,
+                "mean_bias": f"${bias_res['mean_bias']:.2f} \\pm {bias_res['mean_bias_se']:.2f}$",
+                "bias_trend": f"${bias_res['bias_trend']:.3f} \\pm {bias_res['bias_trend_se']:.3f}$",
+                # You could also add p-value stars if desired
+            })
+
+    if not results:
+        print("No assessment results generated.")
+        return
+
+    df = pd.DataFrame(results)
+
+    # --- Pivot and Save Table ---
+    df_pivot = df.pivot(index='model', columns='variable', values=['mean_bias', 'bias_trend'])
+    df_pivot.index.name = "Model"
+
+    tex_path = os.path.join(DATA_PATH, f"{place}_assessment_mixed_model_pi{pi_version}.tex")
+
+    # A simplified wide_dataframe_to_latex call
+    wide_dataframe_to_latex(
+        df=df_pivot,
+        caption=f"Model Bias Assessment for {place.replace('_', ' ').title()} (1980-2024). Values are fixed effects $\\pm$ standard error from a mixed-effects model.",
+        label=f"tab:{place}_bias_mixed_model",
+        filename=tex_path
     )
 
 
@@ -666,5 +913,10 @@ if __name__ == "__main__":
 
     # Generate tables for bias and variability assessment
     # generate_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
-    generate_wide_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
-    generate_wide_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
+    #generate_wide_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
+    # generate_wide_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
+
+    generate_mixed_model_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
+    generate_mixed_model_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
+    generate_newey_west_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
+    generate_newey_west_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
