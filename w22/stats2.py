@@ -14,6 +14,10 @@ from uncertainties import ufloat
 from sithom.curve import fit
 from .plot import get_timeseries
 from .constants import DATA_PATH
+from tcpips.era5 import trend_with_neweywest_full
+
+DATA_PATH = os.path.join(DATA_PATH, "stats")
+os.makedirs(DATA_PATH, exist_ok=True)
 
 
 # CONFIGURATION: Models and variables to process
@@ -370,8 +374,11 @@ def generate_assessment_tables(
     # Format for LaTeX table
     def p_to_star(p):
         return '***' if p < 0.001 else '**' if p < 0.01 else '*' if p < 0.05 else ''
-    df['mean_bias'] = df.apply(lambda r: f"{r.mean_bias:.2f}{p_to_star(r.mean_bias_p)}", axis=1)
-    df['bias_trend'] = df.apply(lambda r: f"{r.bias_trend:.3f}{p_to_star(r.bias_trend_p)}", axis=1)
+    def p_to_str(p):
+        out = f"{p:.1e}" if p < 0.01 else f"{p:.2f}"
+        return " (p=" + out + ")"
+    df['mean_bias'] = df.apply(lambda r: f"{r.mean_bias:.2f}{p_to_str(r.mean_bias_p)}", axis=1)
+    df['bias_trend'] = df.apply(lambda r: f"{r.bias_trend:.3f}{p_to_str(r.bias_trend_p)}", axis=1)
 
     era5_cv_df = df[['variable', 'era5_cv']].drop_duplicates().reset_index(drop=True)
     print("\nERA5 Detrended Coefficient of Variation (1980-2014):")
@@ -661,9 +668,6 @@ def generate_wide_assessment_tables(
     )
 
 
-import statsmodels.api as sm
-from tcpips.era5 import trend_with_neweywest_full
-
 def analyze_bias_newey_west_ensemble(
     model_aligned_ds: xr.Dataset, era5_aligned_ds: xr.Dataset, var: str
 ) -> dict:
@@ -748,13 +752,16 @@ def generate_newey_west_assessment_tables(
             # (CV and RMSE would still be calculated per-member then averaged/ranged)
 
             # Helper for significance stars
-            def p_to_star(p):
-                return '***' if p < 0.001 else '**' if p < 0.01 else '*' if p < 0.05 else ''
+            #def p_to_star(p):
+            #    return '***' if p < 0.001 else '**' if p < 0.01 else '*' # if p < 0.05 else ''
+            def p_to_str(p):
+                out = f"{p:.1e}" if p < 0.01 else f"{p:.2f}"
+                return " (p=" + out + ")"
 
             results.append({
                 "model": model, "variable": var,
                 "mean_bias": f"${analysis_res['mean_bias']:.2f}$",
-                "bias_trend": f"${analysis_res['bias_trend']:.3f}${p_to_star(analysis_res['bias_trend_p_value'])}",
+                "bias_trend": f"${analysis_res['bias_trend']:.3f}${p_to_str(analysis_res['bias_trend_p_value'])}",
             })
 
     if not results:
@@ -913,10 +920,9 @@ if __name__ == "__main__":
 
     # Generate tables for bias and variability assessment
     # generate_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
-    #generate_wide_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
+    # generate_wide_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
     # generate_wide_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
-
-    generate_mixed_model_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
-    generate_mixed_model_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
+    # generate_mixed_model_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
+    # generate_mixed_model_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
     generate_newey_west_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
     generate_newey_west_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
