@@ -31,7 +31,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
         python-version: ${{ matrix.python-version }}
-        environment-file: environment.yml
+        environment-file: env.yml
         auto-update-conda: true
         use-mamba: true # Use the fast Mamba solver
 
