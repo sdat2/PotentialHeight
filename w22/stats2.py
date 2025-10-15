@@ -918,13 +918,13 @@ def p_to_str(p_val: float) -> str:
         str: A LaTeX-formatted string, e.g., "($p=1.3 \\times 10^{-3}$)".
 
     Doctests:
-    >>> format_p_value_latex(0.000126)
+    >>> p_to_str(0.000126)
     ' ($p=1.3 \\times 10^{-4}$)'
-    >>> format_p_value_latex(0.045)
+    >>> p_to_str(0.045)
     ' ($p=0.045$)'
-    >>> format_p_value_latex(0.2314)
+    >>> p_to_str(0.2314)
     ' ($p=0.231$)'
-    >>> format_p_value_latex(np.nan)
+    >>> p_to_str(np.nan)
     ''
     """
     if pd.isna(p_val):
