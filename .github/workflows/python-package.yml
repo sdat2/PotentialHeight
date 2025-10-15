@@ -1,4 +1,4 @@
-name: Python CI
+name: Python Package CI
 
 on:
   push:
@@ -19,17 +19,24 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
+    - name: Cache Conda environment
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.CONDA }}/envs
+        key: ${{ runner.os }}-conda-${{ matrix.python-version }}-${{ hashFiles('environment.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-conda-${{ matrix.python-version }}-
+
     - name: Setup Conda Environment with Mamba 🐍
       uses: conda-incubator/setup-miniconda@v3
       with:
         python-version: ${{ matrix.python-version }}
         environment-file: environment.yml
         auto-update-conda: true
-        use-mamba: true               # Use the fast Mamba solver
-        cache-environment: true       # Cache the solved environment
+        use-mamba: true # Use the fast Mamba solver
 
     - name: Run Tests with Pytest
-      # Use a conda-aware shell to ensure the test runs in the activated environment
+      # Use a conda-aware shell to run in the activated environment
       shell: bash -l {0}
       run: |
         pytest -W ignore::DeprecationWarning
