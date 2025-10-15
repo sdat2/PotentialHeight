@@ -907,6 +907,156 @@ def generate_mixed_model_assessment_tables(
         filename=tex_path
     )
 
+def p_to_str(p_val: float) -> str:
+    """
+    Formats a p-value into a LaTeX string for inclusion in tables.
+
+    Args:
+        p_val (float): The p-value to format.
+
+    Returns:
+        str: A LaTeX-formatted string, e.g., "($p=1.3 \\times 10^{-3}$)".
+
+    Doctests:
+    >>> format_p_value_latex(0.000126)
+    ' ($p=1.3 \\times 10^{-4}$)'
+    >>> format_p_value_latex(0.045)
+    ' ($p=0.045$)'
+    >>> format_p_value_latex(0.2314)
+    ' ($p=0.231$)'
+    >>> format_p_value_latex(np.nan)
+    ''
+    """
+    if pd.isna(p_val):
+        return ""
+    if p_val < 0.001:
+        # Format in scientific notation
+        exponent = np.floor(np.log10(p_val))
+        mantissa = p_val / 10**exponent
+        return f" ($p={mantissa:.1f} \\times 10^{{{int(exponent)}}}$)"
+    else:
+        # Format as a decimal
+        return f" ($p={p_val:.3f}$)"
+
+
+def trend_with_neweywest_full(y: np.ndarray) -> tuple[float, float, float]:
+    """
+    Calculates the linear trend (slope, intercept) and its p-value
+    using OLS with Newey-West standard errors.
+    """
+    if np.all(np.isnan(y)) or len(y) < 2:
+        return np.nan, np.nan, np.nan
+    x = np.arange(len(y))
+    x_const = sm.add_constant(x)
+    model = sm.OLS(y, x_const, missing="drop").fit(
+        cov_type="HAC", cov_kwds={"maxlags": 1}
+    )
+    intercept, slope = model.params
+    p_value = model.pvalues[1]
+    return slope, intercept, p_value
+
+
+def generate_future_trend_table(
+    place: str = "new_orleans",
+    pi_version: int = 4,
+    future_period: Tuple[int, int] = (2014, 2100)
+) -> None:
+    """
+    Generates a table of future trends for CMIP6 models.
+
+    This function calculates the ensemble-mean trend and its significance using
+    Newey-West standard errors. It also calculates the range of trends across
+    individual ensemble members to quantify internal variability.
+
+    Args:
+        place (str): The place for which to generate the trend table.
+        pi_version (int): The potential intensity version to use.
+        future_period (Tuple[int, int]): The (start, end) year for the trend.
+    """
+    print(f"\n--- Generating Future Trend Table for {place} ---")
+    results = []
+    start_yr, end_yr = str(future_period[0]), str(future_period[1])
+
+    for model, members in MODELS_TO_PROCESS.items():
+        # --- Collect data from all members of a model ---
+        member_datasets = []
+        for member_str in members:
+            try:
+                ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                member_datasets.append(ds.sel(time=slice(start_yr, end_yr)))
+            except Exception as e:
+                print(f"Could not load data for {model}/{member_str}. Skipping member.")
+
+        if not member_datasets:
+            continue
+
+        full_model_ds = xr.concat(member_datasets, dim=pd.Index(members, name="member"))
+
+        for var in VARIABLES_TO_PROCESS:
+            if var not in full_model_ds:
+                continue
+            if "r" in var:
+                full_model_ds[var] = full_model_ds[var] / 1000.0  # Convert from m to km
+
+            # 1. Calculate trend on the ENSEMBLE MEAN series
+            ensemble_mean_series = full_model_ds[var].mean(dim="member").values
+            mean_trend, _, mean_p_value = trend_with_neweywest_full(ensemble_mean_series)
+
+            # 2. Calculate trend for EACH MEMBER to get the spread
+            member_trends = []
+            for member_str in full_model_ds.member.values:
+                member_series = full_model_ds[var].sel(member=member_str).values
+                slope, _, _ = trend_with_neweywest_full(member_series)
+                member_trends.append(slope)
+
+            trend_range_min = np.nanmin(member_trends)
+            trend_range_max = np.nanmax(member_trends)
+
+            results.append({
+                "model": model,
+                "variable": var,
+                "mean_trend": mean_trend,
+                "p_value": mean_p_value,
+                "trend_min": trend_range_min,
+                "trend_max": trend_range_max
+            })
+
+    if not results:
+        print("No trend results generated.")
+        return
+
+    df = pd.DataFrame(results)
+
+    # Define a scaling factor for readability (e.g., trend per decade)
+    # This makes the numbers in the table easier to read.
+    scaling_factor = 10
+
+    df['Trend (per decade)'] = df.apply(
+        lambda r: f"${r.mean_trend * scaling_factor:.3f}${p_to_str(r.p_value)}", axis=1
+    )
+    df['Ensemble Range (per decade)'] = df.apply(
+        lambda r: f"$[{r.trend_min * scaling_factor:.3f}, {r.trend_max * scaling_factor:.3f}]$", axis=1
+    )
+
+    # Pivot the table into a wide format for the final output
+    df_pivot = df.pivot(
+        index='model',
+        columns='variable',
+        values=['Trend (per decade)', 'Ensemble Range (per decade)']
+    )
+
+    # Clean up column names for the LaTeX table
+    df_pivot.index.name = "Model"
+    # The dataframe_to_latex_table function would need adjustment for this new format,
+    # but let's first save a clean CSV.
+    csv_path = os.path.join(DATA_PATH, f"{place}_future_trends_pi{pi_version}.csv")
+    df_pivot.to_csv(csv_path)
+    print(f"\nSaved future trend data to {csv_path}")
+
+    # For display purposes, let's print a clean version
+    print("\nFuture Trends (2014-2100):")
+    print(df_pivot)
+
 
 if __name__ == "__main__":
     # python -m w22.stats2
@@ -924,5 +1074,9 @@ if __name__ == "__main__":
     # generate_wide_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
     # generate_mixed_model_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
     # generate_mixed_model_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
-    generate_newey_west_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
-    generate_newey_west_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
+    #generate_newey_west_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
+    # generate_newey_west_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
+    generate_future_trend_table(place="hong_kong", pi_version=PI_VERSION)
+    generate_future_trend_table(place="new_orleans", pi_version=PI_VERSION)
+
+
