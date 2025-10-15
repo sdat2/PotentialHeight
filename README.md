@@ -96,10 +96,10 @@ And cite the code as:
 @software{potential_height_code,
   author = {Thomas, Simon D. A.},
   doi = {10.5281/zenodo.15073504},
-  month = {Sep},
+  month = {Oct},
   title = {{Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
   url = {https://github.com/sdat2/PotentialHeight},
-  version = {v0.1.1},
+  version = {v0.1.2},
   year = {2025}
 }
 ```
