@@ -919,7 +919,7 @@ def p_to_str(p_val: float) -> str:
 
     Doctests:
     >>> p_to_str(0.000126)
-    ' ($p=1.3 \\times 10^{-4}$)'
+    ' ($p=1.3 \\\\times 10^{-4}$)'
     >>> p_to_str(0.045)
     ' ($p=0.045$)'
     >>> p_to_str(0.2314)
