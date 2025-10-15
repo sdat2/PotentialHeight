@@ -493,6 +493,9 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
     client.close()
 
 
+import os
+import netCDF4 as nc
+
 def assign_coordinate_attributes(file_path: str):
     """Assigns CF-compliant 'coordinates' attributes to data variables.
 
@@ -508,8 +511,9 @@ def assign_coordinate_attributes(file_path: str):
     Doctests:
     >>> # Setup a dummy NetCDF file for the test
     >>> file_name = 'test_coord.nc'
-    >>> with nc.Dataset(file_name, 'w') as ds:
-    ...     _ =  ds.createDimension('latitude', 10)
+    >>> # ✅ Use the simpler NETCDF3 format to avoid HDF5 filesystem issues in CI
+    >>> with nc.Dataset(file_name, 'w', format='NETCDF3_CLASSIC') as ds:
+    ...     _ = ds.createDimension('latitude', 10)
     ...     _ = ds.createDimension('longitude', 20)
     ...     _ = ds.createDimension('time', 2)
     ...     _ = ds.createVariable('latitude', 'f4', ('latitude',))
@@ -536,12 +540,14 @@ def assign_coordinate_attributes(file_path: str):
 
     try:
         with nc.Dataset(file_path, "a") as ds:
-            # Get the names of all coordinate variables
+            # Get the names of all coordinate variables (variables that share a name with a dimension)
             coord_vars = list(ds.dimensions.keys())
 
             # Iterate over all variables in the file
             for var_name in ds.variables:
-                # Skip coordinate variables themselves
+                # 🐛 Skip coordinate variables themselves
+                if var_name in coord_vars:
+                    continue
 
                 var_obj = ds.variables[var_name]
                 # Check if the variable has the required dimensions
@@ -551,12 +557,15 @@ def assign_coordinate_attributes(file_path: str):
                     var_obj.setncattr("coordinates", f"{lon_name} {lat_name}")
                     print("Added 'coordinates' attribute.")
 
-            ds[lon_name].setncattr("standard_name", "longitude")
-            ds[lat_name].setncattr("standard_name", "latitude")
-            ds[lon_name].setncattr("axis", "X")
-            ds[lat_name].setncattr("axis", "Y")
-            ds[lon_name].units = "degrees_east"
-            ds[lat_name].units = "degrees_north"
+            # Set standard attributes for coordinate variables
+            if lon_name in ds.variables:
+                ds[lon_name].setncattr("standard_name", "longitude")
+                ds[lon_name].setncattr("axis", "X")
+                ds[lon_name].units = "degrees_east"
+            if lat_name in ds.variables:
+                ds[lat_name].setncattr("standard_name", "latitude")
+                ds[lat_name].setncattr("axis", "Y")
+                ds[lat_name].units = "degrees_north"
 
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
