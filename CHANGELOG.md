@@ -1,6 +1,9 @@
 v0.1.2:
 - Improved logic for filling in temperature and humidity profile.
+- Actually managed to calculate potential sizes on ERA5 Aug/Feb data 1980-2024 for the whole grid 40S to 40N by burning 2000 node hours (128 CPUs per node) on Archer2. This shows parallelization works, but still very strong constraints. 99% of compute is still on the CLE15 profile calculation.
 - Improved the potential size calculation in `w22.ps` so that both potential sizes can be calculated together.
+- Improved the `w22.stats2` module to generate lots of new tables to describe the CMIP6 results.
+- Added additional filters for IBTrACS data in `tcpips.ibtracs` to remove storms that are undergoing extratropical transition. Seems to support hypothesis that most supersize storms are either undergoing ET or have data quality issues.
 
 v0.1.1:
 - Added `tcpips/ibtracs.py` script to compare observations with potential sizes and potential intensity calculated from `era5` monthly averages (all post 1980).
