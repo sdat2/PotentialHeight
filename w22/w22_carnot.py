@@ -1,4 +1,4 @@
-"""Some functions for the Wang 2022 "Tropical Cyclone Potential Size" Carnot engine model."""
+"""Some functions for the Wang 2022 "Tropical Cyclone Potential Size" sub-Carnot engine model."""
 
 from typing import Callable, Tuple
 import numpy as np
@@ -67,7 +67,7 @@ def wang_consts(
     radius_of_max_wind: float = RADIUS_OF_MAX_WIND_DEFAULT,  # m
 ) -> Tuple[float, float, float]:  # a, b, c
     """
-    Wang 2022 Carnot engine model parameters. This function calculates the constants that are then used to calculate the difference function whose root we want to find.
+    Wang 2022 sub-Carnot engine model parameters. This function calculates the constants that are then used to calculate the difference function whose root we want to find.
 
     Args:
         near_surface_air_temperature (float, optional): Defaults to 299 [K].
@@ -84,7 +84,7 @@ def wang_consts(
         radius_of_max_wind (float, optional): Defaults to 64 * 1000 [m].
 
     Returns:
-        Tuple[float, float, float]: a, b, c
+        Tuple[float, float, float]: a, b, c (equations 17--19 in Wang et al. 2022).
 
     # only works if you use dodgy value for constant of latent heat of vaporization of water (2_500_000 J kg-1)
     # and not the more standard value (2_268_000 J kg-1)
@@ -160,7 +160,7 @@ def wang_carnot_velocity(
     pressure_dry_at_inflow: float = PRESSURE_DRY_AT_INFLOW_DEFAULT,  # Pa
 ) -> float:
     """
-    Calculate the Carnot velocity from the Wang 2022 Carnot engine model.
+    Calculate the sub-Carnot velocity from the Wang 2022 sub-Carnot engine model.
 
     In equation 27 they make a series of assumptions, including that intensity does not signicantly change with potential size to get the formula.
 
@@ -208,7 +208,7 @@ def wang_outer_radius_approx(
     coriolis_parameter: float = F_COR_DEFAULT,  # s-1
 ):
     """
-    Calculate the length scale from the Wang 2022 Carnot engine model. The factor of 2 is from Appendix B.
+    Calculate the length scale from the Wang 2022 sub-Carnot engine model. The factor of 2 is from Appendix B.
 
     Most of the time the length scale is referred to as V_carnot/f_cor, but there is a factor of 2 in derivation in Appendix B, so we include that here for completeness.
 
