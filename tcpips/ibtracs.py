@@ -2799,6 +2799,116 @@ def _proc_to_sf(x: np.ndarray) -> np.ndarray:
     return 1 - np.arange(1, _length_of_array(x) + 1) / _length_of_array(x)
 
 
+def plot_normalized_quad_dual(
+    lower_wind_vp: float = LOWER_VP_DEFAULT,
+    lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
+) -> None:
+    """Plot the additional filtered data alongside the original data """
+    plot_defaults()
+    bf_ds = get_normalized_data(
+            lower_wind_vp=lower_wind_vp,
+            lower_wind_obs=lower_wind_obs
+            )
+    af_ds = get_normalized_data(
+            lower_wind_vp=lower_wind_vp,
+            lower_wind_obs=lower_wind_obs,
+            min_sst_c=26.5,
+            max_abs_lat=30,
+        )
+    fig, axs = plt.subplots(
+        1,
+        4,
+        figsize=get_dim(fraction_of_line_width=4 / 3, ratio=(5**0.5 - 1) / 2 * 3 / 4),
+        sharey=True,
+        sharex=True,
+    )
+    axs[0].hist(bf_ds["normalized_intensity"].values.ravel(), bins=100, alpha=0.5, color="blue")
+    axs[0].hist(af_ds["normalized_intensity"].values.ravel(), bins=100, alpha=0.5, color="green")
+    axs[0].set_xlabel(r"$V_{\mathrm{Obs.}} / V_{p}$")
+    axs[0].set_ylabel("Count")
+    #axs[0].set_title(
+    #    f"{_perc_gt_1(bf_ds['normalized_intensity'].values):.1f} % exceedance"
+    #)
+    axs[1].hist(bf_ds["normalized_size_pips"].values.ravel(), bins=400, alpha=0.5, color="blue")
+    axs[1].hist(af_ds["normalized_size_pips"].values.ravel(), bins=400, alpha=0.5, color="green")
+
+    axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
+    #axs[1].set_title(
+    #    f"{_perc_gt_1(bf_ds['normalized_size_pips'].values):.1f} % exceedance"
+    #)
+    axs[2].hist(bf_ds["normalized_size_cps"].values.ravel(), bins=600, alpha=0.5, color="blue")
+    axs[2].hist(af_ds["normalized_size_cps"].values.ravel(), bins=600, alpha=0.5, color="green")
+
+    #axs[2].set_title(
+    #    f"{_perc_gt_1(bf_ds['normalized_size_cps'].values):.1f} % exceedance"
+    #)
+    axs[2].set_xlabel(r"$r_{\mathrm{Obs.}} / r_2$")
+    axs[3].hist(bf_ds["normalized_size_cat1"].values.ravel(), bins=600, alpha=0.5, color="blue")
+    axs[3].hist(af_ds["normalized_size_cat1"].values.ravel(), bins=600, alpha=0.5, color="green")
+
+    #axs[3].set_title(
+    #    f"{_perc_gt_1(bf_ds['normalized_size_cat1'].values):.1f} % exceedance"
+    #)
+    axs[3].set_xlabel(r"$r_{\mathrm{Obs.}} / r_1$")
+    label_subplots(axs)
+    plt.xlim(0, 3)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_quad_dual.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+    NORM_VAR = ["normalized_intensity", "normalized_size_pips", "normalized_size_cps", "normalized_size_cat1"]
+
+    def max_norm_ds_f(ds: xr.Dataset) -> xr.Dataset:
+        out_d  = {}
+        for norm_var in NORM_VAR:
+            out_d[norm_var] = ds[norm_var].max(dim="date_time")
+        return xr.Dataset(out_d)
+
+    max_bf_ds = max_norm_ds_f(bf_ds)
+    max_af_ds = max_norm_ds_f(af_ds)
+
+    def plot_norm_var_panel(ax, var: str, ds1, ds2):
+        ax.plot(
+            np.sort(_processed_array(ds1[var].values)),
+            _proc_to_sf(ds1[var].values),
+            color="blue"
+        )
+        ax.plot(
+            np.sort(_processed_array(ds2[var].values)),
+            _proc_to_sf(ds2[var].values),
+            color="green"
+        )
+    fig, axs = plt.subplots(
+        1,
+        4,
+        figsize=get_dim(fraction_of_line_width=4 / 3, ratio=(5**0.5 - 1) / 2 * 3 / 4),
+        sharey=True,
+        sharex=True,
+    )
+    for i, var in enumerate(NORM_VAR):
+        plot_norm_var_panel(axs[i], var, max_bf_ds, max_af_ds)
+    axs[0].set_xlabel(
+        r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$"
+    )
+    axs[0].set_ylabel("Survival Function (1 - CDF)")
+    axs[1].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_3\right)$")
+    axs[2].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_2\right)$")
+    axs[3].set_xlabel(r"$\max_{\mathrm{storm}}\left(r_{\mathrm{Obs.}} / r_1\right)$")
+    label_subplots(axs, override="outside")
+    plt.xlim(0, 3)
+    plt.ylim(0, 1)
+    plt.savefig(
+        os.path.join(FIGURE_PATH, "normalized_quad_cdf_dual.pdf"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.clf()
+    plt.close()
+
+
 def plot_normalized_quad(
     lower_wind_vp: float = LOWER_VP_DEFAULT,
     lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
@@ -2998,6 +3108,7 @@ def plot_normalized_quad(
     print(
         f"Storms with normalized intensity > 1 and normalized size > 1: {', '.join(storm_names)}"
     )
+    del ibtracs_ds
 
     # get top 10 storms by normalized intensity
     top_intensity_storms = np.argsort(
@@ -3593,12 +3704,13 @@ if __name__ == "__main__":
     # create_exceedance_table()
     # ds = get_vary_vobs_lower_data(num=50, regenerate=True)
     # print(ds)
-    plot_normalized_quad(
-        lower_wind_vp=33,
-        lower_wind_obs=33,
-        min_sst_c=26.5,
-        max_abs_lat=30,
-        plot_storms=False,
-    )
+    # plot_normalized_quad(
+    #     lower_wind_vp=33,
+    #     lower_wind_obs=33,
+    #     min_sst_c=26.5,
+    #     max_abs_lat=30,
+    #     plot_storms=False,
+    # )
+    plot_normalized_quad_dual()
 
 # add a processing step to exclude cyclone time points where PI is going / has gone down.
