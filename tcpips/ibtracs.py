@@ -7,11 +7,9 @@ wget https://www.ncei.noaa.gov/data/international-best-track-archive-for-climate
 
 TODO: test the effect of excluding e.g. colder water or higher latitudes.
 
-- I.e. hypotheses: supersize storms are caused by storms that have extratropical components, or through inertial effects as the potential size rapidly decreases over a patch of cold water.
+- i.e. hypotheses: supersize storms are caused by storms that have extratropical components, or through inertial effects as the potential size rapidly decreases over a patch of cold water.
 
 TODO: standardize all the terminology to Cat1 Potential Inner Size (r_1), Corresponding Potential Inner Size (r_2), PI Potential Innner size (r_3).
-
-
 """
 
 from typing import Optional, Tuple, Union, List, Literal
@@ -68,8 +66,12 @@ IBTRACS_DATA_FILE = os.path.join(IBTRACS_DATA_PATH, "IBTrACS.since1980.v04r01.nc
 FIGURE_PATH = os.path.join(PROJECT_PATH, "img", "ibtracs")
 os.makedirs(FIGURE_PATH, exist_ok=True)
 
-LOWER_VP_DEFAULT = 33  # m/s
-LOWER_WIND_OBS_DEFAULT = 33  # m/s
+LOWER_VP_DEFAULT: float = 33  # m/s
+LOWER_WIND_OBS_DEFAULT: float = 33  # m/s
+NORM_VAR = ["normalized_intensity",
+            "normalized_size_pips",
+            "normalized_size_cps",
+            "normalized_size_cat1"]
 
 
 def download_ibtracs_data() -> None:
@@ -2803,7 +2805,9 @@ def plot_normalized_quad_dual(
     lower_wind_vp: float = LOWER_VP_DEFAULT,
     lower_wind_obs: float = LOWER_WIND_OBS_DEFAULT,
 ) -> None:
-    """Plot the additional filtered data alongside the original data """
+    """Plot the additional filtered data alongside the original data.
+
+    Refactor quad plot to make it cleaner."""
     plot_defaults()
     bf_ds = get_normalized_data(
             lower_wind_vp=lower_wind_vp,
@@ -2815,6 +2819,11 @@ def plot_normalized_quad_dual(
             min_sst_c=26.5,
             max_abs_lat=30,
         )
+    def _plot_norm_var_panel(ax, var: str, bins, ds1: xr.Dataset, ds2: xr.Dataset) -> None:
+        ax.hist(ds1[var].values.ravel(), bins=bins, alpha=0.5, color="blue", label=f"SF: {_perc_gt_1(ds1[var].values):.1f}%")
+        ax.hist(ds2[var].values.ravel(), bins=bins, alpha=0.5, color="green", label=f"AF: {_perc_gt_1(ds2[var].values):.1f}%")
+        ax.legend()
+
     fig, axs = plt.subplots(
         1,
         4,
@@ -2822,33 +2831,13 @@ def plot_normalized_quad_dual(
         sharey=True,
         sharex=True,
     )
-    axs[0].hist(bf_ds["normalized_intensity"].values.ravel(), bins=100, alpha=0.5, color="blue")
-    axs[0].hist(af_ds["normalized_intensity"].values.ravel(), bins=100, alpha=0.5, color="green")
+    bins = [100, 400, 600, 600]
+    for i, var in enumerate(NORM_VAR):
+        _plot_norm_var_panel(axs[i], var, bins[i], bf_ds, af_ds)
     axs[0].set_xlabel(r"$V_{\mathrm{Obs.}} / V_{p}$")
     axs[0].set_ylabel("Count")
-    #axs[0].set_title(
-    #    f"{_perc_gt_1(bf_ds['normalized_intensity'].values):.1f} % exceedance"
-    #)
-    axs[1].hist(bf_ds["normalized_size_pips"].values.ravel(), bins=400, alpha=0.5, color="blue")
-    axs[1].hist(af_ds["normalized_size_pips"].values.ravel(), bins=400, alpha=0.5, color="green")
-
     axs[1].set_xlabel(r"$r_{\mathrm{Obs.}} / r_3$")
-    #axs[1].set_title(
-    #    f"{_perc_gt_1(bf_ds['normalized_size_pips'].values):.1f} % exceedance"
-    #)
-    axs[2].hist(bf_ds["normalized_size_cps"].values.ravel(), bins=600, alpha=0.5, color="blue")
-    axs[2].hist(af_ds["normalized_size_cps"].values.ravel(), bins=600, alpha=0.5, color="green")
-
-    #axs[2].set_title(
-    #    f"{_perc_gt_1(bf_ds['normalized_size_cps'].values):.1f} % exceedance"
-    #)
     axs[2].set_xlabel(r"$r_{\mathrm{Obs.}} / r_2$")
-    axs[3].hist(bf_ds["normalized_size_cat1"].values.ravel(), bins=600, alpha=0.5, color="blue")
-    axs[3].hist(af_ds["normalized_size_cat1"].values.ravel(), bins=600, alpha=0.5, color="green")
-
-    #axs[3].set_title(
-    #    f"{_perc_gt_1(bf_ds['normalized_size_cat1'].values):.1f} % exceedance"
-    #)
     axs[3].set_xlabel(r"$r_{\mathrm{Obs.}} / r_1$")
     label_subplots(axs)
     plt.xlim(0, 3)
@@ -2859,8 +2848,6 @@ def plot_normalized_quad_dual(
     )
     plt.clf()
     plt.close()
-    NORM_VAR = ["normalized_intensity", "normalized_size_pips", "normalized_size_cps", "normalized_size_cat1"]
-
     def max_norm_ds_f(ds: xr.Dataset) -> xr.Dataset:
         out_d  = {}
         for norm_var in NORM_VAR:
@@ -2870,17 +2857,22 @@ def plot_normalized_quad_dual(
     max_bf_ds = max_norm_ds_f(bf_ds)
     max_af_ds = max_norm_ds_f(af_ds)
 
-    def plot_norm_var_panel(ax, var: str, ds1, ds2):
+    def _plot_max_norm_var_panel(ax, var: str, ds1: xr.Dataset, ds2: xr.Dataset) -> None:
         ax.plot(
             np.sort(_processed_array(ds1[var].values)),
             _proc_to_sf(ds1[var].values),
-            color="blue"
+            color="blue",
+            alpha=0.7,
+            label=f"SF: {_find_survival_value_at_thresh(ds1[var].values, 1.0)*100:.1f}%",
         )
         ax.plot(
             np.sort(_processed_array(ds2[var].values)),
             _proc_to_sf(ds2[var].values),
-            color="green"
+            color="green",
+            alpha=0.7,
+            label=f"AF: {_find_survival_value_at_thresh(ds2[var].values, 1.0)*100:.1f}%",
         )
+        ax.legend()
     fig, axs = plt.subplots(
         1,
         4,
@@ -2889,7 +2881,7 @@ def plot_normalized_quad_dual(
         sharex=True,
     )
     for i, var in enumerate(NORM_VAR):
-        plot_norm_var_panel(axs[i], var, max_bf_ds, max_af_ds)
+        _plot_max_norm_var_panel(axs[i], var, max_bf_ds, max_af_ds)
     axs[0].set_xlabel(
         r"$\max_{\mathrm{storm}}\left(V_{\mathrm{Obs.}} / V_{\mathrm{p}}\right)$"
     )
