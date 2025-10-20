@@ -93,9 +93,9 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
 
     # Get static storm information once
     storm_number = int(ds["number"].values)
-    storm_name = _decode_char_array(ds["name"]).upper()
+    storm_name = _decode_char_array(ds["name"]).upper().strip(" ").strip('\x00')
     print(f"Generating ATCF for storm {storm_name} ({storm_number})...")
-    storm_name = "GERT"
+    # storm_name = "GERT"
 
     print(f"Processing {len(valid_time_indices)} valid time steps...")
 
@@ -215,14 +215,16 @@ def generate_adcirc_inputs(storm: Storm,
             ds=storm_ds,
             output_atcf_path=os.path.join(output_dir, "atcf.txt"),
         )
-        #wind_forcing = BestTrackForcing(
-        #    Path(os.path.join(output_dir, "atcf.txt")), nws=20
-        #)  # NWS=20 for GAHM
+        wind_forcing = BestTrackForcing(
+            Path(os.path.join(output_dir, "atcf.txt")), nws=20
+        )  # NWS=20 for GAHM
+        print(dir(wind_forcing))
+        print(wind_forcing.tracks)
     # 2. Pass the track object to the BestTrackForcing constructor
     # Now you can correctly specify the 'nws' parameter
 
     # wind_forcing = BestTrackForcing(storm.id, nws=20)  # NWS=20 for GAHM
-    #mesh.add_forcing(wind_forcing)
+    mesh.add_forcing(wind_forcing)
 
     # 3. Calculate Simulation Window
     sim_start, sim_end, spinup = calculate_simulation_window(storm)
@@ -306,8 +308,8 @@ def generate_all_storm_inputs():
         outputs["year"].append(storm.year)
         outputs["num_timepoints"].append(len(storm.time))
 
-    outputs_df = pd.DataFrame(outputs)
-    outputs_df.to_csv("debug_storms.csv", index=False)
+    # outputs_df = pd.DataFrame(outputs)
+    ## outputs_df.to_csv("debug_storms.csv", index=False)
 
     print(f"Found {len(target_storms)} U.S. landfalling storms in IBTrACS.")
 
@@ -335,7 +337,6 @@ if __name__ == "__main__":
     # generate_all_storm_inputs()
     # drive_katrina()
     # from stormevents.nhc import VortexTrack
-
     # track = VortexTrack('AL112017')
     # print(track.data)
     # drive_katrina()
