@@ -2807,7 +2807,12 @@ def plot_normalized_quad_dual(
 ) -> None:
     """Plot the additional filtered data alongside the original data.
 
-    Refactor quad plot to make it cleaner."""
+    Refactored quad plot to make it cleaner.
+
+    Args:
+        lower_wind_vp (float, optional): Lower wind speed threshold for potential intensity. Defaults to 33.0 m/s.
+        lower_wind_obs (float, optional): Lower wind speed threshold for observed wind speed. Defaults to 33.0 m/s.
+    """
     plot_defaults()
     bf_ds = get_normalized_data(
             lower_wind_vp=lower_wind_vp,
@@ -3395,7 +3400,7 @@ def get_vary_vp_lower_data(
     file_name = os.path.join(IBTRACS_DATA_PATH, "vary_vp_lower_exceedance.nc")
     if os.path.exists(file_name):
         print(f"Loading existing dataset from {file_name}")
-        return xr.open_dataset(os.path.join(file_name))
+        return xr.open_dataset(file_name)
     else:
         vp_lower_array = np.linspace(lower_vp_min, lower_vp_max, num=num)
         ps_exceedance = np.zeros(num)

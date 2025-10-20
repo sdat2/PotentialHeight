@@ -93,6 +93,9 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
 
     # Get static storm information once
     storm_number = int(ds["number"].values)
+    storm_name = _decode_char_array(ds["name"]).upper()
+    print(f"Generating ATCF for storm {storm_name} ({storm_number})...")
+    storm_name = "GERT"
 
     print(f"Processing {len(valid_time_indices)} valid time steps...")
 
@@ -103,10 +106,9 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
 
         # --- Part 1: Basic Identifiers ---
         # Use the helper function to decode character arrays
-        atcf_basin = _decode_char_array(row["basin"]).ljust(2)
-        atcf_cyclone_num = str(storm_number).zfill(2)
+        atcf_basin = _decode_char_array(row["basin"])
+        atcf_cyclone_num = str(storm_number)
         atcf_datetime = pd.to_datetime(row["time"].values).strftime("%Y%m%d%H")
-        atcf_technique = "BEST".rjust(4)
 
         # --- Part 2: Core Storm State ---
         # .item() cleanly extracts the scalar value from a 0-dimensional array
@@ -115,36 +117,21 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
 
         lat_val = int(abs(lat) * 10)
         lat_hem = "N" if lat >= 0 else "S"
-        atcf_lat = f"{lat_val}{lat_hem}".rjust(5)
+        atcf_lat = f"{lat_val}{lat_hem}"#.rjust(5)
 
         lon_val = int(abs(lon) * 10)
         lon_hem = "W" if lon < 0 else "E"
-        atcf_lon = f"{lon_val}{lon_hem}".rjust(6)
+        atcf_lon = f"{lon_val}{lon_hem}"# .rjust(6)
 
-        atcf_wind = str(int(np.nan_to_num(row["usa_wind"].item()))).rjust(4)
-        atcf_pres = str(int(np.nan_to_num(row["usa_pres"].item()))).rjust(5)
-        atcf_status = _decode_char_array(row["usa_status"]).ljust(3)
+        atcf_wind = str(int(np.nan_to_num(row["usa_wind"].item())))#.rjust(4)
+        atcf_pres = str(int(np.nan_to_num(row["usa_pres"].item())))# .rjust(5)
+        atcf_status = _decode_char_array(row["usa_status"])#.ljust(3)
 
         # --- Part 3: Enriched Data for Asymmetry and Size ---
         # Select quadrant data using .isel() and get scalar with .item()
-        # r34_ne = int(np.nan_to_num(row['usa_r34'].isel(quadrant=0).item()))
-        # r34_se = int(np.nan_to_num(row['usa_r34'].isel(quadrant=1).item()))
-        # r34_sw = int(np.nan_to_num(row['usa_r34'].isel(quadrant=2).item()))
-        # r34_nw = int(np.nan_to_num(row['usa_r34'].isel(quadrant=3).item()))
-
-        # r50_ne = int(np.nan_to_num(row['usa_r50'].isel(quadrant=0).item()))
-        # r50_se = int(np.nan_to_num(row['usa_r50'].isel(quadrant=1).item()))
-        # r50_sw = int(np.nan_to_num(row['usa_r50'].isel(quadrant=2).item()))
-        # r50_nw = int(np.nan_to_num(row['usa_r50'].isel(quadrant=3).item()))
-
-        # r64_ne = int(np.nan_to_num(row['usa_r64'].isel(quadrant=0).item()))
-        # r64_se = int(np.nan_to_num(row['usa_r64'].isel(quadrant=1).item()))
-        # r64_sw = int(np.nan_to_num(row['usa_r64'].isel(quadrant=2).item()))
-        # r64_nw = int(np.nan_to_num(row['usa_r64'].isel(quadrant=3).item()))
-
-        atcf_poci = str(int(np.nan_to_num(row["usa_poci"].item()))).rjust(5)
-        atcf_roci = str(int(np.nan_to_num(row["usa_roci"].item()))).rjust(4)
-        atcf_rmw = str(int(np.nan_to_num(row["usa_rmw"].item()))).rjust(4)
+        atcf_poci = str(int(np.nan_to_num(row["usa_poci"].item())))#.rjust(5)
+        atcf_roci = str(int(np.nan_to_num(row["usa_roci"].item())))#.rjust(4)
+        atcf_rmw = str(int(np.nan_to_num(row["usa_rmw"].item())))#.rjust(4)
         radii_data = {
             "34": [
                 int(np.nan_to_num(row["usa_r34"].isel(quadrant=q).item()))
@@ -167,23 +154,35 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
                 # --- Part 3: Build the correctly formatted ATCF line ---
                 # This line now includes all required placeholder commas
                 line = (
-                    f"{atcf_basin}, {atcf_cyclone_num}, {atcf_datetime}, {'00'.rjust(3)}, {'BEST'.rjust(4)}, {'0'.rjust(4)},"
-                    f"{atcf_lat},{atcf_lon},{atcf_wind},{atcf_pres}, {atcf_status}, "
-                    f"{rad.rjust(3)}, {'NEQ'.rjust(4)}, {str(rad_values[0]).rjust(4)}, "
-                    f"{str(rad_values[1]).rjust(4)}, {str(rad_values[2]).rjust(4)}, {str(rad_values[3]).rjust(4)},"
-                    f"{atcf_poci},{atcf_roci},{atcf_rmw}, "
-                    f", , , , , , , {'katrina'}"  # Placeholder commas for unused fields
+                    f"{atcf_basin},{atcf_cyclone_num},{atcf_datetime},{'00'},{'BEST'},{'0'},",
+                    f"{atcf_lat},{atcf_lon},{atcf_wind},{atcf_pres},{atcf_status},",
+                    f"{rad},{'NEQ'},{str(rad_values[0])},",
+                    f"{str(rad_values[1])},{str(rad_values[2])},{str(rad_values[3])},",
+                    f"{atcf_poci},{atcf_roci},{atcf_rmw},",
+                    f" , , , , , , ,{storm_name}"
                 )
-                atcf_lines.append(line)
+                atcf_lines.append("".join(line))
 
-    with open(output_atcf_path, "w") as f:
+    with open(output_atcf_path, "wt") as f:
         f.write("\n".join(atcf_lines))
     print(f"✅ Successfully created ENRICHED ATCF file at '{output_atcf_path}'")
 
 
-def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
+def generate_adcirc_inputs(storm: Storm,
+                           storm_ds: xr.Dataset,
+                           output_dir: str,
+                           stormtracks = False) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
+
+    Args:
+        storm (Storm): Storm object containing storm metadata.
+        storm_ds (xr.Dataset): xarray.Dataset for the storm from IBTrACS.
+        output_dir (str): Directory to save the generated ADCIRC input files.
+        stormtracks (bool): Whether to use NHC storm tracks directly.
+
+    Returns:
+        None
     """
     # 1. Load Mesh
     mesh = AdcircMesh.open(FORT14_PATH, crs="epsg:4326")
@@ -197,29 +196,33 @@ def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
 
     # 1. Use the parent class to find the storm and create a track object
     # This step converts ('NICOLE', 2022) into a track object with the correct ID ('AL152022')
-    # try:
-    #     track = VortexTrack.from_storm_name(name=storm.name.lower(), year=storm.year)
-    # except Exception as e:
-    #     print(f"Could not find NHC data for {storm.name} {storm.year}: {e}")
-    #     import traceback
-
-    #     traceback.print_exc()
-    #     # Decide how to handle this - skip the storm or raise the error
-    #     return
+    # option 1 - from NHC data
     os.makedirs(output_dir, exist_ok=True)
 
-    convert_ibtracs_storm_to_atcf(
-        ds=storm_ds,
-        output_atcf_path=os.path.join(output_dir, "atcf.txt"),
-    )
+    if stormtracks: # rely on the NHC server
+        try:
+            track = VortexTrack.from_storm_name(name=storm.name.lower(), year=storm.year)
+            print(track.data)
+            wind_forcing = BestTrackForcing(storm=track, nws=20)
+
+        except Exception as e:
+            print(f"Could not find NHC data for {storm.name} {storm.year}: {e}")
+            traceback.print_exc()
+            assert False, "Stopping execution."
+    else:
+        # 2nd option: convert IBTrACS data to ATCF format
+        convert_ibtracs_storm_to_atcf(
+            ds=storm_ds,
+            output_atcf_path=os.path.join(output_dir, "atcf.txt"),
+        )
+        #wind_forcing = BestTrackForcing(
+        #    Path(os.path.join(output_dir, "atcf.txt")), nws=20
+        #)  # NWS=20 for GAHM
     # 2. Pass the track object to the BestTrackForcing constructor
     # Now you can correctly specify the 'nws' parameter
-    wind_forcing = BestTrackForcing(
-        Path(os.path.join(output_dir, "atcf.txt")), nws=20
-    )  # NWS=20 for GAHM
-    # wind_forcing = BestTrackForcing(storm=track, nws=20
+
     # wind_forcing = BestTrackForcing(storm.id, nws=20)  # NWS=20 for GAHM
-    mesh.add_forcing(wind_forcing)
+    #mesh.add_forcing(wind_forcing)
 
     # 3. Calculate Simulation Window
     sim_start, sim_end, spinup = calculate_simulation_window(storm)
@@ -250,6 +253,19 @@ def generate_adcirc_inputs(storm: Storm, storm_ds: xr.Dataset, output_dir: str):
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"
     )
+
+def drive_katrina():
+    track = VortexTrack.from_storm_name(name='katrina', year=2005)
+    print(track)
+    # ds = na_landing_tcs().sel(name=b"KATRINA")
+    # print(ds)
+    # generate_adcirc_inputs(
+    #     Storm(sid=ds.sid.values[0],
+    #           name=ds.name.values[0],
+    #           time=pd.to_datetime(ds.time.values).to_pydatetime().tolist()),
+    #     ds.isel(storm=0),
+    #     "./katrina_test/",
+    # )
 
 
 # --- DEBUGGING CODE ---
@@ -296,7 +312,7 @@ def generate_all_storm_inputs():
     print(f"Found {len(target_storms)} U.S. landfalling storms in IBTrACS.")
 
     # 2. Loop and generate inputs for each storm
-    for i, storm in enumerate(target_storms[0:1]):
+    for i, storm in enumerate(target_storms[-1:]):
         storm_name_safe = storm.name.upper().replace(" ", "_")
         run_directory = os.path.join(RUNS_PARENT_DIR, f"{storm_name_safe}_{storm.year}")
 
@@ -313,7 +329,19 @@ def generate_all_storm_inputs():
 
 if __name__ == "__main__":
     # python -m adforce.generate_training_data
-    # generate_all_storm_inputs()
+    generate_all_storm_inputs()
     # track = VortexTrack('AL112017')
     # print(track)
-    generate_all_storm_inputs()
+    # generate_all_storm_inputs()
+    # drive_katrina()
+    # from stormevents.nhc import VortexTrack
+
+    # track = VortexTrack('AL112017')
+    # print(track.data)
+    # drive_katrina()
+    # vortex = VortexTrack.from_storm_name('irma', 2017)
+    # print(vortex.data)
+    # print(vortex)
+    # vortex = VortexTrack.from_storm_name('katrina', 2005)
+    # print(vortex.data, type(vortex.data))
+
