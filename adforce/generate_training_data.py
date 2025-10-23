@@ -1,4 +1,18 @@
-"""Generate ADCIRC input files for historical U.S. landfalling storms."""
+"""Generate ADCIRC runs for historical U.S. landfalling storms.
+
+Ideally we could do this with ADCIRCpy, but that package seemed to be somewhat incomplete.
+
+Also there seem to be a lot of issues with using NOAA servers ATM.
+
+Anyway, so the task in general is to extract the desired storms from IBTrACS,
+get the data into a format that ASWIP can read,
+get ASWIP to convert it into NWS=20 fort.22 format (Generalized Asymmetric Holland Model),
+make AdCIRCpy create the correct fort.15 namelist file for this storm,
+and then run the storm on ARCHER2 with padcirc etc.
+
+After this is all done we will process the fort.*.nc files to get training data to train
+our GNN model.
+"""
 
 # --- MASTER SCRIPT: 01_generate_inputs.py ---
 from typing import Tuple
@@ -394,7 +408,7 @@ def generate_adcirc_inputs(storm: Storm,
         # 2nd option: convert IBTrACS data to ATCF format
         convert_ibtracs_storm_to_aswip_input(
             ds=storm_ds,
-            output_atcf_path=os.path.join(output_dir, "atcf.txt"),
+            output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
         )
         wind_forcing = BestTrackForcing(
             Path(os.path.join(output_dir, "atcf.txt")), nws=20
