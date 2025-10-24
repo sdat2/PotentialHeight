@@ -655,7 +655,7 @@ def generate_all_storm_inputs():
                            "Ensure the 'config' directory is a sibling of this script.")
 
     hydra.core.global_hydra.GlobalHydra.instance().clear()
-    hydra.initialize(config_path=relative_config_path, version_base=None)
+    hydra.initialize(config_path="config", version_base=None)
     cfg = hydra.compose(config_name="wrap_config")
     print("✅ Default config loaded.")
     # --- End New Config ---
