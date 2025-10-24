@@ -1,6 +1,9 @@
 """Run with subprocess rather than slurmpy.
 
 TODO: We could add running ASWIP as an option.
+Equivalent to these commands:
+    $EXE_PATH/aswip -m 4 -z 2 -w pre_aswip_fort.22 > aswip.log
+    mv NWS_20_fort.22 fort.22
 
 """
 
@@ -83,6 +86,37 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
             log_file.write(f"    TEST CASE: {case_name}\n")
             log_file.write("\n")
             log_file.write("    Prepping case...")  # -n (no newline) equivalent
+
+            # if needed, run ASWIP here before adcprep (could probably be the other way round)
+            if config.run_aswip:
+                aswip_log = os.path.join(direc, "aswip.log")
+                try:
+                    with open(aswip_log, "w") as awip_log:
+                        proc_aswip = subprocess.run(
+                            [f"{exe_path}/aswip", "-m", "4", "-z", "2", "-w", "pre_aswip_fort.22"],
+                            stdout=awip_log,
+                            stderr=subprocess.STDOUT,
+                        )
+                except FileNotFoundError:
+                    log_file.write(
+                        "\nERROR: aswip executable not found at path: "
+                        f"{exe_path}/aswip\n"
+                    )
+                    raise RuntimeError("aswip not found. Check ADCIRC executable path.")
+                if proc_aswip.returncode != 0:
+                    log_file.write(
+                        "ERROR!\n"
+                    )  # completes the "Prepping case..." line with ERROR
+                    log_file.write("    ERROR: ASWIP preprocessing failed.\n")
+                    raise RuntimeError(
+                        "ASWIP preprocessing failed (see aswip.log for details)."
+                    )
+                else:
+                    # ASWIP succeeded
+                    log_file.write(
+                        "ASWIP processing done. "
+                    )  # indicates ASWIP step completed before adcprep
+
 
             # 5. Run ADCIRC preparation steps using adcprep
             # Step 5a: Partition the mesh (`adcprep --np <np> --partmesh`)

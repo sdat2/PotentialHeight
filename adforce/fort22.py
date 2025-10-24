@@ -1,6 +1,5 @@
 """fort.22.nc file creation functions.
 
-TODO: Add option for Lin and Chavas 2012 Asymmetric wind profile part based on trajectory.
 """
 
 import os

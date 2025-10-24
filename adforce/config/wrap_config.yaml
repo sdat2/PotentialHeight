@@ -8,4 +8,5 @@ defaults:
 
 name: test-wrap
 use_slurm: false # avoid launching additional slurm jobs by default.
+use_aswip: false
 ani: false
