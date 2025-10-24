@@ -117,6 +117,70 @@ def _decode_char_array(char_array_like) -> str:
         # Fallback if decoding fails
         return "UNKNOWN"
 
+def clean_radii(radii_nm: list) -> list:
+    """
+    Cleans a list of 4-quadrant radii [NE, SE, SW, NW]
+    to remove ambiguous zeros that crash ASWIP/ADCIRC.
+
+    Args:
+        radii_nm (list): A list of 4 radii [NE, SE, SW, NW].
+
+    Returns:
+        list: A corrected, unambiguous list of 4 radii.
+
+    Doctests:
+    >>> clean_radii([60.0, 60.0, 0.0, 0.0])  # Case 1: Simple mirroring
+    [60.0, 60.0, 60.0, 60.0]
+    >>> clean_radii([15.0, 0.0, 15.0, 0.0])  # Case 2: Un-mirrorable pair
+    [15.0, 15.0, 15.0, 15.0]
+    >>> clean_radii([15.0, 0.0, 0.0, 0.0])   # Case 3: Single value
+    [15.0, 15.0, 15.0, 15.0]
+    >>> clean_radii([0.0, 0.0, 0.0, 0.0])    # Case 4: All zeros (no storm)
+    [0.0, 0.0, 0.0, 0.0]
+    >>> clean_radii([60.0, 60.0, 15.0, 25.0]) # Case 5: Fully defined
+    [60.0, 60.0, 15.0, 25.0]
+    """
+    # [NE, SE, SW, NW]
+    #  0   1   2   3
+
+    # Check if the line is "mixed" (has both zeros and non-zeros)
+    has_zeros = any(r == 0 for r in radii_nm)
+    has_non_zeros = any(r > 0 for r in radii_nm)
+
+    if not (has_zeros and has_non_zeros):
+        # This line is fine. It's either all zeros or all non-zeros.
+        return radii_nm
+
+    # print(f"Fixing ambiguous radii: {radii_nm}")
+
+    # --- Pass 1: Try to mirror opposites ---
+
+    # Check NE <-> SW pair
+    if radii_nm[0] > 0 and radii_nm[2] == 0:
+        radii_nm[2] = radii_nm[0]
+    elif radii_nm[0] == 0 and radii_nm[2] > 0:
+        radii_nm[0] = radii_nm[2]
+
+    # Check SE <-> NW pair
+    if radii_nm[1] > 0 and radii_nm[3] == 0:
+        radii_nm[3] = radii_nm[1]
+    elif radii_nm[1] == 0 and radii_nm[3] > 0:
+        radii_nm[1] = radii_nm[3]
+
+    # --- Pass 2: Check for remaining zeros ---
+    # If we still have zeros, it means a pair was [0, 0]
+    # (e.g., [15, 0, 15, 0] or [15, 0, 0, 0])
+
+    if any(r == 0 for r in radii_nm):
+        # Data is fundamentally incomplete.
+        # Find the largest radius provided and make the storm symmetric.
+        # This is the most conservative (strongest) and safest assumption.
+        max_r = max(radii_nm)
+        # print(f"  Mirroring failed. Symmetrizing to max radius: {max_r}")
+        radii_nm = [max_r, max_r, max_r, max_r]
+
+    return radii_nm
+
 
 def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
     """
@@ -179,7 +243,7 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
         >>> print(lines[2].strip()) # First line, 64kt radii
            0  2005082812      BEST    0    257N   847W  100  945      64        30      30      20      20  1013        20                               0    0  KATRINA
         >>> print(lines[3].strip()) # Second line, 34kt radii
-           0  2005082818      BEST    0    265N   859W  110  940      34       120     120      80      80  1013        18                               0    0  KATRINA
+           0  2005082818      BEST    6  265N   859W  110   940       34        120   120    80    80  1013         18                             0    0  KATRINA
         >>> os.remove(output_path) # Clean up the temp file
     """
     atcf_lines = []
@@ -239,7 +303,7 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
 
         technum = 0 # Placeholder for TECHNUM/MIN
         tech = "BEST" # Technique
-        tau = int((start_time - dt_val).total_seconds() / 3600)
+        tau = int((dt_val - start_time).total_seconds() / 3600)
 
         try:
             lat = row["usa_lat"].item()
@@ -292,8 +356,7 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
                         for q in range(4)
                     ]
                     # Check if any radius value is non-zero
-                    if any(r > 0 for r in radii_nm):
-                        has_data = True
+                    radii_nm = clean_radii(radii_nm)
                 except (ValueError, IndexError, KeyError, AttributeError) as e:
                      print(f"Warning: Could not process radii for {rad_kt}kt at index {time_idx}. Error: {e}")
                      radii_nm = [fill_value_int] * 4 # Reset to default on error
@@ -508,7 +571,7 @@ def generate_adcirc_inputs(storm: Storm,
     mesh.add_forcing(wind_forcing)
 
     # 3. Calculate Simulation Window
-    sim_start, sim_end, spinup = calculate_simulation_window(storm)
+    sim_start, sim_end, spinup = calculate_simulation_window(storm, extra_days=0, spinup_days=0)
 
     # 4. Configure AdcircRun Driver
     driver = AdcircRun(

@@ -1,4 +1,8 @@
-"""Run with subprocess rather than slurmpy."""
+"""Run with subprocess rather than slurmpy.
+
+TODO: We could add running ASWIP as an option.
+
+"""
 
 import os
 import subprocess
