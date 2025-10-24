@@ -56,20 +56,21 @@ class Storm:
 
 
 def calculate_simulation_window(
-    storm, spinup_days: float = 10.0, extra_days: float = 2.0
-) -> Tuple[datetime, datetime, timedelta]:
+    storm: Storm,
+    spinup_days: float = 0.0,
+    extra_days: float = 0.0,
+) -> Tuple[datetime, datetime]:
     """
     Calculate the simulation start and end dates based on storm data.
 
     Args:
     - storm: Storm object with 'time' attribute (list of datetime objects).
-    - spinup_days: Number of days for model spin-up before storm start.
-    - extra_days: Number of days to continue simulation after storm end.
+    - spinup_days: Number of days for model spin-up before storm start. Defaults to 0.
+    - extra_days: Number of days to continue simulation after storm end. Defaults to 0.
 
     Returns:
     - simulation_start_date: Start date for the simulation (datetime).
     - simulation_end_date: End date for the simulation (datetime).
-    - spinup_duration: Duration of the spin-up period (timedelta).
     """
     storm_start_time = storm.time[0]
     storm_end_time = storm.time[-1]
@@ -77,7 +78,7 @@ def calculate_simulation_window(
     start_date = storm_start_time
     simulation_start_date = start_date - spinup_duration
     simulation_end_date = storm_end_time + timedelta(days=extra_days)
-    return simulation_start_date, simulation_end_date, spinup_duration
+    return simulation_start_date, simulation_end_date
 
 
 def _decode_char_array(char_array_like) -> str:
@@ -581,7 +582,7 @@ def generate_adcirc_inputs(storm: Storm,
     mesh.add_forcing(wind_forcing)
 
     # 3. Calculate Simulation Window
-    sim_start, sim_end, spinup = calculate_simulation_window(storm, extra_days=0, spinup_days=0)
+    sim_start, sim_end = calculate_simulation_window(storm, extra_days=0, spinup_days=0)
 
     # 4. Configure AdcircRun Driver
     driver = AdcircRun(
@@ -597,8 +598,8 @@ def generate_adcirc_inputs(storm: Storm,
     driver.set_velocity_surface_output(sampling_rate=timedelta(minutes=30))
 
     # Set NWS=20 in fort.15
-    driver.fort15.NWS = 20 # GAHM model
-    driver.fort15.WTIMINC = 3600.0 # 1-hour wind updates (must match fort.22)
+    # driver.fort15.NWS = 20 # GAHM model
+    # driver.fort15.WTIMINC = 3600.0 # 1-hour wind updates (must match fort.22)
 
     # 5. Write files
     if not os.path.exists(output_dir):
@@ -659,8 +660,6 @@ def generate_all_storm_inputs():
     cfg = hydra.compose(config_name="wrap_config")
     print("✅ Default config loaded.")
     # --- End New Config ---
-
-
     target_storms_ds = na_landing_tcs()
     target_storms = []
 

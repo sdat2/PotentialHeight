@@ -88,7 +88,7 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
             log_file.write("    Prepping case...")  # -n (no newline) equivalent
 
             # if needed, run ASWIP here before adcprep (could probably be the other way round)
-            if config.run_aswip:
+            if config.use_aswip:
                 aswip_log = os.path.join(direc, "aswip.log")
                 try:
                     with open(aswip_log, "w") as awip_log:
