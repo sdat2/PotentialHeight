@@ -26,6 +26,12 @@ from adcircpy import AdcircMesh, AdcircRun, Tides
 from adcircpy.forcing.winds import BestTrackForcing
 from stormevents.nhc import VortexTrack
 
+# --- New Imports ---
+import hydra
+from omegaconf import DictConfig, OmegaConf
+from .subprocess import setoff_subprocess_job_and_wait
+# --- End New Imports ---
+
 from tcpips.ibtracs import na_landing_tcs
 
 from .constants import SETUP_PATH, PROJ_PATH
@@ -518,6 +524,11 @@ def generate_adcirc_inputs(storm: Storm,
                            stormtracks = False) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
+    This creates:
+    - pre_aswip_fort.22 (from IBTrACS data)
+    - atcf.txt (from IBTrACS data)
+    - fort.15 (via adcircpy)
+    - fort.13 (copied)
 
     Args:
         storm (Storm): Storm object containing storm metadata.
@@ -550,24 +561,23 @@ def generate_adcirc_inputs(storm: Storm,
             traceback.print_exc()
             assert False, "Stopping execution."
     else:
-        # 2nd option: convert IBTrACS data to ATCF format
+        # 2nd option: convert IBTrACS data to ASWIP format
+        # This is the file ASWIP will read
         convert_ibtracs_storm_to_aswip_input(
             ds=storm_ds,
             output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
         )
+        # This is the file adcircpy will read
         convert_ibtracs_storm_to_atcf(
             ds=storm_ds,
             output_atcf_path=os.path.join(output_dir, "atcf.txt"),
         )
+        # adcircpy reads atcf.txt to get metadata for fort.15
         wind_forcing = BestTrackForcing(
             Path(os.path.join(output_dir, "atcf.txt")), nws=20
         )  # NWS=20 for GAHM
-        print(dir(wind_forcing))
-        print(wind_forcing.tracks)
-    # 2. Pass the track object to the BestTrackForcing constructor
-    # Now you can correctly specify the 'nws' parameter
 
-    # wind_forcing = BestTrackForcing(storm.id, nws=20)  # NWS=20 for GAHM
+    # 2. Pass the track object to the BestTrackForcing constructor
     mesh.add_forcing(wind_forcing)
 
     # 3. Calculate Simulation Window
@@ -582,18 +592,22 @@ def generate_adcirc_inputs(storm: Storm,
 
     # --- Customize fort.15 parameters ---
     driver.timestep = 2.0
-    driver.DRAMP = 2.0
+    driver.DRAMP = 2.0 # Use 2.0-day ramp function
     driver.set_elevation_surface_output(sampling_rate=timedelta(minutes=30))
     driver.set_velocity_surface_output(sampling_rate=timedelta(minutes=30))
+
+    # Set NWS=20 in fort.15
+    driver.fort15.NWS = 20 # GAHM model
+    driver.fort15.WTIMINC = 3600.0 # 1-hour wind updates (must match fort.22)
 
     # 5. Write files
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    driver.write(output_dir, overwrite=True)
+    driver.write(output_dir, overwrite=True) # This creates fort.15
 
     # 6. Copy static files
-    # shutil.copy(FORT14_PATH, output_dir)
+    # fort.14 is copied by driver.write()
     shutil.copy(FORT13_PATH, os.path.join(output_dir, "fort.13"))
 
     print(
@@ -620,6 +634,32 @@ def drive_katrina():
 
 def generate_all_storm_inputs():
     # python -m adforce.generate_training_data
+
+    # --- New: Load Hydra Config ---
+    print("Loading ADCIRC run configuration...")
+
+    # Determine config path relative to this file
+    # __file__ is .../adforce/generate_training_data.py
+    # os.path.dirname(__file__) is .../adforce
+    # The config dir is .../adforce/config
+    # So the relative path is just "config"
+    relative_config_path = "config"
+
+    if not os.path.isdir(relative_config_path):
+        # Fallback if script is run from project root (e.g., python adforce/generate_training_data.py)
+        alt_path = os.path.join(os.path.dirname(__file__), "config")
+        if os.path.isdir(alt_path):
+            relative_config_path = alt_path
+        else:
+             raise IOError(f"Could not find config directory at '{relative_config_path}' or '{alt_path}'. "
+                           "Ensure the 'config' directory is a sibling of this script.")
+
+    hydra.core.global_hydra.GlobalHydra.instance().clear()
+    hydra.initialize(config_path=relative_config_path, version_base=None)
+    cfg = hydra.compose(config_name="wrap_config")
+    print("✅ Default config loaded.")
+    # --- End New Config ---
+
 
     target_storms_ds = na_landing_tcs()
     target_storms = []
@@ -664,11 +704,38 @@ def generate_all_storm_inputs():
 
         try:
             print(
-                f"Generating inputs for {storm.name} {storm.year}, {storm.id} {type(storm.id)}..."
+                f"\n--- Processing Storm {i+1}/{len(target_storms)}: {storm.name} {storm.year} ---"
             )
+
+            # 1. Generate ADCIRC input files (fort.15, pre_aswip_fort.22, fort.13)
+            print(f"Generating inputs in: {run_directory}")
             generate_adcirc_inputs(storm, target_storms_ds.isel(storm=i), run_directory)
+
+            # 2. Create a storm-specific config to pass to subprocess
+            # Start with the default config
+            storm_cfg = cfg.copy()
+
+            # Set the specific run folder and name for logging
+            OmegaConf.update(storm_cfg.files, "run_folder", run_directory)
+            OmegaConf.update(storm_cfg, "name", f"{storm_name_safe}_{storm.year}")
+
+            # Tell the subprocess runner to execute ASWIP
+            # This converts 'pre_aswip_fort.22' to 'fort.22'
+            OmegaConf.update(storm_cfg, "run_aswip", True)
+
+            # Ensure we're NOT using SLURM for this subprocess
+            # (The main script is one SLURM job, but each storm is a local subprocess)
+            OmegaConf.update(storm_cfg, "use_slurm", False)
+
+            # 3. Run the simulation (ASWIP, adcprep, padcirc)
+            print(f"Running ADCIRC simulation for {storm.name} via subprocess...")
+            # This function will chdir into run_directory
+            setoff_subprocess_job_and_wait(run_directory, storm_cfg)
+
+            print(f"✅ Successfully completed run for {storm.name} {storm.year}")
+
         except Exception as e:
-            print(f"!!! FAILED to generate inputs for {storm.name} {storm.year}: {e}")
+            print(f"!!! FAILED to process {storm.name} {storm.year}: {e}")
             print(" traceback:")
             traceback.print_exc()
 
@@ -689,4 +756,3 @@ if __name__ == "__main__":
     # print(vortex)
     # vortex = VortexTrack.from_storm_name('katrina', 2005)
     # print(vortex.data, type(vortex.data))
-
