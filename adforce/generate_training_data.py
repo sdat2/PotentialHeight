@@ -720,7 +720,7 @@ def generate_all_storm_inputs():
 
             # Tell the subprocess runner to execute ASWIP
             # This converts 'pre_aswip_fort.22' to 'fort.22'
-            OmegaConf.update(storm_cfg, "run_aswip", True)
+            OmegaConf.update(storm_cfg, "use_aswip", True)
 
             # Ensure we're NOT using SLURM for this subprocess
             # (The main script is one SLURM job, but each storm is a local subprocess)
