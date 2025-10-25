@@ -34,7 +34,7 @@ from omegaconf import DictConfig, OmegaConf
 from .subprocess import setoff_subprocess_job_and_wait
 # --- End New Imports ---
 
-from tcpips.ibtracs import na_landing_tcs
+from tcpips.ibtracs import na_landing_tcs, select_tc_from_ds
 
 from .constants import SETUP_PATH, PROJ_PATH
 
@@ -774,7 +774,21 @@ def generate_adcirc_inputs(storm: Storm,
     )
 
 
-def generate_all_storm_inputs():
+def drive_all_adcirc(
+        test_single=False,
+        test_nosubprocess=False,
+) -> None:
+    """
+    Generate all storm inputs using NWS=20.
+
+    Args:
+        test_single (bool, optional): If True just use Katrina 2005. Defaults to False.
+        test_nosubprocess (bool, optional): If True do not set of subprocess to run ADCIRC. Defaults to False.
+
+    Raises:
+        IOError: Needs to find the adforce config.
+    """
+    # it could be good to add a flag just to run Katrina
     # python -m adforce.generate_training_data
 
     # --- New: Load Hydra Config ---
@@ -800,13 +814,29 @@ def generate_all_storm_inputs():
     hydra.initialize(config_path="config", version_base=None)
     cfg = hydra.compose(config_name="wrap_config")
     print("✅ Default config loaded.")
+
     # --- End New Config ---
     target_storms_ds = na_landing_tcs()
-    target_storms = []
+    print("target storms", target_storms_ds)
+    if test_single:
+        # select just KATRINA 2005
+        # i.e. name =  b"KATRINA"
+        # and year = 2005
+        i_ran = np.where([x == b"KATRINA" for x in target_storms_ds.name.values])[0]
+        # i_ran = [i for i in i_ran if target_storms_ds.isel(storm=0).time.values[0]==2005]
+        #print(i_ran)
+        if len(i_ran) == 0:
+            i_ran = [0]
+        if len(i_ran) > 1:
+            i_ran = [i_ran[-1]]
+    else:
+        i_ran = range(len(target_storms_ds.sid))
 
-    for i in range(len(target_storms_ds.sid)):
+    target_storms = []
+    for i in i_ran:
         # Isolate the raw numpy array of times for the storm
         raw_times = target_storms_ds.time[i].values
+        #print("raw_times", raw_times)
 
         # Use pandas to reliably convert the array to datetime objects
         # 'coerce' will automatically handle 'NaT' values by turning them into NaT
@@ -822,23 +852,23 @@ def generate_all_storm_inputs():
             name=target_storms_ds.name[i].item(),
             time=time_list,
         )
-        target_storms.append(storm)
+        target_storms.append((i, storm))
 
     outputs = {"storm_id": [], "storm_name": [], "year": [], "num_timepoints": []}
 
-    for storm in target_storms:
+    for i, storm in target_storms:
         outputs["storm_id"].append(storm.id)
         outputs["storm_name"].append(storm.name)
         outputs["year"].append(storm.year)
         outputs["num_timepoints"].append(len(storm.time))
 
     # outputs_df = pd.DataFrame(outputs)
-    ## outputs_df.to_csv("debug_storms.csv", index=False)
+    # outputs_df.to_csv("debug_storms.csv", index=False)
 
     print(f"Found {len(target_storms)} U.S. landfalling storms in IBTrACS.")
 
     # 2. Loop and generate inputs for each storm
-    for i, storm in enumerate(target_storms[:]):
+    for i, storm in target_storms[:]:
         storm_name_safe = storm.name.upper().replace(" ", "_")
         run_directory = os.path.join(RUNS_PARENT_DIR, f"{storm_name_safe}_{storm.year}")
 
@@ -870,22 +900,25 @@ def generate_all_storm_inputs():
             # 3. Run the simulation (ASWIP, adcprep, padcirc)
             print(f"Running ADCIRC simulation for {storm.name} via subprocess...")
             # This function will chdir into run_directory
-            setoff_subprocess_job_and_wait(run_directory, storm_cfg)
-
-            print(f"✅ Successfully completed run for {storm.name} {storm.year}")
+            if not test_nosubprocess:
+                setoff_subprocess_job_and_wait(run_directory, storm_cfg)
+                print(f"✅ Successfully completed run for {storm.name} {storm.year}")
+            else:
+                print(f"✅ Successfully made inputs for {storm.name} {storm.year}")
 
         except Exception as e:
             print(f"!!! FAILED to process {storm.name} {storm.year}: {e}")
             print(" traceback:")
             traceback.print_exc()
+    print(target_storms)
 
 
 if __name__ == "__main__":
     # python -m adforce.generate_training_data
-    generate_all_storm_inputs()
+    drive_all_adcirc(test_nosubprocess=True, test_single=True)
     # track = VortexTrack('AL112017')
     # print(track)
-    # generate_all_storm_inputs()
+    # drive_all_adcirc()
     # drive_katrina()
     # from stormevents.nhc import VortexTrack
     # track = VortexTrack('AL112017')
