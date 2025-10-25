@@ -626,6 +626,7 @@ def generate_adcirc_inputs(storm: Storm,
         mesh=mesh,
         start_date=sim_start,
         end_date=sim_end,  # spinup_duration=spinup
+        # spinup_duration=timedelta(days=1.0)
     )
 
     # --- Customize fort.15 parameters ---
@@ -633,6 +634,7 @@ def generate_adcirc_inputs(storm: Storm,
     driver.ICS = 24
     driver.ITITER = -1
     driver.CONVCR = 1.0e-7
+    driver.DRAMP = 1.0
 
     #
     driver.set_elevation_surface_output(sampling_rate=timedelta(seconds=200))
