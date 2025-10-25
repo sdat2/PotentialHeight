@@ -15,6 +15,7 @@ our GNN model.
 """
 from typing import Tuple, Dict
 import os
+import math
 from pathlib import Path
 import traceback
 import numpy as np
@@ -556,6 +557,114 @@ class CustomAdcircRun(AdcircRun):
 
         return nlists
 
+
+def calculate_cfl_timestep(mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: float = 5.0, g: float = 9.81) -> float:
+    """
+    Calculates a recommended timestep based on the full CFL condition
+    for ADCIRC's shallow water equations.
+
+    The condition is: CFL = (U + sqrt(gH)) * dt / dx <= cfl_target
+    So, the maximum dt = cfl_target * dx / (U + sqrt(gH))
+
+    Args:
+        mesh: An AdcircMesh object containing node coordinates, depths,
+              and element connectivity (implicitly used by properties).
+        cfl_target: The desired Courant number (dimensionless). Typically
+                    <= 1.0 for stability, often 0.5-0.7 is used for safety.
+        maxvel: Estimated maximum expected flow speed (U) in m/s across the
+                entire domain during the simulation. This is an estimate you
+                provide based on the expected physics (e.g., 5-10 m/s for
+                hurricanes). Default is 5.0 m/s.
+        g: Acceleration due to gravity in m/s^2. Default is 9.81.
+
+    Returns:
+        Recommended maximum timestep (dt) in seconds.
+
+    Raises:
+        ValueError: If mesh properties (distances, depths) cannot be determined
+                    or are invalid (e.g., non-positive).
+        AttributeError: If the mesh object doesn't have the expected properties.
+    """
+    print(f"Calculating CFL timestep with cfl_target={cfl_target}, maxvel={maxvel} m/s...")
+
+    # 1. Find the minimum edge length (dx) in meters
+    #    Uses the pre-calculated distances from the mesh object.
+    min_dx = float('inf')
+    try:
+        # Accessing the property triggers calculation if needed
+        node_distances = mesh.node_distances_in_meters
+
+        if not node_distances:
+             raise ValueError("Node distances dictionary is empty. Cannot calculate min_dx.")
+
+        for node_idx, neighbors in node_distances.items():
+            if neighbors: # Check if the neighbor dictionary is not empty
+                min_neighbor_dist = min(neighbors.values())
+                min_dx = min(min_dx, min_neighbor_dist)
+
+    except AttributeError:
+        raise AttributeError("Mesh object requires 'node_distances_in_meters' property for CFL calculation.") from None
+    except Exception as e:
+         raise ValueError(f"Error accessing node distances: {e}") from e
+
+    if min_dx == float('inf') or min_dx <= 0:
+        raise ValueError(f"Could not determine a valid minimum edge length (min_dx={min_dx}). Check mesh connectivity and units.")
+    print(f"  - Minimum edge length (min_dx): {min_dx:.2f} m")
+
+    # 2. Find the maximum depth (H) in meters
+    #    Assumes mesh.values is a pandas DataFrame with depth data, positive downwards.
+    max_h = 0.0
+    try:
+        # Get depth values, assuming it's a DataFrame (might have multiple columns)
+        depth_df = mesh.values
+        if not isinstance(depth_df, pd.DataFrame):
+             raise TypeError("Expected mesh.values to be a pandas DataFrame")
+
+        # Find the maximum value across all depth columns, ignoring NaNs
+        numeric_depths = depth_df.select_dtypes(include=np.number)
+        if numeric_depths.empty:
+             raise ValueError("Mesh 'values' DataFrame contains no numeric depth data.")
+
+        max_h = numeric_depths.max().max() # Max of max of each column
+
+        if pd.isna(max_h):
+             raise ValueError("Maximum depth calculation resulted in NaN. Check depth data.")
+
+    except AttributeError:
+         raise AttributeError("Mesh object requires 'values' property (pandas DataFrame) for depths.") from None
+    except Exception as e:
+         raise ValueError(f"Error accessing or processing mesh depths: {e}") from e
+
+    if max_h < 0:
+        print(f"  - Warning: Maximum mesh depth is negative ({max_h:.2f}m). Using absolute value.")
+        max_h = abs(max_h)
+    # Allow max_h == 0 (completely dry land), sqrt(0) is handled.
+
+    print(f"  - Maximum depth (max_h): {max_h:.2f} m")
+
+    # 3. Calculate gravity wave speed (C = sqrt(gH))
+    wave_speed = math.sqrt(g * max_h)
+    print(f"  - Max gravity wave speed (sqrt(gH)): {wave_speed:.2f} m/s")
+
+    # 4. Calculate characteristic speed (S = U + C)
+    #    Use absolute value of maxvel just in case.
+    characteristic_speed = abs(maxvel) + wave_speed
+    print(f"  - Characteristic speed (maxvel + sqrt(gH)): {characteristic_speed:.2f} m/s")
+
+    if characteristic_speed <= 1e-9: # Check for effectively zero speed
+         # This might happen if max_h=0 and maxvel=0
+         raise ValueError(f"Characteristic speed ({characteristic_speed:.2f} m/s) is near zero. Cannot calculate timestep.")
+
+    # 5. Calculate recommended timestep (dt = cfl_target * dx / S)
+    recommended_dt = cfl_target * min_dx / characteristic_speed
+
+    if recommended_dt <= 0:
+         raise ValueError(f"Calculated timestep ({recommended_dt:.4f}s) is not positive. Check inputs.")
+
+    print(f"✅ Recommended timestep (dt): {recommended_dt:.4f} seconds")
+    return recommended_dt
+
+
 def generate_adcirc_inputs(storm: Storm,
                            storm_ds: xr.Dataset,
                            output_dir: str,
@@ -579,6 +688,22 @@ def generate_adcirc_inputs(storm: Storm,
     """
     # 1. Load Mesh
     mesh = AdcircMesh.open(FORT14_PATH, crs="epsg:4326")
+    try:
+        # You might adjust maxvel based on the storm's intensity if needed
+        # For a major hurricane like Katrina, 10.0 m/s might be a safer estimate
+        recommended_dt = calculate_cfl_timestep(mesh, cfl_target=0.7, maxvel=10.0)
+
+        # Optional: Round down slightly for safety margin or to nicer number
+        recommended_dt = math.floor(recommended_dt * 10) / 10 # e.g., round down to nearest 0.1s
+
+        # Ensure dt is not excessively small (e.g., less than 0.1s might be problematic)
+        if recommended_dt < 0.1:
+            print(f"Warning: Calculated dt ({recommended_dt:.4f}s) is very small. Using 0.1s.")
+            recommended_dt = 0.1
+
+    except (ValueError, AttributeError) as e:
+        print(f"Error calculating CFL timestep: {e}. Defaulting to 2.5s.")
+        recommended_dt = 2.5 # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
 
     # 2. Add Forcings -- no tides
     # tidal_forcing = Tides()
@@ -630,20 +755,19 @@ def generate_adcirc_inputs(storm: Storm,
     )
 
     # --- Customize fort.15 parameters ---
-    driver.timestep = 5.0
+    driver.timestep = recommended_dt
     driver.ICS = 24
     driver.ITITER = -1
     driver.CONVCR = 1.0e-7
     driver.DRAMP = 1.0
 
-    #
+    # set the output timestep in the netcdfs
     driver.set_elevation_surface_output(sampling_rate=timedelta(seconds=200))
     driver.set_velocity_surface_output(sampling_rate=timedelta(seconds=200))
     driver.set_meteorological_surface_output(sampling_rate=timedelta(seconds=200))
 
     # Set NWS=20 in fort.15
     # driver.fort15.NWS = 20 # GAHM model
-    # driver.fort15.WTIMINC = 3600.0 # 1-hour wind updates (must match fort.22)
 
     # 5. Write files
     if not os.path.exists(output_dir):
@@ -658,23 +782,6 @@ def generate_adcirc_inputs(storm: Storm,
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"
     )
-
-def drive_katrina():
-    track = VortexTrack.from_storm_name(name='katrina', year=2005)
-    print(track)
-    # ds = na_landing_tcs().sel(name=b"KATRINA")
-    # print(ds)
-    # generate_adcirc_inputs(
-    #     Storm(sid=ds.sid.values[0],
-    #           name=ds.name.values[0],
-    #           time=pd.to_datetime(ds.time.values).to_pydatetime().tolist()),
-    #     ds.isel(storm=0),
-    #     "./katrina_test/",
-    # )
-
-
-# --- DEBUGGING CODE ---
-# We will just check the first storm to see what's happening.
 
 
 def generate_all_storm_inputs():
