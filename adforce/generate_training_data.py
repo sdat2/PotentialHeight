@@ -27,7 +27,10 @@ from datetime import datetime, timedelta
 from adcircpy import AdcircMesh, AdcircRun, Tides
 from adcircpy.fort15 import Fort15
 from adcircpy.forcing.winds import BestTrackForcing
-from stormevents.nhc import VortexTrack
+import argparse
+
+
+# from stormevents.nhc import VortexTrack
 
 # --- New Imports ---
 import hydra
@@ -814,10 +817,11 @@ def generate_adcirc_inputs(
 
     # --- Customize fort.15 parameters ---
     driver.timestep = recommended_dt
-    driver.ICS = 24
+    driver.ICS = 20  # coordinate system (24 seems to have a big instability bug?)
     driver.ITITER = -1
     driver.CONVCR = 1.0e-7
     driver.DRAMP = 1.0
+    driver.NRAMP = 1
 
     # set the output timestep in the netcdfs
     driver.set_elevation_surface_output(sampling_rate=timedelta(seconds=200))
@@ -985,8 +989,6 @@ def drive_all_adcirc(
 
 if __name__ == "__main__":
     # python -m adforce.generate_training_data
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Generate ADCIRC inputs and run simulations for all U.S. landfalling storms."
     )
