@@ -34,7 +34,8 @@ echo "which python"
 which python
 
 # run python job
-python -m adforce.generate_training_data
+python -m adforce.generate_training_data 
+# --test-single
 
 # try test version
 # python -m adbo.exp_2d --exp_name test-bo-2d-3 --year 2025 --resolution mid-notide --test=True
