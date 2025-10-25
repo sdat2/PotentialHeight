@@ -97,6 +97,7 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
                             stdout=awip_log,
                             stderr=subprocess.STDOUT,
                         )
+                    os.rename("NWS_20_fort.22", "fort.22")  # Move output to fort.22
                 except FileNotFoundError:
                     log_file.write(
                         "\nERROR: aswip executable not found at path: "
