@@ -13,6 +13,7 @@ and then run the storm on ARCHER2 with padcirc etc.
 After this is all done we will process the fort.*.nc files to get training data to train
 our GNN model.
 """
+
 from typing import Tuple, Dict
 import os
 import math
@@ -32,6 +33,7 @@ from stormevents.nhc import VortexTrack
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from .subprocess import setoff_subprocess_job_and_wait
+
 # --- End New Imports ---
 
 from tcpips.ibtracs import na_landing_tcs, select_tc_from_ds
@@ -42,6 +44,7 @@ RUNS_PARENT_DIR = os.path.join(PROJ_PATH, "runs")
 os.makedirs(RUNS_PARENT_DIR, exist_ok=True)
 FORT14_PATH = os.path.join(SETUP_PATH, "fort.14.mid")
 FORT13_PATH = os.path.join(SETUP_PATH, "fort.13.mid")
+
 
 # --- Function Definitions (from Section 2) ---
 # Assuming your Storm class is defined as before:
@@ -102,29 +105,51 @@ def _decode_char_array(char_array_like) -> str:
     """
     try:
         # Attempt common decoding strategy for byte arrays
-        if hasattr(char_array_like, 'tobytes'):
+        if hasattr(char_array_like, "tobytes"):
             decoded_bytes = char_array_like.tobytes()
             # Try decoding as UTF-8, ignore errors, remove null bytes and strip whitespace
-            return decoded_bytes.decode('utf-8', errors='ignore').replace('\x00', '').strip()
+            return (
+                decoded_bytes.decode("utf-8", errors="ignore")
+                .replace("\x00", "")
+                .strip()
+            )
         # Handle cases where it might already be strings or needs different handling
         elif isinstance(char_array_like, (str, bytes)):
-             if isinstance(char_array_like, bytes):
-                 return char_array_like.decode('utf-8', errors='ignore').replace('\x00', '').strip()
-             return str(char_array_like).replace('\x00', '').strip()
-        elif hasattr(char_array_like, 'item'): # Handle xarray DataArray extraction
-             item_val = char_array_like.item()
-             if isinstance(item_val, bytes):
-                 return item_val.decode('utf-8', errors='ignore').replace('\x00', '').strip()
-             return str(item_val).replace('\x00', '').strip()
+            if isinstance(char_array_like, bytes):
+                return (
+                    char_array_like.decode("utf-8", errors="ignore")
+                    .replace("\x00", "")
+                    .strip()
+                )
+            return str(char_array_like).replace("\x00", "").strip()
+        elif hasattr(char_array_like, "item"):  # Handle xarray DataArray extraction
+            item_val = char_array_like.item()
+            if isinstance(item_val, bytes):
+                return (
+                    item_val.decode("utf-8", errors="ignore")
+                    .replace("\x00", "")
+                    .strip()
+                )
+            return str(item_val).replace("\x00", "").strip()
         else:
-             # Fallback for other array-like structures
-             # This might need refinement based on actual data types
-            joined_str = "".join([c.decode('utf-8', errors='ignore') if isinstance(c, bytes) else str(c) for c in char_array_like])
-            return joined_str.replace('\x00', '').strip()
+            # Fallback for other array-like structures
+            # This might need refinement based on actual data types
+            joined_str = "".join(
+                [
+                    (
+                        c.decode("utf-8", errors="ignore")
+                        if isinstance(c, bytes)
+                        else str(c)
+                    )
+                    for c in char_array_like
+                ]
+            )
+            return joined_str.replace("\x00", "").strip()
 
     except Exception:
         # Fallback if decoding fails
         return "UNKNOWN"
+
 
 def clean_radii(radii_nm: list) -> list:
     """
@@ -256,7 +281,7 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
         >>> os.remove(output_path) # Clean up the temp file
     """
     atcf_lines = []
-    fill_value_int = 0 # Default value for missing numeric fields
+    fill_value_int = 0  # Default value for missing numeric fields
 
     # Find all valid time steps by checking where the 'time' variable is not NaT
     valid_time_indices = np.where(~np.isnat(ds["time"].values))[0]
@@ -266,15 +291,15 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
     try:
         storm_number = int(ds["number"].item())
     except (ValueError, KeyError, AttributeError):
-        storm_number = 0 # Default storm number if missing or invalid
+        storm_number = 0  # Default storm number if missing or invalid
         print("Warning: Could not read storm number, defaulting to 0.")
 
     try:
         storm_name = _decode_char_array(ds["name"]).upper().strip()
         if not storm_name or storm_name == "NOT_NAMED":
-             storm_name = "NONAME"
+            storm_name = "NONAME"
     except (KeyError, AttributeError):
-        storm_name = "NONAME" # Default storm name
+        storm_name = "NONAME"  # Default storm name
         print("Warning: Could not read storm name, defaulting to NONAME.")
 
     print(f"Generating AWIP input for storm {storm_name} ({storm_number})...")
@@ -289,15 +314,15 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
 
         # Safely extract and format data, providing defaults
         try:
-            atcf_basin = _decode_char_array(row["basin"])[:2].ljust(2) # Ensure 2 chars
+            atcf_basin = _decode_char_array(row["basin"])[:2].ljust(2)  # Ensure 2 chars
         except (KeyError, AttributeError):
-            atcf_basin = "AL" # Default basin
+            atcf_basin = "AL"  # Default basin
             print(f"Warning: Missing basin at index {time_idx}, defaulting to AL.")
 
         try:
-            atcf_cyclone_num = f"{storm_number:02d}" # Ensure 2 digits
+            atcf_cyclone_num = f"{storm_number:02d}"  # Ensure 2 digits
         except ValueError:
-             atcf_cyclone_num = "00"
+            atcf_cyclone_num = "00"
 
         try:
             dt_val = pd.to_datetime(row["time"].item())
@@ -307,11 +332,13 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
             day = dt_val.day
             hour = dt_val.hour
         except (AttributeError, ValueError):
-            print(f"Error: Invalid time data at index {time_idx}. Skipping this time step.")
-            continue # Skip this time step if time is invalid
+            print(
+                f"Error: Invalid time data at index {time_idx}. Skipping this time step."
+            )
+            continue  # Skip this time step if time is invalid
 
-        technum = 0 # Placeholder for TECHNUM/MIN
-        tech = "BEST" # Technique
+        technum = 0  # Placeholder for TECHNUM/MIN
+        tech = "BEST"  # Technique
         tau = int((dt_val - start_time).total_seconds() / 3600)
 
         try:
@@ -331,15 +358,22 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
             lon_val, lon_hem = 0, "E"
             print(f"Warning: Missing longitude at index {time_idx}, defaulting to 0E.")
 
-
         # Use np.nan_to_num to handle potential NaNs before converting to int
-        atcf_wind = int(np.nan_to_num(row.get("usa_wind", fill_value_int).item(), nan=fill_value_int))
-        atcf_pres = int(np.nan_to_num(row.get("usa_pres", 1013).item(), nan=1013)) # Default pressure 1013
+        atcf_wind = int(
+            np.nan_to_num(
+                row.get("usa_wind", fill_value_int).item(), nan=fill_value_int
+            )
+        )
+        atcf_pres = int(
+            np.nan_to_num(row.get("usa_pres", 1013).item(), nan=1013)
+        )  # Default pressure 1013
 
         # Background pressure (Pn) - typically 1013 mb
         atcf_poci = 1013
 
-        atcf_rmw = int(np.nan_to_num(row.get("usa_rmw", fill_value_int).item(), nan=fill_value_int))
+        atcf_rmw = int(
+            np.nan_to_num(row.get("usa_rmw", fill_value_int).item(), nan=fill_value_int)
+        )
 
         # Placeholder for Direction and Speed (ASWIP recalculates)
         storm_dir = 0
@@ -355,20 +389,27 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
         }
 
         for rad_kt, var_name in radii_vars.items():
-            radii_nm = [fill_value_int] * 4 # Initialize with default
+            radii_nm = [fill_value_int] * 4  # Initialize with default
             has_data = False
             if var_name in row:
                 try:
                     # Extract radii, handle NaNs, convert to int
                     radii_nm = [
-                        int(np.nan_to_num(row[var_name].isel(quadrant=q).item(), nan=fill_value_int))
+                        int(
+                            np.nan_to_num(
+                                row[var_name].isel(quadrant=q).item(),
+                                nan=fill_value_int,
+                            )
+                        )
                         for q in range(4)
                     ]
                     # Check if any radius value is non-zero
                     radii_nm = clean_radii(radii_nm)
                 except (ValueError, IndexError, KeyError, AttributeError) as e:
-                     print(f"Warning: Could not process radii for {rad_kt}kt at index {time_idx}. Error: {e}")
-                     radii_nm = [fill_value_int] * 4 # Reset to default on error
+                    print(
+                        f"Warning: Could not process radii for {rad_kt}kt at index {time_idx}. Error: {e}"
+                    )
+                    radii_nm = [fill_value_int] * 4  # Reset to default on error
 
             # ASWIP documentation suggests it can handle multiple lines per time step,
             # even if radii are zero, as it uses the presence of the isotach line.
@@ -378,41 +419,41 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
                 # FORMAT(22) breakdown and corresponding Python formatting
                 # 3x, i3, 2x, i4, 3i2, 6x, a4, 1x, i4, 2x, i3, a1, 1x, i5, a1, 2x, i3, 2x, i4, 6x, i3, 7x, 4(i4,2x), i4, 8x, i3, 27x, 2(i3,2x), a10
                 line = (
-                    f"   "                          # 3x
-                    f"{0: >3d}"                     # i3      (advr - placeholder 0)
-                    f"  "                          # 2x
-                    f"{year: >4d}"                  # i4      (iyear)
-                    f"{month:02d}"                  # i2      (imth)
-                    f"{day:02d}"                    # i2      (iday)
-                    f"{hour:02d}"                   # i2      (ihr)
-                    f"      "                      # 6x
-                    f"{tech: <4}"                   # a4      (castType)
-                    f" "                           # 1x
-                    f"{tau: >4d}"                   # i4      (iFcstInc)
-                    f"  "                          # 2x
-                    f"{lat_val: >3d}"               # i3      (ilat)
-                    f"{lat_hem: <1}"                # a1      (ns)
-                    f" "                           # 1x
-                    f"{lon_val: >5d}"               # i5      (ilon)
-                    f"{lon_hem: <1}"                # a1      (ew)
-                    f"  "                          # 2x
-                    f"{atcf_wind: >3d}"             # i3      (ispd)
-                    f"  "                          # 2x
-                    f"{atcf_pres: >4d}"             # i4      (icpress)
-                    f"      "                      # 6x
-                    f"{rad_kt: >3d}"                # i3      (ivr - Wind intensity for radii)
-                    f"       "                     # 7x
-                    f"{radii_nm[0]: >4d}  "         # i4, 2x  (ir(1)) NE
-                    f"{radii_nm[1]: >4d}  "         # i4, 2x  (ir(2)) SE
-                    f"{radii_nm[2]: >4d}  "         # i4, 2x  (ir(3)) SW
-                    f"{radii_nm[3]: >4d}  "         # i4, 2x  (ir(4)) NW
-                    f"{atcf_poci: >4d}"             # i4      (ipn - Background pressure)
-                    f"        "                    # 8x
-                    f"{atcf_rmw: >3d}"              # i3      (atcfRMW)
-                    f"                           " # 27x
-                    f"{storm_dir: >3d}  "           # i3, 2x  (dir - placeholder 0)
-                    f"{storm_speed: >3d}  "         # i3, 2x  (speed - placeholder 0)
-                    f"{storm_name: <10}"            # a10     (stormname)
+                    f"   "  # 3x
+                    f"{0: >3d}"  # i3      (advr - placeholder 0)
+                    f"  "  # 2x
+                    f"{year: >4d}"  # i4      (iyear)
+                    f"{month:02d}"  # i2      (imth)
+                    f"{day:02d}"  # i2      (iday)
+                    f"{hour:02d}"  # i2      (ihr)
+                    f"      "  # 6x
+                    f"{tech: <4}"  # a4      (castType)
+                    f" "  # 1x
+                    f"{tau: >4d}"  # i4      (iFcstInc)
+                    f"  "  # 2x
+                    f"{lat_val: >3d}"  # i3      (ilat)
+                    f"{lat_hem: <1}"  # a1      (ns)
+                    f" "  # 1x
+                    f"{lon_val: >5d}"  # i5      (ilon)
+                    f"{lon_hem: <1}"  # a1      (ew)
+                    f"  "  # 2x
+                    f"{atcf_wind: >3d}"  # i3      (ispd)
+                    f"  "  # 2x
+                    f"{atcf_pres: >4d}"  # i4      (icpress)
+                    f"      "  # 6x
+                    f"{rad_kt: >3d}"  # i3      (ivr - Wind intensity for radii)
+                    f"       "  # 7x
+                    f"{radii_nm[0]: >4d}  "  # i4, 2x  (ir(1)) NE
+                    f"{radii_nm[1]: >4d}  "  # i4, 2x  (ir(2)) SE
+                    f"{radii_nm[2]: >4d}  "  # i4, 2x  (ir(3)) SW
+                    f"{radii_nm[3]: >4d}  "  # i4, 2x  (ir(4)) NW
+                    f"{atcf_poci: >4d}"  # i4      (ipn - Background pressure)
+                    f"        "  # 8x
+                    f"{atcf_rmw: >3d}"  # i3      (atcfRMW)
+                    f"                           "  # 27x
+                    f"{storm_dir: >3d}  "  # i3, 2x  (dir - placeholder 0)
+                    f"{storm_speed: >3d}  "  # i3, 2x  (speed - placeholder 0)
+                    f"{storm_name: <10}"  # a10     (stormname)
                 )
                 # Ensure the line length matches expected format length if needed, though Fortran often ignores trailing chars.
                 # Total length from format: 3+3+2+4+2+2+2+6+4+1+4+2+3+1+1+5+1+2+3+2+4+6+3+7+4*6+4+8+3+27+2*5+10 = 143
@@ -427,7 +468,9 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
         # Use repr() to handle potential special characters in the path for printing
         print(f"✅ Successfully created an ASWIP input file at {output_atcf_path!r}")
     except IOError as e:
-        print(f"Error: Could not write to output file {output_atcf_path!r}. Reason: {e}")
+        print(
+            f"Error: Could not write to output file {output_atcf_path!r}. Reason: {e}"
+        )
 
 
 def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
@@ -446,7 +489,7 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
 
     # Get static storm information once
     storm_number = int(ds["number"].values)
-    storm_name = _decode_char_array(ds["name"]).upper().strip(" ").strip('\x00')
+    storm_name = _decode_char_array(ds["name"]).upper().strip(" ").strip("\x00")
     print(f"Generating ATCF for storm {storm_name} ({storm_number})...")
     # storm_name = "GERT"
 
@@ -470,21 +513,21 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
 
         lat_val = int(abs(lat) * 10)
         lat_hem = "N" if lat >= 0 else "S"
-        atcf_lat = f"{lat_val}{lat_hem}"#.rjust(5)
+        atcf_lat = f"{lat_val}{lat_hem}"  # .rjust(5)
 
         lon_val = int(abs(lon) * 10)
         lon_hem = "W" if lon < 0 else "E"
-        atcf_lon = f"{lon_val}{lon_hem}"# .rjust(6)
+        atcf_lon = f"{lon_val}{lon_hem}"  # .rjust(6)
 
-        atcf_wind = str(int(np.nan_to_num(row["usa_wind"].item())))#.rjust(4)
-        atcf_pres = str(int(np.nan_to_num(row["usa_pres"].item())))# .rjust(5)
-        atcf_status = _decode_char_array(row["usa_status"])#.ljust(3)
+        atcf_wind = str(int(np.nan_to_num(row["usa_wind"].item())))  # .rjust(4)
+        atcf_pres = str(int(np.nan_to_num(row["usa_pres"].item())))  # .rjust(5)
+        atcf_status = _decode_char_array(row["usa_status"])  # .ljust(3)
 
         # --- Part 3: Enriched Data for Asymmetry and Size ---
         # Select quadrant data using .isel() and get scalar with .item()
-        atcf_poci = str(int(np.nan_to_num(row["usa_poci"].item())))#.rjust(5)
-        atcf_roci = str(int(np.nan_to_num(row["usa_roci"].item())))#.rjust(4)
-        atcf_rmw = str(int(np.nan_to_num(row["usa_rmw"].item())))#.rjust(4)
+        atcf_poci = str(int(np.nan_to_num(row["usa_poci"].item())))  # .rjust(5)
+        atcf_roci = str(int(np.nan_to_num(row["usa_roci"].item())))  # .rjust(4)
+        atcf_rmw = str(int(np.nan_to_num(row["usa_rmw"].item())))  # .rjust(4)
         radii_data = {
             "34": [
                 int(np.nan_to_num(row["usa_r34"].isel(quadrant=q).item()))
@@ -512,7 +555,7 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
                     f"{rad},{'NEQ'},{str(rad_values[0])},",
                     f"{str(rad_values[1])},{str(rad_values[2])},{str(rad_values[3])},",
                     f"{atcf_poci},{atcf_roci},{atcf_rmw},",
-                    f" , , , , , , ,{storm_name}"
+                    f" , , , , , , ,{storm_name}",
                 )
                 atcf_lines.append("".join(line))
 
@@ -538,27 +581,29 @@ class CustomAdcircRun(AdcircRun):
         # Change DragLawString from 'default' to 'Powell'
         # Note: The quotes are nested ('"Powell"') because the
         # namelist writer will strip one set.
-        nlists['metControl']['DragLawString'] = "'Powell'"
+        nlists["metControl"]["DragLawString"] = "'Powell'"
 
         # Change WindDragLimit (File 1: 0.0025, File 2: 0.0020)
-        nlists['metControl']['WindDragLimit'] = 0.0020
+        nlists["metControl"]["WindDragLimit"] = 0.0020
 
         # --- 2. Add owiWindNetcdf (if needed) ---
         # This namelist is specific to NWS=13 in your File 2.
         # You should check if your new run also uses NWS=13.
         if self.NWS == 13:
             # Get the forcing start date string in the right format
-            start_str = self.forcing_start_date.strftime('%Y%m%d.%H%M%S')
+            start_str = self.forcing_start_date.strftime("%Y%m%d.%H%M%S")
 
-            nlists['owiWindNetcdf'] = {
-                'NWS13ColdStartString': f"'{start_str}'",
-                'NWS13GroupForPowell': '2'
+            nlists["owiWindNetcdf"] = {
+                "NWS13ColdStartString": f"'{start_str}'",
+                "NWS13GroupForPowell": "2",
             }
 
         return nlists
 
 
-def calculate_cfl_timestep(mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: float = 5.0, g: float = 9.81) -> float:
+def calculate_cfl_timestep(
+    mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: float = 5.0, g: float = 9.81
+) -> float:
     """
     Calculates a recommended timestep based on the full CFL condition
     for ADCIRC's shallow water equations.
@@ -585,30 +630,38 @@ def calculate_cfl_timestep(mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: fl
                     or are invalid (e.g., non-positive).
         AttributeError: If the mesh object doesn't have the expected properties.
     """
-    print(f"Calculating CFL timestep with cfl_target={cfl_target}, maxvel={maxvel} m/s...")
+    print(
+        f"Calculating CFL timestep with cfl_target={cfl_target}, maxvel={maxvel} m/s..."
+    )
 
     # 1. Find the minimum edge length (dx) in meters
     #    Uses the pre-calculated distances from the mesh object.
-    min_dx = float('inf')
+    min_dx = float("inf")
     try:
         # Accessing the property triggers calculation if needed
         node_distances = mesh.node_distances_in_meters
 
         if not node_distances:
-             raise ValueError("Node distances dictionary is empty. Cannot calculate min_dx.")
+            raise ValueError(
+                "Node distances dictionary is empty. Cannot calculate min_dx."
+            )
 
         for node_idx, neighbors in node_distances.items():
-            if neighbors: # Check if the neighbor dictionary is not empty
+            if neighbors:  # Check if the neighbor dictionary is not empty
                 min_neighbor_dist = min(neighbors.values())
                 min_dx = min(min_dx, min_neighbor_dist)
 
     except AttributeError:
-        raise AttributeError("Mesh object requires 'node_distances_in_meters' property for CFL calculation.") from None
+        raise AttributeError(
+            "Mesh object requires 'node_distances_in_meters' property for CFL calculation."
+        ) from None
     except Exception as e:
-         raise ValueError(f"Error accessing node distances: {e}") from e
+        raise ValueError(f"Error accessing node distances: {e}") from e
 
-    if min_dx == float('inf') or min_dx <= 0:
-        raise ValueError(f"Could not determine a valid minimum edge length (min_dx={min_dx}). Check mesh connectivity and units.")
+    if min_dx == float("inf") or min_dx <= 0:
+        raise ValueError(
+            f"Could not determine a valid minimum edge length (min_dx={min_dx}). Check mesh connectivity and units."
+        )
     print(f"  - Minimum edge length (min_dx): {min_dx:.2f} m")
 
     # 2. Find the maximum depth (H) in meters
@@ -618,25 +671,31 @@ def calculate_cfl_timestep(mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: fl
         # Get depth values, assuming it's a DataFrame (might have multiple columns)
         depth_df = mesh.values
         if not isinstance(depth_df, pd.DataFrame):
-             raise TypeError("Expected mesh.values to be a pandas DataFrame")
+            raise TypeError("Expected mesh.values to be a pandas DataFrame")
 
         # Find the maximum value across all depth columns, ignoring NaNs
         numeric_depths = depth_df.select_dtypes(include=np.number)
         if numeric_depths.empty:
-             raise ValueError("Mesh 'values' DataFrame contains no numeric depth data.")
+            raise ValueError("Mesh 'values' DataFrame contains no numeric depth data.")
 
-        max_h = numeric_depths.max().max() # Max of max of each column
+        max_h = numeric_depths.max().max()  # Max of max of each column
 
         if pd.isna(max_h):
-             raise ValueError("Maximum depth calculation resulted in NaN. Check depth data.")
+            raise ValueError(
+                "Maximum depth calculation resulted in NaN. Check depth data."
+            )
 
     except AttributeError:
-         raise AttributeError("Mesh object requires 'values' property (pandas DataFrame) for depths.") from None
+        raise AttributeError(
+            "Mesh object requires 'values' property (pandas DataFrame) for depths."
+        ) from None
     except Exception as e:
-         raise ValueError(f"Error accessing or processing mesh depths: {e}") from e
+        raise ValueError(f"Error accessing or processing mesh depths: {e}") from e
 
     if max_h < 0:
-        print(f"  - Warning: Maximum mesh depth is negative ({max_h:.2f}m). Using absolute value.")
+        print(
+            f"  - Warning: Maximum mesh depth is negative ({max_h:.2f}m). Using absolute value."
+        )
         max_h = abs(max_h)
     # Allow max_h == 0 (completely dry land), sqrt(0) is handled.
 
@@ -649,26 +708,31 @@ def calculate_cfl_timestep(mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: fl
     # 4. Calculate characteristic speed (S = U + C)
     #    Use absolute value of maxvel just in case.
     characteristic_speed = abs(maxvel) + wave_speed
-    print(f"  - Characteristic speed (maxvel + sqrt(gH)): {characteristic_speed:.2f} m/s")
+    print(
+        f"  - Characteristic speed (maxvel + sqrt(gH)): {characteristic_speed:.2f} m/s"
+    )
 
-    if characteristic_speed <= 1e-9: # Check for effectively zero speed
-         # This might happen if max_h=0 and maxvel=0
-         raise ValueError(f"Characteristic speed ({characteristic_speed:.2f} m/s) is near zero. Cannot calculate timestep.")
+    if characteristic_speed <= 1e-9:  # Check for effectively zero speed
+        # This might happen if max_h=0 and maxvel=0
+        raise ValueError(
+            f"Characteristic speed ({characteristic_speed:.2f} m/s) is near zero. Cannot calculate timestep."
+        )
 
     # 5. Calculate recommended timestep (dt = cfl_target * dx / S)
     recommended_dt = cfl_target * min_dx / characteristic_speed
 
     if recommended_dt <= 0:
-         raise ValueError(f"Calculated timestep ({recommended_dt:.4f}s) is not positive. Check inputs.")
+        raise ValueError(
+            f"Calculated timestep ({recommended_dt:.4f}s) is not positive. Check inputs."
+        )
 
     print(f"✅ Recommended timestep (dt): {recommended_dt:.4f} seconds")
     return recommended_dt
 
 
-def generate_adcirc_inputs(storm: Storm,
-                           storm_ds: xr.Dataset,
-                           output_dir: str,
-                           recalculate_timestep=False) -> None:
+def generate_adcirc_inputs(
+    storm: Storm, storm_ds: xr.Dataset, output_dir: str, recalculate_timestep=False
+) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
     This creates:
@@ -695,18 +759,22 @@ def generate_adcirc_inputs(storm: Storm,
             recommended_dt = calculate_cfl_timestep(mesh, cfl_target=0.7, maxvel=10.0)
 
             # Optional: Round down slightly for safety margin or to nicer number
-            recommended_dt = math.floor(recommended_dt * 10) / 10 # e.g., round down to nearest 0.1s
+            recommended_dt = (
+                math.floor(recommended_dt * 10) / 10
+            )  # e.g., round down to nearest 0.1s
 
             # Ensure dt is not excessively small (e.g., less than 0.1s might be problematic)
             if recommended_dt < 0.1:
-                print(f"Warning: Calculated dt ({recommended_dt:.4f}s) is very small. Using 0.1s.")
+                print(
+                    f"Warning: Calculated dt ({recommended_dt:.4f}s) is very small. Using 0.1s."
+                )
                 recommended_dt = 0.1
 
         except (ValueError, AttributeError) as e:
             print(f"Error calculating CFL timestep: {e}. Defaulting to 2.5s.")
-            recommended_dt = 2.5 # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
+            recommended_dt = 1  # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
     else:
-        recommended_dt = 2.5 # Default timestep
+        recommended_dt = 1  # Default timestep
 
     # 2. Add Forcings -- no tides
     # tidal_forcing = Tides()
@@ -717,18 +785,18 @@ def generate_adcirc_inputs(storm: Storm,
     os.makedirs(output_dir, exist_ok=True)
 
     convert_ibtracs_storm_to_aswip_input(
-            ds=storm_ds,
-            output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
-        )
-        # This is the file adcircpy will read
+        ds=storm_ds,
+        output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
+    )
+    # This is the file adcircpy will read
     convert_ibtracs_storm_to_atcf(
-            ds=storm_ds,
-            output_atcf_path=os.path.join(output_dir, "atcf.txt"),
-        )
-        # adcircpy reads atcf.txt to get metadata for fort.15
+        ds=storm_ds,
+        output_atcf_path=os.path.join(output_dir, "atcf.txt"),
+    )
+    # adcircpy reads atcf.txt to get metadata for fort.15
     wind_forcing = BestTrackForcing(
-            Path(os.path.join(output_dir, "atcf.txt")), nws=20
-        )  # NWS=20 for GAHM
+        Path(os.path.join(output_dir, "atcf.txt")), nws=20
+    )  # NWS=20 for GAHM
 
     # 2. Pass the track object to the BestTrackForcing constructor
     mesh.add_forcing(wind_forcing)
@@ -763,7 +831,7 @@ def generate_adcirc_inputs(storm: Storm,
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    driver.write(output_dir, overwrite=True) # This creates fort.15
+    driver.write(output_dir, overwrite=True)  # This creates fort.15
 
     # 6. Copy static files
     # fort.14 is copied by driver.write()
@@ -775,8 +843,8 @@ def generate_adcirc_inputs(storm: Storm,
 
 
 def drive_all_adcirc(
-        test_single=False,
-        test_nosubprocess=False,
+    test_single=False,
+    test_nosubprocess=False,
 ) -> None:
     """
     Generate all storm inputs using NWS=20.
@@ -807,8 +875,10 @@ def drive_all_adcirc(
         if os.path.isdir(alt_path):
             relative_config_path = alt_path
         else:
-             raise IOError(f"Could not find config directory at '{relative_config_path}' or '{alt_path}'. "
-                           "Ensure the 'config' directory is a sibling of this script.")
+            raise IOError(
+                f"Could not find config directory at '{relative_config_path}' or '{alt_path}'. "
+                "Ensure the 'config' directory is a sibling of this script."
+            )
 
     hydra.core.global_hydra.GlobalHydra.instance().clear()
     hydra.initialize(config_path="config", version_base=None)
@@ -824,7 +894,7 @@ def drive_all_adcirc(
         # and year = 2005
         i_ran = np.where([x == b"KATRINA" for x in target_storms_ds.name.values])[0]
         # i_ran = [i for i in i_ran if target_storms_ds.isel(storm=0).time.values[0]==2005]
-        #print(i_ran)
+        # print(i_ran)
         if len(i_ran) == 0:
             i_ran = [0]
         if len(i_ran) > 1:
@@ -836,7 +906,7 @@ def drive_all_adcirc(
     for i in i_ran:
         # Isolate the raw numpy array of times for the storm
         raw_times = target_storms_ds.time[i].values
-        #print("raw_times", raw_times)
+        # print("raw_times", raw_times)
 
         # Use pandas to reliably convert the array to datetime objects
         # 'coerce' will automatically handle 'NaT' values by turning them into NaT
@@ -915,7 +985,30 @@ def drive_all_adcirc(
 
 if __name__ == "__main__":
     # python -m adforce.generate_training_data
-    drive_all_adcirc(test_nosubprocess=True, test_single=True)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Generate ADCIRC inputs and run simulations for all U.S. landfalling storms."
+    )
+    parser.add_argument(
+        "--test-single",
+        action="store_true",
+        help="If set, only process Katrina 2005 for testing.",
+    )
+    parser.add_argument(
+        "--test-nosubprocess",
+        action="store_true",
+        help="If set, generate inputs but do not run subprocess simulations.",
+    )
+    args = parser.parse_args()
+
+    drive_all_adcirc(
+        test_single=args.test_single,
+        test_nosubprocess=args.test_nosubprocess,
+    )
+    # python -m adforce.generate_training_data --test-single --test-nosubprocess
+
+    # drive_all_adcirc(test_nosubprocess=True, test_single=True)
     # track = VortexTrack('AL112017')
     # print(track)
     # drive_all_adcirc()
