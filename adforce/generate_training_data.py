@@ -573,6 +573,37 @@ class CustomAdcircRun(AdcircRun):
     to match the "notide-example" (File 2) configuration.
     """
 
+    def __init__(self, *args, **kwargs):
+        # This initializes the parent AdcircRun class normally
+        super().__init__(*args, **kwargs)
+        # We add a private variable to store our custom NRAMP value
+        self._custom_nramp = None
+
+    @property
+    def NRAMP(self) -> int:
+        """
+        Overrides the parent NRAMP property. If a custom value has been
+        set, it returns that value. Otherwise, it falls back to the
+        original logic of the parent class.
+        """
+        if self._custom_nramp is not None:
+            return self._custom_nramp
+        else:
+            # This calls the original NRAMP logic from the Fort15 class
+            return super().NRAMP
+
+    @NRAMP.setter
+    def NRAMP(self, value: int):
+        """
+        This is the new setter. It allows you to assign a value
+        directly to the NRAMP property.
+        """
+        # You can add validation for the NRAMP value if you wish
+        valid_nramp_values = [0, 1]
+        if value not in valid_nramp_values:
+            print(f"Warning: {value} is not a standard NRAMP value.")
+        self._custom_nramp = int(value)
+
     @property
     def namelists(self) -> Dict[str, Dict[str, str]]:
         """
@@ -812,7 +843,7 @@ def generate_adcirc_inputs(
         mesh=mesh,
         start_date=sim_start,
         end_date=sim_end,  # spinup_duration=spinup
-        # spinup_duration=timedelta(days=1.0)
+        # spinup_time=timedelta(days=1.0),
     )
 
     # --- Customize fort.15 parameters ---
