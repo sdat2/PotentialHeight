@@ -668,7 +668,7 @@ def calculate_cfl_timestep(mesh: AdcircMesh, cfl_target: float = 0.7, maxvel: fl
 def generate_adcirc_inputs(storm: Storm,
                            storm_ds: xr.Dataset,
                            output_dir: str,
-                           stormtracks = False) -> None:
+                           recalculate_timestep=False) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
     This creates:
@@ -681,29 +681,32 @@ def generate_adcirc_inputs(storm: Storm,
         storm (Storm): Storm object containing storm metadata.
         storm_ds (xr.Dataset): xarray.Dataset for the storm from IBTrACS.
         output_dir (str): Directory to save the generated ADCIRC input files.
-        stormtracks (bool): Whether to use NHC storm tracks directly.
+        recalculate_timestep (bool): Whether to recalculate the timestep
 
     Returns:
         None
     """
     # 1. Load Mesh
     mesh = AdcircMesh.open(FORT14_PATH, crs="epsg:4326")
-    try:
-        # You might adjust maxvel based on the storm's intensity if needed
-        # For a major hurricane like Katrina, 10.0 m/s might be a safer estimate
-        recommended_dt = calculate_cfl_timestep(mesh, cfl_target=0.7, maxvel=10.0)
+    if recalculate_timestep:
+        try:
+            # You might adjust maxvel based on the storm's intensity if needed
+            # For a major hurricane like Katrina, 10.0 m/s might be a safer estimate
+            recommended_dt = calculate_cfl_timestep(mesh, cfl_target=0.7, maxvel=10.0)
 
-        # Optional: Round down slightly for safety margin or to nicer number
-        recommended_dt = math.floor(recommended_dt * 10) / 10 # e.g., round down to nearest 0.1s
+            # Optional: Round down slightly for safety margin or to nicer number
+            recommended_dt = math.floor(recommended_dt * 10) / 10 # e.g., round down to nearest 0.1s
 
-        # Ensure dt is not excessively small (e.g., less than 0.1s might be problematic)
-        if recommended_dt < 0.1:
-            print(f"Warning: Calculated dt ({recommended_dt:.4f}s) is very small. Using 0.1s.")
-            recommended_dt = 0.1
+            # Ensure dt is not excessively small (e.g., less than 0.1s might be problematic)
+            if recommended_dt < 0.1:
+                print(f"Warning: Calculated dt ({recommended_dt:.4f}s) is very small. Using 0.1s.")
+                recommended_dt = 0.1
 
-    except (ValueError, AttributeError) as e:
-        print(f"Error calculating CFL timestep: {e}. Defaulting to 2.5s.")
-        recommended_dt = 2.5 # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
+        except (ValueError, AttributeError) as e:
+            print(f"Error calculating CFL timestep: {e}. Defaulting to 2.5s.")
+            recommended_dt = 2.5 # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
+    else:
+        recommended_dt = 2.5 # Default timestep
 
     # 2. Add Forcings -- no tides
     # tidal_forcing = Tides()
@@ -713,30 +716,17 @@ def generate_adcirc_inputs(storm: Storm,
     # 1. Use the parent class to find the storm and create a track object
     os.makedirs(output_dir, exist_ok=True)
 
-    if stormtracks: # rely on the NHC server
-        try:
-            track = VortexTrack.from_storm_name(name=storm.name.lower(), year=storm.year)
-            print(track.data)
-            wind_forcing = BestTrackForcing(storm=track, nws=20)
-
-        except Exception as e:
-            print(f"Could not find NHC data for {storm.name} {storm.year}: {e}")
-            traceback.print_exc()
-            assert False, "Stopping execution."
-    else:
-        # 2nd option: convert IBTrACS data to ASWIP format
-        # This is the file ASWIP will read
-        convert_ibtracs_storm_to_aswip_input(
+    convert_ibtracs_storm_to_aswip_input(
             ds=storm_ds,
             output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
         )
         # This is the file adcircpy will read
-        convert_ibtracs_storm_to_atcf(
+    convert_ibtracs_storm_to_atcf(
             ds=storm_ds,
             output_atcf_path=os.path.join(output_dir, "atcf.txt"),
         )
         # adcircpy reads atcf.txt to get metadata for fort.15
-        wind_forcing = BestTrackForcing(
+    wind_forcing = BestTrackForcing(
             Path(os.path.join(output_dir, "atcf.txt")), nws=20
         )  # NWS=20 for GAHM
 
