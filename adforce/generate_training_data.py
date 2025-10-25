@@ -13,7 +13,7 @@ and then run the storm on ARCHER2 with padcirc etc.
 After this is all done we will process the fort.*.nc files to get training data to train
 our GNN model.
 """
-from typing import Tuple
+from typing import Tuple, Dict
 import os
 from pathlib import Path
 import traceback
@@ -23,6 +23,7 @@ import xarray as xr
 import shutil
 from datetime import datetime, timedelta
 from adcircpy import AdcircMesh, AdcircRun, Tides
+from adcircpy.fort15 import Fort15
 from adcircpy.forcing.winds import BestTrackForcing
 from stormevents.nhc import VortexTrack
 
@@ -519,6 +520,42 @@ def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
     print(f"✅ Successfully created ENRICHED ATCF file at '{output_atcf_path}'")
 
 
+class CustomAdcircRun(AdcircRun):
+    """
+    An AdcircRun subclass that overrides the default namelists
+    to match the "notide-example" (File 2) configuration.
+    """
+
+    @property
+    def namelists(self) -> Dict[str, Dict[str, str]]:
+        """
+        Overrides the Fort15.namelists property.
+        """
+        # Get the default namelist dictionary from the parent class
+        nlists = super().namelists
+        # --- 1. Modify metControl ---
+        # Change DragLawString from 'default' to 'Powell'
+        # Note: The quotes are nested ('"Powell"') because the
+        # namelist writer will strip one set.
+        nlists['metControl']['DragLawString'] = "'Powell'"
+
+        # Change WindDragLimit (File 1: 0.0025, File 2: 0.0020)
+        nlists['metControl']['WindDragLimit'] = 0.0020
+
+        # --- 2. Add owiWindNetcdf (if needed) ---
+        # This namelist is specific to NWS=13 in your File 2.
+        # You should check if your new run also uses NWS=13.
+        if self.NWS == 13:
+            # Get the forcing start date string in the right format
+            start_str = self.forcing_start_date.strftime('%Y%m%d.%H%M%S')
+
+            nlists['owiWindNetcdf'] = {
+                'NWS13ColdStartString': f"'{start_str}'",
+                'NWS13GroupForPowell': '2'
+            }
+
+        return nlists
+
 def generate_adcirc_inputs(storm: Storm,
                            storm_ds: xr.Dataset,
                            output_dir: str,
@@ -585,17 +622,22 @@ def generate_adcirc_inputs(storm: Storm,
     sim_start, sim_end = calculate_simulation_window(storm, extra_days=0, spinup_days=0)
 
     # 4. Configure AdcircRun Driver
-    driver = AdcircRun(
+    driver = CustomAdcircRun(
         mesh=mesh,
         start_date=sim_start,
         end_date=sim_end,  # spinup_duration=spinup
     )
 
     # --- Customize fort.15 parameters ---
-    driver.timestep = 2.0
-    driver.DRAMP = 2.0 # Use 2.0-day ramp function
-    driver.set_elevation_surface_output(sampling_rate=timedelta(minutes=30))
-    driver.set_velocity_surface_output(sampling_rate=timedelta(minutes=30))
+    driver.timestep = 5.0
+    driver.ICS = 24
+    driver.ITITER = -1
+    driver.CONVCR = 1.0e-7
+
+    #
+    driver.set_elevation_surface_output(sampling_rate=timedelta(seconds=200))
+    driver.set_velocity_surface_output(sampling_rate=timedelta(seconds=200))
+    driver.set_meteorological_surface_output(sampling_rate=timedelta(seconds=200))
 
     # Set NWS=20 in fort.15
     # driver.fort15.NWS = 20 # GAHM model
@@ -719,7 +761,7 @@ def generate_all_storm_inputs():
             OmegaConf.update(storm_cfg, "name", f"{storm_name_safe}_{storm.year}")
 
             # Tell the subprocess runner to execute ASWIP
-            # This converts 'pre_aswip_fort.22' to 'fort.22'
+            # This converts 'pre_aswip_fort.22' to 'fort.22' with the NWS=20 format
             OmegaConf.update(storm_cfg, "use_aswip", True)
 
             # Ensure we're NOT using SLURM for this subprocess
