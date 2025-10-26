@@ -1018,6 +1018,158 @@ def grad_for_triangle_timeseries(
     return np.stack((grad_x, grad_y), axis=0)
 
 
+# --- ghost cell functions ---
+
+def get_boundary_edge_midpoints(
+    node_xy: np.ndarray,
+    edge_index_BC: np.ndarray
+) -> np.ndarray:
+    """Calculates the midpoint of each boundary edge.
+
+    Args:
+        node_xy: Array of node coordinates, shape (num_nodes, 2).
+        edge_index_BC: Array of node indices forming boundary edges,
+                       shape (num_BC_edges, 2).
+
+    Returns:
+        Midpoints of boundary edges, shape (num_BC_edges, 2).
+
+    Doctests:
+        >>> node_coords = np.array([[0., 0.], [2., 0.], [2., 2.], [0., 2.]])
+        >>> bc_edges = np.array([[0, 1], [1, 2]]) # Edges (0,1) and (1,2)
+        >>> get_boundary_edge_midpoints(node_coords, bc_edges)
+        array([[1., 0.],
+               [2., 1.]])
+        >>> bc_edges_empty = np.empty((0, 2), dtype=int)
+        >>> get_boundary_edge_midpoints(node_coords, bc_edges_empty)
+        array([], shape=(0, 2), dtype=float64)
+    """
+    if edge_index_BC.shape[0] == 0:
+        return np.empty((0, 2), dtype=float)
+    # Get coordinates of nodes for each edge: shape (num_BC_edges, 2, 2)
+    edge_node_coords = node_xy[edge_index_BC]
+    # Calculate mean along the axis containing the two nodes: axis=1
+    midpoints = np.mean(edge_node_coords, axis=1)
+    return midpoints
+
+
+def calculate_outward_normals(
+    node_xy: np.ndarray,
+    face_xy: np.ndarray,
+    edge_index_BC: np.ndarray,
+    face_BC: np.ndarray,
+    edge_midpoints: np.ndarray
+) -> np.ndarray:
+    """Calculates outward-pointing unit normal vectors for boundary edges.
+
+    Args:
+        node_xy: Array of node coordinates, shape (num_nodes, 2).
+        face_xy: Array of face center coordinates, shape (num_faces, 2).
+        edge_index_BC: Indices of nodes forming BC edges, shape (num_BC_edges, 2).
+        face_BC: Indices of boundary faces corresponding to edge_index_BC,
+                   shape (num_BC_edges,).
+        edge_midpoints: Midpoints of boundary edges, shape (num_BC_edges, 2).
+
+    Returns:
+        Outward unit normal vectors, shape (num_BC_edges, 2).
+
+    Doctests:
+        >>> node_coords = np.array([[0., 0.], [2., 0.], [1., 1.]]) # Triangle 0
+        >>> face_coords = np.array([[1., 1./3]]) # Center of triangle 0
+        >>> bc_edges = np.array([[0, 1]]) # Edge (0,1) is boundary
+        >>> bc_faces = np.array([0]) # Face 0 is the boundary face
+        >>> midpts = get_boundary_edge_midpoints(node_coords, bc_edges)
+        >>> calculate_outward_normals(node_coords, face_coords, bc_edges, bc_faces, midpts)
+        array([[ 0., -1.]])
+
+        >>> node_coords = np.array([[0., 0.], [0., 2.], [1., 1.]]) # Triangle 0
+        >>> face_coords = np.array([[1./3, 1.]]) # Center of triangle 0
+        >>> bc_edges = np.array([[0, 1]]) # Edge (0,1) is boundary
+        >>> bc_faces = np.array([0]) # Face 0 is the boundary face
+        >>> midpts = get_boundary_edge_midpoints(node_coords, bc_edges)
+        >>> normals = calculate_outward_normals(node_coords, face_coords, bc_edges, bc_faces, midpts)
+        >>> np.allclose(normals, np.array([[-1., 0.]]))
+        True
+    """
+    if edge_index_BC.shape[0] == 0:
+        return np.empty((0, 2), dtype=float)
+
+    # Calculate edge vectors (Node1 -> Node2)
+    edge_vec = node_xy[edge_index_BC[:, 1]] - node_xy[edge_index_BC[:, 0]]
+    edge_len = np.linalg.norm(edge_vec, axis=1, keepdims=True)
+    # Handle potential zero-length edges
+    edge_len = np.where(edge_len == 0, 1.0, edge_len)
+
+    # Calculate one possible normal vector (rotate 90 deg: (x,y) -> (-y,x))
+    # Note: Choice of (-y, x) vs (y, -x) determines initial direction.
+    normal_vec = np.stack([-edge_vec[:, 1], edge_vec[:, 0]], axis=-1) / edge_len
+
+    # Orient normals outwards relative to face centers
+    # Vector from edge midpoint to face center
+    vec_mid_to_face = face_xy[face_BC] - edge_midpoints
+    # Dot product: If positive, normal and mid_to_face point in similar directions (normal is inward)
+    dot_prod = np.sum(normal_vec * vec_mid_to_face, axis=1, keepdims=True)
+    # Flip normal vector if dot product is positive (currently pointing inward)
+    outward_normal_vec = normal_vec * np.where(dot_prod >= 0, -1.0, 1.0)
+
+    # Ensure unit length after potential flipping (shouldn't change length)
+    # outward_normal_vec /= np.linalg.norm(outward_normal_vec, axis=1, keepdims=True)
+
+    return outward_normal_vec
+
+
+def calculate_ghost_face_coords(
+    face_xy: np.ndarray,
+    face_BC: np.ndarray,
+    edge_midpoints: np.ndarray,
+    outward_normals: np.ndarray
+) -> np.ndarray:
+    """Calculates coordinates for ghost faces by mirroring across boundary edges.
+
+    Args:
+        face_xy: Array of face center coordinates, shape (num_faces, 2).
+        face_BC: Indices of boundary faces, shape (num_BC_edges,).
+        edge_midpoints: Midpoints of boundary edges corresponding to face_BC,
+                        shape (num_BC_edges, 2).
+        outward_normals: Outward unit normal vectors for boundary edges,
+                         shape (num_BC_edges, 2).
+
+    Returns:
+        Coordinates of the ghost faces, shape (num_BC_edges, 2).
+
+    Doctests:
+        >>> face_coords = np.array([[1., 0.5], [3., 1.5]]) # Two face centers
+        >>> bc_faces = np.array([0, 1]) # Both are boundary faces
+        >>> midpts = np.array([[1., 0.], [3., 2.]]) # Edge midpoints
+        >>> normals = np.array([[0., -1.], [0., 1.]]) # Outward normals
+        >>> calculate_ghost_face_coords(face_coords, bc_faces, midpts, normals)
+        array([[ 1. , -0.5],
+               [ 3. ,  2.5]])
+
+        >>> empty_faces = np.empty((0, 2))
+        >>> empty_idx = np.empty(0, dtype=int)
+        >>> empty_midpts = np.empty((0, 2))
+        >>> empty_normals = np.empty((0, 2))
+        >>> calculate_ghost_face_coords(empty_faces, empty_idx, empty_midpts, empty_normals)
+        array([], shape=(0, 2), dtype=float64)
+    """
+    if face_BC.shape[0] == 0:
+        return np.empty((0, 2), dtype=float)
+
+    face_BC_xy = face_xy[face_BC]
+
+    # Distance from boundary face center to edge midpoint (symmetry point)
+    distance_face_edge_BC = np.linalg.norm(
+        (face_BC_xy - edge_midpoints), axis=1, keepdims=True
+    )
+
+    # Calculate Ghost Coordinates: SymmetryPoint + Normal * Distance
+    ghost_face_xy = edge_midpoints + outward_normals * distance_face_edge_BC
+
+    return ghost_face_xy
+
+
+# -- coast functions ---
 @timeit
 def select_coast(
     mesh_ds: xr.Dataset, overtopping: bool = False, keep_sparse: bool = False

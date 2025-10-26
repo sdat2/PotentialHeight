@@ -1,14 +1,21 @@
 """Script to explore the boundaries of the ADCIRC mesh."""
-
+from typing import Optional
 import os
 import numpy as np
 import netCDF4 as nc
 from matplotlib import pyplot as plt
-from sithom.plot import plot_defaults, label_subplots, get_dim
-from .constants import FORT63_EXAMPLE, FIGURE_PATH
+from sithom.plot import plot_defaults, get_dim
+from .constants import FORT63_EXAMPLE, FIGURE_PATH, DATA_PATH
 
 
 def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE, typ="medium"):
+    """Plot the boundaries in the ADCIRC mesh from a fort.63 netCDF file.
+
+    Args:
+        path (str): Path to the fort.63 netCDF file. Defaults to FORT63_EXAMPLE.
+        typ (str): Type of mesh for labeling purposes. Defaults to "medium".
+    """
+
     figure_path = os.path.join(FIGURE_PATH, "mesh_boundaries")
     os.makedirs(figure_path, exist_ok=True)
     plot_defaults()
@@ -134,17 +141,141 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE, typ="medium"):
     plt.ylabel("Number of Nodes")
 
     plt.savefig(
-        os.path.join(figure_path, "mesh_boundaries_types.pdf"),
+        os.path.join(figure_path, f"mesh_boundaries_types_{typ}.pdf"),
         bbox_inches="tight",
     )
     plt.clf()
     plt.close()
 
 
+def extract_elevation_boundary_edges(
+    netcdf_path: str,
+    boundary_type: Optional[int] = 0
+) -> np.ndarray:
+    """
+    Extracts the edges corresponding to elevation specified boundaries
+    from an ADCIRC NetCDF file (like fort.63.nc or maxele.63.nc).
+
+    Args:
+        netcdf_path (str): Path to the ADCIRC NetCDF file.
+        boundary_type (Optional[int]): The specific elevation boundary type
+            (from 'ibtypee') to extract. If None, extracts edges for all
+            elevation boundary types. Defaults to 0 based on user's data.
+
+    Returns:
+        np.ndarray: An array of boundary edges, shape (num_BC_edges, 2),
+                    containing pairs of 0-based node indices. Returns an
+                    empty array if no relevant boundaries are found.
+
+    Raises:
+        FileNotFoundError: If the netcdf_path does not exist.
+        KeyError: If required variables ('nbdv', 'nvdll', 'ibtypee') are
+                  missing from the NetCDF file.
+
+    Doctests:
+        >>> # Create a dummy NetCDF file for testing
+        >>> dummy_path = "dummy_adcirc_boundary.nc"
+        >>> with nc.Dataset(dummy_path, 'w') as ds:
+        ...     _ = ds.createDimension('node', 5)
+        ...     _ = ds.createDimension('neta', 4) # Total nodes in elevation boundaries
+        ...     _ = ds.createDimension('nope', 1) # Number of elevation boundary segments
+        ...     # Node indices (1-based in file, adjusted to 0-based: 0, 1, 3, 4)
+        ...     nbdv_var = ds.createVariable('nbdv', 'i4', ('neta',))
+        ...     nbdv_var[:] = np.array([1, 2, 4, 5])
+        ...     # Segment lengths (one segment with 4 nodes)
+        ...     nvdll_var = ds.createVariable('nvdll', 'i4', ('nope',))
+        ...     nvdll_var[:] = np.array([4])
+        ...     # Segment types (one segment of type 0)
+        ...     ibtypee_var = ds.createVariable('ibtypee', 'i4', ('nope',))
+        ...     ibtypee_var[:] = np.array([0])
+        >>> extract_elevation_boundary_edges(dummy_path, boundary_type=0)
+        masked_array(
+        data=[[0, 1],
+               [1, 3],
+               [3, 4]],
+        mask=False,
+        fill_value=999999,
+        dtype=int32)
+        >>> # Test with type mismatch
+        >>> extract_elevation_boundary_edges(dummy_path, boundary_type=1)
+        array([], shape=(0, 2), dtype=int64)
+        >>> # Test with multiple segments (requires adjusting dimensions/data)
+        >>> # Cleanup dummy file
+        >>> os.remove(dummy_path)
+    """
+    if not os.path.exists(netcdf_path):
+        raise FileNotFoundError(f"NetCDF file not found at: {netcdf_path}")
+
+    all_boundary_edges = []
+    current_node_index = 0
+
+    with nc.Dataset(netcdf_path, 'r') as ds:
+        # Check for required variables
+        required_vars = ['nbdv', 'nvdll', 'ibtypee']
+        for var in required_vars:
+            if var not in ds.variables:
+                raise KeyError(f"Required variable '{var}' not found in {netcdf_path}")
+
+        nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
+        nvdll = ds.variables['nvdll'][:]    # Nodes per segment
+        ibtypee = ds.variables['ibtypee'][:] # Type per segment
+
+        # Iterate through each defined elevation boundary segment
+        for i, num_nodes_in_segment in enumerate(nvdll):
+            segment_type = ibtypee[i]
+
+            # Skip if the type doesn't match the requested type
+            if boundary_type is not None and segment_type != boundary_type:
+                current_node_index += num_nodes_in_segment
+                continue
+
+            # Extract node indices for the current segment
+            segment_nodes = nbdv[current_node_index : current_node_index + num_nodes_in_segment]
+
+            # Create edges by pairing consecutive nodes within the segment
+            # An open boundary typically doesn't loop back, so we stop at len-1
+            segment_edges = np.stack(
+                [segment_nodes[:-1], segment_nodes[1:]], axis=-1
+            )
+            all_boundary_edges.append(segment_edges)
+
+            # Move the index pointer for the flat nbdv array
+            current_node_index += num_nodes_in_segment
+
+    if not all_boundary_edges:
+        return np.empty((0, 2), dtype=np.int64) # Use int64 for consistency
+
+    return np.vstack(all_boundary_edges)
+
+
+# --- Example Usage (within if __name__ == '__main__': block) ---
 if __name__ == "__main__":
+    # Example using the path from your script output
+    # Make sure DATA_PATH is correctly defined or replace with the full path
+    try:
+        from .constants import DATA_PATH # Adjust import if needed
+        file_path = os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc")
+
+        print(f"Extracting elevation boundary edges (type 0) from: {file_path}")
+        ocean_edges = extract_elevation_boundary_edges(file_path, boundary_type=0)
+
+        if ocean_edges.shape[0] > 0:
+            print(f"Found {ocean_edges.shape[0]} elevation boundary edges.")
+            print("First 5 edges:\n", ocean_edges[:5])
+            print("Last 5 edges:\n", ocean_edges[-5:])
+        else:
+            print("No elevation boundary edges of the specified type found.")
+
+    except ImportError:
+        print("Could not import DATA_PATH. Please ensure constants.py is accessible or provide the full path.")
+    except FileNotFoundError as e:
+        print(e)
+    except KeyError as e:
+        print(e)
     # python -m adforce.boundaries
-    from .constants import DATA_PATH
 
     # find_boundaries_in_fort63()
-    find_boundaries_in_fort63(os.path.join(DATA_PATH, "tiny.maxele.63.nc"), typ="small")
+    # find_boundaries_in_fort63(os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc"), typ="medium")
+
+    #find_boundaries_in_fort63(os.path.join(DATA_PATH, "tiny.maxele.63.nc"), typ="small")
     # find_boundaries_in_fort63(os.path.join(DATA_PATH, "big.maxele.63.nc"), typ="big")
