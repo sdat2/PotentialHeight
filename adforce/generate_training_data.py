@@ -14,7 +14,7 @@ After this is all done we will process the fort.*.nc files to get training data 
 our GNN model.
 """
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Optional
 import os
 import math
 from pathlib import Path
@@ -765,7 +765,7 @@ def calculate_cfl_timestep(
 
 
 def generate_adcirc_inputs(
-    storm: Storm, storm_ds: xr.Dataset, output_dir: str, recalculate_timestep=False
+    storm: Storm, storm_ds: xr.Dataset, output_dir: str, recalculate_timestep=False, recommended_dt = 1.0
 ) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
@@ -806,9 +806,9 @@ def generate_adcirc_inputs(
 
         except (ValueError, AttributeError) as e:
             print(f"Error calculating CFL timestep: {e}. Defaulting to 2.5s.")
-            recommended_dt = 1  # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
+            recommended_dt = recommended_dt  # Fallback timestep    print(f"✅ Calculated recommended timestep (CFL=0.7): {recommended_dt:.2f} seconds")
     else:
-        recommended_dt = 1  # Default timestep
+        recommended_dt = recommended_dt  # Default timestep
 
     # 2. Add Forcings -- no tides
     # tidal_forcing = Tides()
@@ -880,6 +880,8 @@ def generate_adcirc_inputs(
 def drive_all_adcirc(
     test_single=False,
     test_nosubprocess=False,
+    runs_parent_name: Optional[str] = None,
+    recommended_dt: float = None,
 ) -> None:
     """
     Generate all storm inputs using NWS=20.
@@ -893,6 +895,10 @@ def drive_all_adcirc(
     """
     # it could be good to add a flag just to run Katrina
     # python -m adforce.generate_training_data
+    if runs_parent_name is None:
+        runs_parent_dir = RUNS_PARENT_DIR
+    else:
+        runs_parent_dir = os.path.join(PROJ_PATH, runs_parent_name)
 
     # --- New: Load Hydra Config ---
     print("Loading ADCIRC run configuration...")
@@ -975,7 +981,7 @@ def drive_all_adcirc(
     # 2. Loop and generate inputs for each storm
     for i, storm in target_storms[:]:
         storm_name_safe = storm.name.upper().replace(" ", "_")
-        run_directory = os.path.join(RUNS_PARENT_DIR, f"{storm_name_safe}_{storm.year}")
+        run_directory = os.path.join(runs_parent_dir, f"{i}_{storm_name_safe}_{storm.year}")
 
         try:
             print(
@@ -984,7 +990,7 @@ def drive_all_adcirc(
 
             # 1. Generate ADCIRC input files (fort.15, pre_aswip_fort.22, fort.13)
             print(f"Generating inputs in: {run_directory}")
-            generate_adcirc_inputs(storm, target_storms_ds.isel(storm=i), run_directory)
+            generate_adcirc_inputs(storm, target_storms_ds.isel(storm=i), run_directory, recommended_dt=recommended_dt)
 
             # 2. Create a storm-specific config to pass to subprocess
             # Start with the default config
@@ -1033,13 +1039,28 @@ if __name__ == "__main__":
         action="store_true",
         help="If set, generate inputs but do not run subprocess simulations.",
     )
+    parser.add_argument(
+        "--recommended-dt",
+        type=float,
+        default=5.0,
+        help="Recommended timestep (dt) in seconds for ADCIRC simulations. Default is 5s.",
+    )
+    parser.add_argument(
+        "--runs-parent-name",
+        type=str,
+        default=None,
+        help="Name of the parent directory for runs inside the project path. Defaults to the constant RUNS_PARENT_DIR.",
+    )
     args = parser.parse_args()
 
     drive_all_adcirc(
         test_single=args.test_single,
         test_nosubprocess=args.test_nosubprocess,
+        recommended_dt=args.recommended_dt,
+        runs_parent_name=args.runs_parent_name,
     )
     # python -m adforce.generate_training_data --test-single --test-nosubprocess
+    # python -m adforce.generate_training_data --recommended-dt 5.0 --test-nosubprocess --test-single --runs-parent-name test_runs
 
     # drive_all_adcirc(test_nosubprocess=True, test_single=True)
     # track = VortexTrack('AL112017')
