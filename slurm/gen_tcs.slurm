@@ -1,6 +1,6 @@
 #!/bin/bash --login
 
-#SBATCH --job-name=gen_tcs
+#SBATCH --job-name=gen_tcs_5sec
 #SBATCH --nodes=1
 #SBATCH --tasks-per-node=128
 #SBATCH --cpus-per-task=1
@@ -34,7 +34,9 @@ echo "which python"
 which python
 
 # run python job
-python -m adforce.generate_training_data 
+# python -m adforce.generate_training_data 
+python -m adforce.generate_training_data --recommended-dt 5.0 --runs-parent-name run_5sec
+# --test-nosubprocess --test-single 
 # --test-single
 
 # try test version
