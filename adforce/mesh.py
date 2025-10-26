@@ -32,7 +32,7 @@ fort.73 format: ditto but "pressure" instead of "zeta"
 fort.74 format: ditto but "u-vel" and "v-vel" instead of "zeta"
 
 """
-from typing import Union, Tuple, List, Literal, Optional
+from typing import Union, Tuple, List, Literal, Optional, Dict
 import os
 import numpy as np
 import collections
@@ -774,46 +774,295 @@ def calc_ghost_cells_for_swegnn(
     dg_x, dg_y = mean_for_triangle(x, triangles), mean_for_triangle(y, triangles)
     dg_xy = np.stack([dg_x, dg_y], axis=-1)
 
-    ds = xr.Dataset()
+    ghost_ds = xr.Dataset()
+
+    num_real_nodes = original_node_xy.shape[0]
+    num_real_faces = dg_xy.shape[0]
 
     if edge_index_BC.shape[0] == 0:
         print("Warning: No elevation boundary edges found. Ghost cells cannot be calculated.")
-        # Add empty placeholders if needed by downstream code
-        ds['face_BC'] = (['num_BC_edges'], np.array([], dtype=int))
-        ds['edge_index_BC'] = (['num_BC_edges', 'two'], np.empty((0,2), dtype=int))
-        ds['node_BC'] = (['num_BC_edges'], np.array([], dtype=int)) # Placeholder for ghost indices
-        # Potentially add ghost coordinates as empty arrays too
-    else:
-        print(f"Found {edge_index_BC.shape[0]} elevation boundary edges.")
-        # Store edge_index_BC (useful for PyG conversion later)
-        ds['edge_index_BC'] = (['num_BC_edges', 'two'], edge_index_BC)
+        ghost_ds['face_BC'] = (['num_BC_edges'], np.array([], dtype=int))
+        ghost_ds['edge_index_BC'] = (['num_BC_edges', 'two'], np.empty((0, 2), dtype=int))
+        ghost_ds['node_BC'] = (['num_BC_edges'], np.array([], dtype=int))
+        ghost_ds['ghost_face_x'] = (['num_BC_edges'], np.array([]))
+        ghost_ds['ghost_face_y'] = (['num_BC_edges'], np.array([]))
+        ghost_ds['ghost_node_x'] = (['num_ghost_nodes'], np.array([])) # Dim needs defining
+        ghost_ds['ghost_node_y'] = (['num_ghost_nodes'], np.array([])) # Dim needs defining
+        ghost_ds['original_ghost_node_indices'] = (['num_ghost_nodes'], np.array([], dtype=int)) # Dim needs defining
+        # Cannot define dimensions easily here, might be better to return empty DS or None
+        # Returning DS with empty data arrays for now
+        ghost_ds = ghost_ds.assign_coords(num_BC_edges=0, num_ghost_nodes=0) # Add empty dims
+        return ghost_ds
 
-        # 4b. Find Boundary Faces
-        face_BC = find_boundary_faces(triangles, edge_index_BC)
-        print(f"Found {face_BC.shape[0]} corresponding boundary faces.")
-        if face_BC.shape[0] != edge_index_BC.shape[0]:
-             print(f"Warning: Number of boundary faces ({face_BC.shape[0]}) does not match boundary edges ({edge_index_BC.shape[0]}).")
-        ds['face_BC'] = (['num_BC_edges'], face_BC)
+    print(f"Found {edge_index_BC.shape[0]} elevation boundary edges.")
+    ghost_ds['edge_index_BC'] = (['num_BC_edges', 'two'], edge_index_BC)
 
+    # Find Boundary Faces
+    face_BC = find_boundary_faces(triangles, edge_index_BC) # Use NumPy version
+    print(f"Found {face_BC.shape[0]} corresponding boundary faces.")
+    if face_BC.shape[0] != edge_index_BC.shape[0]:
+        print(f"Warning: Number of boundary faces ({face_BC.shape[0]}) does not match boundary edges ({edge_index_BC.shape[0]}). Check assumptions.")
+        # Decide how to proceed: error, padding, or careful indexing? Assuming ok for now.
+    ghost_ds['face_BC'] = (['num_BC_edges'], face_BC)
+
+    # Calculate Midpoints and Normals
     edge_midpoints = get_boundary_edge_midpoints(original_node_xy, edge_index_BC)
     outward_normals = calculate_outward_normals(
-            original_node_xy,
-            dg_xy, # Use dual graph node coords (face centers)
-            edge_index_BC,
-            face_BC,
-            edge_midpoints
-        )
+        original_node_xy,
+        dg_xy, # Use dual graph node coords (face centers)
+        edge_index_BC,
+        face_BC,
+        edge_midpoints
+    )
 
-    # 4d. Calculate Ghost Face Coordinates
+    # Calculate Ghost Face Coordinates
     ghost_face_xy = calculate_ghost_face_coords(
-            dg_xy, # Use dual graph node coords (face centers)
+        dg_xy, # Use dual graph node coords (face centers)
+        face_BC,
+        edge_midpoints,
+        outward_normals
+    )
+    ghost_ds['ghost_face_x'] = (['num_BC_edges'], ghost_face_xy[:, 0])
+    ghost_ds['ghost_face_y'] = (['num_BC_edges'], ghost_face_xy[:, 1])
+
+    # Calculate Ghost Node Coordinates (assuming triangles)
+    try:
+        ghost_node_xy, original_node_indices, face_to_ghost_node_map = calculate_ghost_node_coords(
+            original_node_xy,
+            triangles,
             face_BC,
+            edge_index_BC,
             edge_midpoints,
             outward_normals
         )
-    ds['ghost_face_x'] = (['num_BC_edges'], ghost_face_xy[:, 0])
-    ds['ghost_face_y'] = (['num_BC_edges'], ghost_face_xy[:, 1])
-    return ds
+        num_ghost_nodes = ghost_node_xy.shape[0]
+        ghost_ds['ghost_node_x'] = (['num_ghost_nodes'], ghost_node_xy[:, 0])
+        ghost_ds['ghost_node_y'] = (['num_ghost_nodes'], ghost_node_xy[:, 1])
+        # Store original node indices for reference/debugging
+        ghost_ds['original_ghost_node_indices'] = (['num_ghost_nodes'], original_node_indices)
+        # We might need the face_to_ghost_node_map later for connectivity,
+        # but storing dicts in xarray isn't straightforward. We'll recalculate if needed,
+        # or store constituent parts. Let's store the new indices.
+        new_ghost_node_indices = np.arange(num_real_nodes, num_real_nodes + num_ghost_nodes)
+        ghost_ds['ghost_node_indices'] = (['num_ghost_nodes'], new_ghost_node_indices)
+
+
+    except ValueError as e:
+        print(f"Error calculating ghost node coordinates: {e}")
+        print("Adding empty placeholders for ghost node data.")
+        num_ghost_nodes = 0 # Set to zero if calculation fails
+        ghost_ds['ghost_node_x'] = (['num_ghost_nodes'], np.array([]))
+        ghost_ds['ghost_node_y'] = (['num_ghost_nodes'], np.array([]))
+        ghost_ds['original_ghost_node_indices'] = (['num_ghost_nodes'], np.array([], dtype=int))
+        ghost_ds['ghost_node_indices'] = (['num_ghost_nodes'], np.array([], dtype=int))
+
+
+    # Calculate Ghost Cell (Face) Indices (node_BC for PyG)
+    ghost_cell_indices = np.arange(num_real_faces, num_real_faces + face_BC.shape[0])
+    ghost_ds['node_BC'] = (['num_BC_edges'], ghost_cell_indices)
+    ghost_ds['node_BC'].attrs = {'description': 'Indices assigned to ghost cells (faces) appended after real faces'}
+
+    # Assign coordinates/dimensions
+    ghost_ds = ghost_ds.assign_coords(
+        num_BC_edges=np.arange(face_BC.shape[0]),
+        num_ghost_nodes=np.arange(num_ghost_nodes),
+        two=['x', 'y'] # Assuming 'two' dim is for coordinates
+    )
+
+    return ghost_ds
+
+
+def find_non_boundary_nodes_for_faces(
+    triangles: np.ndarray,
+    face_BC: np.ndarray,
+    edge_index_BC: np.ndarray
+) -> Dict[int, List[int]]:
+    """
+    Identifies the node(s) within each boundary face that are not part
+    of the corresponding boundary edge.
+
+    Assumes each face in face_BC corresponds uniquely to an edge in
+    edge_index_BC (i.e., they have the same order and length).
+
+    Args:
+        triangles: Array of triangle definitions, shape (num_faces, 3),
+                   containing 0-based node indices.
+        face_BC: Indices of boundary faces, shape (num_BC_edges,).
+        edge_index_BC: Boundary edges corresponding to face_BC,
+                       shape (num_BC_edges, 2).
+
+    Returns:
+        A dictionary mapping each boundary face index (from face_BC) to a
+        list of its non-boundary node index(es).
+
+    Raises:
+        ValueError: If a face in face_BC is not found or if the number
+                    of boundary faces and edges don't match.
+
+    Doctests:
+        >>> # Tri 0: [0,1,2], Tri 1: [1,3,2]
+        >>> triangles_data = np.array([[0, 1, 2], [1, 3, 2]])
+        >>> # BC Edge (0,1) corresponds to Face 0
+        >>> bc_faces_data = np.array([0])
+        >>> bc_edges_data = np.array([[0, 1]])
+        >>> find_non_boundary_nodes_for_faces(triangles_data, bc_faces_data, bc_edges_data)
+        {0: [2]}
+        >>> # BC Edge (3,2) corresponds to Face 1
+        >>> bc_faces_data = np.array([1])
+        >>> bc_edges_data = np.array([[3, 2]])
+        >>> find_non_boundary_nodes_for_faces(triangles_data, bc_faces_data, bc_edges_data)
+        {1: [1]}
+        >>> # BC Edges (0,1) -> Face 0; (3,2) -> Face 1
+        >>> bc_faces_data = np.array([0, 1])
+        >>> bc_edges_data = np.array([[0, 1], [3, 2]])
+        >>> find_non_boundary_nodes_for_faces(triangles_data, bc_faces_data, bc_edges_data)
+        {0: [2], 1: [1]}
+        >>> # Test empty input
+        >>> find_non_boundary_nodes_for_faces(triangles_data, np.array([]), np.empty((0,2)))
+        {}
+    """
+    if face_BC.shape[0] != edge_index_BC.shape[0]:
+        raise ValueError(f"Number of boundary faces ({face_BC.shape[0]}) must match "
+                         f"number of boundary edges ({edge_index_BC.shape[0]})")
+    if face_BC.shape[0] == 0:
+        return {}
+
+    non_boundary_nodes_map = {}
+
+    # Convert boundary edge nodes to sets for faster lookup per edge
+    bc_edge_node_sets = [set(edge) for edge in edge_index_BC]
+
+    for i, face_idx in enumerate(face_BC):
+        if face_idx >= triangles.shape[0] or face_idx < 0:
+             raise ValueError(f"Boundary face index {face_idx} is out of bounds for triangles array.")
+
+        face_nodes = triangles[face_idx]
+        bc_edge_nodes = bc_edge_node_sets[i]
+
+        # Find nodes in the face that are NOT in the boundary edge set
+        other_nodes = [node for node in face_nodes if node not in bc_edge_nodes]
+
+        non_boundary_nodes_map[face_idx] = other_nodes
+
+    return non_boundary_nodes_map
+
+
+def calculate_ghost_node_coords(
+    node_xy: np.ndarray,
+    triangles: np.ndarray, # Needed by helper
+    face_BC: np.ndarray,
+    edge_index_BC: np.ndarray,
+    edge_midpoints: np.ndarray,
+    outward_normals: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, Dict[int, List[int]]]:
+    """
+    Calculates coordinates for ghost nodes by mirroring non-boundary nodes
+    across boundary edges. Assumes a triangular mesh.
+
+    Args:
+        node_xy: Array of node coordinates, shape (num_nodes, 2).
+        triangles: Array of triangle definitions, shape (num_faces, 3).
+        face_BC: Indices of boundary faces, shape (num_BC_edges,).
+        edge_index_BC: Boundary edges corresponding to face_BC,
+                       shape (num_BC_edges, 2).
+        edge_midpoints: Midpoints of boundary edges, shape (num_BC_edges, 2).
+        outward_normals: Outward unit normals for boundary edges,
+                         shape (num_BC_edges, 2).
+
+    Returns:
+        A tuple containing:
+        - ghost_node_xy: Coordinates of ghost nodes, shape (num_BC_edges, 2)
+                         (assuming one ghost node per boundary face/triangle).
+        - original_node_indices: Indices of the original nodes that were mirrored,
+                                 shape (num_BC_edges,).
+        - face_to_ghost_node_map: Dictionary mapping face_BC index to its
+                                  new ghost node index(es) (after appending).
+
+    Raises:
+        ValueError: If helper function fails or assumptions aren't met.
+
+    Doctests:
+        >>> # Tri 0: [0,1,2] nodes at (0,0), (2,0), (1,1)
+        >>> triangles_data = np.array([[0, 1, 2]])
+        >>> node_coords = np.array([[0., 0.], [2., 0.], [1., 1.]])
+        >>> bc_faces = np.array([0])
+        >>> bc_edges = np.array([[0, 1]]) # Edge (0,1) is boundary
+        >>> midpts = get_boundary_edge_midpoints(node_coords, bc_edges) # Should be [1., 0.]
+        >>> # Dummy face center needed for normal calc - use actual if available
+        >>> face_coords = np.array([[1., 1./3]])
+        >>> normals = calculate_outward_normals(node_coords, face_coords, bc_edges, bc_faces, midpts) # Should be [0., -1.]
+        >>> ghost_coords, orig_indices, _ = calculate_ghost_node_coords(node_coords, triangles_data, bc_faces, bc_edges, midpts, normals)
+        >>> # Node 2 is at (1,1). Midpoint is (1,0). Normal is (0,-1). Dist=1. Ghost=(1,0)+[(0,-1)*1] = (1,-1)
+        >>> np.allclose(ghost_coords, np.array([[1., -1.]]))
+        True
+        >>> orig_indices
+        array([2])
+
+        >>> # Test empty input
+        >>> empty_tris = np.empty((0,3), dtype=int)
+        >>> empty_nodes = np.empty((0,2))
+        >>> empty_faces = np.empty(0, dtype=int)
+        >>> empty_edges = np.empty((0,2), dtype=int)
+        >>> empty_midpts = np.empty((0,2))
+        >>> empty_normals = np.empty((0,2))
+        >>> ghost_coords, orig_indices, _ = calculate_ghost_node_coords(
+        ...     empty_nodes, empty_tris, empty_faces, empty_edges, empty_midpts, empty_normals
+        ... )
+        >>> ghost_coords.shape
+        (0, 2)
+        >>> orig_indices.shape
+        (0,)
+    """
+    if face_BC.shape[0] == 0:
+        num_orig_nodes = node_xy.shape[0]
+        return np.empty((0, 2)), np.array([], dtype=int), {}
+
+    # 1. Find the non-boundary node for each boundary face
+    non_boundary_nodes_map = find_non_boundary_nodes_for_faces(
+        triangles, face_BC, edge_index_BC
+    )
+
+    # Check if map contains all faces and assume one node per face (triangle)
+    if len(non_boundary_nodes_map) != face_BC.shape[0]:
+         raise ValueError("Could not find non-boundary nodes for all boundary faces.")
+
+    original_node_indices_list = []
+    corresponding_face_indices = [] # Keep track of which face this node belongs to
+    for face_idx in face_BC:
+        other_nodes = non_boundary_nodes_map.get(face_idx)
+        if other_nodes is None or len(other_nodes) != 1:
+             raise ValueError(f"Expected exactly one non-boundary node for face {face_idx} (triangle assumption), found {other_nodes}")
+        original_node_indices_list.append(other_nodes[0])
+        corresponding_face_indices.append(face_idx) # Store face index
+
+    original_node_indices = np.array(original_node_indices_list, dtype=int)
+    node_BC_xy = node_xy[original_node_indices]
+
+    # --- Mirroring Calculation (Similar to ghost faces but uses node coords) ---
+    # For triangles, the symmetry point for the node mirror is often the edge midpoint.
+    # mSWE-GNN uses edge nodes for quads, edge midpoint for triangles. Stick with midpoint here.
+    node_symmetry_point = edge_midpoints # Using edge midpoints as symmetry points
+
+    # Distance from the non-boundary node to the symmetry point
+    distance_node_edge_BC = np.linalg.norm(
+        (node_BC_xy - node_symmetry_point), axis=1, keepdims=True
+    )
+
+    # Use the same outward normals calculated for the faces
+    node_outward_normals = outward_normals
+
+    # Calculate Ghost Coordinates: SymmetryPoint + Normal * Distance
+    ghost_node_xy = node_symmetry_point + node_outward_normals * distance_node_edge_BC
+
+    # --- Create mapping from face index to new ghost node index ---
+    num_orig_nodes = node_xy.shape[0]
+    # Assign new indices sequentially after original nodes
+    new_ghost_node_indices = np.arange(num_orig_nodes, num_orig_nodes + ghost_node_xy.shape[0])
+
+    # Map the original face index to the new ghost node index
+    face_to_ghost_node_map = {face_idx: [new_idx] for face_idx, new_idx in zip(face_BC, new_ghost_node_indices)}
+
+    return ghost_node_xy, original_node_indices, face_to_ghost_node_map
 
 
 # not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
