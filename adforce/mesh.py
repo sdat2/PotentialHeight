@@ -862,6 +862,10 @@ def calc_ghost_cells_for_swegnn(
     ghost_ds['node_BC'] = (['num_BC_edges'], ghost_cell_indices)
     ghost_ds['node_BC'].attrs = {'description': 'Indices assigned to ghost cells (faces) appended after real faces'}
 
+    ghost_ds['edge_BC_length'] = (['num_BC_edges'], calculate_boundary_edge_lengths(
+        original_node_xy, edge_index_BC
+    ))
+
     # Assign coordinates/dimensions
     ghost_ds = ghost_ds.assign_coords(
         num_BC_edges=np.arange(face_BC.shape[0]),
@@ -1281,6 +1285,51 @@ def grad_for_triangle_static(
         grad_y = -normal[:, 1] / normal[:, 2]  # (M,)
 
     return np.stack((grad_x, grad_y))  # (2, M)
+
+
+def calculate_boundary_edge_lengths(
+    node_xy: np.ndarray,
+    edge_index_BC: np.ndarray
+) -> np.ndarray:
+    """
+    Calculates the physical length of each boundary edge.
+
+    Assumes node_xy coordinates allow for Euclidean distance calculation
+    (e.g., meters in a projected coordinate system). For lat/lon degrees,
+    a geodesic distance calculation would be more accurate.
+
+    Args:
+        node_xy: Array of node coordinates, shape (num_nodes, 2).
+        edge_index_BC: Array of node indices forming boundary edges,
+                       shape (num_BC_edges, 2).
+
+    Returns:
+        np.ndarray: Array containing the length of each boundary edge,
+                    shape (num_BC_edges,).
+
+    Doctests:
+        >>> node_coords = np.array([[0., 0.], [3., 0.], [3., 4.], [0., 4.]])
+        >>> bc_edges = np.array([[0, 1], [1, 2], [3, 0]]) # Edges (0,1), (1,2), (3,0)
+        >>> calculate_boundary_edge_lengths(node_coords, bc_edges)
+        array([3., 4., 4.])
+        >>> bc_edges_empty = np.empty((0, 2), dtype=int)
+        >>> calculate_boundary_edge_lengths(node_coords, bc_edges_empty)
+        array([], dtype=float64)
+    """
+    if edge_index_BC.shape[0] == 0:
+        return np.array([], dtype=float)
+
+    # Get coordinates for the start and end node of each boundary edge
+    start_nodes_xy = node_xy[edge_index_BC[:, 0]] # Shape: (num_BC_edges, 2)
+    end_nodes_xy   = node_xy[edge_index_BC[:, 1]] # Shape: (num_BC_edges, 2)
+
+    # Calculate the difference in coordinates (dx, dy)
+    delta_xy = end_nodes_xy - start_nodes_xy # Shape: (num_BC_edges, 2)
+
+    # Calculate Euclidean distance (length) = sqrt(dx^2 + dy^2)
+    edge_lengths = np.linalg.norm(delta_xy, axis=1) # Calculate norm along axis 1
+
+    return edge_lengths
 
 
 def grad_for_triangle_timeseries(
