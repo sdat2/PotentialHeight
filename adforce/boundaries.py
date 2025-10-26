@@ -6,6 +6,7 @@ import netCDF4 as nc
 from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, get_dim
 from .constants import FORT63_EXAMPLE, FIGURE_PATH, DATA_PATH
+from .mesh import elevation_boundary_edges
 
 
 def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE, typ="medium"):
@@ -238,39 +239,11 @@ def get_elevation_boundary_edges(
                     empty array if no relevant boundaries are found.
     """
 
-    all_boundary_edges = []
-    current_node_index = 0
-
     nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
     nvdll = ds.variables['nvdll'][:]    # Nodes per segment
     ibtypee = ds.variables['ibtypee'][:] # Type per segment
+    return elevation_boundary_edges(nbdv, nvdll, ibtypee, boundary_type)
 
-    # Iterate through each defined elevation boundary segment
-    for i, num_nodes_in_segment in enumerate(nvdll):
-        segment_type = ibtypee[i]
-
-        # Skip if the type doesn't match the requested type
-        if boundary_type is not None and segment_type != boundary_type:
-            current_node_index += num_nodes_in_segment
-            continue
-        # Extract node indices for the current segment
-        segment_nodes = nbdv[current_node_index : current_node_index + num_nodes_in_segment]
-
-        # Create edges by pairing consecutive nodes within the segment
-        # An open boundary typically doesn't loop back, so we stop at len-1
-        segment_edges = np.stack(
-           [segment_nodes[:-1], segment_nodes[1:]],
-           axis=-1
-        )
-        all_boundary_edges.append(segment_edges)
-
-        # Move the index pointer for the flat nbdv array
-        current_node_index += num_nodes_in_segment
-
-    if not all_boundary_edges:
-        return np.empty((0, 2), dtype=np.int64) # Use int64 for consistency
-
-    return np.vstack(all_boundary_edges)
 
 
 # --- Example Usage (within if __name__ == '__main__': block) ---

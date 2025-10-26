@@ -31,13 +31,8 @@ fort.73 format: ditto but "pressure" instead of "zeta"
 
 fort.74 format: ditto but "u-vel" and "v-vel" instead of "zeta"
 
-TODO: additional variables for dual graph:
- - Water depth (zeta+depth) at dual graph nodes (mean of triangle vertices)
- - Face area (at dual graph nodes)
- - Topographic slope (gradient of depth at dual graph nodes)
 """
-
-from typing import Union, Tuple, List, Literal
+from typing import Union, Tuple, List, Literal, Optional
 import os
 import numpy as np
 import collections
@@ -48,7 +43,6 @@ import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
 from .constants import NO_BBOX, DATA_PATH, GEOD
-from .boundaries import extract_elevation_boundary_edges
 
 
 @timeit
@@ -817,6 +811,7 @@ def calculate_triangle_areas(
 
     return areas
 
+
 def grad_for_triangle_static(
     x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
 ) -> np.ndarray:
@@ -1267,6 +1262,68 @@ def find_boundary_faces(
     return boundary_face_indices.astype(np.int64)
 
 
+
+def elevation_boundary_edges(nbdv: np.ndarray,
+                             nvdll: np.ndarray,
+                             ibtypee: np.ndarray,
+                             boundary_type: Optional[int] = 0) -> np.ndarray:
+    """
+    Extract elevation boundary edges from ADCIRC mesh data.
+
+    Args:
+        nbdv (np.ndarray): 1D array of node indices for elevation boundaries (0-based).
+        nvdll (np.ndarray): 1D array of number of nodes in each elevation boundary segment.
+        ibtypee (np.ndarray): 1D array of types for each elevation boundary segment.
+        boundary_type (Optional[int]): Specific elevation boundary type to extract.
+            If None, extracts edges for all types. Defaults to 0.
+    Returns:
+        np.ndarray: Array of boundary edges, shape (num_BC_edges, 2),
+                    containing pairs of 0-based node indices. Returns an
+                    empty array if no relevant boundaries are found.
+
+    Doctests:
+        >>> nbdv = np.array([0, 1, 3, 4])
+        >>> nvdll = np.array([4])
+        >>> ibtypee = np.array([0])
+        >>> elevation_boundary_edges(nbdv, nvdll, ibtypee, boundary_type=0)
+        array([[0, 1],
+                [1, 3],
+                [3, 4]])
+        >>> elevation_boundary_edges(nbdv, nvdll, ibtypee, boundary_type=1)
+        array([], shape=(0, 2), dtype=int64)
+    """
+
+    all_boundary_edges = []
+    current_node_index = 0
+    # Iterate through each defined elevation boundary segment
+    for i, num_nodes_in_segment in enumerate(nvdll):
+        segment_type = ibtypee[i]
+
+        # Skip if the type doesn't match the requested type
+        if boundary_type is not None and segment_type != boundary_type:
+            current_node_index += num_nodes_in_segment
+            continue
+        # Extract node indices for the current segment
+        segment_nodes = nbdv[current_node_index : current_node_index + num_nodes_in_segment]
+
+        # Create edges by pairing consecutive nodes within the segment
+        # An open boundary typically doesn't loop back, so we stop at len-1
+        segment_edges = np.stack(
+           [segment_nodes[:-1], segment_nodes[1:]],
+           axis=-1
+        )
+        all_boundary_edges.append(segment_edges)
+
+        # Move the index pointer for the flat nbdv array
+        current_node_index += num_nodes_in_segment
+
+    if not all_boundary_edges:
+        return np.empty((0, 2), dtype=np.int64) # Use int64 for consistency
+
+    return np.vstack(all_boundary_edges)
+
+
+
 # -- coast functions ---
 @timeit
 def select_coast(
@@ -1515,6 +1572,7 @@ if __name__ == "__main__":
 
     try:
         from .constants import DATA_PATH # Adjust import if needed
+        from .boundaries import extract_elevation_boundary_edges
 
         file_path = os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc")
 
@@ -1546,10 +1604,6 @@ if __name__ == "__main__":
              if triangles_from_file is None: print("Could not load triangle data.")
              if ocean_edges.shape[0] == 0: print("No boundary edges were provided.")
 
-        # Example doctest execution
-        import doctest
-        results = doctest.testmod(extraglobs={'find_boundary_faces': find_boundary_faces})
-        print(f"\nDoctest results: {results}")
 
     except ImportError:
         print("Could not import DATA_PATH or other functions.")
