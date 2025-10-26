@@ -24,6 +24,17 @@ coordinates:
 data_vars:
     depth (node): (31435) depth, meters
     zeta (time, node): (604, 31435) water surface elevation, meters
+
+fort.74 format: ditto but with u-vel and v-vel instead of zeta
+
+fort.73 format: ditto but "pressure" instead of "zeta"
+
+fort.74 format: ditto but "u-vel" and "v-vel" instead of "zeta"
+
+TODO: additional variables for dual graph:
+ - Water depth (zeta+depth) at dual graph nodes (mean of triangle vertices)
+ - Face area (at dual graph nodes)
+ - Topographic slope (gradient of depth at dual graph nodes)
 """
 
 from typing import Union, Tuple, List
