@@ -6,7 +6,7 @@ import netCDF4 as nc
 from matplotlib import pyplot as plt
 from sithom.plot import plot_defaults, get_dim
 from .constants import FORT63_EXAMPLE, FIGURE_PATH, DATA_PATH
-from .mesh import elevation_boundary_edges
+from .mesh import get_elevation_boundary_edges
 
 
 def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE, typ="medium"):
@@ -219,30 +219,6 @@ def extract_elevation_boundary_edges(
     return be_np
 
 
-def get_elevation_boundary_edges(
-        ds: nc.Dataset,
-        boundary_type: Optional[int] = 0
-        )  -> np.ndarray:
-    """
-    Helper function to extract elevation boundary edges from an open
-    netCDF4 Dataset object.
-
-    Args:
-        ds (nc.Dataset): Open netCDF4 Dataset object.
-        boundary_type (Optional[int]): The specific elevation boundary type
-            (from 'ibtypee') to extract. If None, extracts edges for all
-            elevation boundary types. Defaults to 0.
-
-    Returns:
-        np.ndarray: An array of boundary edges, shape (num_BC_edges, 2),
-                    containing pairs of 0-based node indices. Returns an
-                    empty array if no relevant boundaries are found.
-    """
-
-    nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
-    nvdll = ds.variables['nvdll'][:]    # Nodes per segment
-    ibtypee = ds.variables['ibtypee'][:] # Type per segment
-    return elevation_boundary_edges(nbdv, nvdll, ibtypee, boundary_type)
 
 
 

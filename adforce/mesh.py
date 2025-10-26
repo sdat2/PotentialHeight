@@ -627,6 +627,7 @@ def swegnn_dg_from_mesh_ds_from_path(
     """
 
     # --- Step 1: Get the initial dual graph dataset ---
+
     dg = dual_graph_ds_from_mesh_ds_from_path(
         path=path,
         use_dask=use_dask,
@@ -736,6 +737,11 @@ def swegnn_dg_from_mesh_ds_from_path(
     swegnn_ds['element'] = dg['element'] # Example
 
     # --- Step 6: Placeholder for Boundary Conditions ---
+
+    ghost_ds = calc_ghost_cells_for_swegnn(path)
+    for var in ghost_ds.data_vars:
+        swegnn_ds[var] = ghost_ds[var]
+
     # Boundary condition processing (ghost cells) is complex and needs separate implementation.
     # Add placeholders or markers here if needed before the PyG conversion step.
     print("Boundary Condition / Ghost Cell implementation is needed separately.")
@@ -745,7 +751,97 @@ def swegnn_dg_from_mesh_ds_from_path(
 
     return swegnn_ds
 
+
+def calc_ghost_cells_for_swegnn(
+        path: str
+        ) -> xr.Dataset:
+    """
+    Calculate ghost cells for elevation boundary conditions from ADCIRC fort.63.nc file.
+
+    Args:
+        path (str): Path to the directory containing fort.63.nc file.
+
+    Returns:
+        xr.Dataset: Dataset containing ghost cell information for elevation boundary conditions.
+    """
+    with nc.Dataset(os.path.join(path, "fort.63.nc"), "r") as ds:
+        edge_index_BC = get_elevation_boundary_edges(ds, boundary_type=0)
+        triangles = ds.variables['element'][:] - 1
+        x = ds.variables['x'][:]
+        y = ds.variables['y'][:]
+        original_node_xy = np.stack([x, y], axis=-1)
+
+    dg_x, dg_y = mean_for_triangle(x, triangles), mean_for_triangle(y, triangles)
+    dg_xy = np.stack([dg_x, dg_y], axis=-1)
+
+    ds = xr.Dataset()
+
+    if edge_index_BC.shape[0] == 0:
+        print("Warning: No elevation boundary edges found. Ghost cells cannot be calculated.")
+        # Add empty placeholders if needed by downstream code
+        ds['face_BC'] = (['num_BC_edges'], np.array([], dtype=int))
+        ds['edge_index_BC'] = (['num_BC_edges', 'two'], np.empty((0,2), dtype=int))
+        ds['node_BC'] = (['num_BC_edges'], np.array([], dtype=int)) # Placeholder for ghost indices
+        # Potentially add ghost coordinates as empty arrays too
+    else:
+        print(f"Found {edge_index_BC.shape[0]} elevation boundary edges.")
+        # Store edge_index_BC (useful for PyG conversion later)
+        ds['edge_index_BC'] = (['num_BC_edges', 'two'], edge_index_BC)
+
+        # 4b. Find Boundary Faces
+        face_BC = find_boundary_faces(triangles, edge_index_BC)
+        print(f"Found {face_BC.shape[0]} corresponding boundary faces.")
+        if face_BC.shape[0] != edge_index_BC.shape[0]:
+             print(f"Warning: Number of boundary faces ({face_BC.shape[0]}) does not match boundary edges ({edge_index_BC.shape[0]}).")
+        ds['face_BC'] = (['num_BC_edges'], face_BC)
+
+    edge_midpoints = get_boundary_edge_midpoints(original_node_xy, edge_index_BC)
+    outward_normals = calculate_outward_normals(
+            original_node_xy,
+            dg_xy, # Use dual graph node coords (face centers)
+            edge_index_BC,
+            face_BC,
+            edge_midpoints
+        )
+
+    # 4d. Calculate Ghost Face Coordinates
+    ghost_face_xy = calculate_ghost_face_coords(
+            dg_xy, # Use dual graph node coords (face centers)
+            face_BC,
+            edge_midpoints,
+            outward_normals
+        )
+    ds['ghost_face_x'] = (['num_BC_edges'], ghost_face_xy[:, 0])
+    ds['ghost_face_y'] = (['num_BC_edges'], ghost_face_xy[:, 1])
+    return ds
+
+
 # not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
+
+def get_elevation_boundary_edges(
+        ds: nc.Dataset,
+        boundary_type: Optional[int] = 0
+        )  -> np.ndarray:
+    """
+    Helper function to extract elevation boundary edges from an open
+    netCDF4 Dataset object.
+
+    Args:
+        ds (nc.Dataset): Open netCDF4 Dataset object.
+        boundary_type (Optional[int]): The specific elevation boundary type
+            (from 'ibtypee') to extract. If None, extracts edges for all
+            elevation boundary types. Defaults to 0.
+
+    Returns:
+        np.ndarray: An array of boundary edges, shape (num_BC_edges, 2),
+                    containing pairs of 0-based node indices. Returns an
+                    empty array if no relevant boundaries are found.
+    """
+
+    nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
+    nvdll = ds.variables['nvdll'][:]    # Nodes per segment
+    ibtypee = ds.variables['ibtypee'][:] # Type per segment
+    return elevation_boundary_edges(nbdv, nvdll, ibtypee, boundary_type)
 
 
 def mean_for_triangle(
@@ -1260,7 +1356,6 @@ def find_boundary_faces(
     boundary_face_indices = np.where(np.any(face_edge_match_mask, axis=1))[0]
 
     return boundary_face_indices.astype(np.int64)
-
 
 
 def elevation_boundary_edges(nbdv: np.ndarray,
