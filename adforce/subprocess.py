@@ -1,15 +1,8 @@
-"""Run with subprocess rather than slurmpy.
-
-TODO: We could add running ASWIP as an option.
-Equivalent to these commands:
-    $EXE_PATH/aswip -m 4 -z 2 -w pre_aswip_fort.22 > aswip.log
-    mv NWS_20_fort.22 fort.22
-
-"""
+"""Run ADCIRC with subprocess rather than slurmpy."""
 
 import os
 import subprocess
-from omegaconf import DictConfig  # Assuming omegaconf is available for DictConfig type
+from omegaconf import DictConfig
 
 
 def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
@@ -89,6 +82,7 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
 
             # if needed, run ASWIP here before adcprep (could probably be the other way round)
             if config.use_aswip:
+                # This is just for the NWS=20 GAHM runs, not normal NWS=13 meshes.
                 aswip_log = os.path.join(direc, "aswip.log")
                 try:
                     with open(aswip_log, "w") as awip_log:

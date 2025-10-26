@@ -12,6 +12,13 @@ and then run the storm on ARCHER2 with padcirc etc.
 
 After this is all done we will process the fort.*.nc files to get training data to train
 our GNN model.
+
+The script relies on the IBtrACS netcdf being downloaded, and a couple of functions from tcpips.ibtracs to select storms.
+
+It also relies on the aswip, padcirc and adcprep executables being compiled.
+
+Usage:
+    python -m adforce.generate_training_data [--test-single] [--test-nosubprocess] [--recommended-dt 5.0] [--runs-parent-name test_runs]
 """
 
 from typing import Tuple, Dict, Optional
