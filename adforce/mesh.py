@@ -1169,6 +1169,103 @@ def calculate_ghost_face_coords(
     return ghost_face_xy
 
 
+def find_boundary_faces(
+    triangles: np.ndarray,
+    edge_index_BC: np.ndarray
+) -> np.ndarray:
+    """
+    Finds the indices of faces (triangles) that contain boundary edges using NumPy.
+
+    Compares the edges of each triangle against a provided list of
+    boundary edges efficiently.
+
+    Args:
+        triangles: Array of triangle definitions, shape (num_faces, 3),
+                   containing 0-based node indices for each face.
+        edge_index_BC: Array of boundary edges, shape (num_BC_edges, 2),
+                       containing pairs of 0-based node indices.
+
+    Returns:
+        np.ndarray: A sorted array of unique indices of the faces that
+                    contain at least one boundary edge.
+
+    Doctests:
+        >>> # Triangle 0: nodes [0, 1, 2], edges (0,1), (1,2), (2,0)
+        >>> # Triangle 1: nodes [1, 3, 2], edges (1,3), (3,2), (2,1)
+        >>> triangles_data = np.array([[0, 1, 2], [1, 3, 2]])
+        >>> # Boundary edge is (0, 1)
+        >>> bc_edges_data = np.array([[0, 1]])
+        >>> find_boundary_faces(triangles_data, bc_edges_data)
+        array([0])
+        >>> # Boundary edge is (1, 2) - shared by both triangles
+        >>> bc_edges_data = np.array([[1, 2]])
+        >>> find_boundary_faces(triangles_data, bc_edges_data)
+        array([0, 1])
+        >>> # Boundary edge is (2, 1) - reverse direction, shared by both
+        >>> bc_edges_data = np.array([[2, 1]])
+        >>> find_boundary_faces(triangles_data, bc_edges_data)
+        array([0, 1])
+        >>> # Boundary edge (3, 2) - only in triangle 1
+        >>> bc_edges_data = np.array([[3, 2]])
+        >>> find_boundary_faces(triangles_data, bc_edges_data)
+        array([1])
+        >>> # No matching boundary edges
+        >>> bc_edges_data = np.array([[0, 3]])
+        >>> find_boundary_faces(triangles_data, bc_edges_data)
+        array([], dtype=int64)
+        >>> # Empty input edges
+        >>> bc_edges_empty = np.empty((0, 2), dtype=int)
+        >>> find_boundary_faces(triangles_data, bc_edges_empty)
+        array([], dtype=int64)
+    """
+    if edge_index_BC.shape[0] == 0:
+        return np.array([], dtype=np.int64)
+    if triangles.shape[0] == 0:
+         return np.array([], dtype=np.int64)
+
+    num_faces = triangles.shape[0]
+
+    # 1. Prepare boundary edges: Sort node indices within each edge
+    # Shape: (num_BC_edges, 2)
+    sorted_bc_edges = np.sort(edge_index_BC, axis=1)
+
+    # 2. Generate all edges for all triangles
+    # Edge 1: node 0 -> node 1
+    # Edge 2: node 1 -> node 2
+    # Edge 3: node 2 -> node 0
+    # Shape: (num_faces, 3, 2) -> (num_faces * 3, 2)
+    all_triangle_edges = np.stack([
+        np.stack([triangles[:, 0], triangles[:, 1]], axis=-1),
+        np.stack([triangles[:, 1], triangles[:, 2]], axis=-1),
+        np.stack([triangles[:, 2], triangles[:, 0]], axis=-1)
+    ], axis=1).reshape(-1, 2)
+
+    # 3. Sort node indices within each triangle edge
+    # Shape: (num_faces * 3, 2)
+    sorted_triangle_edges = np.sort(all_triangle_edges, axis=1)
+
+    # 4. Efficiently check for matches using broadcasting and comparison
+    # Check if each sorted_triangle_edge exists in sorted_bc_edges
+    # This creates a boolean array: matches[i, j] is True if triangle_edge[i] == bc_edge[j]
+    # Shape: (num_faces * 3, num_BC_edges)
+    matches = (sorted_triangle_edges[:, None, :] == sorted_bc_edges).all(axis=2)
+
+    # 5. Find which triangle edges matched *any* boundary edge
+    # Shape: (num_faces * 3,) -> boolean mask for edges that are boundary edges
+    is_boundary_triangle_edge = np.any(matches, axis=1)
+
+    # 6. Identify the faces (triangles) associated with these matching edges
+    # Reshape the boolean mask back to align with faces
+    # Shape: (num_faces, 3) -> True if the corresponding edge was a boundary edge
+    face_edge_match_mask = is_boundary_triangle_edge.reshape(num_faces, 3)
+
+    # Find the indices of faces where *at least one* edge matched
+    # Shape: (num_matching_faces,)
+    boundary_face_indices = np.where(np.any(face_edge_match_mask, axis=1))[0]
+
+    return boundary_face_indices.astype(np.int64)
+
+
 # -- coast functions ---
 @timeit
 def select_coast(
