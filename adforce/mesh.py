@@ -742,14 +742,76 @@ def swegnn_dg_from_mesh_ds_from_path(
     for var in ghost_ds.data_vars:
         swegnn_ds[var] = ghost_ds[var]
 
-    # Boundary condition processing (ghost cells) is complex and needs separate implementation.
-    # Add placeholders or markers here if needed before the PyG conversion step.
-    print("Boundary Condition / Ghost Cell implementation is needed separately.")
-
-
     swegnn_ds.attrs['description'] = 'Dual graph formatted for mSWE-GNN input pipeline'
 
     return swegnn_ds
+
+
+@timeit
+def swegnn_netcdf_creation(path_in: str, path_out: str, use_dask: bool = True) -> None:
+    """
+    Create a netCDF file formatted for mSWE-GNN from ADCIRC fort.*.nc files.
+
+    Args:
+        path_in (str): Path to the directory containing fort.*.nc files.
+        path_out (str): Path to save the output netCDF file. E.g. "swegnn_data.nc".
+        use_dask (bool, optional): Whether to use dask for loading. Defaults to True.
+    """
+    # Define encoding settings
+
+    swegnn_ds = swegnn_dg_from_mesh_ds_from_path(path=path_in, use_dask=use_dask)
+
+    encoding_dict = {}
+    float_vars = [
+        'DEM', 'WD', 'VX', 'VY', 'slopex', 'slopey', 'area',
+        'face_distance', 'face_relative_distance', 'edge_slope',
+        'ghost_face_x', 'ghost_face_y', 'ghost_node_x', 'ghost_node_y',
+        'edge_BC_length'
+    ]
+    int_vars = [
+        'edge_index', 'element', 'edge_index_BC', 'face_BC',
+        'original_ghost_node_indices', 'ghost_node_indices', 'node_BC'
+    ]
+
+    compression_level = 5 # Example compression level (adjust as needed)
+
+    for var in float_vars:
+        if var in swegnn_ds: # Check if variable exists
+            encoding_dict[var] = {
+                'dtype': 'float32',
+                'zlib': True,
+                'complevel': compression_level
+            }
+            # For variables with _FillValue (like potentially WD, VX, VY if masked)
+            if '_FillValue' in swegnn_ds[var].attrs:
+                encoding_dict[var]['_FillValue'] = swegnn_ds[var].attrs['_FillValue']
+
+    for var in int_vars:
+        if var in swegnn_ds:
+            # Check max index value to see if int32 is sufficient
+            max_val = swegnn_ds[var].max().item() # Get max value as scalar
+            min_val = swegnn_ds[var].min().item() # Get min value as scalar
+            # Check range for int32
+            if max_val < 2**31 and min_val >= -2**31:
+                dtype_choice = 'int32'
+            else:
+                dtype_choice = 'int64' # Fallback if indices are too large
+
+            encoding_dict[var] = {
+                'dtype': dtype_choice,
+                'zlib': True,
+                'complevel': compression_level
+            }
+            if '_FillValue' in swegnn_ds[var].attrs:
+                encoding_dict[var]['_FillValue'] = swegnn_ds[var].attrs['_FillValue']
+
+    # Save the dataset
+    try:
+        print(f"Saving dataset to {path_out} with encoding...")
+        swegnn_ds.to_netcdf(path_out, encoding=encoding_dict, engine='netcdf4')
+        print("Save complete.")
+    except Exception as e:
+        print(f"Error saving NetCDF: {e}")
 
 
 def calc_ghost_cells_for_swegnn(
@@ -1955,13 +2017,16 @@ if __name__ == "__main__":
     # from adforce.mesh import dual_graph_ds_from_mesh_ds_from_path
 
     print("Processing ADCIRC data into SWE-GNN format...")
-    swegnn_formatted_ds = swegnn_dg_from_mesh_ds_from_path(
-        path=os.path.join(DATA_PATH, "exp_0049"), # Adjust path as needed
-        use_dask=False # Using use_dask=False might be simpler initially for debugging
-    )
-    print("\n--- SWE-GNN Formatted Dataset ---")
-    print(swegnn_formatted_ds)
-    print("\nVariables:", list(swegnn_formatted_ds.data_vars))
+    # swegnn_formatted_ds = swegnn_dg_from_mesh_ds_from_path(
+    #     path=os.path.join(DATA_PATH, "exp_0049"), # Adjust path as needed
+    #     # use_dask=False # Using use_dask=False might be simpler initially for debugging
+    # )
+    swegnn_netcdf_creation(os.path.join(DATA_PATH, "exp_0049"),
+                           os.path.join(DATA_PATH, "exp_0049", "swegnn.nc")
+                           )
+    # print("\n--- SWE-GNN Formatted Dataset ---")
+    # print(swegnn_formatted_ds)
+    # print("\nVariables:", list(swegnn_formatted_ds.data_vars))
 
     try:
         from .constants import DATA_PATH # Adjust import if needed
