@@ -36,12 +36,15 @@ def status_list(parent_dir: str) -> List[bool]:
 
 
 if __name__ == "__main__":
-    # python -m adforce.check_training_runs
+    # python -m adforce.check_training_runs --runs-parent-name run_5sec
+    # python -m adforce.check_training_runs --runs-parent-name runs
+    # python -m adforce.check_training_runs --runs-parent-name run_10sec
+
     parser = argparse.ArgumentParser(
         description="Check the status of ADCIRC training runs."
     )
     parser.add_argument("--runs-parent-name", type=str, default=None,
-        help="Name of the parent directory for runs inside the project path. Defaults to the constant RUNS_PARENT_DIR.",)
+        help="Name of the parent directory for runs inside the project path. Defaults to the constant RUNS_PARENT_DIR.")
     args = parser.parse_args()
 
     parent_dir = os.path.join(PROJ_PATH, args.runs_parent_name) if args.runs_parent_name is not None else os.path.join(PROJ_PATH, "runs")
