@@ -37,7 +37,7 @@ TODO: additional variables for dual graph:
  - Topographic slope (gradient of depth at dual graph nodes)
 """
 
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Literal
 import os
 import numpy as np
 import collections
@@ -381,6 +381,7 @@ def dual_graph_ds_base_from_triangles(
     starts, ends, lengths, xd, yd, unx, uny = dual_graph_starts_ends_from_triangles(
         triangles, x, y
     )
+    areas = calculate_triangle_areas(x, y, triangles)
 
     return xr.Dataset(
         {
@@ -406,6 +407,11 @@ def dual_graph_ds_base_from_triangles(
                     "description": "Latitude of the dual graph nodes.",
                     "units": "degrees_north",
                 },
+            ),
+            "area": (
+                ["nele"],
+                areas,
+                {"description": "Area of the original triangles.", "units": "degrees^2"},
             ),
             "start": ("edge", starts, {"description": "Start indices of the edges."}),
             "end": ("edge", ends, {"description": "End indices of the edges."}),
@@ -480,19 +486,21 @@ def _test_xr_dataset() -> xr.Dataset:
     )
 
 
-def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
+def dual_graph_ds_from_mesh_ds(ds: xr.Dataset,
+                               take_grad: Literal["none", "dynamic", "static", "all"] = "static"
+                               ) -> xr.Dataset:
     """
     Create a dual graph dataset from an ADCIRC output dataset.
 
     Args:
         ds (xr.Dataset): ADCIRC output xarray dataset with "x", "y", "element" and "depth".
-        take_grad (bool, optional): Whether to calculate the gradient of the depth and zeta. Defaults to True.
+        take_grad (take_grad: Literal["none", "dynamic", "static", "all"], optional): Whether to calculate the gradient of the depth, zeta, u-vel, v-vel, windx, windy, pressure. Defaults to "static".
 
     Returns:
         xr.Dataset: Dual graph dataset.
 
     Examples::
-        >>> ds = dual_graph_ds_from_mesh_ds(_test_xr_dataset())
+        >>> ds = dual_graph_ds_from_mesh_ds(_test_xr_dataset(), take_grad="all")
         >>> np.isclose(ds.depth.values, np.array([2, 3, 4-1/3]), atol=1e-6).all()
         True
         >>> np.isclose(ds.y.values, np.array([-1 +1/3, -1 - 1/3, -1 - 1/3]), atol=1e-6).all()
@@ -515,20 +523,22 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
         ds.element.values - 1, ds.x.values, ds.y.values
     )
     # calculate the mean for static node features
-    for val in ["depth"]:  # static fields # "x", "y",s
-        dg[val] = (
-            ["nele"],
-            mean_for_triangle(ds[val].values, ds["element"].values - 1),
-        )
-    if take_grad:
-        # calculate the gradient of the depth in x and y
-        dg["depth_grad"] = (
-            ["direction", "nele"],  # this might be the wrong way round
-            grad_for_triangle_static(
-                ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
-            ),
-        )
-    variable_names = ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"]
+    if "depth" in ds:
+        for val in ["depth"]:  # static fields # "x", "y",s
+            dg[val] = (
+                ["nele"],
+                mean_for_triangle(ds[val].values, ds["element"].values - 1),
+            )
+        if take_grad in ["all", "static"]:
+            # calculate the gradient of the depth in x and y
+            dg["depth_grad"] = (
+                ["direction", "nele"],  # this might be the wrong way round
+                grad_for_triangle_static(
+                    ds.x.values, ds.y.values, ds.depth.values, ds.element.values - 1
+                ),
+            )
+
+    variable_names = [x for x in ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"] if x in ds]
     # calculate the gradient of the zeta in x and y
     # ds["time"] = ("time", ds["time"].values)
     # assign time coordinate
@@ -540,7 +550,7 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset, take_grad=True) -> xr.Dataset:
                 np.mean(ds[variable].values[:, ds.element.values - 1], axis=2),
             )
             # calculate the gradient for the variable in x and y
-            if take_grad:
+            if take_grad in ["dynamic", "all"]:
                 dg[f"{variable}_grad"] = (
                     ["direction", "time", "nele"],
                     grad_for_triangle_timeseries(
@@ -559,7 +569,7 @@ def dual_graph_ds_from_mesh_ds_from_path(
     path: str = os.path.join(DATA_PATH, "exp_0049"),
     bbox: BoundingBox = None,
     use_dask: bool = True,
-    take_grad: bool = False,
+    take_grad: Literal["none", "dynamic", "static", "all"] = "static",
 ) -> xr.Dataset:
     """
     Process the dual graph from a path to the fort.*.nc files.
@@ -568,7 +578,7 @@ def dual_graph_ds_from_mesh_ds_from_path(
         path (str, optional): Defaults to DATA_PATH
         bbox (BoundingBox, optional): Bounding box to filter the data. Defaults to NO_BBOX.
         use_dask (bool, optional): Whether to use dask. Defaults to True.
-        take_grad (bool, optional): Whether to calculate the gradient of the variables. Defaults to False.
+        take_grad (bool, Literal["none", "dynamic", "static", "all"]): Whether to calculate the gradient of the variables. Defaults to "static".
 
     Raises:
         FileNotFoundError: If the fort.*.nc files do not exist. for * in [63, 64, 73, 74].
@@ -598,10 +608,147 @@ def dual_graph_ds_from_mesh_ds_from_path(
                 ]
             else:
                 ds_l += [xr_loader(paths[var], use_dask=use_dask)[var_from_file_d[var]]]
-    print(ds_l)
+    # print(ds_l)
 
     return dual_graph_ds_from_mesh_ds(xr.merge(ds_l), take_grad=take_grad)
 
+
+def swegnn_dg_from_mesh_ds_from_path(
+    path: str = os.path.join(DATA_PATH, "exp_0049"),
+    use_dask: bool = True,
+) -> xr.Dataset:
+    """
+    Get the dual graph into the format required for the SWE-GNN model.
+
+    Transforms the output of dual_graph_ds_from_mesh_ds_from_path to match
+    the expected variable names and structure for the mSWE-GNN input pipeline.
+
+    Args:
+        path (str, optional): Path to ADCIRC fort.*.nc files. Defaults to DATA_PATH/exp_0049.
+        use_dask (bool, optional): Whether to use dask for loading. Defaults to True.
+
+    Returns:
+        xr.Dataset: Dual graph dataset formatted for mSWE-GNN processing.
+    """
+
+    # --- Step 1: Get the initial dual graph dataset ---
+    dg = dual_graph_ds_from_mesh_ds_from_path(
+        path=path,
+        use_dask=use_dask,
+        take_grad="static" # Only calculate static depth gradient
+    )
+
+    # --- Step 2: Create a new Dataset for SWE-GNN format ---
+    swegnn_ds = xr.Dataset()
+
+    # --- Step 3: Rename/Calculate Node (Face) Features ---
+
+    # DEM (Digital Elevation Model / Bathymetry)
+    # Assuming 'depth' in dg is positive downwards bathymetry.
+    # mSWE-GNN might expect positive elevation, so DEM = -depth.
+    # Check mSWE-GNN's convention if unsure. For now, let's assume -depth.
+    if 'depth' in dg:
+        swegnn_ds['DEM'] = -dg['depth']
+        swegnn_ds['DEM'].attrs = {'description': 'Bathymetry/DEM at face centers (m, positive up)', 'units': 'm'}
+    else:
+         # Add handling if depth is missing - maybe raise error or set to zero
+         raise ValueError("Input dataset 'dg' is missing the 'depth' variable.")
+
+
+    # WD (Water Depth)
+    # WD = zeta - DEM = zeta - (-depth) = zeta + depth
+    if 'zeta' in dg and 'depth' in dg:
+        swegnn_ds['WD'] = dg['zeta'] + dg['depth']
+        swegnn_ds['WD'].attrs = {'description': 'Water depth at face centers (time series)', 'units': 'm'}
+        # Ensure non-negative water depth
+        swegnn_ds['WD'] = swegnn_ds['WD'].where(swegnn_ds['WD'] > 0, 0)
+    else:
+        # Handle missing zeta or depth for WD calculation
+        if 'zeta' not in dg:
+             print("Warning: 'zeta' variable not found. Cannot calculate 'WD'.")
+        if 'depth' not in dg:
+             print("Warning: 'depth' variable not found. Cannot calculate 'WD'.")
+
+
+    # VX, VY (Velocities) - Rename u-vel, v-vel
+    if 'u-vel' in dg:
+        swegnn_ds['VX'] = dg['u-vel']
+        swegnn_ds['VX'].attrs = {'description': 'X-velocity at face centers (time series)', 'units': 'm/s'}
+    if 'v-vel' in dg:
+        swegnn_ds['VY'] = dg['v-vel']
+        swegnn_ds['VY'].attrs = {'description': 'Y-velocity at face centers (time series)', 'units': 'm/s'}
+
+    # Slopes (from depth_grad)
+    if 'depth_grad' in dg:
+        # Assuming dg['depth_grad'] has shape [direction(2), nele]
+        swegnn_ds['slopex'] = dg['depth_grad'].isel(direction=0)
+        # Apply negative sign if DEM = -depth (gradient of DEM = -gradient of depth)
+        swegnn_ds['slopex'] = -swegnn_ds['slopex']
+        swegnn_ds['slopex'].attrs = {'description': 'Topographic slope in x-direction at face centers', 'units': 'm/degree_east'} # Check units
+
+        swegnn_ds['slopey'] = dg['depth_grad'].isel(direction=1)
+        # Apply negative sign
+        swegnn_ds['slopey'] = -swegnn_ds['slopey']
+        swegnn_ds['slopey'].attrs = {'description': 'Topographic slope in y-direction at face centers', 'units': 'm/degree_north'} # Check units
+    else:
+        # Handle missing depth_grad if needed (e.g., set slopes to zero)
+        print("Warning: 'depth_grad' not found. Slopes ('slopex', 'slopey') will not be included.")
+
+
+    # Area
+    swegnn_ds['area'] = dg["area"]
+    swegnn_ds['area'].attrs = {'description': 'Area of each mesh face (triangle)', 'units': 'm^2'}
+
+    # --- Step 4: Rename/Calculate Edge (Dual Edge) Features ---
+    # Edge Index (Connectivity of faces)
+    # Using 'start' and 'end' from dg. These represent connections between 'nele' indices.
+    # mSWE-GNN expects shape [2, num_dual_edges]. Ensure dg.start/end are combined correctly.
+    # Note: mSWE-GNN's graph_creation makes edges undirected later.
+    edge_index = np.stack([dg['start'].values, dg['end'].values])
+    swegnn_ds['edge_index'] = (['two', 'edge'], edge_index)
+    swegnn_ds['edge_index'].attrs = {'description': 'Dual graph connectivity (face indices)', 'units': 'index'}
+
+    # Face Distance (Distance between face centers)
+    # Calculate from dg.x, dg.y using edge_index
+    x_coords = dg['x'].values
+    y_coords = dg['y'].values
+    dx = x_coords[edge_index[1, :]] - x_coords[edge_index[0, :]]
+    dy = y_coords[edge_index[1, :]] - y_coords[edge_index[0, :]]
+    face_distance = np.sqrt(dx**2 + dy**2)
+    swegnn_ds['face_distance'] = (['edge'], face_distance)
+    swegnn_ds['face_distance'].attrs = {'description': 'Distance between centers of connected faces', 'units': 'degrees'} # Check units
+
+    # Relative Face Distance (Vector between face centers)
+    face_relative_distance = np.stack([dx, dy], axis=-1) # Shape [num_edges, 2]
+    # mSWE-GNN might expect [num_edges, 2]. Let's store it like that.
+    swegnn_ds['face_relative_distance'] = (['edge', 'xy'], face_relative_distance)
+    swegnn_ds['face_relative_distance'].attrs = {'description': 'Vector (dx, dy) between centers of connected faces', 'units': 'degrees'} # Check units
+
+    # Edge Slope (Slope between connected faces based on DEM)
+    dem_values = swegnn_ds['DEM'].values
+    dem_diff = dem_values[edge_index[1, :]] - dem_values[edge_index[0, :]]
+    # Avoid division by zero if face_distance is zero (shouldn't happen for distinct faces)
+    edge_slope = np.divide(dem_diff, face_distance, out=np.zeros_like(dem_diff), where=face_distance!=0)
+    swegnn_ds['edge_slope'] = (['edge'], edge_slope)
+    swegnn_ds['edge_slope'].attrs = {'description': 'Slope between connected faces based on DEM', 'units': 'm/degree'} # Check units
+
+    # --- Step 5: Add Coordinates and other relevant info ---
+    swegnn_ds = swegnn_ds.assign_coords(dg.coords) # Copy coordinates (time, nele, edge, nvertex, direction)
+    swegnn_ds = swegnn_ds.drop_vars(['start', 'end', 'direction', 'depth_grad', 'length', 'unit_normal_x', 'unit_normal_y'], errors='ignore') # Drop original/intermediate vars
+    swegnn_ds = swegnn_ds.rename({'nele': 'num_nodes'}) # Rename nele dimension to num_nodes (for clarity in PyG context)
+
+    # Add original mesh info if needed for area calc or BCs later
+    swegnn_ds['element'] = dg['element'] # Example
+
+    # --- Step 6: Placeholder for Boundary Conditions ---
+    # Boundary condition processing (ghost cells) is complex and needs separate implementation.
+    # Add placeholders or markers here if needed before the PyG conversion step.
+    print("Boundary Condition / Ghost Cell implementation is needed separately.")
+
+
+    swegnn_ds.attrs['description'] = 'Dual graph formatted for mSWE-GNN input pipeline'
+
+    return swegnn_ds
 
 # not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
 
@@ -628,6 +775,46 @@ def mean_for_triangle(
     """
     return np.mean(values[triangles], axis=1)
 
+
+def calculate_triangle_areas(
+    x_coords: np.ndarray, y_coords: np.ndarray, triangles: np.ndarray
+) -> np.ndarray:
+    """
+    Calculate the area of each triangle using the Shoelace formula.
+
+    Args:
+        x_coords (np.ndarray): (N,) array of x-coordinates for all nodes.
+        y_coords (np.ndarray): (N,) array of y-coordinates for all nodes.
+        triangles (np.ndarray): (M, 3) array of triangle indices (0-based).
+
+    Returns:
+        np.ndarray: (M,) array containing the area of each triangle.
+
+    Examples::
+        >>> x = np.array([0, 1, 0])
+        >>> y = np.array([0, 0, 1])
+        >>> tri = np.array([[0, 1, 2]])
+        >>> calculate_triangle_areas(x, y, tri)
+        array([0.5])
+        >>> x = np.array([0, 1, 1, 0])
+        >>> y = np.array([0, 0, 1, 1])
+        >>> tri = np.array([[0, 1, 2], [0, 2, 3]])
+        >>> calculate_triangle_areas(x, y, tri)
+        array([0.5, 0.5])
+    """
+    # Get coordinates for each vertex of each triangle
+    # Shape: (M, 3)
+    x1 = x_coords[triangles[:, 0]]
+    y1 = y_coords[triangles[:, 0]]
+    x2 = x_coords[triangles[:, 1]]
+    y2 = y_coords[triangles[:, 1]]
+    x3 = x_coords[triangles[:, 2]]
+    y3 = y_coords[triangles[:, 2]]
+
+    # Apply Shoelace formula
+    areas = 0.5 * np.abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
+
+    return areas
 
 def grad_for_triangle_static(
     x_lon: np.ndarray, y_lat: np.ndarray, z_values: np.ndarray, triangles: np.ndarray
@@ -1060,4 +1247,19 @@ if __name__ == "__main__":
     # dg_ex = dual_graph_ds_from_mesh_ds(xr_loader(FORT63_EXAMPLE))
     # dg_ex.to_netcdf(os.path.join(DATA_PATH, "fort.63.dual.nc"))
     # print(xr_loader(FORT63_EXAMPLE))
-    print(dual_graph_ds_from_mesh_ds_from_path())
+    # ds = dual_graph_ds_from_mesh_ds_from_path(take_grad="static")
+    # print(ds)
+    # print([v for v in ds])
+    # Assuming dual_graph_ds_from_mesh_ds_from_path is defined above or imported
+    # Make sure DATA_PATH points to the correct base directory containing exp_0049
+    # from adforce.mesh import dual_graph_ds_from_mesh_ds_from_path
+
+    print("Processing ADCIRC data into SWE-GNN format...")
+    swegnn_formatted_ds = swegnn_dg_from_mesh_ds_from_path(
+        path=os.path.join(DATA_PATH, "exp_0049"), # Adjust path as needed
+        use_dask=False # Using use_dask=False might be simpler initially for debugging
+    )
+    print("\n--- SWE-GNN Formatted Dataset ---")
+    print(swegnn_formatted_ds)
+    print("\nVariables:", list(swegnn_formatted_ds.data_vars))
+

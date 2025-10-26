@@ -326,21 +326,9 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
         # Select a single time slice using .isel()
         row = ds.isel(date_time=time_idx)
 
-        # Safely extract and format data, providing defaults
-        try:
-            atcf_basin = _decode_char_array(row["basin"])[:2].ljust(2)  # Ensure 2 chars
-        except (KeyError, AttributeError):
-            atcf_basin = "AL"  # Default basin
-            print(f"Warning: Missing basin at index {time_idx}, defaulting to AL.")
-
-        try:
-            atcf_cyclone_num = f"{storm_number:02d}"  # Ensure 2 digits
-        except ValueError:
-            atcf_cyclone_num = "00"
-
+        # Safely extract and format data, providing defaults where necessary
         try:
             dt_val = pd.to_datetime(row["time"].item())
-            atcf_datetime = dt_val.strftime("%Y%m%d%H")
             year = dt_val.year
             month = dt_val.month
             day = dt_val.day
@@ -351,7 +339,6 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
             )
             continue  # Skip this time step if time is invalid
 
-        technum = 0  # Placeholder for TECHNUM/MIN
         tech = "BEST"  # Technique
         tau = int((dt_val - start_time).total_seconds() / 3600)
 
@@ -404,7 +391,6 @@ def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
 
         for rad_kt, var_name in radii_vars.items():
             radii_nm = [fill_value_int] * 4  # Initialize with default
-            has_data = False
             if var_name in row:
                 try:
                     # Extract radii, handle NaNs, convert to int
