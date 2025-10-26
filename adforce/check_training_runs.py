@@ -19,9 +19,10 @@ def status_list(parent_dir: str) -> List[bool]:
     for run_dir in run_dir_list:
         run_path =  os.path.join(parent_dir, run_dir)
         slurm_path = os.path.join(run_path, "slurm.out")
-        with open(slurm_path, "r") as fort22_file:
-            fort22_lines = fort22_file.readlines()
-            if "Job completed successfully" in fort22_lines:
+        with open(slurm_path, "r") as slurm_out_file:
+            slurm_out_lines = slurm_out_file.readlines() # produces list of strings
+            # print(slurm_out_lines)
+            if "Job completed successfully.\n" in slurm_out_lines:
                 out_l.append(True)
                 print(f"Run {run_dir}: SUCCESS")
             else:
