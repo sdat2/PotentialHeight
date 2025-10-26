@@ -20,7 +20,6 @@ It also relies on the aswip, padcirc and adcprep executables being compiled.
 Usage:
     python -m adforce.generate_training_data [--test-single] [--test-nosubprocess] [--recommended-dt 5.0] [--runs-parent-name test_runs]
 
-TODO: Add ability to resume failed runs without redoing successful ones.
 TODO: Add some yaml to each storm to track key characteristics for readability.
 TODO: Add ability to split a task list between multiple slurm jobs.
 """
@@ -979,6 +978,27 @@ def drive_all_adcirc(
     for i, storm in target_storms[:]:
         storm_name_safe = storm.name.upper().replace(" ", "_")
         run_directory = os.path.join(runs_parent_dir, f"{i}_{storm_name_safe}_{storm.year}")
+
+        # --- Check for existing successful run (implements TODO #1) ---
+        slurm_path = os.path.join(run_directory, "slurm.out")
+        is_successful = False
+        if os.path.exists(slurm_path):
+            try:
+                with open(slurm_path, "r") as slurm_out_file:
+                    for line in slurm_out_file:
+                        if "Job completed successfully.\n" in line:
+                            is_successful = True
+                            break
+            except (IOError, FileNotFoundError) as e:
+                print(f"Warning: Could not read {slurm_path}. Will attempt to rerun. Error: {e}")
+                is_successful = False
+
+        if is_successful:
+            print(f"Run {run_directory} already completed successfully. Skipping.")
+            continue  # Skip to the next storm
+        elif os.path.exists(run_directory):
+            print(f"Directory {run_directory} exists but is incomplete or failed. Rerunning...")
+        # --- End check ---
 
         try:
             print(
