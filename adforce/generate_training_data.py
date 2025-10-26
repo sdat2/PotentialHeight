@@ -19,6 +19,10 @@ It also relies on the aswip, padcirc and adcprep executables being compiled.
 
 Usage:
     python -m adforce.generate_training_data [--test-single] [--test-nosubprocess] [--recommended-dt 5.0] [--runs-parent-name test_runs]
+
+TODO: Add ability to resume failed runs without redoing successful ones.
+TODO: Add some yaml to each storm to track key characteristics for readability.
+TODO: Add ability to split a task list between multiple slurm jobs.
 """
 
 from typing import Tuple, Dict, Optional

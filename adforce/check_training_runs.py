@@ -1,4 +1,9 @@
-"""Let's go through the training ADICRC runs and check if they were sucessful."""
+"""Let's go through the training ADICRC runs and check if they were sucessful.
+
+# TODO: add additional checks for
+- maxele values (find maxele, if too high, mark as failed)
+- check if output files are generated (fort.63, fort.64, fort.73, fort.74)
+"""
 from typing import List
 import os
 import argparse
