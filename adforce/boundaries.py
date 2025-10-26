@@ -206,9 +206,6 @@ def extract_elevation_boundary_edges(
     if not os.path.exists(netcdf_path):
         raise FileNotFoundError(f"NetCDF file not found at: {netcdf_path}")
 
-    all_boundary_edges = []
-    current_node_index = 0
-
     with nc.Dataset(netcdf_path, 'r') as ds:
         # Check for required variables
         required_vars = ['nbdv', 'nvdll', 'ibtypee']
@@ -216,31 +213,59 @@ def extract_elevation_boundary_edges(
             if var not in ds.variables:
                 raise KeyError(f"Required variable '{var}' not found in {netcdf_path}")
 
-        nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
-        nvdll = ds.variables['nvdll'][:]    # Nodes per segment
-        ibtypee = ds.variables['ibtypee'][:] # Type per segment
+        be_np = get_elevation_boundary_edges(ds, boundary_type)
 
-        # Iterate through each defined elevation boundary segment
-        for i, num_nodes_in_segment in enumerate(nvdll):
-            segment_type = ibtypee[i]
+    return be_np
 
-            # Skip if the type doesn't match the requested type
-            if boundary_type is not None and segment_type != boundary_type:
-                current_node_index += num_nodes_in_segment
-                continue
 
-            # Extract node indices for the current segment
-            segment_nodes = nbdv[current_node_index : current_node_index + num_nodes_in_segment]
+def get_elevation_boundary_edges(
+        ds: nc.Dataset,
+        boundary_type: Optional[int] = 0
+        )  -> np.ndarray:
+    """
+    Helper function to extract elevation boundary edges from an open
+    netCDF4 Dataset object.
 
-            # Create edges by pairing consecutive nodes within the segment
-            # An open boundary typically doesn't loop back, so we stop at len-1
-            segment_edges = np.stack(
-                [segment_nodes[:-1], segment_nodes[1:]], axis=-1
-            )
-            all_boundary_edges.append(segment_edges)
+    Args:
+        ds (nc.Dataset): Open netCDF4 Dataset object.
+        boundary_type (Optional[int]): The specific elevation boundary type
+            (from 'ibtypee') to extract. If None, extracts edges for all
+            elevation boundary types. Defaults to 0.
 
-            # Move the index pointer for the flat nbdv array
+    Returns:
+        np.ndarray: An array of boundary edges, shape (num_BC_edges, 2),
+                    containing pairs of 0-based node indices. Returns an
+                    empty array if no relevant boundaries are found.
+    """
+
+    all_boundary_edges = []
+    current_node_index = 0
+
+    nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
+    nvdll = ds.variables['nvdll'][:]    # Nodes per segment
+    ibtypee = ds.variables['ibtypee'][:] # Type per segment
+
+    # Iterate through each defined elevation boundary segment
+    for i, num_nodes_in_segment in enumerate(nvdll):
+        segment_type = ibtypee[i]
+
+        # Skip if the type doesn't match the requested type
+        if boundary_type is not None and segment_type != boundary_type:
             current_node_index += num_nodes_in_segment
+            continue
+        # Extract node indices for the current segment
+        segment_nodes = nbdv[current_node_index : current_node_index + num_nodes_in_segment]
+
+        # Create edges by pairing consecutive nodes within the segment
+        # An open boundary typically doesn't loop back, so we stop at len-1
+        segment_edges = np.stack(
+           [segment_nodes[:-1], segment_nodes[1:]],
+           axis=-1
+        )
+        all_boundary_edges.append(segment_edges)
+
+        # Move the index pointer for the flat nbdv array
+        current_node_index += num_nodes_in_segment
 
     if not all_boundary_edges:
         return np.empty((0, 2), dtype=np.int64) # Use int64 for consistency

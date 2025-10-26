@@ -48,6 +48,7 @@ import matplotlib.pyplot as plt
 from sithom.time import timeit
 from sithom.place import BoundingBox
 from .constants import NO_BBOX, DATA_PATH, GEOD
+from .boundaries import extract_elevation_boundary_edges
 
 
 @timeit
@@ -1512,3 +1513,47 @@ if __name__ == "__main__":
     print(swegnn_formatted_ds)
     print("\nVariables:", list(swegnn_formatted_ds.data_vars))
 
+    try:
+        from .constants import DATA_PATH # Adjust import if needed
+
+        file_path = os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc")
+
+        with nc.Dataset(file_path, 'r') as ds:
+            # Load 0-based triangle node indices
+            triangles_from_file = ds.variables['element'][:] - 1
+
+        # 2. Get the boundary edges using the previously defined function
+        ocean_edges = extract_elevation_boundary_edges(file_path, boundary_type=0)
+
+        # 3. Find the boundary faces using the NumPy version
+        if triangles_from_file is not None and ocean_edges.shape[0] > 0:
+            print(f"Finding boundary faces for {ocean_edges.shape[0]} boundary edges (NumPy)...")
+            face_BC_np = find_boundary_faces(triangles_from_file, ocean_edges)
+
+            if face_BC_np.shape[0] > 0:
+                print(f"Found {face_BC_np.shape[0]} boundary faces.")
+                print("First 10 face indices:", face_BC_np[:10])
+                print("Last 10 face indices:", face_BC_np[-10:])
+                # Verification
+                if face_BC_np.shape[0] == ocean_edges.shape[0]:
+                    print("Number of boundary faces matches number of boundary edges.")
+                else:
+                     print(f"Warning: Number of faces ({face_BC_np.shape[0]}) doesn't match edges ({ocean_edges.shape[0]}).")
+
+            else:
+                print("No boundary faces found corresponding to the boundary edges.")
+        else:
+             if triangles_from_file is None: print("Could not load triangle data.")
+             if ocean_edges.shape[0] == 0: print("No boundary edges were provided.")
+
+        # Example doctest execution
+        import doctest
+        results = doctest.testmod(extraglobs={'find_boundary_faces': find_boundary_faces})
+        print(f"\nDoctest results: {results}")
+
+    except ImportError:
+        print("Could not import DATA_PATH or other functions.")
+    except FileNotFoundError as e:
+        print(e)
+    except KeyError as e:
+        print(e)
