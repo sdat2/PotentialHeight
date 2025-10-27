@@ -7,18 +7,17 @@ on the ADCIRC mesh, colored by intensity.
 Usage:
     python -m adforce.plotting [--test-single] [--output-name "track_summary.pdf"]
 """
-
+from typing import List
 import os
 import numpy as np
 import netCDF4 as nc
 import xarray as xr
 import pandas as pd
-from adcircpy import AdcircMesh
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.colors import ListedColormap, BoundaryNorm
 import argparse
-from sithom.plot import plot_defaults, get_dim
+from sithom.plot import plot_defaults
 
 # --- Assuming constants.py and ibtracs.py are accessible ---
 # Use .constants and .ibtracs if running as a module,
@@ -37,31 +36,35 @@ except ImportError:
     sys.path.append(PROJ_PATH)
     from tcpips.ibtracs import na_landing_tcs
 
-from .generate_training_data import _decode_char_array
 from .constants import DATA_PATH
 
 plot_defaults()
 
-# --- Saffir-Simpson Scale Definitions (in m/s) ---
+# --- Saffir-Simpson Scale Definitions (in m s$^{-1}$) ---
 KNOTS_TO_MS = 0.514444
 
 # Original wind speed bins in knots
-SS_BINS_KNOTS = [0, 34, 64, 83, 96, 113, 137, 500]  # Bin edges
-
-# Convert bins to m/s and round to one decimal
-SS_BINS = [np.round(kt * KNOTS_TO_MS, 1) for kt in SS_BINS_KNOTS]
+#SS_BINS_KNOTS = [0, 34, 64, 83, 96, 113, 137, 500]  # Bin edges
+# Convert bins to m s$^{-1}$ and round to one decimal
+SS_BINS = [0, 17.5, 33, 43, 50, 58, 70, 86, 500]  # in m s$^{-1}$
 # Result: [0.0, 17.5, 32.9, 42.7, 49.4, 58.1, 70.5, 257.2]
 
-SS_COLORS = ['blue', 'green', 'yellow', 'orange', 'red', 'darkred', 'magenta']
+SS_COLORS = ['cyan', 'green', 'yellow', 'orange', 'red', 'darkred', 'magenta', 'black']
 
-# Labels updated to reflect m/s
-SS_LABELS = [
-    'TD (<17.5 m/s)', 'TS (17.5-32.8 m/s)', 'Cat 1 (32.9-42.6 m/s)',
-    'Cat 2 (42.7-49.3 m/s)', 'Cat 3 (49.4-58.0 m/s)',
-    'Cat 4 (58.1-70.4 m/s)', 'Cat 5 (70.5+ m/s)'
+# Labels updated to reflect m s$^{-1}$
+SS_LABELS: List[str] = [
+    'TD (<17.5 m s$^{-1}$)',
+    'TS (17.5-33 m s$^{-1}$)',
+    'Cat 1 (33-43 m s$^{-1}$)',
+    'Cat 2 (43-50 m s$^{-1}$)',
+    'Cat 3 (50-58 m s$^{-1}$)',
+    'Cat 4 (58-70 m s$^{-1}$)',
+    'Cat 5 (70-86 m s$^{-1}$)',
+    'Cat 6 (86.0+ m s$^{-1}$)'
 ]
+
 SS_CMAP = ListedColormap(SS_COLORS)
-SS_NORM = BoundaryNorm(SS_BINS, SS_CMAP.N) # This now uses the m/s bins
+SS_NORM = BoundaryNorm(SS_BINS, SS_CMAP.N) # This now uses the m s$^{-1}$ bins
 
 
 # --- Plotting Function ---
@@ -102,7 +105,7 @@ def plot_all_tc_tracks_on_mesh(
     print("Plotting mesh background...")
     ax.triplot(
         x_nodes, y_nodes, triangles,
-        color='grey', alpha=0.2, linewidth=0.1, label='ADCIRC Mesh'
+        color='blue', alpha=0.3, linewidth=0.1, label='ADCIRC Mesh'
     )
 
     # Determine storms to plot
@@ -123,20 +126,15 @@ def plot_all_tc_tracks_on_mesh(
     tracks_plotted = 0
     for i in indices:
         storm_ds = all_storms_ds.isel(storm=i)
-        storm_name = _decode_char_array(storm_ds['name'])
 
         # Extract and clean data
         lat = storm_ds['usa_lat'].values
         lon = storm_ds['usa_lon'].values
-        wind = storm_ds['usa_wind'].values * KNOTS_TO_MS  # Convert to m/s
+        wind = storm_ds['usa_wind'].values * KNOTS_TO_MS  # Convert to m s$^{-1}$
 
         valid_mask = ~np.isnan(lat) & ~np.isnan(lon) & ~np.isnan(wind)
         lat, lon, wind = lat[valid_mask], lon[valid_mask], wind[valid_mask]
 
-        # --- CONVERT TO M/S ---
-        # Data from IBTrACS (via na_landing_tcs) is in knots, convert to m/s
-        wind = wind * KNOTS_TO_MS
-        # ----------------------
 
         if len(lat) < 2:
             # print(f"Skipping {storm_name} (insufficient data).")
@@ -147,15 +145,18 @@ def plot_all_tc_tracks_on_mesh(
         segments = np.concatenate([points[:-1], points[1:]], axis=1)
 
         # Use wind at the start of each segment for coloring
-        # This is now in m/s
+        # This is now in m s$^{-1}$
         segment_winds = wind[:-1]
 
         # Create a LineCollection
         lc = LineCollection(
-            segments, cmap=SS_CMAP, norm=SS_NORM,
-            linewidths=0.5, alpha=0.7  # Thinner, semi-transparent lines
+            segments,
+            cmap=SS_CMAP,
+            norm=SS_NORM,
+            linewidths=0.5,
+            alpha=0.7  # Thinner, semi-transparent lines
         )
-        lc.set_array(segment_winds) # Set array with m/s values
+        lc.set_array(segment_winds) # Set array with m s$^{-1}$ values
         ax.add_collection(lc)
         tracks_plotted += 1
 
@@ -187,7 +188,7 @@ def plot_all_tc_tracks_on_mesh(
         # spacing='proportional'
     )
     cbar.ax.set_yticklabels(SS_LABELS, fontsize='small')
-    cbar.set_label("Wind Speed (m/s) - Saffir-Simpson Scale") # Updated label
+    cbar.set_label("Wind Speed (m s$^{-1}$) - Saffir-Simpson Scale") # Updated label
 
     # Save the figure
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -234,7 +235,7 @@ if __name__ == "__main__":
     os.makedirs(output_folder, exist_ok=True)
     output_plot_path = os.path.join(output_folder, output_file)
 
-    # The plotting function will now handle the conversion to m/s
+    # The plotting function will now handle the conversion to m s$^{-1}$
     plot_all_tc_tracks_on_mesh(
         all_storms_ds=all_storms_ds,
         mesh_path=os.path.join(DATA_PATH, "exp_0049", "fort.63.nc"),
