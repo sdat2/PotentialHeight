@@ -24,6 +24,10 @@ def status_list(parent_dir: str) -> List[bool]:
     for run_dir in run_dir_list:
         run_path =  os.path.join(parent_dir, run_dir)
         slurm_path = os.path.join(run_path, "slurm.out")
+        if os.path.exists(slurm_path) is False:
+            print(f"Run {run_dir}: slurm.out not found, marking as FAILED")
+            out_l.append(False)
+            continue
         with open(slurm_path, "r") as slurm_out_file:
             slurm_out_lines = slurm_out_file.readlines() # produces list of strings
             # print(slurm_out_lines)
