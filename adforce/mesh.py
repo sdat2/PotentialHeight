@@ -610,6 +610,7 @@ def dual_graph_ds_from_mesh_ds_from_path(
 
 def swegnn_dg_from_mesh_ds_from_path(
     path: str = os.path.join(DATA_PATH, "exp_0049"),
+    time_downsampling: int = 36,
     use_dask: bool = True,
 ) -> xr.Dataset:
     """
@@ -620,6 +621,7 @@ def swegnn_dg_from_mesh_ds_from_path(
 
     Args:
         path (str, optional): Path to ADCIRC fort.*.nc files. Defaults to DATA_PATH/exp_0049.
+        time_downsampling (int, optional): Factor to downsample time dimension. Defaults to 36.
         use_dask (bool, optional): Whether to use dask for loading. Defaults to True.
 
     Returns:
@@ -633,6 +635,9 @@ def swegnn_dg_from_mesh_ds_from_path(
         use_dask=use_dask,
         take_grad="static" # Only calculate static depth gradient
     )
+    # Downsample time dimension, getting every nth timestep
+    if time_downsampling > 1:
+        dg = dg.isel(time=slice(None, None, time_downsampling))
 
     # --- Step 2: Create a new Dataset for SWE-GNN format ---
     swegnn_ds = xr.Dataset()
@@ -752,18 +757,25 @@ def swegnn_dg_from_mesh_ds_from_path(
 
 
 @timeit
-def swegnn_netcdf_creation(path_in: str, path_out: str, use_dask: bool = True) -> None:
+def swegnn_netcdf_creation(path_in: str,
+                           path_out: str,
+                           time_downsampling: int = 36,
+                           use_dask: bool = True) -> None:
     """
     Create a netCDF file formatted for mSWE-GNN from ADCIRC fort.*.nc files.
 
     Args:
         path_in (str): Path to the directory containing fort.*.nc files.
         path_out (str): Path to save the output netCDF file. E.g. "swegnn_data.nc".
+        time_downsampling (int, optional): Factor to downsample time dimension. Defaults to 36.
         use_dask (bool, optional): Whether to use dask for loading. Defaults to True.
     """
     # Define encoding settings
 
-    swegnn_ds = swegnn_dg_from_mesh_ds_from_path(path=path_in, use_dask=use_dask)
+    swegnn_ds = swegnn_dg_from_mesh_ds_from_path(path=path_in,
+                                                 time_downsampling=time_downsampling,
+                                                 use_dask=use_dask)
+
 
     encoding_dict = {}
     float_vars = [
@@ -2025,6 +2037,7 @@ if __name__ == "__main__":
     #     path=os.path.join(DATA_PATH, "exp_0049"), # Adjust path as needed
     #     # use_dask=False # Using use_dask=False might be simpler initially for debugging
     # )
+    # python -m adforce.mesh
     swegnn_netcdf_creation(os.path.join(DATA_PATH, "exp_0049"),
                            os.path.join(DATA_PATH, "exp_0049", "swegnn.nc")
                            )

@@ -652,6 +652,7 @@ def plot_swegnn_ghost_cells(path_in: str, output_path: str) -> None:
         ax.legend(ordered_handles, ordered_labels, fontsize="small", loc="best")
 
         plt.savefig(output_path, bbox_inches="tight", dpi=300)
+        plt.savefig(output_path.replace(".pdf", ".png"), bbox_inches="tight", dpi=400)
         plt.close()
         print(f"Ghost cell plot saved to {output_path}")
 
