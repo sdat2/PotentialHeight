@@ -637,6 +637,10 @@ def swegnn_dg_from_mesh_ds_from_path(
     # --- Step 2: Create a new Dataset for SWE-GNN format ---
     swegnn_ds = xr.Dataset()
 
+    swegnn_ds["x"] = dg["x"]
+    swegnn_ds["y"] = dg["y"]
+    swegnn_ds["time"] = dg["time"]
+
     # --- Step 3: Rename/Calculate Node (Face) Features ---
 
     # DEM (Digital Elevation Model / Bathymetry)
@@ -766,7 +770,7 @@ def swegnn_netcdf_creation(path_in: str, path_out: str, use_dask: bool = True) -
         'DEM', 'WD', 'VX', 'VY', 'slopex', 'slopey', 'area',
         'face_distance', 'face_relative_distance', 'edge_slope',
         'ghost_face_x', 'ghost_face_y', 'ghost_node_x', 'ghost_node_y',
-        'edge_BC_length'
+        'edge_BC_length',
     ]
     int_vars = [
         'edge_index', 'element', 'edge_index_BC', 'face_BC',

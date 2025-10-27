@@ -4,6 +4,8 @@ Dual graph functions in .mesh currently"""
 
 import os
 import numpy as np
+import xarray as xr
+import netCDF4 as nc
 from matplotlib import pyplot as plt
 import imageio
 from tqdm import tqdm
@@ -15,7 +17,10 @@ from .mesh import (
     dual_graph_ds_from_mesh_ds_from_path,
     dual_graph_ds_from_mesh_ds,
     xr_loader,
+    swegnn_dg_from_mesh_ds_from_path,  # <-- Add this one
 )
+FIGURE_PATH = os.path.join(FIGURE_PATH, "dual_graph")
+os.makedirs(FIGURE_PATH, exist_ok=True)
 
 
 @timeit
@@ -23,8 +28,7 @@ def plot_dual_graph() -> None:
     """
     Some test plots for the dual graph.
     """
-    figure_path = os.path.join(FIGURE_PATH, "dual_graph")
-    os.makedirs(figure_path, exist_ok=True)
+    figure_path = FIGURE_PATH
 
     ds = xr_loader(os.path.join(DATA_PATH, "exp_0049", "fort.64.nc"))
     dg = dual_graph_ds_from_mesh_ds_from_path(
@@ -452,8 +456,219 @@ def make_dual_graph_nc() -> None:
     ).to_netcdf(os.path.join(DATA_PATH, "exp_0049", "dual_graph.nc"))
 
 
+@timeit
+def plot_swegnn_ghost_cells(path_in: str, output_path: str) -> None:
+    """
+    Calculates SWE-GNN data on the fly and plots components to verify ghost cells.
+
+    This plot shows:
+    1. The original triangular mesh (faint gray).
+    2. The dual graph face centers and edges (faint blue).
+    3. The original mesh boundary edges (thick green).
+    4. The real boundary faces (red dots).
+    5. The calculated ghost faces (cyan dots).
+    6. The mirroring lines connecting boundary faces to ghost faces (dashed magenta).
+    7. The calculated ghost nodes (orange 'x').
+
+    Args:
+        path_in (str): Path to the directory containing fort.*.nc files
+                       (e.g., .../exp_0049).
+        output_path (str): Path to save the output plot (e.g., .../figure.pdf).
+    """
+    print(f"Generating SWE-GNN data on the fly from {path_in}...")
+
+    swegnn_ds = None  # Initialize for finally block
+    try:
+        # --- 1. Calculate SWE-GNN Dataset On-the-Fly ---
+        # Use use_dask=False to compute immediately for plotting
+        swegnn_ds = swegnn_dg_from_mesh_ds_from_path(
+            path=path_in, use_dask=True
+        )
+        print("SWE-GNN dataset calculated.", swegnn_ds)
+        print("SWE-GNN dataset variables:", [var for var in swegnn_ds])
+
+        # --- 2. Load Original Mesh Coords ---
+        original_mesh_path = os.path.join(path_in, "fort.63.nc")
+        print(f"Loading original mesh from {original_mesh_path}...")
+        try:
+            with nc.Dataset(original_mesh_path, "r") as ds:
+                print("Variables in original mesh file:", ds.variables.keys())
+                original_x = ds.variables["x"][:]
+                original_y = ds.variables["y"][:]
+                original_elements = ds.variables["element"][:] - 1
+        except FileNotFoundError:
+            print(f"Error: Original mesh file not found at {original_mesh_path}")
+            return
+        except KeyError as e:
+            print(f"Error: Missing variable {e} in {original_mesh_path}")
+            return
+
+        # --- 3. Setup Plot ---
+        plot_defaults()
+        fig, ax = plt.subplots(figsize=get_dim(fraction_of_line_width=1.2, ratio=0.7))
+
+        # --- 4. Plot Original Mesh (faint) ---
+        ax.triplot(
+            original_x,
+            original_y,
+            original_elements,
+            color="gray",
+            alpha=0.3,
+            linewidth=0.5,
+            label="Original Mesh",
+        )
+
+        # --- 5. Plot Dual Graph (faint) ---
+        edge_index = swegnn_ds["edge_index"].values
+        face_x = swegnn_ds["x"].values
+        face_y = swegnn_ds["y"].values
+        starts, ends = edge_index[0, :], edge_index[1, :]
+        # Plot dual edges as segments
+        ax.plot(
+            [face_x[starts], face_x[ends]],
+            [face_y[starts], face_y[ends]],
+            color="blue",
+            alpha=0.15,
+            linewidth=0.4,
+            label="Dual Graph Edges",
+        )
+        # Plot all dual nodes (face centers)
+        ax.scatter(
+            face_x, face_y, color="blue", s=0.5, alpha=0.2, label="Face Centers"
+        )
+
+        # --- 6. Plot Original Boundary Edges (Green) ---
+        edge_index_BC = swegnn_ds["edge_index_BC"].values
+        if edge_index_BC.shape[0] > 0:
+            bc_edge_starts = edge_index_BC[:, 0]
+            bc_edge_ends = edge_index_BC[:, 1]
+            ax.plot(
+                [original_x[bc_edge_starts], original_x[bc_edge_ends]],
+                [original_y[bc_edge_starts], original_y[bc_edge_ends]],
+                color="green",
+                alpha=0.8,
+                linewidth=2.0,
+                label="Boundary Edges (Original)",
+                zorder=4,
+            )
+        else:
+            print("Warning: No 'edge_index_BC' found in dataset.")
+
+        # --- 7. Plot Boundary Faces (Red) ---
+        face_BC_indices = swegnn_ds["face_BC"].values
+        if face_BC_indices.shape[0] > 0:
+            boundary_face_x = face_x[face_BC_indices]
+            boundary_face_y = face_y[face_BC_indices]
+            ax.scatter(
+                boundary_face_x,
+                boundary_face_y,
+                color="red",
+                s=12,
+                label="Boundary Faces (Real)",
+                zorder=5,
+            )
+        else:
+            print("Warning: No 'face_BC' found in dataset.")
+            # Set empty arrays to prevent errors if no BCs
+            boundary_face_x, boundary_face_y = np.array([]), np.array([])
+
+        # --- 8. Plot Ghost Faces (Cyan) ---
+        ghost_face_x = swegnn_ds["ghost_face_x"].values
+        ghost_face_y = swegnn_ds["ghost_face_y"].values
+        if ghost_face_x.shape[0] > 0:
+            ax.scatter(
+                ghost_face_x,
+                ghost_face_y,
+                color="cyan",
+                s=12,
+                edgecolors="k",
+                linewidth=0.5,
+                label="Ghost Faces (Calculated)",
+                zorder=5,
+            )
+        else:
+            print("Warning: No 'ghost_face_x' found in dataset.")
+
+        # --- 9. Plot Mirroring Lines (Magenta) ---
+        if boundary_face_x.shape[0] > 0 and ghost_face_x.shape[0] > 0:
+            # Ensure they have the same length
+            if boundary_face_x.shape[0] == ghost_face_x.shape[0]:
+                ax.plot(
+                    [boundary_face_x, ghost_face_x],
+                    [boundary_face_y, ghost_face_y],
+                    color="magenta",
+                    alpha=0.6,
+                    linewidth=0.8,
+                    linestyle="--",
+                    label="Face Mirroring",
+                    zorder=3,
+                )
+            else:
+                print(
+                    f"Warning: Mismatch in boundary faces ({boundary_face_x.shape[0]}) "
+                    f"and ghost faces ({ghost_face_x.shape[0]}). "
+                    "Cannot plot mirroring lines."
+                )
+
+        # --- 10. Plot Ghost Nodes (Orange 'x') ---
+        ghost_node_x = swegnn_ds["ghost_node_x"].values
+        ghost_node_y = swegnn_ds["ghost_node_y"].values
+        if ghost_node_x.shape[0] > 0:
+            ax.scatter(
+                ghost_node_x,
+                ghost_node_y,
+                color="orange",
+                s=15,
+                marker="x",
+                label="Ghost Nodes (Calculated)",
+                zorder=4,
+            )
+        else:
+            print("Warning: No 'ghost_node_x' found in dataset.")
+
+        # --- 11. Finalize Plot ---
+        ax.set_aspect("equal")
+        ax.set_xlabel("Longitude [$^{\circ}$E]")
+        ax.set_ylabel("Latitude [$^{\circ}$N]")
+        ax.set_title("SWE-GNN Ghost Cell Calculation Verification")
+
+        # Create legend with a specific order for clarity
+        handles, labels = ax.get_legend_handles_labels()
+        label_map = {label: handle for handle, label in zip(handles, labels)}
+        order_keys = [
+            "Original Mesh",
+            "Boundary Edges (Original)",
+            "Boundary Faces (Real)",
+            "Ghost Faces (Calculated)",
+            "Face Mirroring",
+            "Ghost Nodes (Calculated)",
+            "Dual Graph Edges",
+            "Face Centers",
+        ]
+
+        ordered_handles = [label_map[key] for key in order_keys if key in label_map]
+        ordered_labels = [key for key in order_keys if key in label_map]
+
+        ax.legend(ordered_handles, ordered_labels, fontsize="small", loc="best")
+
+        plt.savefig(output_path, bbox_inches="tight", dpi=300)
+        plt.close()
+        print(f"Ghost cell plot saved to {output_path}")
+
+    except Exception as e:
+        print(f"An error occurred during plotting: {e}")
+
+    finally:
+        if swegnn_ds is not None:
+            swegnn_ds.close()  # Ensure the dataset is closed
+
+
 if __name__ == "__main__":
     # python -m adforce.dual_graph
-    plot_dual_graph()
+    # plot_dual_graph()
     # test_dual_graph()
     # make_dual_graph_nc()
+    plot_swegnn_ghost_cells(
+        path_in=os.path.join(DATA_PATH, "exp_0049"),
+        output_path=os.path.join(FIGURE_PATH, "swegnn_ghost_cells.pdf"),
+    )

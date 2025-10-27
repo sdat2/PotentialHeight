@@ -22,6 +22,7 @@ Usage:
 
 TODO: Add some yaml to each storm to track key characteristics for readability.
 TODO: Add ability to split a task list between multiple slurm jobs.
+TODO: Plot and summarise this training data.
 """
 
 from typing import Tuple, Dict, Optional
@@ -39,18 +40,12 @@ from adcircpy.fort15 import Fort15
 from adcircpy.forcing.winds import BestTrackForcing
 import argparse
 
-
 # from stormevents.nhc import VortexTrack
 
-# --- New Imports ---
 import hydra
 from omegaconf import DictConfig, OmegaConf
 from .subprocess import setoff_subprocess_job_and_wait
-
-# --- End New Imports ---
-
 from tcpips.ibtracs import na_landing_tcs, select_tc_from_ds
-
 from .constants import SETUP_PATH, PROJ_PATH
 
 RUNS_PARENT_DIR = os.path.join(PROJ_PATH, "runs")
@@ -59,8 +54,6 @@ FORT14_PATH = os.path.join(SETUP_PATH, "fort.14.mid")
 FORT13_PATH = os.path.join(SETUP_PATH, "fort.13.mid")
 
 
-# --- Function Definitions (from Section 2) ---
-# Assuming your Storm class is defined as before:
 class Storm:
     # I hate classes, but this was to mirror tropycal
     def __init__(self, sid, name, time):
@@ -82,9 +75,9 @@ def calculate_simulation_window(
     Calculate the simulation start and end dates based on storm data.
 
     Args:
-    - storm: Storm object with 'time' attribute (list of datetime objects).
-    - spinup_days: Number of days for model spin-up before storm start. Defaults to 0.
-    - extra_days: Number of days to continue simulation after storm end. Defaults to 0.
+       storm (Storm): Storm object with 'time' attribute (list of datetime objects).
+       spinup_days (float, optional): Number of days for model spin-up before storm start. Defaults to 0.
+       extra_days (float, optional): Number of days to continue simulation after storm end. Defaults to 0.
 
     Returns:
     - simulation_start_date: Start date for the simulation (datetime).
