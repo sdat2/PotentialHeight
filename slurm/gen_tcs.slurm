@@ -35,7 +35,8 @@ which python
 
 # run python job
 # python -m adforce.generate_training_data 
-python -m adforce.generate_training_data --recommended-dt 5.0 --runs-parent-name run_5sec
+# python -m adforce.generate_training_data --recommended-dt 5.0 --runs-parent-name run_5sec
+python -m adforce.check_training_runs --runs-parent-name run_5sec --save-to swegnn_5sec
 # --test-nosubprocess --test-single 
 # --test-single
 

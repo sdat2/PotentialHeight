@@ -24,7 +24,8 @@ def status_list(parent_dir: str,
     """
     if not os.path.exists(parent_dir):
         raise FileNotFoundError(f"Parent directory {parent_dir} does not exist.")
-    if save_to is not None and not os.path.exists(save_to):
+    if save_to is not None:
+        save_to = os.path.join(PROJ_PATH, save_to)
         os.makedirs(save_to)
 
     out_l = []
