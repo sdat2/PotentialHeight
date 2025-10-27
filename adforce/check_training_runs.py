@@ -26,7 +26,7 @@ def status_list(parent_dir: str,
         raise FileNotFoundError(f"Parent directory {parent_dir} does not exist.")
     if save_to is not None:
         save_to = os.path.join(PROJ_PATH, save_to)
-        os.makedirs(save_to)
+        os.makedirs(save_to, exist_ok=True)
 
     out_l = []
     run_dir_list = os.listdir(parent_dir)
