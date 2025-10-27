@@ -6,6 +6,8 @@ data/
 # C extensions
 *.so
 
+mSWE-GNN/
+
 # Distribution / packaging
 .Python
 StormEvents/
