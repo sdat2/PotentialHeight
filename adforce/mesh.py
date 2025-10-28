@@ -2053,7 +2053,8 @@ if __name__ == "__main__":
     # )
     # python -m adforce.mesh
     swegnn_netcdf_creation(os.path.join(DATA_PATH, "exp_0049"),
-                           os.path.join(DATA_PATH, "exp_0049", "swegnn.nc")
+                           os.path.join(DATA_PATH, "exp_0049", "swegnn.nc"),
+                           use_dask=False
                            )
     # print("\n--- SWE-GNN Formatted Dataset ---")
     # print(swegnn_formatted_ds)
