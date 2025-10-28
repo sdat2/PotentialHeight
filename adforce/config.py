@@ -10,8 +10,7 @@ Attributes:
 
 import os
 from dataclasses import dataclass
-from omegaconf import DictConfig
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
 
 @dataclass
