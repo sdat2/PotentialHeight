@@ -12,14 +12,14 @@
 # --- JOB ARRAY ---
 # Replace '499' with your (total_runs - 1)
 # %128 means "run 128 tasks at a time"
-#SBATCH --array=0-499%128 
+# SBATCH --array=0-499%128 
 
 # Output log file:
 # %x = job name, %A = job ID, %a = array task ID
 #SBATCH --output=logs/%x-%A_%a.out
 
-#SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=sdat2@cam.ac.uk
+##SBATCH --mail-type=BEGIN,END,FAIL
+##SBATCH --mail-user=sdat2@cam.ac.uk
 
 # --- Setup ---
 source /work/n02/n02/sdat2/.bashrc
@@ -43,7 +43,7 @@ mkdir -p $SAVE_PARENT_DIR
 
 # --- Job Array Logic ---
 # 1. Create a bash array of all run directories
-DIRS=($(find $RUN_PARENT_DIR -mindepth 1 -maxdepth 1 -type d -name "exp_*" | sort))
+DIRS=($(find $RUN_PARENT_DIR -mindepth 1 -maxdepth 1 -type d | sort))
 
 # 2. Check if the array is empty
 if [ ${#DIRS[@]} -eq 0 ]; then
@@ -76,7 +76,7 @@ echo "---"
 # OPTION 1: Run with use_dask=False (My recommendation for Lustre)
 # The --use-dask flag is absent, so the script defaults to False.
 echo "Running with use_dask=False"
-python -m adforce.process_single_run \
+python -m adforce.process_single \
     --run-path $MY_RUN_DIR \
     --save-path $MY_SAVE_PATH
 
