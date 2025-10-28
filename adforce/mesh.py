@@ -683,6 +683,18 @@ def swegnn_dg_from_mesh_ds_from_path(
         swegnn_ds['VY'] = dg['v-vel']
         swegnn_ds['VY'].attrs = {'description': 'Y-velocity at face centers (time series)', 'units': 'm/s'}
 
+    if 'windx' in dg:
+        swegnn_ds['WX'] = dg['windx']
+        swegnn_ds['WX'].attrs = {'description': 'X-component of wind at face centers (time series)', 'units': 'm/s'}
+
+    if 'windy' in dg:
+        swegnn_ds['WY'] = dg['windy']
+        swegnn_ds['WY'].attrs = {'description': 'Y-component of wind at face centers (time series)', 'units': 'm/s'}
+
+    if 'pressure' in dg:
+        swegnn_ds['P'] = dg['pressure']
+        swegnn_ds['P'].attrs = {'description': 'Atmospheric pressure at face centers (time series)', 'units': 'm'}
+
     # Slopes (from depth_grad)
     if 'depth_grad' in dg:
         # Assuming dg['depth_grad'] has shape [direction(2), nele]
@@ -752,6 +764,8 @@ def swegnn_dg_from_mesh_ds_from_path(
         swegnn_ds[var] = ghost_ds[var]
 
     swegnn_ds.attrs['description'] = 'Dual graph formatted for mSWE-GNN input pipeline'
+
+    print("SWE_GNN dataset created with variables:", [var for var in swegnn_ds.data_vars])
 
     return swegnn_ds
 
