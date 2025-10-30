@@ -12,13 +12,13 @@
 # Let's use 0-3 (which is 4 tasks).
 #
 #
-#SBATCH --array=0-16%10
+#SBATCH --array=0-32%10
 
 # --- STEP 2: RESOURCE REQUEST (PER MANAGER) ---
 # Each *manager task* (0, 1, 2, or 3) gets ONE full node.
 # We will then use all 128 cores on that node.
 #SBATCH --nodes=1
-#SBATCH --tasks-per-node=16
+#SBATCH --tasks-per-node=8
 #SBATCH --time=01:00:00  # 1 hour to process 128 runs (adjust if needed)
 
 # Log file for each manager task
@@ -51,7 +51,7 @@ NUM_DIRS=${#DIRS[@]}
 echo "Found $NUM_DIRS total directories to process."
 
 # 2. Define how many runs this manager task will process
-TASKS_PER_NODE=16 # This MUST match --tasks-per-node above
+TASKS_PER_NODE=8 # This MUST match --tasks-per-node above
 
 # 3. Calculate the *chunk* of directories this manager task is responsible for
 # Manager 0 (ID=0) processes dirs 0-127
