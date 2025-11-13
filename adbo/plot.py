@@ -1011,7 +1011,7 @@ def plot_bo_comp() -> None:
 
 
 @timeit
-def make_argmax_table(daf: str ="mes") -> None:
+def make_argmax_table(daf: str = "mes") -> None:
     """We want to make a table of the argmax values for each experiment.
 
     Args:
@@ -1138,8 +1138,9 @@ def make_argmax_table(daf: str ="mes") -> None:
 
 
 if __name__ == "__main__":
-    make_argmax_table("ei")
     # python -m adbo.plot
+    make_argmax_table("ei")
+    make_argmax_table("mes")
     # for point in ["new-orleans", "miami", "galverston"]:
     #    plot_diff(
     #        exps=(f"{point}-2015", f"{point}-2100"),
