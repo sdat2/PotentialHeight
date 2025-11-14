@@ -4,45 +4,7 @@ import tempfile
 import doctest
 from pathlib import Path
 from typing import Optional, List
-
-# --- Mock Function for Demonstration ---
-# In your real environment, this import should find the actual
-# adforce.mesh module.
-try:
-    from adforce.mesh import swegnn_dg_from_mesh_ds_from_path
-
-    print(
-        "Successfully imported 'swegnn_dg_from_mesh_ds_from_path' from 'adforce.mesh'."
-    )
-except ImportError:
-    print("Warning: Could not import 'adforce.mesh'.")
-    print("Using a MOCK function for demonstration purposes.")
-
-    def swegnn_dg_from_mesh_ds_from_path(path=None, **kwargs):
-        """Mock function for demonstration."""
-        print(f"  (Mock) Calling swegnn_dg_from_mesh_ds_from_path(path='{path}')")
-
-        # In a real run, this returns an xarray.Dataset.
-        # We return a mock object with a .to_netcdf() method.
-        class MockDataset:
-            def to_netcdf(self, output_path):
-                print(f"  (Mock) Saving xarray.Dataset to {output_path}")
-                # Create a dummy file to show it worked
-                with open(output_path, "w") as f:
-                    f.write(f"Mock SWE-GNN data from {path}")
-
-            def close(self):
-                # Add a close method to mimic xarray.Dataset
-                pass
-
-        # Check if the mock path exists, as the real function would
-        if path is None or not os.path.exists(path):
-            raise FileNotFoundError(f"Mock or real: Path not found at {path}")
-
-        return MockDataset()
-
-
-# --- Helper Function ---
+from adforce.mesh import swegnn_dg_from_mesh_ds_from_path
 
 
 def find_best_run_from_json(json_path: str) -> Optional[str]:
@@ -127,9 +89,6 @@ def find_best_run_from_json(json_path: str) -> Optional[str]:
     return best_run_path
 
 
-# --- Core Worker Function ---
-
-
 def convert_best_bo_run_to_swegnn(
     bayesopt_run_folder: str, output_nc_path: str
 ) -> None:
@@ -164,7 +123,9 @@ def convert_best_bo_run_to_swegnn(
     swegnn_ds = None
     try:
         print(f"  Converting {best_run_path} to SWE-GNN format...")
-        swegnn_ds = swegnn_dg_from_mesh_ds_from_path(path=best_run_path)
+        swegnn_ds = swegnn_dg_from_mesh_ds_from_path(
+            path=best_run_path, time_downsampling=7
+        )
 
         print(f"  Saving to {output_nc_path}...")
         swegnn_ds.to_netcdf(output_nc_path)
