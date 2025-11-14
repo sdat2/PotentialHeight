@@ -194,7 +194,7 @@ def process_all_bo_runs(
         base_exp_dir: The root directory where all BO folders live
                       (e.g., '/work/n01/n01/sithom/adcirc-swan/tcpips/exp').
         output_base_dir: The target directory to save .nc files
-                         (e.g., '/work/n01/n01/sithom/adcirc-swan/SurenetTestPH').
+                         (e.g., '/work/n01/n01/sithom/adcirc-swan/SurgenetTestPH').
         folder_names: A list of string names for the subfolders within
                       `base_exp_dir` to process.
         skip_existing: If True, skips processing if the output .nc file
@@ -216,7 +216,10 @@ def process_all_bo_runs(
         input_folder_path = os.path.join(base_exp_dir, folder_name)
 
         # 2. Construct output filename and path
-        output_name = folder_name.replace("-", "_") + ".nc"
+        output_name = (
+            folder_name.replace("-", "_").replace("galverston", "galveston")
+            + ".nc"  # get rid of embarrassing typo
+        )
         output_file_path = os.path.join(output_base_dir, output_name)
 
         # 3. Check if we should skip
@@ -245,10 +248,12 @@ if __name__ == "__main__":
 
     # 2. Define your batch job parameters
     BASE_EXP_DIR = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp"
-    OUTPUT_DATA_DIR = "/work/n01/n01/sithom/adcirc-swan/SurenetTestPH"
+    OUTPUT_DATA_DIR = "/work/n01/n01/sithom/adcirc-swan/SurgeNetTestPH"
 
     # This is the raw string you provided
-    RAW_FOLDER_LIST_STRING = """
+    RAW_FOLDER_LIST_STRING = """galverston-2015-1 galverson-2015-2 galverston-2015-3 galverston-2100-1 galverston-2100-2 galverston-2100-3 miami-2015-1 miami-2015-2 miami-2015-3 miami-2100-1 miami-2100-2 miami-2100-3 new-orleans-2015-1 new-orleans-2015-2 new-orleans-2015-3 new-orleans-2100-1 new-orleans-2100-2 new-orleans-2100-3"""
+
+    """
     2d-ani-1             galverston-2015-3      galverston-2100-8  miami-2100-11           new-orleans-2015-6
     8729840-2015           galverston-2015-3-ei   galverston-2100-9  miami-2100-2            new-orleans-2015-7
     8729840-2100           galverston-2015-4      miami-2015         miami-2100-2-ei         new-orleans-2015-8
