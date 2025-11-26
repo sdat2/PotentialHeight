@@ -1,3 +1,9 @@
+v0.1.3:
+- Created ability to transform data to required dual graph format for SurgeNet training in `adforce/mesh.py`.
+- Created training datasets needed to create the SurgeNet model, by forcing the ADCIRC model with IBTrACS storms from 1980-2024 in `adforce/generate_training_data.py`.
+- Created the potential height test set for SurgeNet training in `adbo/create_test_set.py`.
+
+
 v0.1.2:
 - Improved logic for filling in temperature and humidity profile.
 - Actually managed to calculate potential sizes on ERA5 Aug/Feb data 1980-2024 for the whole grid 40S to 40N by burning 2000 node hours (128 CPUs per node) on Archer2. This shows parallelization works, but still very strong constraints. 99% of compute is still on the CLE15 profile calculation.
