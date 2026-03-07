@@ -30,7 +30,7 @@ from typing import Tuple, Union, Optional, Dict
 import os
 from numpy.typing import NDArray
 import numpy as np
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, PchipInterpolator
 from scipy.optimize import root_scalar
 import warnings
 import matplotlib.pyplot as plt  # Optional: For plotting example
@@ -635,190 +635,115 @@ def _er11_radprof(
         return np.full_like(rr_ER11, np.nan), np.nan
     dr = rr_ER11[1] - rr_ER11[0]  # Assumes uniform spacing
 
+    # Convergence thresholds (matching MATLAB ER11_radprof.m)
+    vmax_conv_thresh = 1e-2   # Relative error for Vmax
+    rin_conv_thresh = dr / 2.0 if dr > 0 else 1.0  # Half grid step for r_in (m)
+
     # Initial guess for internal parameters = target values
     Vmax_current = Vmax_target
     r_in_current = r_in_target
 
-    max_iter = 25  # Max iterations to prevent infinite loops
-    n_iter = 0
+    # MATLAB uses a nested loop: outer loop adjusts r_in; inner loop converges
+    # Vmax.  Max 20 outer iterations before declaring failure (matching MATLAB).
+    max_outer = 20
+    n_outer = 0
     converged = False
 
-    V_ER11 = np.full_like(rr_ER11, np.nan)  # Initialize output
+    V_ER11 = np.full_like(rr_ER11, np.nan)
     r_out_prof = np.nan
 
-    while n_iter < max_iter:
-        n_iter += 1
+    def _get_profile_rmax(V_raw, rr):
+        """Return (Vmax_prof, rmax_prof) from a raw ER11 profile array."""
+        clean = ~np.isnan(V_raw) & (V_raw >= 0)
+        if not np.any(clean):
+            return 0.0, np.nan
+        V_c = V_raw[clean]
+        r_c = rr[clean]
+        imax = np.argmax(V_c)
+        return float(V_c[imax]), float(r_c[imax])
 
-        # Calculate raw profile with current internal parameters
-        V_ER11_raw, r_out_raw = _er11_radprof_raw(
+    # --- Outer loop: converge r_in ---
+    while n_outer < max_outer:
+        n_outer += 1
+
+        # --- Inner loop: converge Vmax (MATLAB's inner while) ---
+        n_inner = 0
+        max_inner = 20
+        while n_inner < max_inner:
+            n_inner += 1
+            V_raw, r_out_raw = _er11_radprof_raw(
+                Vmax_current, r_in_current, rmax_or_r0, fcor, CkCd, rr_ER11
+            )
+            if np.all(np.isnan(V_raw)):
+                # Raw profile failed; propagate failure upward
+                V_ER11.fill(np.nan)
+                r_out_prof = np.nan
+                return V_ER11, r_out_prof
+
+            Vmax_prof, _ = _get_profile_rmax(V_raw, rr_ER11)
+            dVmax = Vmax_target - Vmax_prof
+
+            if abs(dVmax / max(Vmax_target, 1e-9)) < vmax_conv_thresh:
+                break  # Vmax converged
+
+            Vmax_current = max(Vmax_current + dVmax, 1.0)
+
+        # --- Check r_in convergence ---
+        # Re-evaluate with fully-converged Vmax
+        V_raw, r_out_raw = _er11_radprof_raw(
             Vmax_current, r_in_current, rmax_or_r0, fcor, CkCd, rr_ER11
         )
-
-        # Check if raw calculation failed
-        if np.all(np.isnan(V_ER11_raw)):
-            warnings.warn(
-                f"ER11 convergence failed: Raw profile calculation returned NaNs (iter {n_iter})."
-            )
-            V_ER11.fill(np.nan)  # Ensure output is NaN
-            r_out_prof = np.nan
-            break  # Exit loop
-
-        # --- Calculate profile properties (Vmax_prof, r_in_prof) ---
-        # Use cleaned profile (non-NaN, non-negative V)
-        clean_mask = ~np.isnan(V_ER11_raw) & (V_ER11_raw >= 0)
-        rr_clean = rr_ER11[clean_mask]
-        V_clean = V_ER11_raw[clean_mask]
-
-        if len(rr_clean) < 2:
-            warnings.warn(
-                f"ER11 convergence failed: Raw profile had < 2 valid points (iter {n_iter})."
-            )
+        if np.all(np.isnan(V_raw)):
             V_ER11.fill(np.nan)
             r_out_prof = np.nan
-            break
+            return V_ER11, r_out_prof
 
-        Vmax_prof = np.max(V_clean) if len(V_clean) > 0 else 0.0
-        imax_prof = np.argmax(V_clean) if Vmax_prof > 0 else -1
+        Vmax_prof, rmax_prof = _get_profile_rmax(V_raw, rr_ER11)
 
-        r_in_prof = np.nan
+        # Compute r_in error depending on mode (matching MATLAB switch)
         if rmax_or_r0.lower() == "rmax":
-            if Vmax_prof > 0:
-                rmax_prof = rr_clean[imax_prof]
-                r_in_prof = rmax_prof
-            else:
-                warnings.warn(
-                    f"ER11 convergence: Could not find Vmax > 0 in profile (iter {n_iter})."
-                )
-                # Keep r_in_prof as NaN, likely loop will break or adjust badly
-
-        elif rmax_or_r0.lower() == "r0":
-            # Interpolate for r0 (similar logic as in _er11_radprof_raw)
-            if imax_prof != -1:
-                r_outer = rr_clean[imax_prof:]
-                V_outer = V_clean[imax_prof:]
-                if len(r_outer) >= 2 and V_outer[0] > 1e-6:
-                    try:
-                        # Find monotonic decreasing part
-                        dV = np.diff(V_outer)
-                        first_increase_idx = np.where(dV >= 0)[0]
-                        end_idx = (
-                            first_increase_idx[0] + 1
-                            if len(first_increase_idx) > 0
-                            else len(r_outer)
-                        )
-                        if end_idx < 2:
-                            end_idx = 2
-                        r_outer_interp = r_outer[:end_idx]
-                        V_outer_interp = V_outer[:end_idx]
-
-                        if (
-                            len(r_outer_interp) >= 2
-                            and V_outer_interp[-1] < V_outer_interp[0]
-                        ):
-                            # Try linear interp first
-                            interp_func = interp1d(
-                                V_outer_interp,
-                                r_outer_interp,
-                                kind="linear",
-                                bounds_error=False,
-                                fill_value=np.nan,
-                            )
-                            r0_prof_interp = interp_func(0.0)
-                            if (
-                                np.isnan(r0_prof_interp)
-                                or r0_prof_interp <= rr_clean[imax_prof]
-                            ):
-                                # Try PCHIP
-                                if len(r_outer_interp) >= 3:
-                                    try:
-                                        interp_func_pchip = interp1d(
-                                            V_outer_interp,
-                                            r_outer_interp,
-                                            kind="pchip",
-                                            bounds_error=False,
-                                            fill_value=np.nan,
-                                        )
-                                        r0_prof_interp = interp_func_pchip(0.0)
-                                        if (
-                                            np.isnan(r0_prof_interp)
-                                            or r0_prof_interp <= rr_clean[imax_prof]
-                                        ):
-                                            r0_prof_interp = np.nan  # Mark as failed
-                                    except ValueError:
-                                        r0_prof_interp = np.nan
-                                else:
-                                    r0_prof_interp = np.nan
-                            r_in_prof = (
-                                r0_prof_interp  # Assign result (or NaN if failed)
-                            )
-                        else:
-                            r_in_prof = np.nan  # Not decreasing or too few points
-                    except ValueError:
-                        r_in_prof = np.nan  # Interpolation error
+            drin = r_in_target - rmax_prof
+        else:  # r0 mode: interpolate the profile's zero-wind radius
+            clean = ~np.isnan(V_raw) & (V_raw >= 0)
+            rr_c = rr_ER11[clean]
+            V_c = V_raw[clean]
+            imax = int(np.argmax(V_c)) if len(V_c) > 0 else 0
+            r_outer = rr_c[imax:]
+            V_outer = V_c[imax:]
+            try:
+                if len(r_outer) >= 2 and V_outer[-1] < V_outer[0]:
+                    r0_interp = interp1d(
+                        V_outer, r_outer, kind="linear",
+                        bounds_error=False, fill_value=np.nan
+                    )(0.0)
                 else:
-                    r_in_prof = np.nan  # Vmax=0 or too few points
-            else:
-                r_in_prof = np.nan  # No Vmax found
+                    r0_interp = np.nan
+            except ValueError:
+                r0_interp = np.nan
+            drin = r_in_target - (r0_interp if not np.isnan(r0_interp) else r_in_current)
 
-        # --- Check for convergence ---
-        # Need valid profile values to check
-        valid_check = Vmax_prof > 0 and not np.isnan(r_in_prof)
+        dVmax_final = Vmax_target - Vmax_prof
 
-        if valid_check:
-            # Calculate errors
-            # Use relative error for Vmax, absolute error for r_in (like MATLAB)
-            dVmax_err = Vmax_target - Vmax_prof
-            drin_err = r_in_target - r_in_prof
-
-            # Convergence criteria (similar to MATLAB)
-            vmax_conv_thresh = 1e-2  # Relative error for Vmax
-            # Use half the grid spacing for r_in error (absolute)
-            # Handle potential zero dr case
-            rin_conv_thresh = dr / 2.0 if dr > 0 else 1.0  # Use 1m if dr=0
-
-            if (
-                abs(dVmax_err / Vmax_target) < vmax_conv_thresh
-                and abs(drin_err) < rin_conv_thresh
-            ):
-                converged = True
-                V_ER11 = V_ER11_raw  # Store the converged profile
-                r_out_prof = r_out_raw  # Store the corresponding r_out
-                break  # Exit loop
-
-            # --- Adjust internal parameters for next iteration ---
-            # Simple additive adjustment based on error (like MATLAB)
-            # Adjust r_in first, then Vmax
-            r_in_current = r_in_current + drin_err
-            Vmax_current = Vmax_current + dVmax_err
-
-            # Add basic checks to prevent parameters becoming non-physical
-            if r_in_current <= 0:
-                warnings.warn(
-                    f"ER11 convergence: r_in_current became non-positive ({r_in_current:.2f}). Resetting slightly positive."
-                )
-                r_in_current = 1.0  # Reset to small positive value
-            if Vmax_current <= 0:
-                warnings.warn(
-                    f"ER11 convergence: Vmax_current became non-positive ({Vmax_current:.2f}). Resetting slightly positive."
-                )
-                Vmax_current = 1.0  # Reset to small positive value
-
-        else:
-            # Profile calculation failed to produce valid Vmax/r_in_prof
-            warnings.warn(
-                f"ER11 convergence: Profile Vmax or r_in calculation failed (iter {n_iter}). Stopping."
-            )
-            V_ER11.fill(np.nan)
-            r_out_prof = np.nan
+        # Check full convergence
+        if (
+            abs(drin) < rin_conv_thresh
+            and abs(dVmax_final / max(Vmax_target, 1e-9)) < vmax_conv_thresh
+        ):
+            converged = True
+            V_ER11 = V_raw
+            r_out_prof = r_out_raw
             break
 
-    # End of while loop
+        # Adjust r_in for next outer iteration
+        r_in_current = max(r_in_current + drin, 1.0)
+
     if not converged:
         warnings.warn(
-            f"ER11 profile did not converge within {max_iter} iterations "
-            f"for target Vmax={Vmax_target:.1f}, r_in={r_in_target/1000:.1f} km ({rmax_or_r0}), Ck/Cd={CkCd:.2f}."
+            f"ER11 profile did not converge within {max_outer} outer iterations "
+            f"for target Vmax={Vmax_target:.1f}, r_in={r_in_target/1000:.1f} km "
+            f"({rmax_or_r0}), Ck/Cd={CkCd:.2f}."
         )
-        V_ER11.fill(np.nan)  # Ensure output is NaN if not converged
+        V_ER11.fill(np.nan)
         r_out_prof = np.nan
 
     return V_ER11, r_out_prof
@@ -1153,147 +1078,158 @@ def chavas_et_al_2015_profile(
     # Search for rmaxr0 where ER11 M/M0 curve becomes tangent to E04 curve.
     # We iterate rmaxr0 and check for intersections between the profiles.
     # Tangency occurs when the number of intersections transitions from >=1 to 0.
+    #
+    # Outer loop: if no solution found, nudge CkCd upward by 0.1 (matching
+    # the MATLAB fallback in ER11E04_nondim_r0input.m's soln_converged loop).
 
-    rmaxr0_min = 0.001
-    rmaxr0_max = 0.75  # Initial search range from MATLAB
-    rmaxr0_final = np.nan
-    rmerger0 = np.nan
-    MmergeM0 = np.nan
-    VV_ER11_final = None  # Store the profile associated with this
-    rr_ER11_final = None  # Store the matching radius vector for VV_ER11_final
-
-    max_iter_merge = 50  # Max iterations for rmaxr0 search
-    drmaxr0_thresh = 1e-6  # Convergence threshold for rmaxr0
-    iter_merge = 0
     soln_converged = False
-    last_valid_rmaxr0 = None  # Keep track of last rmaxr0 that gave intersections
+    ckcd_adjusted = False
+    while not soln_converged:
 
-    # Store results from last successful intersection check
-    rmerger0_last = np.nan
-    MmergeM0_last = np.nan
+        rmaxr0_min = 0.001
+        rmaxr0_max = 0.75  # Initial search range from MATLAB
+        rmaxr0_final = np.nan
+        rmerger0 = np.nan
+        MmergeM0 = np.nan
+        VV_ER11_final = None  # Store the profile associated with this
+        rr_ER11_final = None  # Store the matching radius vector for VV_ER11_final
 
-    # Bisection search loop
-    rmaxr0_low = rmaxr0_min
-    rmaxr0_high = rmaxr0_max
+        max_iter_merge = 50  # Max iterations for rmaxr0 search
+        drmaxr0_thresh = 1e-6  # Convergence threshold for rmaxr0
+        iter_merge = 0
+        last_valid_rmaxr0 = None  # Keep track of last rmaxr0 that gave intersections
 
-    while iter_merge < max_iter_merge:
-        iter_merge += 1
-        rmaxr0_guess = (rmaxr0_low + rmaxr0_high) / 2.0
+        # Store results from last successful intersection check
+        rmerger0_last = np.nan
+        MmergeM0_last = np.nan
 
-        # Calculate ER11 profile for this rmaxr0_guess
-        rmax_guess = rmaxr0_guess * r0
-        drfracrm = 0.01  # Grid spacing relative to rmax for ER11 calc
-        if rmax_guess > 100 * 1000:
-            drfracrm /= 10.0
-        rfracrm_max_er11 = 50.0  # Extend ER11 profile far out
-        # Ensure enough points, especially if drfracrm is small
-        num_pts_er11 = max(500, int(rfracrm_max_er11 / drfracrm) + 1)
-        rrfracrm_ER11 = np.linspace(0, rfracrm_max_er11, num_pts_er11)
-        rr_ER11 = rrfracrm_ER11 * rmax_guess
+        # Bisection search loop
+        rmaxr0_low = rmaxr0_min
+        rmaxr0_high = rmaxr0_max
+        bisect_converged = False
 
-        # Use the converging ER11 function
-        V_ER11, _ = _er11_radprof(Vmax, rmax_guess, "rmax", fcor, CkCd, rr_ER11)
+        while iter_merge < max_iter_merge:
+            iter_merge += 1
+            rmaxr0_guess = (rmaxr0_low + rmaxr0_high) / 2.0
 
-        # Check if ER11 calculation succeeded
-        if np.all(np.isnan(V_ER11)):
-            warnings.warn(
-                f"Merge search: ER11 profile failed for rmaxr0_guess={rmaxr0_guess:.4f}. "
-                f"Assuming rmaxr0 is too low (reducing Ro). Adjusting search range."
-            )
-            # If ER11 fails, it often means Ro=Vmax/(f*rmax) is too high,
-            # which implies rmax (and rmaxr0) is too small.
-            # Treat as if no intersection found, increase lower bound.
-            rmaxr0_low = rmaxr0_guess
-            num_intersections = 0
-        else:
-            # Convert ER11 profile to M/M0 vs r/r0 space
-            # Ensure rr_ER11 > 0 for M calculation where V is defined
-            valid_er11_mask = ~np.isnan(V_ER11) & (rr_ER11 > 1e-9)
-            rr_ER11_valid = rr_ER11[valid_er11_mask]
-            V_ER11_valid = V_ER11[valid_er11_mask]
+            # Calculate ER11 profile for this rmaxr0_guess
+            rmax_guess = rmaxr0_guess * r0
+            drfracrm = 0.01  # Grid spacing relative to rmax for ER11 calc
+            if rmax_guess > 100 * 1000:
+                drfracrm /= 10.0
+            rfracrm_max_er11 = 50.0  # Extend ER11 profile far out
+            # Ensure enough points, especially if drfracrm is small
+            num_pts_er11 = max(500, int(rfracrm_max_er11 / drfracrm) + 1)
+            rrfracrm_ER11 = np.linspace(0, rfracrm_max_er11, num_pts_er11)
+            rr_ER11 = rrfracrm_ER11 * rmax_guess
 
-            if len(rr_ER11_valid) < 2:
+            # Use the converging ER11 function
+            V_ER11, _ = _er11_radprof(Vmax, rmax_guess, "rmax", fcor, CkCd, rr_ER11)
+
+            # Check if ER11 calculation succeeded
+            if np.all(np.isnan(V_ER11)):
                 warnings.warn(
-                    f"Merge search: ER11 profile valid points < 2 for rmaxr0_guess={rmaxr0_guess:.4f}."
+                    f"Merge search: ER11 profile failed for rmaxr0_guess={rmaxr0_guess:.4f}. "
+                    f"Assuming rmaxr0 is too low (reducing Ro). Adjusting search range."
                 )
-                # Treat as failure, adjust search range (assume too low)
+                # If ER11 fails, it often means Ro=Vmax/(f*rmax) is too high,
+                # which implies rmax (and rmaxr0) is too small.
+                # Treat as if no intersection found, increase lower bound.
                 rmaxr0_low = rmaxr0_guess
                 num_intersections = 0
             else:
-                MM_ER11 = rr_ER11_valid * V_ER11_valid + 0.5 * fcor * rr_ER11_valid**2
-                rrfracr0_ER11 = rr_ER11_valid / r0
-                MMfracM0_ER11 = MM_ER11 / M0_E04
+                # Convert ER11 profile to M/M0 vs r/r0 space
+                # Ensure rr_ER11 > 0 for M calculation where V is defined
+                valid_er11_mask = ~np.isnan(V_ER11) & (rr_ER11 > 1e-9)
+                rr_ER11_valid = rr_ER11[valid_er11_mask]
+                V_ER11_valid = V_ER11[valid_er11_mask]
 
-                # Find intersections between E04 and ER11 curves
-                x_intersect, y_intersect = _curve_intersect(
-                    rrfracr0_E04, MMfracM0_E04, rrfracr0_ER11, MMfracM0_ER11
-                )
-                num_intersections = len(x_intersect)
+                if len(rr_ER11_valid) < 2:
+                    warnings.warn(
+                        f"Merge search: ER11 profile valid points < 2 for rmaxr0_guess={rmaxr0_guess:.4f}."
+                    )
+                    # Treat as failure, adjust search range (assume too low)
+                    rmaxr0_low = rmaxr0_guess
+                    num_intersections = 0
+                else:
+                    MM_ER11 = rr_ER11_valid * V_ER11_valid + 0.5 * fcor * rr_ER11_valid**2
+                    rrfracr0_ER11 = rr_ER11_valid / r0
+                    MMfracM0_ER11 = MM_ER11 / M0_E04
 
-        # Adjust search range based on intersections
-        if num_intersections == 0:
-            # No intersections -> rmaxr0 too small (ER11 curve below E04)
-            # Increase the lower bound
-            rmaxr0_low = rmaxr0_guess
-        else:
-            # Intersection(s) found -> rmaxr0 too large (ER11 curve crosses E04)
-            # Decrease the upper bound
-            rmaxr0_high = rmaxr0_guess
-            # Store this as a potential candidate for the merge point
-            last_valid_rmaxr0 = rmaxr0_guess
-            # Use the mean of intersection points (like MATLAB) as estimate
-            rmerger0_last = np.mean(x_intersect)
-            MmergeM0_last = np.mean(y_intersect)
-            VV_ER11_final = V_ER11  # Store the profile associated with this
-            rr_ER11_final = rr_ER11  # Keep the radius vector in sync
+                    # Find intersections between E04 and ER11 curves
+                    x_intersect, y_intersect = _curve_intersect(
+                        rrfracr0_E04, MMfracM0_E04, rrfracr0_ER11, MMfracM0_ER11
+                    )
+                    num_intersections = len(x_intersect)
 
-        # Check for convergence
-        if (rmaxr0_high - rmaxr0_low) < drmaxr0_thresh:
-            soln_converged = True
-            # The final rmaxr0 should be the highest value that still had
-            # intersections (or very close to it). Use last_valid_rmaxr0.
-            if last_valid_rmaxr0 is not None:
-                rmaxr0_final = last_valid_rmaxr0
-                rmerger0 = rmerger0_last
-                MmergeM0 = MmergeM0_last
+            # Adjust search range based on intersections
+            if num_intersections == 0:
+                # No intersections -> rmaxr0 too small (ER11 curve below E04)
+                # Increase the lower bound
+                rmaxr0_low = rmaxr0_guess
             else:
-                # This happens if no intersections were ever found (E04 always above ER11)
-                # Could indicate parameter issue or model limitation.
-                # Use the upper bound of the search as a best guess? Or fail.
+                # Intersection(s) found -> rmaxr0 too large (ER11 curve crosses E04)
+                # Decrease the upper bound
+                rmaxr0_high = rmaxr0_guess
+                # Store this as a potential candidate for the merge point
+                last_valid_rmaxr0 = rmaxr0_guess
+                # Use the mean of intersection points (like MATLAB) as estimate
+                rmerger0_last = np.mean(x_intersect)
+                MmergeM0_last = np.mean(y_intersect)
+                VV_ER11_final = V_ER11  # Store the profile associated with this
+                rr_ER11_final = rr_ER11  # Keep the radius vector in sync
+
+            # Check for convergence of the inner bisection
+            if (rmaxr0_high - rmaxr0_low) < drmaxr0_thresh:
+                bisect_converged = True
+                if last_valid_rmaxr0 is not None:
+                    rmaxr0_final = last_valid_rmaxr0
+                    rmerger0 = rmerger0_last
+                    MmergeM0 = MmergeM0_last
+                    soln_converged = True  # Valid solution found
+                else:
+                    # Bisection converged but never found an intersection:
+                    # ER11 curve was always below E04 → CkCd too low.
+                    warnings.warn(
+                        "Merge search converged with no intersections ever found. "
+                        "Will nudge CkCd upward (MATLAB fallback)."
+                    )
+                    bisect_converged = True  # stop inner loop
+                break  # Exit bisection while loop
+
+        # --- End of bisection loop ---
+
+        if not bisect_converged:
+            # Ran out of iterations without bisection converging
+            warnings.warn(
+                f"Bisection did not converge within {max_iter_merge} iterations "
+                f"(CkCd={CkCd:.3f}). Nudging CkCd."
+            )
+
+        if not soln_converged:
+            # MATLAB fallback: increment CkCd by 0.1 and retry the whole bisection.
+            if ckcd_adjusted and CkCd >= 3.0:
+                # Safety valve: avoid infinite loop if CkCd becomes unreasonably large
                 warnings.warn(
-                    "Merge search converged, but no intersections ever found. Using upper bound."
+                    f"Merge process failed even after CkCd adjustments (CkCd={CkCd:.3f}). "
+                    "Returning NaNs."
                 )
-                rmaxr0_final = rmaxr0_high  # Or potentially fail here
-                # Need to recalculate ER11 and find closest point if we proceed
-                soln_converged = False  # Mark as not truly converged
+                nan_arr = np.array([np.nan])
+                return (
+                    nan_arr, nan_arr,
+                    np.nan, np.nan, np.nan,
+                    nan_arr, nan_arr,
+                    np.nan, np.nan, np.nan, np.nan,
+                )
+            warnings.warn(
+                f"Adjusting CkCd from {CkCd:.3f} to {CkCd + 0.1:.3f} to find convergence "
+                "(matching MATLAB ER11E04_nondim_r0input fallback)."
+            )
+            CkCd += 0.1
+            ckcd_adjusted = True
+            # soln_converged remains False → outer while loop retries
 
-            break  # Exit loop
-
-    # End of merge search loop
-
-    if not soln_converged or np.isnan(rmaxr0_final):
-        # Try adjusting CkCd slightly if convergence failed (like MATLAB fallback)
-        warnings.warn(
-            f"Merge search failed to converge or find valid rmaxr0. Trying CkCd adjustment (current={CkCd:.3f})."
-        )
-        # This part is complex to replicate exactly without deeper analysis.
-        # For now, we will just fail if the primary search fails.
-        # A more robust implementation might try small CkCd adjustments.
-        warnings.warn("Merge process failed. Returning NaNs.")
-        nan_arr = np.array([np.nan])
-        return (
-            nan_arr,
-            nan_arr,
-            np.nan,
-            np.nan,
-            np.nan,
-            nan_arr,
-            nan_arr,
-            np.nan,
-            np.nan,
-            np.nan,
-            np.nan,
-        )
+    # --- End of outer soln_converged loop ---
 
     # Ensure the radius vector matches the stored profile
     if rr_ER11_final is None:
@@ -1389,19 +1325,15 @@ def chavas_et_al_2015_profile(
             np.nan,
         )
 
-    interp_ER11 = interp1d(
+    interp_ER11 = PchipInterpolator(
         rrfracrm_ER11_interp[unique_er11_idx],
         MMfracMm_ER11_interp[unique_er11_idx],
-        kind="linear",
-        bounds_error=False,
-        fill_value=np.nan,
+        extrapolate=False,  # Return NaN outside range, matching MATLAB behaviour
     )
-    interp_E04 = interp1d(
+    interp_E04 = PchipInterpolator(
         rrfracrm_E04_interp[unique_e04_idx],
         MMfracMm_E04_interp[unique_e04_idx],
-        kind="linear",
-        bounds_error=False,
-        fill_value=np.nan,
+        extrapolate=False,  # Return NaN outside range, matching MATLAB behaviour
     )
 
     # Merge profiles based on rmerger0
