@@ -197,7 +197,7 @@ def _er11_profile_nb(
         base = 2.0 * ros2 / denom
         if base <= 0.0:
             continue
-        V[i] = (Mm / r) * (base ** exp) - 0.5 * fcor * r
+        V[i] = (Mm / r) * (base**exp) - 0.5 * fcor * r
         if V[i] < 0.0:
             V[i] = 0.0
 
@@ -206,8 +206,10 @@ def _er11_profile_nb(
 
 @njit(cache=True)
 def _curve_intersect_count_nb(
-    x1: NDArray, y1: NDArray,
-    x2: NDArray, y2: NDArray,
+    x1: NDArray,
+    y1: NDArray,
+    x2: NDArray,
+    y2: NDArray,
     nx: int,
 ) -> Tuple[float, float, int]:
     """
@@ -226,7 +228,11 @@ def _curve_intersect_count_nb(
     """
     # Overlap range
     x_lo = x1[0] if x1[0] > x2[0] else x2[0]
-    x_hi = x1[x1.shape[0] - 1] if x1[x1.shape[0] - 1] < x2[x2.shape[0] - 1] else x2[x2.shape[0] - 1]
+    x_hi = (
+        x1[x1.shape[0] - 1]
+        if x1[x1.shape[0] - 1] < x2[x2.shape[0] - 1]
+        else x2[x2.shape[0] - 1]
+    )
 
     if x_lo >= x_hi:
         return np.nan, np.nan, 0
@@ -336,16 +342,16 @@ def _bisect_rmaxr0_nb(
     VV_ER11_best : 1-D array
         Wind-speed array for the best ER11 profile (m/s).
     """
-    rmaxr0_low  = rmaxr0_lo
+    rmaxr0_low = rmaxr0_lo
     rmaxr0_high = rmaxr0_hi
 
     last_valid_rmaxr0 = np.nan
-    rmerger0_last  = np.nan
-    MmergeM0_last  = np.nan
+    rmerger0_last = np.nan
+    MmergeM0_last = np.nan
 
     # Allocate ER11 arrays (fixed size across iterations)
-    rr_ER11     = np.empty(num_pts_er11, dtype=np.float64)
-    VV_ER11     = np.empty(num_pts_er11, dtype=np.float64)
+    rr_ER11 = np.empty(num_pts_er11, dtype=np.float64)
+    VV_ER11 = np.empty(num_pts_er11, dtype=np.float64)
     rr_ER11_best = np.empty(num_pts_er11, dtype=np.float64)
     VV_ER11_best = np.empty(num_pts_er11, dtype=np.float64)
     rr_ER11_best[:] = np.nan
@@ -355,7 +361,7 @@ def _bisect_rmaxr0_nb(
 
     for _it in range(max_iter):
         rmaxr0_guess = 0.5 * (rmaxr0_low + rmaxr0_high)
-        rmax_guess   = rmaxr0_guess * r0
+        rmax_guess = rmaxr0_guess * r0
 
         # Build ER11 radius grid — cap at r0 so no points are wasted beyond
         # the E04 domain; this also avoids spurious boundary intersections.
@@ -370,10 +376,10 @@ def _bisect_rmaxr0_nb(
         # This matches what the Python reference code does with _er11_radprof().
         Vmax_cur = Vmax
         rmax_cur = rmax_guess
-        dr_step  = rr_ER11[1] - rr_ER11[0]
+        dr_step = rr_ER11[1] - rr_ER11[0]
 
         for _conv in range(max_conv):
-            Mm_cur  = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur
+            Mm_cur = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur
             VV_ER11 = _er11_profile_nb(rr_ER11, Mm_cur, rmax_cur, fcor, CkCd)
 
             Vmax_prof = 0.0
@@ -388,8 +394,8 @@ def _bisect_rmaxr0_nb(
                 break
 
             rmax_prof = rr_ER11[imax_prof]
-            dV_err   = Vmax       - Vmax_prof
-            dr_err   = rmax_guess - rmax_prof
+            dV_err = Vmax - Vmax_prof
+            dr_err = rmax_guess - rmax_prof
 
             if abs(dV_err / Vmax) < 1e-2 and abs(dr_err) < dr_step * 0.5:
                 break
@@ -401,7 +407,7 @@ def _bisect_rmaxr0_nb(
 
         # Final evaluation with converged parameters
         Mm_final = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur
-        VV_ER11  = _er11_profile_nb(rr_ER11, Mm_final, rmax_cur, fcor, CkCd)
+        VV_ER11 = _er11_profile_nb(rr_ER11, Mm_final, rmax_cur, fcor, CkCd)
 
         # Convert ER11 to (r/r0, M/M0) space, clipping to r <= r0
         # (points beyond r0 cause spurious boundary intersections)
@@ -430,8 +436,10 @@ def _bisect_rmaxr0_nb(
 
         # Find intersections between E04 and ER11 curves
         x_mean, y_mean, n_cross = _curve_intersect_count_nb(
-            rrfracr0_E04, MMfracM0_E04,
-            rrfracr0_ER11, MMfracM0_ER11,
+            rrfracr0_E04,
+            MMfracM0_E04,
+            rrfracr0_ER11,
+            MMfracM0_ER11,
             nx_intersect,
         )
 
@@ -468,7 +476,7 @@ def _e04_outerwind_r0input_nondim_mm0(
 ) -> Tuple[NDArray, NDArray]:
     """E04 outer profile.  Euler loop is compiled with numba."""
     fcor = abs(fcor)
-    M0 = 0.5 * fcor * r0 ** 2
+    M0 = 0.5 * fcor * r0**2
 
     drfracr0 = 0.001
     if r0 > 2500e3 or r0 < 200e3:
@@ -495,11 +503,11 @@ def _er11_rmax_r0_relation(rmax_var, Vmax, r0, fcor, CkCd):
     """Implicit ER11 relation (root = 0).  Same as cle15.py."""
     if rmax_var <= 0 or rmax_var >= r0:
         return np.inf
-    M0 = 0.5 * fcor * r0 ** 2
-    Mm = Vmax * rmax_var + 0.5 * fcor * rmax_var ** 2
+    M0 = 0.5 * fcor * r0**2
+    Mm = Vmax * rmax_var + 0.5 * fcor * rmax_var**2
     if Mm <= 0 or (2.0 - CkCd) == 0:
         return np.inf
-    ratio_M  = M0 / Mm
+    ratio_M = M0 / Mm
     ratio_r2 = (r0 / rmax_var) ** 2
     lhs = ratio_M ** (2.0 - CkCd)
     denom_rhs = 2.0 - CkCd + CkCd * ratio_r2
@@ -522,7 +530,7 @@ def _er11_radprof_raw(
     Returns V (m/s) at every point in rr_er11.
     """
     fcor = abs(fcor)
-    Mm = Vmax * rmax + 0.5 * fcor * rmax ** 2
+    Mm = Vmax * rmax + 0.5 * fcor * rmax**2
     V = _er11_profile_nb(rr_er11, Mm, rmax, fcor, CkCd)
     return V
 
@@ -611,10 +619,17 @@ def chavas_et_al_2015_profile(
     eye_adj: int,
     alpha_eye: float,
 ) -> Tuple[
-    NDArray, NDArray,
-    float, float, float,
-    NDArray, NDArray,
-    float, float, float, float,
+    NDArray,
+    NDArray,
+    float,
+    float,
+    float,
+    NDArray,
+    NDArray,
+    float,
+    float,
+    float,
+    float,
 ]:
     """
     Chavas et al. (2015) merged TC wind profile — numba-accelerated.
@@ -623,13 +638,24 @@ def chavas_et_al_2015_profile(
     """
     fcor = abs(fcor)
     _nan = np.array([np.nan])
-    _fail = (_nan, _nan, np.nan, np.nan, np.nan,
-             _nan, _nan, np.nan, np.nan, np.nan, np.nan)
+    _fail = (
+        _nan,
+        _nan,
+        np.nan,
+        np.nan,
+        np.nan,
+        _nan,
+        _nan,
+        np.nan,
+        np.nan,
+        np.nan,
+        np.nan,
+    )
 
     # --- Ck/Cd ---
     CkCd = CkCd_input
     if CkCdvary == 1:
-        CkCd = CKCD_COEFQUAD * Vmax ** 2 + CKCD_COEFLIN * Vmax + CKCD_COEFCNST
+        CkCd = CKCD_COEFQUAD * Vmax**2 + CKCD_COEFLIN * Vmax + CKCD_COEFCNST
         CkCd = max(0.5, min(1.9, CkCd))
 
     # --- Step 1: E04 outer profile ---
@@ -644,20 +670,24 @@ def chavas_et_al_2015_profile(
         warnings.warn(f"E04 failed: {e}")
         return _fail
 
-    M0 = 0.5 * fcor * r0 ** 2
+    M0 = 0.5 * fcor * r0**2
 
     # --- Step 2: Bisection to find rmaxr0 (numba kernel) ---
     # ER11 grid parameters
     rfracrm_max = 50.0
-    num_pts_er11 = 5000   # coarser grid inside bisection — enough for intersection check
-    nx_intersect = 4000   # resolution of the common grid for curve intersection
+    num_pts_er11 = 5000  # coarser grid inside bisection — enough for intersection check
+    nx_intersect = 4000  # resolution of the common grid for curve intersection
 
     rmaxr0_final, rmerger0, MmergeM0, rr_ER11_best, VV_ER11_best = _bisect_rmaxr0_nb(
-        r0, fcor, Vmax, CkCd,
+        r0,
+        fcor,
+        Vmax,
+        CkCd,
         np.ascontiguousarray(rrfracr0_E04, dtype=np.float64),
         np.ascontiguousarray(MMfracM0_E04, dtype=np.float64),
         M0,
-        0.001, 0.75,
+        0.001,
+        0.75,
         50,
         1e-6,
         rfracrm_max,
@@ -670,7 +700,7 @@ def chavas_et_al_2015_profile(
         return _fail
 
     rmax = rmaxr0_final * r0
-    Mm = Vmax * rmax + 0.5 * fcor * rmax ** 2
+    Mm = Vmax * rmax + 0.5 * fcor * rmax**2
     MmM0 = Mm / M0
 
     # --- Step 3: Final high-resolution ER11 profile ---
@@ -700,7 +730,7 @@ def chavas_et_al_2015_profile(
     valid_er11 = ~np.isnan(VV_ER11_fine) & (rr_er11_fine > 1e-9)
     rr_e11v = rr_er11_fine[valid_er11]
     VV_e11v = VV_ER11_fine[valid_er11]
-    MM_er11 = rr_e11v * VV_e11v + 0.5 * fcor * rr_e11v ** 2
+    MM_er11 = rr_e11v * VV_e11v + 0.5 * fcor * rr_e11v**2
     rrfracrm_er11_v = rr_e11v / rmax
     MMfracMm_er11_v = MM_er11 / Mm
 
@@ -718,7 +748,7 @@ def chavas_et_al_2015_profile(
         return interp1d(xu, yu, kind="linear", bounds_error=False, fill_value=np.nan)
 
     interp_ER11 = _make_interp(rrfracrm_er11_v, MMfracMm_er11_v)
-    interp_E04  = _make_interp(rrfracrm_e04_v,  MMfracMm_e04_v)
+    interp_E04 = _make_interp(rrfracrm_e04_v, MMfracMm_e04_v)
 
     rmergerfracrm = rmerger0 * r0 / rmax
     MMfracMm_merged = np.full(num_pts_final, np.nan)
@@ -737,10 +767,9 @@ def chavas_et_al_2015_profile(
     # --- Step 5: Dimensional wind speed ---
     VV_final = np.full(num_pts_final, np.nan)
     valid_r = rrfracrm_final > 1e-9
-    VV_final[valid_r] = (
-        (Mm / rmax) * (MMfracMm_merged[valid_r] / rrfracrm_final[valid_r])
-        - 0.5 * fcor * rmax * rrfracrm_final[valid_r]
-    )
+    VV_final[valid_r] = (Mm / rmax) * (
+        MMfracMm_merged[valid_r] / rrfracrm_final[valid_r]
+    ) - 0.5 * fcor * rmax * rrfracrm_final[valid_r]
     VV_final[~valid_r] = 0.0
     VV_final[VV_final < 0] = 0.0
 
@@ -772,10 +801,17 @@ def chavas_et_al_2015_profile(
         warnings.warn("Final profile has no valid wind speeds.")
 
     return (
-        rr_final, VV_final,
-        rmax_out, rmerge, Vmerge,
-        rrfracr0_final, MMfracM0_final,
-        rmaxr0_final, MmM0, rmerger0, MmergeM0,
+        rr_final,
+        VV_final,
+        rmax_out,
+        rmerge,
+        Vmerge,
+        rrfracr0_final,
+        MMfracM0_final,
+        rmaxr0_final,
+        MmM0,
+        rmerger0,
+        MmergeM0,
     )
 
 
@@ -820,10 +856,16 @@ def run_cle15(
         inputs = {}
     ins = process_inputs(inputs)
     o = chavas_et_al_2015_profile(
-        ins["Vmax"], ins["r0"], ins["fcor"],
-        ins["Cdvary"], ins["Cd"], ins["w_cool"],
-        ins["CkCdvary"], ins["CkCd"],
-        ins["eye_adj"], ins["alpha_eye"],
+        ins["Vmax"],
+        ins["r0"],
+        ins["fcor"],
+        ins["Cdvary"],
+        ins["Cd"],
+        ins["w_cool"],
+        ins["CkCdvary"],
+        ins["CkCd"],
+        ins["eye_adj"],
+        ins["alpha_eye"],
     )
     ou = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
     ou["VV"][-1] = 0
@@ -831,8 +873,12 @@ def run_cle15(
     rr = np.array(ou["rr"], dtype="float32")
     vv = np.array(ou["VV"], dtype="float32")
     p = pressure_from_wind(
-        rr, vv, p0=ins["p0"] * 100, rho0=rho0,
-        fcor=ins["fcor"], assumption=pressure_assumption,
+        rr,
+        vv,
+        p0=ins["p0"] * 100,
+        rho0=rho0,
+        fcor=ins["fcor"],
+        assumption=pressure_assumption,
     )
     return (
         float(interp1d(rr, p)(ou["rmax"])),
@@ -852,20 +898,30 @@ def profile_from_stats(
     """Same as cle15.profile_from_stats but uses the numba-accelerated kernel."""
     ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
     o = chavas_et_al_2015_profile(
-        ins["Vmax"], ins["r0"], ins["fcor"],
-        ins["Cdvary"], ins["Cd"], ins["w_cool"],
-        ins["CkCdvary"], ins["CkCd"],
-        ins["eye_adj"], ins["alpha_eye"],
+        ins["Vmax"],
+        ins["r0"],
+        ins["fcor"],
+        ins["Cdvary"],
+        ins["Cd"],
+        ins["w_cool"],
+        ins["CkCdvary"],
+        ins["CkCd"],
+        ins["eye_adj"],
+        ins["alpha_eye"],
     )
     out = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
     out["VV"][-1] = 0
     out["VV"][np.isnan(out["VV"])] = 0
     out["p"] = (
         pressure_from_wind(
-            out["rr"], out["VV"],
-            p0=p0 * 100, fcor=fcor, rho0=rho0,
+            out["rr"],
+            out["VV"],
+            p0=p0 * 100,
+            fcor=fcor,
+            rho0=rho0,
             assumption=pressure_assumption,
-        ) / 100
+        )
+        / 100
     )
     return out
 
@@ -883,10 +939,16 @@ def warmup():
     counted against the timed runs.
     """
     chavas_et_al_2015_profile(
-        Vmax=50.0, r0=500e3, fcor=5e-5,
-        Cdvary=0, C_d=1.5e-3, w_cool=2e-3,
-        CkCdvary=0, CkCd_input=1.0,
-        eye_adj=0, alpha_eye=0.15,
+        Vmax=50.0,
+        r0=500e3,
+        fcor=5e-5,
+        Cdvary=0,
+        C_d=1.5e-3,
+        w_cool=2e-3,
+        CkCdvary=0,
+        CkCd_input=1.0,
+        eye_adj=0,
+        alpha_eye=0.15,
     )
 
 

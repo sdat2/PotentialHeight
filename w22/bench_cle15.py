@@ -33,40 +33,41 @@ warnings.filterwarnings("ignore")
 
 # ── Parameter grid ───────────────────────────────────────────────────────────
 # Cover a physically plausible range of (Vmax, r0) combinations
-VMAX_VALS = [30.0, 40.0, 50.0, 60.0, 70.0]   # m/s
-R0_VALS   = [400e3, 600e3, 800e3, 1000e3, 1200e3]  # m
-FCOR_VALS = [3e-5, 5e-5, 7e-5]                # s^-1
+VMAX_VALS = [30.0, 40.0, 50.0, 60.0, 70.0]  # m/s
+R0_VALS = [400e3, 600e3, 800e3, 1000e3, 1200e3]  # m
+FCOR_VALS = [3e-5, 5e-5, 7e-5]  # s^-1
 
 # Build a flat list of test cases
 ALL_CASES: List[Tuple[float, float, float]] = [
-    (v, r, f)
-    for v in VMAX_VALS
-    for r in R0_VALS
-    for f in FCOR_VALS
+    (v, r, f) for v in VMAX_VALS for r in R0_VALS for f in FCOR_VALS
 ]
 N_CASES = len(ALL_CASES)
 
 # Shared fixed parameters (same for all cases)
-CDVARY   = 0
-C_D      = CD_DEFAULT
-W_COOL   = W_COOL_DEFAULT
+CDVARY = 0
+C_D = CD_DEFAULT
+W_COOL = W_COOL_DEFAULT
 CKCDVARY = 0
-CKCD     = CK_CD_DEFAULT
-EYE_ADJ  = 0
-ALPHA    = 0.15
+CKCD = CK_CD_DEFAULT
+EYE_ADJ = 0
+ALPHA = 0.15
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _call_py(vmax, r0, fcor):
     return cle15_py(vmax, r0, fcor, CDVARY, C_D, W_COOL, CKCDVARY, CKCD, EYE_ADJ, ALPHA)
 
+
 def _call_nb(vmax, r0, fcor):
     return cle15_nb(vmax, r0, fcor, CDVARY, C_D, W_COOL, CKCDVARY, CKCD, EYE_ADJ, ALPHA)
+
 
 def _extract_scalars(result):
     """Return (rmax_km, rmerge_km, Vmerge) from a profile result tuple."""
     _, _, rmax, rmerge, Vmerge, *_ = result
     return rmax, rmerge, Vmerge
+
 
 # ── Step 1 · Warm up numba (spin-up not counted in timing) ──────────────────
 
@@ -85,7 +86,7 @@ print(f"  JIT warm-up took {t_warmup:.2f} s\n")
 print(f"Running {N_CASES} samples with pure-Python (cle15.py) …", flush=True)
 py_results = []
 t0 = time.perf_counter()
-for (vmax, r0, fcor) in ALL_CASES:
+for vmax, r0, fcor in ALL_CASES:
     py_results.append(_call_py(vmax, r0, fcor))
 t_py = time.perf_counter() - t0
 print(f"  Total: {t_py:.2f} s  →  {t_py/N_CASES*1000:.1f} ms/call")
@@ -95,7 +96,7 @@ print(f"  Total: {t_py:.2f} s  →  {t_py/N_CASES*1000:.1f} ms/call")
 print(f"\nRunning {N_CASES} samples with numba (cle15n.py) …", flush=True)
 nb_results = []
 t0 = time.perf_counter()
-for (vmax, r0, fcor) in ALL_CASES:
+for vmax, r0, fcor in ALL_CASES:
     nb_results.append(_call_nb(vmax, r0, fcor))
 t_nb = time.perf_counter() - t0
 print(f"  Total: {t_nb:.2f} s  →  {t_nb/N_CASES*1000:.1f} ms/call")
@@ -105,7 +106,7 @@ print(f"\n  Speedup (Python → Numba): {t_py/t_nb:.1f}×")
 # ── Step 4 · Accuracy comparison ─────────────────────────────────────────────
 
 print("\nAccuracy comparison (Python vs Numba):")
-rmax_errs   = []
+rmax_errs = []
 rmerge_errs = []
 vmerge_errs = []
 n_failed_py = 0
@@ -129,40 +130,54 @@ for i, (case, py_res, nb_res) in enumerate(zip(ALL_CASES, py_results, nb_results
             vmerge_errs.append(abs(vm_py - vm_nb))
 
 if rmax_errs:
-    print(f"  rmax   : mean |err| = {np.mean(rmax_errs):.3f} %   "
-          f"max = {np.max(rmax_errs):.3f} %")
+    print(
+        f"  rmax   : mean |err| = {np.mean(rmax_errs):.3f} %   "
+        f"max = {np.max(rmax_errs):.3f} %"
+    )
 if rmerge_errs:
-    print(f"  rmerge : mean |err| = {np.mean(rmerge_errs):.3f} %   "
-          f"max = {np.max(rmerge_errs):.3f} %")
+    print(
+        f"  rmerge : mean |err| = {np.mean(rmerge_errs):.3f} %   "
+        f"max = {np.max(rmerge_errs):.3f} %"
+    )
 if vmerge_errs:
-    print(f"  Vmerge : mean |err| = {np.mean(vmerge_errs):.3f} m/s  "
-          f"max = {np.max(vmerge_errs):.3f} m/s")
+    print(
+        f"  Vmerge : mean |err| = {np.mean(vmerge_errs):.3f} m/s  "
+        f"max = {np.max(vmerge_errs):.3f} m/s"
+    )
 print(f"  Failures: Python={n_failed_py}/{N_CASES}, Numba={n_failed_nb}/{N_CASES}")
 
 # Per-case detail for first 5 cases
 print("\n  Per-case detail (first 5 cases):")
-print(f"  {'Vmax':>6}  {'r0':>8}  {'fcor':>8}  "
-      f"{'rmax_py':>9}  {'rmax_nb':>9}  {'Δrmax%':>7}  "
-      f"{'rm_py':>8}  {'rm_nb':>8}  {'ΔVm':>7}")
+print(
+    f"  {'Vmax':>6}  {'r0':>8}  {'fcor':>8}  "
+    f"{'rmax_py':>9}  {'rmax_nb':>9}  {'Δrmax%':>7}  "
+    f"{'rm_py':>8}  {'rm_nb':>8}  {'ΔVm':>7}"
+)
 for i in range(min(5, N_CASES)):
     vmax, r0, fcor = ALL_CASES[i]
     rmax_py, rmerge_py, vm_py = _extract_scalars(py_results[i])
     rmax_nb, rmerge_nb, vm_nb = _extract_scalars(nb_results[i])
     d_rmax = abs(rmax_py - rmax_nb) / rmax_py * 100 if not np.isnan(rmax_py) else np.nan
-    d_vm   = abs(vm_py - vm_nb) if not np.isnan(vm_py) else np.nan
-    print(f"  {vmax:6.0f}  {r0/1e3:8.0f}  {fcor:8.1e}  "
-          f"  {rmax_py/1e3:7.1f}    {rmax_nb/1e3:7.1f}  {d_rmax:7.3f}  "
-          f"  {rmerge_py/1e3:6.1f}  {rmerge_nb/1e3:6.1f}  {d_vm:7.3f}")
+    d_vm = abs(vm_py - vm_nb) if not np.isnan(vm_py) else np.nan
+    print(
+        f"  {vmax:6.0f}  {r0/1e3:8.0f}  {fcor:8.1e}  "
+        f"  {rmax_py/1e3:7.1f}    {rmax_nb/1e3:7.1f}  {d_rmax:7.3f}  "
+        f"  {rmerge_py/1e3:6.1f}  {rmerge_nb/1e3:6.1f}  {d_vm:7.3f}"
+    )
 
 # ── Step 5 · Quick profile shape check ───────────────────────────────────────
 
 print("\nProfile shape check (case 0, V=30 m/s, r0=400 km, fcor=3e-5):")
 rr_py, VV_py = py_results[0][0], py_results[0][1]
 rr_nb, VV_nb = nb_results[0][0], nb_results[0][1]
-print(f"  Python: {len(rr_py)} radial points, "
-      f"Vmax_profile = {np.nanmax(VV_py):.2f} m/s")
-print(f"  Numba : {len(rr_nb)} radial points, "
-      f"Vmax_profile = {np.nanmax(VV_nb):.2f} m/s")
+print(
+    f"  Python: {len(rr_py)} radial points, "
+    f"Vmax_profile = {np.nanmax(VV_py):.2f} m/s"
+)
+print(
+    f"  Numba : {len(rr_nb)} radial points, "
+    f"Vmax_profile = {np.nanmax(VV_nb):.2f} m/s"
+)
 
 # Interpolate both to a common grid and compute RMS error
 r_common = np.linspace(0, min(rr_py[-1], rr_nb[-1]), 500)
@@ -189,28 +204,37 @@ try:
     print(f"\nRunning {N_OCT} samples with Octave …", flush=True)
     oct_results = []
     t0 = time.perf_counter()
-    for (vmax, r0, fcor) in OCT_CASES:
+    for vmax, r0, fcor in OCT_CASES:
         oct_results.append(_call_oct(vmax, r0, fcor))
     t_oct = time.perf_counter() - t0
     print(f"  Total: {t_oct:.2f} s  →  {t_oct/N_OCT:.2f} s/call")
 
-    print(f"\n  Speedup (Octave → Python): {t_oct/t_py*N_CASES/N_OCT:.1f}×  "
-          f"(Octave → Numba): {t_oct/t_nb*N_CASES/N_OCT:.1f}×")
+    print(
+        f"\n  Speedup (Octave → Python): {t_oct/t_py*N_CASES/N_OCT:.1f}×  "
+        f"(Octave → Numba): {t_oct/t_nb*N_CASES/N_OCT:.1f}×"
+    )
 
     print("\n  Comparison (Octave vs Python vs Numba) for 3 samples:")
-    print(f"  {'Vmax':>6}  {'r0(km)':>8}  {'fcor':>8}  "
-          f"{'rmax_oct':>9}  {'rmax_py':>9}  {'rmax_nb':>9}")
+    print(
+        f"  {'Vmax':>6}  {'r0(km)':>8}  {'fcor':>8}  "
+        f"{'rmax_oct':>9}  {'rmax_py':>9}  {'rmax_nb':>9}"
+    )
     for i, (case, oct_r, py_r, nb_r) in enumerate(
-        zip(OCT_CASES, oct_results,
+        zip(
+            OCT_CASES,
+            oct_results,
             [py_results[0], py_results[12], py_results[24]],
-            [nb_results[0], nb_results[12], nb_results[24]])
+            [nb_results[0], nb_results[12], nb_results[24]],
+        )
     ):
         vmax, r0, fcor = case
         rmax_oct = oct_r["rmax"]
         rmax_py, *_ = _extract_scalars(py_r)
         rmax_nb, *_ = _extract_scalars(nb_r)
-        print(f"  {vmax:6.0f}  {r0/1e3:8.0f}  {fcor:8.1e}  "
-              f"  {rmax_oct/1e3:7.1f}    {rmax_py/1e3:7.1f}    {rmax_nb/1e3:7.1f}")
+        print(
+            f"  {vmax:6.0f}  {r0/1e3:8.0f}  {fcor:8.1e}  "
+            f"  {rmax_oct/1e3:7.1f}    {rmax_py/1e3:7.1f}    {rmax_nb/1e3:7.1f}"
+        )
 
 except Exception as e:
     print(f"\n  Octave comparison skipped: {e}")
