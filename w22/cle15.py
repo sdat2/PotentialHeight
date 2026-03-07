@@ -636,7 +636,7 @@ def _er11_radprof(
     dr = rr_ER11[1] - rr_ER11[0]  # Assumes uniform spacing
 
     # Convergence thresholds (matching MATLAB ER11_radprof.m)
-    vmax_conv_thresh = 1e-2   # Relative error for Vmax
+    vmax_conv_thresh = 1e-2  # Relative error for Vmax
     rin_conv_thresh = dr / 2.0 if dr > 0 else 1.0  # Half grid step for r_in (m)
 
     # Initial guess for internal parameters = target values
@@ -713,14 +713,19 @@ def _er11_radprof(
             try:
                 if len(r_outer) >= 2 and V_outer[-1] < V_outer[0]:
                     r0_interp = interp1d(
-                        V_outer, r_outer, kind="linear",
-                        bounds_error=False, fill_value=np.nan
+                        V_outer,
+                        r_outer,
+                        kind="linear",
+                        bounds_error=False,
+                        fill_value=np.nan,
                     )(0.0)
                 else:
                     r0_interp = np.nan
             except ValueError:
                 r0_interp = np.nan
-            drin = r_in_target - (r0_interp if not np.isnan(r0_interp) else r_in_current)
+            drin = r_in_target - (
+                r0_interp if not np.isnan(r0_interp) else r_in_current
+            )
 
         dVmax_final = Vmax_target - Vmax_prof
 
@@ -1152,7 +1157,9 @@ def chavas_et_al_2015_profile(
                     rmaxr0_low = rmaxr0_guess
                     num_intersections = 0
                 else:
-                    MM_ER11 = rr_ER11_valid * V_ER11_valid + 0.5 * fcor * rr_ER11_valid**2
+                    MM_ER11 = (
+                        rr_ER11_valid * V_ER11_valid + 0.5 * fcor * rr_ER11_valid**2
+                    )
                     rrfracr0_ER11 = rr_ER11_valid / r0
                     MMfracM0_ER11 = MM_ER11 / M0_E04
 
@@ -1216,10 +1223,17 @@ def chavas_et_al_2015_profile(
                 )
                 nan_arr = np.array([np.nan])
                 return (
-                    nan_arr, nan_arr,
-                    np.nan, np.nan, np.nan,
-                    nan_arr, nan_arr,
-                    np.nan, np.nan, np.nan, np.nan,
+                    nan_arr,
+                    nan_arr,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    nan_arr,
+                    nan_arr,
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                    np.nan,
                 )
             warnings.warn(
                 f"Adjusting CkCd from {CkCd:.3f} to {CkCd + 0.1:.3f} to find convergence "

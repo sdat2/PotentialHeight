@@ -30,7 +30,7 @@ import warnings
 
 import numpy as np
 from numpy.typing import NDArray
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, PchipInterpolator
 from scipy.optimize import root_scalar
 import matplotlib.pyplot as plt
 
@@ -544,30 +544,47 @@ def _er11_radprof_with_convergence(
 ) -> NDArray:
     """
     Iteratively converge the ER11 profile so the *profile* Vmax and rmax
-    match the targets (same as ``_er11_radprof`` in cle15.py, rmax-input
-    branch only).
+    match the targets — matching the nested-loop structure of MATLAB's
+    ``ER11_radprof.m`` and the updated ``cle15.py``.
+
+    Outer loop (max 20): converge r_in until |Δr| < dr/2.
+    Inner loop (max 20): converge Vmax until |ΔVmax/Vmax| < 1 %.
     """
     dr = rr_ER11[1] - rr_ER11[0]
+    rin_thresh = dr / 2.0 if dr > 0 else 1.0
+    vmax_thresh = 1e-2
+
     Vmax_cur = Vmax_target
     rmax_cur = rmax_target
     V = np.full_like(rr_ER11, np.nan)
 
-    for _ in range(25):
+    for _outer in range(20):
+        # --- Inner loop: converge Vmax ---
+        for _inner in range(20):
+            V = _er11_radprof_raw(Vmax_cur, rmax_cur, fcor, CkCd, rr_ER11)
+            valid = ~np.isnan(V) & (V >= 0)
+            if not np.any(valid):
+                return V  # total failure
+            Vmax_prof = float(np.max(V[valid]))
+            dV = Vmax_target - Vmax_prof
+            if abs(dV / max(Vmax_target, 1e-9)) < vmax_thresh:
+                break
+            Vmax_cur = max(1.0, Vmax_cur + dV)
+
+        # --- Check r_in convergence ---
         V = _er11_radprof_raw(Vmax_cur, rmax_cur, fcor, CkCd, rr_ER11)
         valid = ~np.isnan(V) & (V >= 0)
         if not np.any(valid):
-            break
-        Vmax_prof = np.max(V[valid])
-        rmax_prof = rr_ER11[valid][np.argmax(V[valid])]
-
+            return V
+        Vmax_prof = float(np.max(V[valid]))
+        rmax_prof = float(rr_ER11[valid][np.argmax(V[valid])])
         dV = Vmax_target - Vmax_prof
         dr_err = rmax_target - rmax_prof
 
-        if abs(dV / Vmax_target) < 1e-2 and abs(dr_err) < dr / 2.0:
+        if abs(dV / max(Vmax_target, 1e-9)) < vmax_thresh and abs(dr_err) < rin_thresh:
             break
 
         rmax_cur = max(1.0, rmax_cur + dr_err)
-        Vmax_cur = max(1.0, Vmax_cur + dV)
 
     return V
 
@@ -678,26 +695,45 @@ def chavas_et_al_2015_profile(
     num_pts_er11 = 5000  # coarser grid inside bisection — enough for intersection check
     nx_intersect = 4000  # resolution of the common grid for curve intersection
 
-    rmaxr0_final, rmerger0, MmergeM0, rr_ER11_best, VV_ER11_best = _bisect_rmaxr0_nb(
-        r0,
-        fcor,
-        Vmax,
-        CkCd,
-        np.ascontiguousarray(rrfracr0_E04, dtype=np.float64),
-        np.ascontiguousarray(MMfracM0_E04, dtype=np.float64),
-        M0,
-        0.001,
-        0.75,
-        50,
-        1e-6,
-        rfracrm_max,
-        num_pts_er11,
-        nx_intersect,
-    )
+    # Outer loop: if bisection finds no intersection, nudge CkCd upward by 0.1
+    # (matching the MATLAB soln_converged fallback in ER11E04_nondim_r0input.m).
+    soln_converged = False
+    ckcd_adjusted = False
+    while not soln_converged:
+        rmaxr0_final, rmerger0, MmergeM0, rr_ER11_best, VV_ER11_best = (
+            _bisect_rmaxr0_nb(
+                r0,
+                fcor,
+                Vmax,
+                CkCd,
+                np.ascontiguousarray(rrfracr0_E04, dtype=np.float64),
+                np.ascontiguousarray(MMfracM0_E04, dtype=np.float64),
+                M0,
+                0.001,
+                0.75,
+                50,
+                1e-6,
+                rfracrm_max,
+                num_pts_er11,
+                nx_intersect,
+            )
+        )
 
-    if np.isnan(rmaxr0_final):
-        warnings.warn("Bisection failed — no tangent rmaxr0 found.")
-        return _fail
+        if not np.isnan(rmaxr0_final):
+            soln_converged = True
+        else:
+            if ckcd_adjusted and CkCd >= 3.0:
+                warnings.warn(
+                    f"Bisection failed even after CkCd adjustments (CkCd={CkCd:.3f}). "
+                    "Returning NaNs."
+                )
+                return _fail
+            warnings.warn(
+                f"Adjusting CkCd from {CkCd:.3f} to {CkCd + 0.1:.3f} to find convergence "
+                "(matching MATLAB ER11E04_nondim_r0input fallback)."
+            )
+            CkCd += 0.1
+            ckcd_adjusted = True
 
     rmax = rmaxr0_final * r0
     Mm = Vmax * rmax + 0.5 * fcor * rmax**2
@@ -740,12 +776,12 @@ def chavas_et_al_2015_profile(
     rrfracrm_e04_v = rr_E04 / rmax
     MMfracMm_e04_v = MM_E04 / Mm
 
-    # Interpolation functions
+    # Interpolation functions — pchip matches MATLAB's interp1(...,'pchip')
     def _make_interp(x, y):
         order = np.argsort(x)
         xu, idx = np.unique(x[order], return_index=True)
         yu = y[order][idx]
-        return interp1d(xu, yu, kind="linear", bounds_error=False, fill_value=np.nan)
+        return PchipInterpolator(xu, yu, extrapolate=False)
 
     interp_ER11 = _make_interp(rrfracrm_er11_v, MMfracMm_er11_v)
     interp_E04 = _make_interp(rrfracrm_e04_v, MMfracMm_e04_v)

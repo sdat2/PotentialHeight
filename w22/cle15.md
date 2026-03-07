@@ -81,20 +81,19 @@ The key design decision is that `_bisect_rmaxr0_nb` inlines everything (ER11 eva
 
 ### Accuracy differences from `cle15.py`
 
-The numba version uses the same algorithm as `cle15.py` but with differences in:
-- ER11 convergence: simplified additive adjustment with max 10 iterations (vs nested loop in Python)
-- ER11 is clipped to $r \leq r_0$ before the intersection check (fixes a spurious boundary intersection bug)
-- Final profile assembled with `scipy.interpolate.interp1d` (linear), not pchip
+The numba version uses the same high-level algorithm as `cle15.py` with one unavoidable difference: inside `_bisect_rmaxr0_nb` the ER11 convergence is simplified to a flat 10-iteration additive adjustment (the full nested 20×20 loop cannot run inside an `@njit` kernel without significant restructuring). ER11 is also clipped to $r \leq r_0$ before the intersection check to suppress a spurious boundary-intersection bug.
 
-These produce rmax agreement with `cle15.py` to a mean of ~0.3 % and a maximum of ~1.7 % across a 75-case benchmark grid.
+The Python-level wrappers (`_er11_radprof_with_convergence`, `chavas_et_al_2015_profile`, `_make_interp`) are now fully consistent with `cle15.py`: nested 20×20 convergence, CkCd fallback loop, and `PchipInterpolator`.
+
+These produce rmax agreement with `cle15.py` to a mean of ~0.22 % and a maximum of ~1.72 % across a 75-case benchmark grid.
 
 ### Performance (75-case benchmark: $V_\text{max} \in \{30\text{–}70\}$ m/s, $r_0 \in \{400\text{–}1200\}$ km, $f \in \{3, 5, 7\} \times 10^{-5}$ s$^{-1}$)
 
 | Implementation | Time per call | Speedup vs Octave |
 |---|---|---|
-| Octave (`cle15m.py`) | ~540 ms | 1× |
-| Python (`cle15.py`) | ~45 ms | ~12× |
-| **Numba** (`cle15n.py`) | **~6.4 ms** | **~85×** |
+| Octave (`cle15m.py`) | ~500 ms | 1× |
+| Python (`cle15.py`) | ~45 ms | ~11× |
+| **Numba** (`cle15n.py`) | **~7 ms** | **~71×** |
 
 JIT warm-up (first call only): ~1.2 s. Subsequent calls use the cached compiled kernel.
 
