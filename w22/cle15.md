@@ -83,17 +83,89 @@ The key design decision is that `_bisect_rmaxr0_nb` inlines everything (ER11 eva
 
 The numba version uses the same high-level algorithm as `cle15.py` with one unavoidable difference: inside `_bisect_rmaxr0_nb` the ER11 convergence is simplified to a flat 10-iteration additive adjustment (the full nested 20×20 loop cannot run inside an `@njit` kernel without significant restructuring). ER11 is also clipped to $r \leq r_0$ before the intersection check to suppress a spurious boundary-intersection bug.
 
-The Python-level wrappers (`_er11_radprof_with_convergence`, `chavas_et_al_2015_profile`, `_make_interp`) are now fully consistent with `cle15.py`: nested 20×20 convergence, CkCd fallback loop, and `PchipInterpolator`.
+The Python-level wrappers (`_er11_radprof_with_convergence`, `chavas_et_al_2015_profile`, `_make_interp`) are fully consistent with `cle15.py`: nested 20×20 convergence, CkCd fallback loop, and `PchipInterpolator`.
 
 These produce rmax agreement with `cle15.py` to a mean of ~0.22 % and a maximum of ~1.72 % across a 75-case benchmark grid.
 
-### Performance (75-case benchmark: $V_\text{max} \in \{30\text{–}70\}$ m/s, $r_0 \in \{400\text{–}1200\}$ km, $f \in \{3, 5, 7\} \times 10^{-5}$ s$^{-1}$)
+### `SolverConfig` — resolution presets
+
+The four internal resolution knobs are exposed through the `SolverConfig` dataclass, which can be passed as `solver=` to `chavas_et_al_2015_profile`, `run_cle15`, and `profile_from_stats`.  Three named presets are provided:
+
+```python
+from w22.cle15n import chavas_et_al_2015_profile, SolverConfig
+
+# ~7.5× faster than default, ~0.8 % rmax error
+res = chavas_et_al_2015_profile(..., solver=SolverConfig.fast())
+
+# default (no argument needed)
+res = chavas_et_al_2015_profile(...)
+
+# ~2× slower than default, ~0.13 % rmax error
+res = chavas_et_al_2015_profile(..., solver=SolverConfig.precise())
+```
+
+### Accuracy vs. cost sweep (`bench_precision.py`)
+
+The four knobs were swept independently over a 75-case benchmark grid ($V_\text{max} \in \{30\text{–}70\}$ m/s, $r_0 \in \{400\text{–}1200\}$ km, $f \in \{3,5,7\} \times 10^{-5}$ s$^{-1}$), with rmax error measured relative to the pure-Python reference.
+
+#### `Nr_e04` — E04 Euler grid points (default 200 000)
+
+Cost and accuracy are **completely flat** from 1 000 to 500 000 points (~6 ms, 0.265 % mean error throughout).  The bottleneck is not grid resolution but the number of ER11 evaluations inside the bisection.  The default can safely be reduced to 10 000.
+
+#### `num_pts_er11` — ER11 points inside the bisection kernel (default 5 000)
+
+This is the **dominant driver** of both cost and accuracy.
+
+| Points | ms/call | mean err% | max err% |
+|-------:|--------:|----------:|---------:|
+| 50 | 1.0 | 11.7 | 48.4 |
+| 100 | 0.9 | 1.75 | 8.3 |
+| 200 | 0.9 | 1.25 | 5.0 |
+| 500 | 1.2 | 0.82 | 3.0 |
+| 1 000 | 1.7 | 0.57 | 2.0 |
+| 2 000 | 2.7 | 0.40 | 1.1 |
+| **5 000** | **6.3** | **0.27** | **1.2** |
+| 10 000 | 12.8 | 0.13 | 1.0 |
+
+#### `nx_intersect` — intersection check grid points (default 4 000)
+
+Nearly **no effect** on accuracy beyond 200 points; cost increases only mildly (6.0 → 6.8 ms over the full range).  500 points is sufficient.
+
+| Points | ms/call | mean err% | max err% |
+|-------:|--------:|----------:|---------:|
+| 50 | 6.0 | 0.41 | 1.1 |
+| 200 | 6.0 | 0.27 | 1.2 |
+| **4 000** | **6.4** | **0.27** | **1.2** |
+| 8 000 | 6.8 | 0.27 | 1.2 |
+
+#### `max_iter` — bisection iterations (default 50)
+
+Accuracy **degrades sharply** below 15 iterations.  The solver saturates at 20 iterations — going higher gives negligible benefit.
+
+| Iters | ms/call | mean err% | max err% |
+|------:|--------:|----------:|---------:|
+| 5 | 2.4 | 45.0 | 160 |
+| 10 | 3.6 | 1.77 | 6.2 |
+| 15 | 5.0 | 0.29 | 1.2 |
+| **20** | **6.4** | **0.27** | **1.2** |
+| 50 | 6.3 | 0.27 | 1.2 |
+
+#### Preset summary
+
+| Preset | `Nr_e04` | `num_pts_er11` | `nx_intersect` | `max_iter` | ms/call | mean err% | max err% |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| `fast()` | 10 000 | 500 | 500 | 20 | ~0.8 | ~0.82 | ~3.0 |
+| `default()` | 200 000 | 5 000 | 4 000 | 50 | ~6–7 | ~0.27 | ~1.2 |
+| `precise()` | 200 000 | 10 000 | 4 000 | 50 | ~13 | ~0.13 | ~1.0 |
+
+### Performance summary (75-case benchmark)
 
 | Implementation | Time per call | Speedup vs Octave |
 |---|---|---|
 | Octave (`cle15m.py`) | ~500 ms | 1× |
 | Python (`cle15.py`) | ~45 ms | ~11× |
-| **Numba** (`cle15n.py`) | **~7 ms** | **~71×** |
+| Numba default (`cle15n.py`) | ~7 ms | ~71× |
+| **Numba fast** (`SolverConfig.fast()`) | **~0.8 ms** | **~625×** |
 
 JIT warm-up (first call only): ~1.2 s. Subsequent calls use the cached compiled kernel.
 

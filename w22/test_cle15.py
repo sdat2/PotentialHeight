@@ -502,3 +502,158 @@ class TestEdgeCases:
         out = mod.profile_from_stats(vmax=45.0, fcor=4e-5, r0=700e3, p0=1010.0)
         assert "rr" in out
         assert np.isfinite(out["rmax"])
+
+
+# ===========================================================================
+# 7. TestSolverConfig
+# ===========================================================================
+
+
+class TestSolverConfig:
+    """Tests for the SolverConfig dataclass and named presets in cle15n."""
+
+    def test_default_fields(self):
+        """SolverConfig() should expose the documented default values."""
+        cfg = cle15n.SolverConfig()
+        assert cfg.Nr_e04 == 200_000
+        assert cfg.num_pts_er11 == 5_000
+        assert cfg.nx_intersect == 4_000
+        assert cfg.max_iter == 50
+
+    def test_fast_preset_fields(self):
+        """SolverConfig.fast() should have smaller values than default."""
+        fast = cle15n.SolverConfig.fast()
+        default = cle15n.SolverConfig()
+        assert fast.Nr_e04 <= default.Nr_e04
+        assert fast.num_pts_er11 < default.num_pts_er11
+        assert fast.nx_intersect <= default.nx_intersect
+        assert fast.max_iter <= default.max_iter
+
+    def test_precise_preset_fields(self):
+        """SolverConfig.precise() should have >= default values."""
+        precise = cle15n.SolverConfig.precise()
+        default = cle15n.SolverConfig()
+        assert precise.num_pts_er11 >= default.num_pts_er11
+
+    @pytest.mark.parametrize(
+        "preset,label",
+        [
+            (cle15n.SolverConfig.fast(), "fast"),
+            (cle15n.SolverConfig.default(), "default"),
+            (cle15n.SolverConfig.precise(), "precise"),
+        ],
+    )
+    def test_preset_produces_finite_rmax(self, preset, label):
+        """All three presets must converge for a standard input."""
+        res = cle15n.chavas_et_al_2015_profile(
+            50.0,
+            800e3,
+            5e-5,
+            CDVARY_DEFAULT,
+            CD_DEFAULT,
+            W_COOL_DEFAULT,
+            CKCDVARY_DEFAULT,
+            CK_CD_DEFAULT,
+            EYE_ADJ_DEFAULT,
+            ALPHA_EYE_DEFAULT,
+            solver=preset,
+        )
+        rmax = res[2]
+        assert np.isfinite(rmax), f"Preset '{label}' did not converge: rmax={rmax}"
+
+    @pytest.mark.parametrize("Vmax,r0,fcor", REFERENCE_CASES)
+    def test_fast_rmax_within_5pct_of_default(self, Vmax, r0, fcor):
+        """Fast preset rmax must be within 5 % of the default preset rmax."""
+        kw = dict(
+            Cdvary=CDVARY_DEFAULT,
+            C_d=CD_DEFAULT,
+            w_cool=W_COOL_DEFAULT,
+            CkCdvary=CKCDVARY_DEFAULT,
+            CkCd_input=CK_CD_DEFAULT,
+            eye_adj=EYE_ADJ_DEFAULT,
+            alpha_eye=ALPHA_EYE_DEFAULT,
+        )
+        default_res = cle15n.chavas_et_al_2015_profile(
+            Vmax, r0, fcor, **kw, solver=cle15n.SolverConfig.default()
+        )
+        fast_res = cle15n.chavas_et_al_2015_profile(
+            Vmax, r0, fcor, **kw, solver=cle15n.SolverConfig.fast()
+        )
+        rmax_def = default_res[2]
+        rmax_fast = fast_res[2]
+        assert np.isfinite(rmax_fast), "Fast preset returned NaN"
+        rel_err = abs(rmax_fast - rmax_def) / rmax_def
+        assert rel_err < 0.05, (
+            f"Vmax={Vmax} r0={r0/1e3:.0f}km: fast rmax={rmax_fast/1e3:.2f} km "
+            f"vs default {rmax_def/1e3:.2f} km  ({100*rel_err:.1f} %)"
+        )
+
+    def test_fast_is_faster_than_default(self):
+        """SolverConfig.fast() should be measurably quicker than default (at least 2×)."""
+        import time
+
+        kw = dict(
+            Vmax=50.0,
+            r0=800e3,
+            fcor=5e-5,
+            Cdvary=CDVARY_DEFAULT,
+            C_d=CD_DEFAULT,
+            w_cool=W_COOL_DEFAULT,
+            CkCdvary=CKCDVARY_DEFAULT,
+            CkCd_input=CK_CD_DEFAULT,
+            eye_adj=EYE_ADJ_DEFAULT,
+            alpha_eye=ALPHA_EYE_DEFAULT,
+        )
+        n = 10
+
+        t0 = time.perf_counter()
+        for _ in range(n):
+            cle15n.chavas_et_al_2015_profile(**kw, solver=cle15n.SolverConfig.fast())
+        t_fast = (time.perf_counter() - t0) / n
+
+        t0 = time.perf_counter()
+        for _ in range(n):
+            cle15n.chavas_et_al_2015_profile(**kw, solver=cle15n.SolverConfig.default())
+        t_default = (time.perf_counter() - t0) / n
+
+        assert (
+            t_fast < t_default
+        ), f"fast ({t_fast*1e3:.1f} ms) was not faster than default ({t_default*1e3:.1f} ms)"
+
+    def test_solver_kwarg_passthrough_run_cle15(self):
+        """run_cle15 should accept and honour the solver kwarg."""
+        pm, rmax, pc = cle15n.run_cle15(solver=cle15n.SolverConfig.fast())
+        assert np.isfinite(rmax), "run_cle15 with fast solver returned non-finite rmax"
+
+    def test_solver_kwarg_passthrough_profile_from_stats(self):
+        """profile_from_stats should accept and honour the solver kwarg."""
+        out = cle15n.profile_from_stats(
+            vmax=50.0,
+            fcor=5e-5,
+            r0=800e3,
+            p0=1013.25,
+            solver=cle15n.SolverConfig.fast(),
+        )
+        assert np.isfinite(
+            out["rmax"]
+        ), "profile_from_stats with fast solver returned non-finite rmax"
+
+    def test_custom_config(self):
+        """A manually constructed SolverConfig should work without error."""
+        cfg = cle15n.SolverConfig(
+            Nr_e04=5_000, num_pts_er11=200, nx_intersect=200, max_iter=15
+        )
+        res = cle15n.chavas_et_al_2015_profile(
+            50.0,
+            800e3,
+            5e-5,
+            CDVARY_DEFAULT,
+            CD_DEFAULT,
+            W_COOL_DEFAULT,
+            CKCDVARY_DEFAULT,
+            CK_CD_DEFAULT,
+            EYE_ADJ_DEFAULT,
+            ALPHA_EYE_DEFAULT,
+            solver=cfg,
+        )
+        assert np.isfinite(res[2]), "Custom SolverConfig did not converge"

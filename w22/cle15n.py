@@ -25,6 +25,7 @@ References
 """
 
 from typing import Tuple, Optional, Dict, Union
+from dataclasses import dataclass
 import os
 import warnings
 
@@ -66,6 +67,96 @@ V_THRESH1 = 6.0
 V_THRESH2 = 35.4
 CD_HIGHV = 2.35e-3
 LINEAR_SLOPE = (CD_HIGHV - CD_LOWV) / (V_THRESH2 - V_THRESH1)
+
+# ---------------------------------------------------------------------------
+# Solver configuration
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SolverConfig:
+    """
+    Resolution / iteration knobs for the numba CLE15 solver.
+
+    All four parameters control accuracy vs. run-time.  The table below
+    summarises the sweep results from ``bench_precision.py`` (75-case
+    benchmark, rmax error relative to the pure-Python reference):
+
+    +----------------+----------+-----------+------------+-----------+
+    | Preset         | ms/call  | mean err% | max err%   | fails     |
+    +================+==========+===========+============+===========+
+    | ``"fast"``     |  ~0.8    | ~0.82     | ~3.0       | 0/75      |
+    | ``"default"``  |  ~6–7    | ~0.27     | ~1.2       | 0/75      |
+    | ``"precise"``  | ~13      | ~0.13     | ~1.0       | 0/75      |
+    +----------------+----------+-----------+------------+-----------+
+
+    **Knob summary** (from individual sweeps, all others held at default):
+
+    ``Nr_e04`` — E04 Euler grid points
+        Accuracy is *insensitive* to Nr_e04 across the full range tested
+        (1 000 – 500 000): mean rmax error stays at 0.265 % throughout.
+        Cost is also flat (~6 ms).  The default 200 000 can safely be
+        reduced to 10 000 with no accuracy penalty.
+
+    ``num_pts_er11`` — ER11 profile points inside the bisection kernel
+        The **dominant cost and accuracy driver**.  Halving from 5 000 to
+        2 000 saves ~2× time (6 → 2.7 ms) with only a small accuracy cost
+        (0.27 % → 0.40 % mean).  Going to 500 points gives ~6× speedup
+        at the cost of ~0.82 % mean error (max ~3 %).
+
+    ``nx_intersect`` — intersection check grid points
+        Very weak effect on accuracy beyond 200 points.  Cost is also
+        nearly flat (6.0 – 6.8 ms).  Reducing from 4 000 to 500 is free.
+
+    ``max_iter`` — bisection iterations
+        Below 15 iterations the solver degrades sharply (44 % mean error
+        at 5 iterations).  At 15 iterations (~5 ms) accuracy is already
+        within 0.30 % mean.  Going above 20 gives negligible improvement.
+
+    Parameters
+    ----------
+    Nr_e04 : int
+        Number of points in the E04 Euler integration grid.
+    num_pts_er11 : int
+        Number of ER11 profile points evaluated inside each bisection step.
+    nx_intersect : int
+        Number of points in the common grid used for the curve-intersection
+        check inside the bisection kernel.
+    max_iter : int
+        Maximum number of bisection iterations.
+    """
+
+    Nr_e04: int = 200_000
+    num_pts_er11: int = 5_000
+    nx_intersect: int = 4_000
+    max_iter: int = 50
+
+    @classmethod
+    def fast(cls) -> "SolverConfig":
+        """
+        ~7.5× faster than default; rmax mean error ~0.82 %, max ~3 %.
+
+        Recommended for large ensemble runs where speed matters more than
+        sub-percent accuracy in rmax.
+        """
+        return cls(Nr_e04=10_000, num_pts_er11=500, nx_intersect=500, max_iter=20)
+
+    @classmethod
+    def default(cls) -> "SolverConfig":
+        """
+        Current default settings; rmax mean error ~0.27 %, max ~1.2 %.
+        """
+        return cls()
+
+    @classmethod
+    def precise(cls) -> "SolverConfig":
+        """
+        ~2× slower than default; rmax mean error ~0.13 %, max ~1.0 %.
+
+        Useful for reference comparisons or validating the fast preset.
+        """
+        return cls(Nr_e04=200_000, num_pts_er11=10_000, nx_intersect=4_000, max_iter=50)
+
 
 # ---------------------------------------------------------------------------
 # Numba-compiled kernels
@@ -635,6 +726,7 @@ def chavas_et_al_2015_profile(
     CkCd_input: float,
     eye_adj: int,
     alpha_eye: float,
+    solver: Optional[SolverConfig] = None,
 ) -> Tuple[
     NDArray,
     NDArray,
@@ -651,8 +743,31 @@ def chavas_et_al_2015_profile(
     """
     Chavas et al. (2015) merged TC wind profile — numba-accelerated.
 
-    API is identical to :func:`w22.cle15.chavas_et_al_2015_profile`.
+    API is identical to :func:`w22.cle15.chavas_et_al_2015_profile`, with
+    one additional optional argument.
+
+    Parameters
+    ----------
+    solver : SolverConfig, optional
+        Resolution / iteration settings.  Defaults to ``SolverConfig()``
+        (the "default" preset).  Pass ``SolverConfig.fast()`` for ~7.5×
+        faster evaluation at ~0.8 % rmax accuracy, or
+        ``SolverConfig.precise()`` for ~2× slower but ~0.13 % accuracy.
+
+    Examples
+    --------
+    >>> from w22.cle15n import chavas_et_al_2015_profile, SolverConfig
+    >>> res = chavas_et_al_2015_profile(
+    ...     50.0, 800e3, 5e-5, 0, 1.5e-3, 2e-3, 0, 0.9, 0, 0.5,
+    ...     solver=SolverConfig.fast(),
+    ... )
+    >>> rmax_km = res[2] / 1e3          # rmax in km
+    >>> 5 < rmax_km < 300               # sanity: physically plausible rmax
+    True
     """
+    if solver is None:
+        solver = SolverConfig()
+
     fcor = abs(fcor)
     _nan = np.array([np.nan])
     _fail = (
@@ -676,10 +791,9 @@ def chavas_et_al_2015_profile(
         CkCd = max(0.5, min(1.9, CkCd))
 
     # --- Step 1: E04 outer profile ---
-    Nr_e04 = 200000
     try:
         rrfracr0_E04, MMfracM0_E04 = _e04_outerwind_r0input_nondim_mm0(
-            r0, fcor, Cdvary, C_d, w_cool, Nr=Nr_e04
+            r0, fcor, Cdvary, C_d, w_cool, Nr=solver.Nr_e04
         )
         if len(rrfracr0_E04) < 2:
             raise ValueError("E04 < 2 valid points")
@@ -690,10 +804,7 @@ def chavas_et_al_2015_profile(
     M0 = 0.5 * fcor * r0**2
 
     # --- Step 2: Bisection to find rmaxr0 (numba kernel) ---
-    # ER11 grid parameters
     rfracrm_max = 50.0
-    num_pts_er11 = 5000  # coarser grid inside bisection — enough for intersection check
-    nx_intersect = 4000  # resolution of the common grid for curve intersection
 
     # Outer loop: if bisection finds no intersection, nudge CkCd upward by 0.1
     # (matching the MATLAB soln_converged fallback in ER11E04_nondim_r0input.m).
@@ -711,11 +822,11 @@ def chavas_et_al_2015_profile(
                 M0,
                 0.001,
                 0.75,
-                50,
+                solver.max_iter,
                 1e-6,
                 rfracrm_max,
-                num_pts_er11,
-                nx_intersect,
+                solver.num_pts_er11,
+                solver.nx_intersect,
             )
         )
 
@@ -886,8 +997,15 @@ def run_cle15(
     inputs: Optional[Dict] = None,
     rho0: float = RHO_AIR_DEFAULT,
     pressure_assumption: str = "isopycnal",
+    solver: Optional[SolverConfig] = None,
 ) -> Tuple[float, float, float]:
-    """Run the numba-accelerated CLE15 model — same API as cle15.run_cle15."""
+    """Run the numba-accelerated CLE15 model — same API as cle15.run_cle15.
+
+    Parameters
+    ----------
+    solver : SolverConfig, optional
+        Resolution settings.  Defaults to ``SolverConfig()`` (default preset).
+    """
     if inputs is None:
         inputs = {}
     ins = process_inputs(inputs)
@@ -902,6 +1020,7 @@ def run_cle15(
         ins["CkCd"],
         ins["eye_adj"],
         ins["alpha_eye"],
+        solver=solver,
     )
     ou = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
     ou["VV"][-1] = 0
@@ -930,8 +1049,15 @@ def profile_from_stats(
     p0: float,
     rho0: float = RHO_AIR_DEFAULT,
     pressure_assumption: str = "isothermal",
+    solver: Optional[SolverConfig] = None,
 ) -> dict:
-    """Same as cle15.profile_from_stats but uses the numba-accelerated kernel."""
+    """Same as cle15.profile_from_stats but uses the numba-accelerated kernel.
+
+    Parameters
+    ----------
+    solver : SolverConfig, optional
+        Resolution settings.  Defaults to ``SolverConfig()`` (default preset).
+    """
     ins = process_inputs({"Vmax": vmax, "fcor": fcor, "r0": r0, "p0": p0})
     o = chavas_et_al_2015_profile(
         ins["Vmax"],
@@ -944,6 +1070,7 @@ def profile_from_stats(
         ins["CkCd"],
         ins["eye_adj"],
         ins["alpha_eye"],
+        solver=solver,
     )
     out = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
     out["VV"][-1] = 0
