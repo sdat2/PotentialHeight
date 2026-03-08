@@ -92,7 +92,7 @@ These produce rmax agreement with `cle15.py` to a mean of ~0.22 % and a maximum 
 The four internal resolution knobs are exposed through the `SolverConfig` dataclass, which can be passed as `solver=` to `chavas_et_al_2015_profile`, `run_cle15`, and `profile_from_stats`.  Three named presets are provided:
 
 ```python
-from w22.cle15n import chavas_et_al_2015_profile, SolverConfig
+from cle15.cle15n import chavas_et_al_2015_profile, SolverConfig
 
 # ~7.5× faster than default, ~0.8 % rmax error
 res = chavas_et_al_2015_profile(..., solver=SolverConfig.fast())
@@ -157,6 +157,20 @@ Accuracy **degrades sharply** below 15 iterations.  The solver saturates at 20 i
 | `fast()` | 10 000 | 500 | 500 | 20 | ~0.8 | ~0.82 | ~3.0 |
 | `default()` | 200 000 | 5 000 | 4 000 | 50 | ~6–7 | ~0.27 | ~1.2 |
 | `precise()` | 200 000 | 10 000 | 4 000 | 50 | ~13 | ~0.13 | ~1.0 |
+
+### Known limitation: intermittent solver failures at certain $r_0$ values
+
+When the numba solver is used inside a bisection loop that sweeps over $r_0$ (as in `w22/ps.py`), approximately **19% of $r_0$ values** in a typical search range (1.9–2.4 Mm) cause `chavas_et_al_2015_profile` to fail and return a bad result.  Two failure modes exist:
+
+1. **Silent pressure spike** — the ER11 inner profile converges to a physically implausible $r_\text{max}$ (e.g. ~52 km instead of ~108 km), and `rmerge` collapses to $r_0$ (no valid merge point found).  The resulting degenerate profile is still passed to the pressure integrator, which returns a wildly wrong $p_m$ (~98 500 Pa instead of ~96 600 Pa, a ~2 kPa spike).  This was fixed by detecting `rmerge ≈ r0` inside `run_cle15` and returning NaN instead.
+
+2. **NaN propagation** — after the spike fix, the same convergence failure now correctly returns NaN, but the enclosing bisection cannot handle NaN-valued function evaluations and crashes.
+
+Consequence: if `w22/ps.py` uses `cle15n.run_cle15` instead of `cle15.run_cle15`, the outer $r_0$ bisection converges to the wrong root (or crashes), giving an $r_0$ ~6% larger than the correct answer.  This is **not** a physical model difference or a precision difference — the pure-Python solver gives identical results at all $r_0$ values where the numba solver succeeds; the discrepancy arises entirely from the numba solver sampling a spike or NaN point mid-bisection.
+
+**Root cause**: the simplified 10-iteration ER11 convergence loop inside `_bisect_rmaxr0_nb` (the compiled kernel, which cannot run the full nested 20×20 Python-level loop) fails to converge for certain $(r_0, V_\text{max}, f)$ combinations, producing a grossly wrong $r_\text{max}/r_0$ estimate.  The Python-level wrappers in `chavas_et_al_2015_profile` detect and recover from *total* convergence failures (all-NaN profiles) but cannot detect *partial* failures where $r_\text{max}$ is simply wrong.
+
+**Current status**: `w22/ps.py` uses `cle15.cle15.run_cle15` (pure Python) for the $r_0$ bisection.  The numba solver is safe to use for standalone single-point calls (e.g. benchmarking, profile plotting) but should not be used inside a bisection loop until the kernel-level convergence is made robust.
 
 ### Performance summary (75-case benchmark)
 

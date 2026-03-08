@@ -1023,6 +1023,16 @@ def run_cle15(
         solver=solver,
     )
     ou = {"rr": o[0], "VV": o[1], "rmax": o[2], "rmerge": o[3], "Vmerge": o[4]}
+    # If the solver returned NaN for rmax the profile is invalid — propagate failure
+    if np.isnan(ou["rmax"]):
+        return (np.nan, np.nan, np.nan)
+    # If more than a small fraction of the wind profile is NaN the solve failed
+    nan_frac = np.mean(np.isnan(ou["VV"]))
+    if nan_frac > 0.1:
+        return (np.nan, np.nan, np.nan)
+    # If rmerge == r0 the inner profile didn't converge (degenerate merge)
+    if np.isclose(ou["rmerge"], ins["r0"], rtol=1e-4):
+        return (np.nan, np.nan, np.nan)
     ou["VV"][-1] = 0
     ou["VV"][np.isnan(ou["VV"])] = 0
     rr = np.array(ou["rr"], dtype="float32")
