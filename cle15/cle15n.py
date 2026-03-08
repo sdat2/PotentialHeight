@@ -529,13 +529,17 @@ def _bisect_rmaxr0_nb(
         Mm_final = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur
         VV_ER11 = _er11_profile_nb(rr_ER11, Mm_final, rmax_cur, fcor, CkCd)
 
-        # Convert ER11 to (r/r0, M/M0) space, clipping to r <= r0
-        # (points beyond r0 cause spurious boundary intersections)
+        # Convert ER11 to (r/r0, M/M0) space.
+        # Clip to r < r0 (strictly less than), excluding the boundary point at
+        # r == r0.  The E04 curve also terminates at r/r0 = 1.0; including the
+        # last ER11 point would create a spurious boundary intersection whenever
+        # M_ER11(r0) > M_E04(r0) (= M0), which can happen for large rmaxr0 guesses.
+        r0_thresh = r0 * (1.0 - 1e-6)
         n_valid = 0
         for k in range(num_pts_er11):
             v = VV_ER11[k]
             r = rr_ER11[k]
-            if not (v != v) and r > 1e-9 and r <= r0:  # not NaN, within r0
+            if not (v != v) and r > 1e-9 and r < r0_thresh:  # strictly inside r0
                 n_valid += 1
 
         if n_valid < 2:
@@ -548,7 +552,7 @@ def _bisect_rmaxr0_nb(
         for k in range(num_pts_er11):
             v = VV_ER11[k]
             r = rr_ER11[k]
-            if not (v != v) and r > 1e-9 and r <= r0:
+            if not (v != v) and r > 1e-9 and r < r0_thresh:
                 MM = r * v + 0.5 * fcor * r * r
                 rrfracr0_ER11[idx] = r / r0
                 MMfracM0_ER11[idx] = MM / M0
