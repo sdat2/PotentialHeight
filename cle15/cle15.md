@@ -158,19 +158,50 @@ Accuracy **degrades sharply** below 15 iterations.  The solver saturates at 20 i
 | `default()` | 200 000 | 5 000 | 4 000 | 50 | ~6–7 | ~0.27 | ~1.2 |
 | `precise()` | 200 000 | 10 000 | 4 000 | 50 | ~13 | ~0.13 | ~1.0 |
 
-### Known limitation: intermittent solver failures at certain $r_0$ values
+### Resolved: spurious boundary-crossing bug in the numba bisection kernel
 
-When the numba solver is used inside a bisection loop that sweeps over $r_0$ (as in `w22/ps.py`), approximately **19% of $r_0$ values** in a typical search range (1.9–2.4 Mm) cause `chavas_et_al_2015_profile` to fail and return a bad result.  Two failure modes exist:
+**Status: fixed.** The numba solver (`cle15n`) is now fully reliable for use in bisection loops and is re-enabled in `w22/ps.py`.
 
-1. **Silent pressure spike** — the ER11 inner profile converges to a physically implausible $r_\text{max}$ (e.g. ~52 km instead of ~108 km), and `rmerge` collapses to $r_0$ (no valid merge point found).  The resulting degenerate profile is still passed to the pressure integrator, which returns a wildly wrong $p_m$ (~98 500 Pa instead of ~96 600 Pa, a ~2 kPa spike).  This was fixed by detecting `rmerge ≈ r0` inside `run_cle15` and returning NaN instead.
+**Root cause (fixed):** `_bisect_rmaxr0_nb` built the ER11 profile grid capped at $r \le r_0$.  The E04 outer curve also terminates at $r/r_0 = 1.0$ with $M/M_0 = 1.0$ (by definition).  For large $r_\text{max}/r_0$ guesses the ER11 $M/M_0$ exceeds 1.0 in the outer region (supergradient) and then drops back to 1.0 at the boundary — creating a spurious sign-change that `_curve_intersect_count_nb` detected as a valid crossing at $r_\text{merge}/r_0 = 1.0$.  The bisection then converged to an unphysical tiny-$r_\text{max}$ solution, producing a degenerate merged profile and ultimately a NaN or wildly wrong $p_m$.
 
-2. **NaN propagation** — after the spike fix, the same convergence failure now correctly returns NaN, but the enclosing bisection cannot handle NaN-valued function evaluations and crashes.
+**Fix (one line in `cle15n.py`):** the ER11 grid is now clipped to $r < r_0 \times (1 - 10^{-6})$ (strictly less than $r_0$), so the shared endpoint is never included and the spurious crossing cannot occur.
 
-Consequence: if `w22/ps.py` uses `cle15n.run_cle15` instead of `cle15.run_cle15`, the outer $r_0$ bisection converges to the wrong root (or crashes), giving an $r_0$ ~6% larger than the correct answer.  This is **not** a physical model difference or a precision difference — the pure-Python solver gives identical results at all $r_0$ values where the numba solver succeeds; the discrepancy arises entirely from the numba solver sampling a spike or NaN point mid-bisection.
+**Verification:** a sweep of 100 $r_0$ values in the bisection range (1.9–2.4 Mm) previously produced a ~19% NaN rate; after the fix the NaN rate is **0%**.  Regression tests covering the two previously failing $(V_\text{max},\, r_0)$ cases are in `TestNbRobustness` in `test_cle15.py`.
 
-**Root cause**: the simplified 10-iteration ER11 convergence loop inside `_bisect_rmaxr0_nb` (the compiled kernel, which cannot run the full nested 20×20 Python-level loop) fails to converge for certain $(r_0, V_\text{max}, f)$ combinations, producing a grossly wrong $r_\text{max}/r_0$ estimate.  The Python-level wrappers in `chavas_et_al_2015_profile` detect and recover from *total* convergence failures (all-NaN profiles) but cannot detect *partial* failures where $r_\text{max}$ is simply wrong.
+### Performance: `w22/ps.py` bisection — using `SolverConfig.fast()` for inner calls
 
-**Current status**: `w22/ps.py` uses `cle15.cle15.run_cle15` (pure Python) for the $r_0$ bisection.  The numba solver is safe to use for standalone single-point calls (e.g. benchmarking, profile plotting) but should not be used inside a bisection loop until the kernel-level convergence is made robust.
+**Problem:** After switching `w22/ps.py` to the numba backend, the `w22` test suite ran in **12 minutes** despite the numba kernel being 4.5× faster than Python on the standard benchmark.
+
+**Root cause:** `calculate_ps_ufunc` finds the potential size $r_0$ by bisecting on `run_cle15` — it calls the solver ~24 times per grid point.  The benchmark grid uses $r_0 \in \{400\text{–}1200\}$ km, but `ps.py` typically operates at $r_0 \sim 2$ Mm (potential size), where `_bisect_rmaxr0_nb` takes **~14 ms** per call (vs ~10 ms at the benchmark scale).  This gave ~400 ms per `calculate_ps_ufunc` point, and the numba speedup at the leaf level was completely swamped by the 24× call multiplier.
+
+A secondary issue that was investigated but found to be negligible: `cle15n.py` had a `drfracrm /= 10` branch that expanded the final ER11 grid to 50 001 points when $r_\text{max} > 100$ km.  This added ~0.5 ms to the *final* call (negligible) and was removed for cleanliness.
+
+**Fix:** Use `SolverConfig.fast()` (500 ER11 points, ~2 ms/call) for all `run_cle15` calls **inside** the bisection loop, and keep the default solver for the single **final** call after convergence (which produces the output profile).  The final call uses the full 5 000-point grid and gives the same result as before; only the ~24 intermediate calls are coarsened.
+
+In `w22/ps.py`:
+```python
+from cle15.cle15n import run_cle15, SolverConfig
+
+_BISECT_SOLVER = SolverConfig.fast()   # ~2 ms/call; used only inside bisection
+
+def try_for_r0(r0: float):
+    pm_cle, rmax_cle, _ = run_cle15(..., solver=_BISECT_SOLVER)  # fast
+    ...
+
+# after bisection converges:
+pm, rmax, pc = run_cle15(...)   # default precision — called once
+```
+
+**Result:**
+
+| Stage | Before | After |
+|---|---|---|
+| `run_cle15` per bisection step | ~14 ms | ~2 ms |
+| `calculate_ps_ufunc` per point | ~400 ms | ~71 ms |
+| `w22` test suite (9 tests) | 738 s (12 min) | 17.6 s |
+| **Speedup** | — | **42×** |
+
+The <0.4 % rmax error introduced at the bisection stage is well within the uncertainty of the $r_0$ bisection itself (1 Pa pressure tolerance → much larger $r_0$ uncertainty), and the output profile is computed with full precision.
 
 ### Performance summary (75-case benchmark)
 
