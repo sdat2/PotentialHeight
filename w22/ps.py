@@ -36,7 +36,12 @@ from .constants import (
     ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
 from .w22_carnot import wang_diff, wang_consts
-from cle15.cle15 import run_cle15
+from cle15.cle15n import run_cle15, SolverConfig  # numba; boundary-crossing bug fixed in cle15n.py
+
+# Inside the r0 bisection loop, use a fast solver (500 pts, 20 iter → ~2 ms/call)
+# so that the ~24 bisection steps cost ~50 ms total instead of ~350 ms.
+# The single final call after convergence uses default precision.
+_BISECT_SOLVER = SolverConfig.fast()
 from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,
@@ -121,6 +126,7 @@ def calculate_ps_ufunc(
             },
             rho0=rho_air,
             pressure_assumption=pressure_assumption,
+            solver=_BISECT_SOLVER,
         )
         ys = bisection(
             wang_diff(
@@ -276,6 +282,7 @@ def calculate_ps13_ufunc(
             },
             rho0=rho_air,
             pressure_assumption=pressure_assumption,
+            solver=_BISECT_SOLVER,
         )
         ys = bisection(
             wang_diff(
@@ -697,6 +704,7 @@ def point_solution_ps(
             },
             rho0=rho_air,
             pressure_assumption=pressure_assumption,
+            solver=_BISECT_SOLVER,
         )
 
         ys = bisection(
@@ -851,10 +859,6 @@ def parallelized_ps(
         Automatically failed in autofail mode.
         Automatically failed in autofail mode.
         Automatically failed in autofail mode.
-        Automatically failed in autofail mode.
-        Automatically failed in autofail mode.
-        Automatically failed in autofail mode.
-        Automatically failed in autofail mode.
         'parallelized_ps' ... s
 
     """
@@ -897,24 +901,27 @@ def parallelized_ps(
 
     def ps_skip(ids: xr.Dataset) -> xr.Dataset:
         try:
-            assert not autofail, "Automatically failed in autofail mode."
-            assert not np.isnan(ids.vmax.values), "Did not converge"
-            assert ids["vmax"].values > 0.01, "Vmax is not positive"
-            assert not np.isnan(ids.sst.values), "SST is not valid"
-            assert ids["rh"].values >= 0, "Relative humidity is negative"
-            assert ids["rh"].values <= 1, "Relative humidity is greater than 1"
-            assert (
-                ids["t0"].values > 100
-            ), "Outflow temperature is not greater than 100K"
-            assert (
-                ids["msl"].values > 950
-            ), "Ambient surface pressure is not greater than 0 mbar"
+            if autofail:
+                raise AssertionError("Automatically failed in autofail mode.")
+            if np.isnan(ids.vmax.values):
+                raise AssertionError("Did not converge")
+            if not ids["vmax"].values > 0.01:
+                raise AssertionError("Vmax is not positive")
+            if np.isnan(ids.sst.values):
+                raise AssertionError("SST is not valid")
+            if not ids["rh"].values >= 0:
+                raise AssertionError("Relative humidity is negative")
+            if not ids["rh"].values <= 1:
+                raise AssertionError("Relative humidity is greater than 1")
+            if not ids["t0"].values > 100:
+                raise AssertionError("Outflow temperature is not greater than 100K")
+            if not ids["msl"].values > 950:
+                raise AssertionError("Ambient surface pressure is not greater than 0 mbar")
             return point_solution_ps(
                 ids, include_profile=False, pressure_assumption=pressure_assumption
             )
         except AssertionError as e:
             print(e.args[0] if e.args else "error")
-            print(e)
             ids["pm"] = np.nan
             ids["pc"] = np.nan
             ids["r0"] = np.nan

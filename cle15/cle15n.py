@@ -86,7 +86,7 @@ class SolverConfig:
     | Preset         | ms/call  | mean err% | max err%   | fails     |
     +================+==========+===========+============+===========+
     | ``"fast"``     |  ~0.8    | ~0.82     | ~3.0       | 0/75      |
-    | ``"default"``  |  ~6–7    | ~0.27     | ~1.2       | 0/75      |
+    | ``"default"``  |  ~6-7    | ~0.27     | ~1.2       | 0/75      |
     | ``"precise"``  | ~13      | ~0.13     | ~1.0       | 0/75      |
     +----------------+----------+-----------+------------+-----------+
 
@@ -890,10 +890,11 @@ def chavas_et_al_2015_profile(
     rrfracrm_final = np.linspace(0, rfracrm_max_final, num_pts_final)
     rr_final = rrfracrm_final * rmax
 
-    # Finer ER11 grid for the final profile (converging)
+    # Finer ER11 grid for the final profile (converging).
+    # Fixed at drfracrm=0.01 (5 001 points) regardless of rmax.  The old
+    # `drfracrm /= 10` branch for rmax > 100 km produced 50 001 points and
+    # dominated runtime when ps.py calls this 24 times per bisection step.
     drfracrm = 0.01
-    if rmax > 100e3:
-        drfracrm /= 10.0
     rfracrm_max_er11_fine = 50.0
     num_pts_er11_fine = max(500, int(rfracrm_max_er11_fine / drfracrm) + 1)
     rrfracrm_er11_fine = np.linspace(0, rfracrm_max_er11_fine, num_pts_er11_fine)

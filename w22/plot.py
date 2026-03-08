@@ -13,7 +13,7 @@ from sithom.io import write_json
 from sithom.plot import feature_grid, label_subplots, plot_defaults, get_dim, pairplot
 from sithom.curve import fit
 from .constants import DATA_PATH, FIGURE_PATH, OFFSET_D
-from cle15.cle15m import profile_from_stats
+from cle15.cle15n import profile_from_stats
 from .utils import coriolis_parameter_from_lat
 
 
