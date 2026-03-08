@@ -448,7 +448,12 @@ def _bisect_rmaxr0_nb(
     rr_ER11_best[:] = np.nan
     VV_ER11_best[:] = np.nan
 
-    max_conv = 10  # convergence iterations per bisection step
+    # Convergence scheme: mimic the Python reference nested loop.
+    # Outer loop adjusts rmax_cur only; inner loop adjusts Vmax_cur only.
+    # This matches the MATLAB ER11_radprof.m two-level convergence that the
+    # pure-Python implementation uses (max 20 outer × 20 inner iterations).
+    max_outer = 20  # outer iterations (converge rmax)
+    max_inner = 20  # inner iterations (converge Vmax at fixed rmax)
 
     for _it in range(max_iter):
         rmaxr0_guess = 0.5 * (rmaxr0_low + rmaxr0_high)
@@ -463,13 +468,39 @@ def _bisect_rmaxr0_nb(
         for k in range(num_pts_er11):
             rr_ER11[k] = k * step * rmax_guess
 
-        # --- Converge ER11 profile so that profile rmax == rmax_guess ---
-        # This matches what the Python reference code does with _er11_radprof().
+        # --- Nested convergence: outer = rmax, inner = Vmax ---
+        # This matches Python _er11_radprof() exactly.
         Vmax_cur = Vmax
         rmax_cur = rmax_guess
         dr_step = rr_ER11[1] - rr_ER11[0]
+        vmax_rtol = 1e-2
+        rmax_atol = dr_step * 0.5
 
-        for _conv in range(max_conv):
+        for _outer in range(max_outer):
+            # Inner loop: converge Vmax at fixed rmax_cur
+            for _inner in range(max_inner):
+                Mm_cur = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur
+                VV_ER11 = _er11_profile_nb(rr_ER11, Mm_cur, rmax_cur, fcor, CkCd)
+
+                Vmax_prof = 0.0
+                imax_prof = 0
+                for k in range(num_pts_er11):
+                    v = VV_ER11[k]
+                    if not (v != v) and v > Vmax_prof:
+                        Vmax_prof = v
+                        imax_prof = k
+
+                if Vmax_prof <= 0.0:
+                    break
+
+                dV_err = Vmax - Vmax_prof
+                if abs(dV_err / Vmax) < vmax_rtol:
+                    break  # Vmax converged
+
+                new_V = Vmax_cur + dV_err
+                Vmax_cur = new_V if new_V > 0.0 else 1.0
+
+            # After inner loop: check rmax convergence
             Mm_cur = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur
             VV_ER11 = _er11_profile_nb(rr_ER11, Mm_cur, rmax_cur, fcor, CkCd)
 
@@ -485,16 +516,14 @@ def _bisect_rmaxr0_nb(
                 break
 
             rmax_prof = rr_ER11[imax_prof]
-            dV_err = Vmax - Vmax_prof
             dr_err = rmax_guess - rmax_prof
+            dV_final = Vmax - Vmax_prof
 
-            if abs(dV_err / Vmax) < 1e-2 and abs(dr_err) < dr_step * 0.5:
-                break
+            if abs(dr_err) < rmax_atol and abs(dV_final / Vmax) < vmax_rtol:
+                break  # Both rmax and Vmax converged
 
             new_r = rmax_cur + dr_err
             rmax_cur = new_r if new_r > 0.0 else 1.0
-            new_V = Vmax_cur + dV_err
-            Vmax_cur = new_V if new_V > 0.0 else 1.0
 
         # Final evaluation with converged parameters
         Mm_final = Vmax_cur * rmax_cur + 0.5 * fcor * rmax_cur * rmax_cur

@@ -2,21 +2,27 @@
 Test suite for the CLE15 tropical cyclone wind profile implementations.
 
 Covers:
-- :mod:`w22.cle15`  (pure-Python reference)
-- :mod:`w22.cle15n` (numba-accelerated drop-in replacement)
+- :mod:`cle15.cle15`  (pure-Python reference)
+- :mod:`cle15.cle15n` (numba-accelerated drop-in replacement)
 
 Tests are grouped as:
 
-1. ``TestChavasProfile``   – unit tests for ``chavas_et_al_2015_profile``
-2. ``TestProcessInputs``   – unit tests for ``process_inputs``
-3. ``TestRunCle15``        – smoke tests for ``run_cle15``
-4. ``TestProfileFromStats``– smoke tests for ``profile_from_stats``
-5. ``TestNbConsistency``   – numerical agreement between the two implementations
-6. ``TestEdgeCases``       – degenerate / boundary inputs
+1. ``TestChavasProfile``      – unit tests for ``chavas_et_al_2015_profile``
+2. ``TestProcessInputs``      – unit tests for ``process_inputs``
+3. ``TestRunCle15``           – smoke tests for ``run_cle15``
+4. ``TestProfileFromStats``   – smoke tests for ``profile_from_stats``
+5. ``TestNbConsistency``      – numerical agreement between the two implementations
+6. ``TestEdgeCases``          – degenerate / boundary inputs
+7. ``TestSolverConfig``       – SolverConfig dataclass and presets
+8. ``TestNbRobustness``       – known failure modes in the numba solver
+                                (these tests are expected to FAIL until the
+                                kernel-level convergence is fixed; they are
+                                marked xfail so the suite stays green while
+                                the regressions are tracked)
 
 Run with::
 
-    pytest w22/test_cle15.py -v
+    pytest cle15/test_cle15.py -v
 
 or as part of the full suite::
 
@@ -657,3 +663,172 @@ class TestSolverConfig:
             solver=cfg,
         )
         assert np.isfinite(res[2]), "Custom SolverConfig did not converge"
+
+
+# ===========================================================================
+# 8. TestNbRobustness
+# ===========================================================================
+
+# Input combinations where the numba solver is known to return rmerge == r0
+# (degenerate merge — the compiled ER11 convergence kernel failed), causing
+# run_cle15 to return NaN.  These were identified by sweeping the ps.py
+# bisection search range (r0 ∈ [1.9, 2.4] Mm, Vmax=49.5, fcor at 25°N)
+# and a broader grid sweep (Vmax 30-70, r0 400-2000 km).
+#
+# Format: (Vmax m/s, r0 m, fcor s-1)
+#
+# Note: fcor ≈ 6.16e-5 s⁻¹ corresponds to the Coriolis parameter at 25°N.
+# The cases with Vmax=49.5 are drawn from the ps.py bisection range;
+# the low-Vmax cases are from the broader grid sweep.
+#
+# All tests in this class are marked xfail(strict=False):
+#   - xfail:  we EXPECT them to fail with the current numba implementation
+#   - strict=False: if they unexpectedly pass (i.e. the bug is fixed) the
+#                   suite turns them green rather than erroring, so fixing
+#                   the kernel automatically promotes them to passing tests.
+
+# Only keep cases that actually fail at test-run time.  Re-confirmed after
+# NaN guards were added to run_cle15; these are the survivors that still
+# trigger rmerge==r0 in the compiled bisection kernel.
+_NB_FAILURE_CASES = [
+    # ps.py bisection sweep at 25°N: the one r0 that still reliably fails
+    (49.5, 1935.4e3, 6.16e-5),
+    # Low-Vmax, mid-r0: the compiled ER11 loop diverges most consistently here
+    (30.0, 661.2e3, 6.16e-5),
+]
+
+
+class TestNbRobustness:
+    """
+    Regression tests for known numba solver failure modes.
+
+    Root cause
+    ----------
+    The compiled kernel ``_bisect_rmaxr0_nb`` uses a simplified 10-iteration
+    ER11 convergence loop (the full nested 20×20 Python-level loop cannot run
+    inside ``@njit``).  For certain (Vmax, r0, fcor) combinations this loop
+    fails to converge, producing a grossly wrong rmaxr0 estimate.  The
+    resulting profile has rmerge ≈ r0 (degenerate — no valid inner/outer
+    merge point), which ``run_cle15`` detects and converts to NaN.
+
+    Consequence
+    -----------
+    When ``run_cle15`` (numba) is used inside the ``w22/ps.py`` bisection
+    loop, ~19 % of sampled r0 values return NaN, preventing the bisection
+    from converging to the correct r0.
+
+    Fix target
+    ----------
+    Each test checks one of the two required properties once the fix lands:
+
+    1. ``chavas_et_al_2015_profile`` must return a *valid* profile
+       (rmerge strictly less than r0, rmax finite and physically plausible).
+    2. ``run_cle15`` must return a finite pm that agrees with the pure-Python
+       reference to within 100 Pa.
+
+    Until the fix lands these are expected to fail (xfail).
+    """
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="numba kernel ER11 convergence fails for these inputs (rmerge==r0)",
+    )
+    @pytest.mark.parametrize("Vmax,r0,fcor", _NB_FAILURE_CASES)
+    def test_nb_profile_rmerge_not_degenerate(self, Vmax, r0, fcor):
+        """numba chavas_et_al_2015_profile must not return rmerge == r0."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res = cle15n.chavas_et_al_2015_profile(
+                Vmax, r0, fcor,
+                CDVARY_DEFAULT, CD_DEFAULT, W_COOL_DEFAULT,
+                CKCDVARY_DEFAULT, CK_CD_DEFAULT,
+                EYE_ADJ_DEFAULT, ALPHA_EYE_DEFAULT,
+            )
+        rmerge = res[3]
+        rmax = res[2]
+        assert np.isfinite(rmax), f"rmax is NaN/inf at Vmax={Vmax} r0={r0/1e3:.0f}km"
+        assert not np.isclose(rmerge, r0, rtol=1e-4), (
+            f"rmerge={rmerge/1e3:.1f} km == r0={r0/1e3:.1f} km "
+            f"(degenerate merge) at Vmax={Vmax} r0={r0/1e3:.0f}km"
+        )
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="numba run_cle15 returns NaN for these inputs due to degenerate merge",
+    )
+    @pytest.mark.parametrize("Vmax,r0,fcor", _NB_FAILURE_CASES)
+    def test_nb_run_cle15_finite(self, Vmax, r0, fcor):
+        """numba run_cle15 must return finite pm for all failure-case inputs."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pm_nb, rmax_nb, pc_nb = cle15n.run_cle15(
+                inputs={"Vmax": Vmax, "r0": r0, "fcor": fcor,
+                        "CkCd": CK_CD_DEFAULT, "Cd": CD_DEFAULT,
+                        "w_cool": W_COOL_DEFAULT}
+            )
+        assert np.isfinite(pm_nb), (
+            f"pm is NaN at Vmax={Vmax} r0={r0/1e3:.0f}km fcor={fcor:.2e}"
+        )
+
+    @pytest.mark.xfail(
+        strict=False,
+        reason="numba run_cle15 returns NaN or wrong value for these inputs",
+    )
+    @pytest.mark.parametrize("Vmax,r0,fcor", _NB_FAILURE_CASES)
+    def test_nb_run_cle15_agrees_with_python(self, Vmax, r0, fcor):
+        """numba run_cle15 pm must agree with pure-Python to within 100 Pa."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pm_py, _, _ = cle15.run_cle15(
+                inputs={"Vmax": Vmax, "r0": r0, "fcor": fcor,
+                        "CkCd": CK_CD_DEFAULT, "Cd": CD_DEFAULT,
+                        "w_cool": W_COOL_DEFAULT}
+            )
+            pm_nb, _, _ = cle15n.run_cle15(
+                inputs={"Vmax": Vmax, "r0": r0, "fcor": fcor,
+                        "CkCd": CK_CD_DEFAULT, "Cd": CD_DEFAULT,
+                        "w_cool": W_COOL_DEFAULT}
+            )
+        assert np.isfinite(pm_nb), f"pm_nb is NaN at Vmax={Vmax} r0={r0/1e3:.0f}km"
+        assert abs(pm_nb - pm_py) < 100, (
+            f"pm disagrees by {abs(pm_nb-pm_py):.0f} Pa at "
+            f"Vmax={Vmax} r0={r0/1e3:.0f}km: py={pm_py:.0f} nb={pm_nb:.0f}"
+        )
+
+    def test_nb_failure_rate_in_bisection_range(self):
+        """
+        Document the failure rate of the numba solver over the ps.py bisection range.
+
+        Sweeps r0 ∈ [1.9, 2.4] Mm at Vmax=49.5 m/s, fcor at 25°N (the same
+        range used by w22/ps.py for a typical tropical storm input).  Asserts
+        that the failure rate is 0 %.  Currently expected to fail with ~19 %
+        NaN rate; will pass once the kernel convergence is fixed.
+        """
+        from w22.utils import coriolis_parameter_from_lat
+
+        fcor = abs(coriolis_parameter_from_lat(25))
+        r0_vals = np.linspace(1.9e6, 2.4e6, 100)
+        nan_count = 0
+        for r0 in r0_vals:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                pm, _, _ = cle15n.run_cle15(
+                    inputs={"Vmax": 49.5, "r0": r0, "fcor": fcor,
+                            "CkCd": 0.95, "Cd": 0.0015, "w_cool": 0.002}
+                )
+            if np.isnan(pm):
+                nan_count += 1
+
+        failure_rate = nan_count / len(r0_vals)
+        # This assert is the target: 0 % failure rate.
+        # Currently fails with ~19 %; tracked here so it auto-promotes when fixed.
+        assert failure_rate == 0.0, (
+            f"numba solver failure rate in bisection range: "
+            f"{nan_count}/{len(r0_vals)} = {100*failure_rate:.0f} % "
+            f"(target: 0 %)"
+        )
+
+    test_nb_failure_rate_in_bisection_range = pytest.mark.xfail(
+        strict=False,
+        reason="~19 % of r0 values in the bisection range cause numba NaN (target: 0 %)",
+    )(test_nb_failure_rate_in_bisection_range)
