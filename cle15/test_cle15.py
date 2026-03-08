@@ -30,8 +30,8 @@ import pytest
 # ---------------------------------------------------------------------------
 # Import both implementations
 # ---------------------------------------------------------------------------
-from w22 import cle15, cle15n
-from w22.constants import (
+from cle15 import cle15, cle15n
+from cle15.constants import (
     CK_CD_DEFAULT,
     CD_DEFAULT,
     W_COOL_DEFAULT,

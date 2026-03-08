@@ -756,7 +756,7 @@ def chavas_et_al_2015_profile(
 
     Examples
     --------
-    >>> from w22.cle15n import chavas_et_al_2015_profile, SolverConfig
+    >>> from cle15.cle15n import chavas_et_al_2015_profile, SolverConfig
     >>> res = chavas_et_al_2015_profile(
     ...     50.0, 800e3, 5e-5, 0, 1.5e-3, 2e-3, 0, 0.9, 0, 0.5,
     ...     solver=SolverConfig.fast(),

@@ -61,12 +61,13 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "w22", "adforce", "adbo", "worst"],
+    packages=["tcpips", "w22", "adforce", "adbo", "worst", "cle15"],
     package_dir={
         "tcpips": "tcpips",  # Calculate potential intensity and prerequisites for potential size
         "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab (octave), calculate potential size
         "adforce": "adforce",  # All of the interfacing with ADCIRC
         "adbo": "adbo",  # All of the tensorflow/trieste Bayesian optimization stuff
         "worst": "worst",  # Extreme value theory using the upper bound limit using tensorflow for fitting.
+        "cle15": "cle15",  # Chavas, Lin & Emanuel (2015) TC wind profile implementations
     },
 )

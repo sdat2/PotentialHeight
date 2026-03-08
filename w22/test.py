@@ -16,7 +16,7 @@ from .constants import (
     GAS_CONSTANT,
     GAS_CONSTANT_FOR_WATER_VAPOR,
 )
-from .cle15m import run_cle15
+from cle15.cle15m import run_cle15
 from .w22_carnot import wang_consts, wang_diff
 from .ps import point_solution_ps
 from .utils import buck_sat_vap_pressure
@@ -557,8 +557,8 @@ def test_figure_5():
 
 
 def octave_vs_python(add_name: str = ""):
-    from .cle15m import run_cle15 as run_cle15_octave
-    from .cle15 import run_cle15 as run_cle15_python
+    from cle15.cle15m import run_cle15 as run_cle15_octave
+    from cle15.cle15 import run_cle15 as run_cle15_python
     from .constants import (
         RA_DEFAULT,
         BACKGROUND_PRESSURE,

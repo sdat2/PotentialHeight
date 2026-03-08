@@ -36,7 +36,7 @@ from .constants import (
     ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
 from .w22_carnot import wang_diff, wang_consts
-from .cle15 import run_cle15
+from cle15.cle15 import run_cle15
 from .utils import (
     coriolis_parameter_from_lat,
     buck_sat_vap_pressure,

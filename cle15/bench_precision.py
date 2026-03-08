@@ -34,7 +34,7 @@ warnings.filterwarnings("ignore")
 from .cle15 import chavas_et_al_2015_profile as _py_profile
 
 # ── Numba kernels / internals we need to call directly ───────────────────────
-import w22.cle15n as _nb_mod
+import cle15.cle15n as _nb_mod
 from .cle15n import (
     _e04_outerwind_r0input_nondim_mm0,
     _bisect_rmaxr0_nb,
