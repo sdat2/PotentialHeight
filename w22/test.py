@@ -508,6 +508,10 @@ def test_figure_4():
 
 
 def test_figure_5():
+    from matplotlib.ticker import FuncFormatter, MultipleLocator
+
+    plot_defaults()
+
     vp = 83 / 1.2  # m s-1
     v_car = v_carnot(
         efficiency_relative_to_carnot=0.5,
@@ -520,38 +524,67 @@ def test_figure_5():
     )
     print("v_car", v_car)
     print("vp", vp)
-    # column 1 = 1/f, column 2 = r0
+
+    fig, ax = plt.subplots()
+
+    # column 1 = 1/f [s], column 2 = r0 [km]
     vpdiv_df = pd.read_csv(os.path.join(DATA_PATH, "w22", "5a-vp-div-f.csv"))
-    plt.plot(
-        vpdiv_df.iloc[:, 0], vpdiv_df.iloc[:, 1], color="grey", label=r"$\frac{v_p}{f}$"
+    ax.plot(
+        vpdiv_df.iloc[:, 0],
+        vpdiv_df.iloc[:, 1],
+        color="grey",
+        label=r"$v_p / f$ (W22)",
     )
-    plt.plot(
+    ax.plot(
         vpdiv_df.iloc[:, 0],
         vp * vpdiv_df.iloc[:, 0] / 1000,
         ":",
         color="grey",
-        alpha=0.5,
-        label=r"Our $\frac{V_p}{f}$",
+        alpha=0.7,
+        label=r"$V_p / f$ (ours)",
     )
     vcarnot_div_df = pd.read_csv(os.path.join(DATA_PATH, "w22", "5a-vcarnot-div-f.csv"))
-    plt.plot(
+    ax.plot(
         vcarnot_div_df.iloc[:, 0],
         vcarnot_div_df.iloc[:, 1],
         color="black",
-        label=r"$\frac{v_{\mathrm{carnot}}}{f}$",
+        label=r"$v_{\mathrm{carnot}} / f$ (W22)",
     )
-    plt.plot(
+    ax.plot(
         vcarnot_div_df.iloc[:, 0],
         v_car * vcarnot_div_df.iloc[:, 0] / 1000,
         ":",
         color="black",
-        alpha=0.5,
-        label=r"Our $\frac{V_{\mathrm{carnot}}}{f}$",
+        alpha=0.7,
+        label=r"$V_{\mathrm{carnot}} / f$ (ours)",
     )
-    plt.xlabel(r"$\frac{1}{f}$, larger at lower latitudes [s]")
-    plt.ylabel(r"Potential Size, $r_a$ [km]")
-    plt.legend(ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.05))
-    plt.savefig(os.path.join(FIGURE_PATH, "w22", "figure_5a.pdf"))
+
+    # Format x-axis: values in seconds (~5e3–8e4), display as ×10³ s
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x * 1e-3:.0f}"))
+    ax.xaxis.set_major_locator(MultipleLocator(10_000))
+    ax.set_xlabel(
+        r"$f^{-1}$, larger at lower latitudes"
+        "\n"
+        r"$({\times}10^{3}\ \mathrm{s})$"
+    )
+
+    # Format y-axis: values in km (~350–6500), display as ×10³ km
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y * 1e-3:.1f}"))
+    ax.yaxis.set_major_locator(MultipleLocator(1000))
+    ax.set_ylabel(
+        r"Potential Size, $r_a$"
+        "\n"
+        r"$({\times}10^{3}\ \mathrm{km})$"
+    )
+
+    ax.legend(ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.05), frameon=True)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    ax.grid(True, linestyle="--", linewidth=0.4, alpha=0.5)
+
+    fig.tight_layout()
+    os.makedirs(os.path.join(FIGURE_PATH, "w22"), exist_ok=True)
+    fig.savefig(os.path.join(FIGURE_PATH, "w22", "figure_5a.pdf"), bbox_inches="tight")
     plt.clf()
     plt.close()
 

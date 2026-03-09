@@ -36,7 +36,10 @@ from .constants import (
     ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
 from .w22_carnot import wang_diff, wang_consts
-from cle15.cle15n import run_cle15, SolverConfig  # numba; boundary-crossing bug fixed in cle15n.py
+from cle15.cle15n import (
+    run_cle15,
+    SolverConfig,
+)  # numba; boundary-crossing bug fixed in cle15n.py
 
 # Inside the r0 bisection loop, use a fast solver (500 pts, 20 iter → ~2 ms/call)
 # so that the ~24 bisection steps cost ~50 ms total instead of ~350 ms.
@@ -916,7 +919,9 @@ def parallelized_ps(
             if not ids["t0"].values > 100:
                 raise AssertionError("Outflow temperature is not greater than 100K")
             if not ids["msl"].values > 950:
-                raise AssertionError("Ambient surface pressure is not greater than 0 mbar")
+                raise AssertionError(
+                    "Ambient surface pressure is not greater than 0 mbar"
+                )
             return point_solution_ps(
                 ids, include_profile=False, pressure_assumption=pressure_assumption
             )
