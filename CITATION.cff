@@ -7,5 +7,5 @@ authors:
 title: Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization
 version: v0.1.3
 doi: 10.5281/zenodo.15073504
-url: "https://github.com/sdat2/worstsurge"
+url: "https://github.com/sdat2/PotentialHeight"
 date-released: 2025-11-26
