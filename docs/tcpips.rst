@@ -12,6 +12,14 @@ tcpips.ani module
    :undoc-members:
    :show-inheritance:
 
+tcpips.bias module
+------------------
+
+.. automodule:: tcpips.bias
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 tcpips.constants module
 -----------------------
 
@@ -28,10 +36,34 @@ tcpips.convert module
    :undoc-members:
    :show-inheritance:
 
+tcpips.dask\_utils module
+-------------------------
+
+.. automodule:: tcpips.dask_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tcpips.driver module
+--------------------
+
+.. automodule:: tcpips.driver
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 tcpips.era5 module
 ------------------
 
 .. automodule:: tcpips.era5
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tcpips.era5\_ps\_calc module
+----------------------------
+
+.. automodule:: tcpips.era5_ps_calc
    :members:
    :undoc-members:
    :show-inheritance:
@@ -76,26 +108,18 @@ tcpips.pi\_driver module
    :undoc-members:
    :show-inheritance:
 
-tcpips.pi\_ex module
---------------------
-
-.. automodule:: tcpips.pi_ex
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-tcpips.pi\_old module
----------------------
-
-.. automodule:: tcpips.pi_old
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 tcpips.plot module
 ------------------
 
 .. automodule:: tcpips.plot
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tcpips.ps\_driver module
+------------------------
+
+.. automodule:: tcpips.ps_driver
    :members:
    :undoc-members:
    :show-inheritance:
@@ -120,6 +144,22 @@ tcpips.rh module
 ----------------
 
 .. automodule:: tcpips.rh
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tcpips.run\_dask\_calculation module
+------------------------------------
+
+.. automodule:: tcpips.run_dask_calculation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tcpips.simple\_sensitivity module
+---------------------------------
+
+.. automodule:: tcpips.simple_sensitivity
    :members:
    :undoc-members:
    :show-inheritance:

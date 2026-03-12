@@ -1,6 +1,6 @@
 # Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian optimization
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)[![Python package](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml/badge.svg)](https://github.com/sdat2/worstsurge/actions/workflows/python-package.yml)[![Documentation Status](https://readthedocs.org/projects/worstsurge/badge/?version=latest)](https://worstsurge.readthedocs.io/en/latest/?badge=latest)[![Code DOI](https://zenodo.org/badge/718141777.svg)](https://doi.org/10.5281/zenodo.15073504)[![EarthArXiv Preprint](https://img.shields.io/badge/EarthArXiv-doi:10.31223/X57T5R-blue?style=flat)](https://doi.org/10.31223/X57T5R)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)[![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)[![Python package](https://github.com/sdat2/actions/workflows/python-package.yml/badge.svg)](https://github.com/sdat2/PotentialHeight/actions/workflows/python-package.yml)[![Documentation Status](https://readthedocs.org/projects/worstsurge/badge/?version=latest)](https://worstsurge.readthedocs.io/en/latest/?badge=latest)[![Code DOI](https://zenodo.org/badge/718141777.svg)](https://doi.org/10.5281/zenodo.15073504)[![EarthArXiv Preprint](https://img.shields.io/badge/EarthArXiv-doi:10.31223/X57T5R-blue?style=flat)](https://doi.org/10.31223/X57T5R)
 
 EarthArXiv preprint available at <https://doi.org/10.31223/X57T5R>.
 
@@ -153,7 +153,7 @@ And cite the code as:
   doi = {10.5281/zenodo.15073504},
   month = {Nov},
   title = {{Finding the potential height of tropical cyclone storm surges in a changing climate using Bayesian Optimization}},
-  url = {https://github.com/sdat2/worstsurge},
+  url = {https://github.com/sdat2/PotentialHeight},
   version = {v0.1.3},
   year = {2025}
 }
