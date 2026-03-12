@@ -563,19 +563,13 @@ def test_figure_5():
     ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{x * 1e-3:.0f}"))
     ax.xaxis.set_major_locator(MultipleLocator(10_000))
     ax.set_xlabel(
-        r"$f^{-1}$, larger at lower latitudes"
-        "\n"
-        r"$({\times}10^{3}\ \mathrm{s})$"
+        r"$f^{-1}$, larger at lower latitudes" "\n" r"$({\times}10^{3}\ \mathrm{s})$"
     )
 
     # Format y-axis: values in km (~350–6500), display as ×10³ km
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y * 1e-3:.1f}"))
     ax.yaxis.set_major_locator(MultipleLocator(1000))
-    ax.set_ylabel(
-        r"Potential Size, $r_a$"
-        "\n"
-        r"$({\times}10^{3}\ \mathrm{km})$"
-    )
+    ax.set_ylabel(r"Potential Size, $r_a$" "\n" r"$({\times}10^{3}\ \mathrm{km})$")
 
     ax.legend(ncols=2, loc="lower center", bbox_to_anchor=(0.5, 1.05), frameon=True)
     ax.set_xlim(left=0)
