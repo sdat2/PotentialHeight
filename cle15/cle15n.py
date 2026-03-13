@@ -1030,7 +1030,7 @@ def run_cle15(
     plot: bool = False,
     inputs: Optional[Dict] = None,
     rho0: float = RHO_AIR_DEFAULT,
-    pressure_assumption: str = "isopycnal",
+    pressure_assumption: str = "isothermal",
     solver: Optional[SolverConfig] = None,
 ) -> Tuple[float, float, float]:
     """Run the numba-accelerated CLE15 model — same API as cle15.run_cle15.

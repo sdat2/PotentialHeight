@@ -1498,7 +1498,7 @@ def run_cle15(
     plot: bool = False,
     inputs: Optional[Dict[str, any]] = None,
     rho0=RHO_AIR_DEFAULT,  # [kg m-3]
-    pressure_assumption: str = "isopycnal",
+    pressure_assumption: str = "isothermal",
 ) -> Tuple[float, float, float]:  # pm, rmax, vmax, pc
     """
     Run the CLE15 model.

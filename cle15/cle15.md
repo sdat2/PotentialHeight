@@ -262,9 +262,14 @@ These are marked `pytest.mark.xfail` with descriptive messages so that fixing an
 
 #### Pressure consistency (`run_cle15` vs. `profile_from_stats`)
 
-A systematic **~2.7 hPa offset** exists between the central pressures returned by `run_cle15` and `profile_from_stats` even when both are called with the same thermodynamic assumption (`isothermal`).  This offset is independent of the assumption (measured: 2.74 hPa isothermal, 2.75 hPa isopycnal) and arises because the two functions integrate the pressure gradient along different radial grids.  The test (`test_pressure_assumption_consistent_when_matched`) now accepts up to 5 hPa divergence and asserts at least 0.5 hPa divergence (a canary for unexpected changes to the integration paths).
+The two pressure assumptions correspond to different thermodynamic closures in the cyclogeostrophic balance integral $\frac{dp}{dr} = \rho(r)\left(\frac{v^2}{r} + fv\right)$:
 
-Note also that **`profile_from_stats` defaults to `isothermal`** while **`run_cle15` defaults to `isopycnal`** — mixing the two without explicitly specifying `pressure_assumption` in both calls will give an additional ~2.3 hPa difference on top of the grid-integration offset.
+- **Isopycnal** (constant density): $\rho(r) = \rho_0$, so $p(r) = p_0 + \rho_0 \int_\infty^r \left(\frac{v^2}{r} + fv\right) dr$.  Linear in wind speed squared.
+- **Isothermal** (ideal gas at constant temperature, so $\rho \propto p$): $\rho(r) = \frac{\rho_0}{p_0} p(r)$, yielding $p(r) = p_0 \exp\!\left(-\frac{\rho_0}{p_0} \int_\infty^r \left(\frac{v^2}{r} + fv\right) dr\right)$.  Exponential, and gives a slightly lower central pressure than isopycnal for the same wind field.
+
+Both `run_cle15` and `profile_from_stats` default to **`isothermal`**, consistent with `w22/ps.py` and all other callers in the codebase.
+
+A systematic **~2.7 hPa offset** exists between the central pressures returned by the two functions even when called with the same assumption.  This is independent of the assumption chosen (measured: 2.74 hPa isothermal, 2.75 hPa isopycnal) and arises purely because the two functions integrate the pressure gradient along different radial grids.  The test (`test_pressure_assumption_consistent_when_matched`) accepts up to 5 hPa divergence and asserts at least 0.5 hPa divergence (a canary for unexpected changes to the integration paths).
 
 ---
 
