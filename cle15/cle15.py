@@ -281,9 +281,12 @@ def _er11_rmax_r0_relation(
     else:
         try:
             lhs = ratio_M ** (2.0 - CkCd)
-        except ValueError:  # Handle potential complex result if base is negative
+        except (
+            ValueError,
+            ZeroDivisionError,
+        ):  # Handle potential complex result or 0^negative
             warnings.warn(
-                f"Potential complex number in ER11 rmax/r0 LHS (M0/Mm={ratio_M:.2e})"
+                f"Potential complex number or zero-power in ER11 rmax/r0 LHS (M0/Mm={ratio_M:.2e})"
             )
             return np.inf
 
@@ -337,9 +340,9 @@ def _er11_r0_rmax_relation(
     else:
         try:
             lhs = ratio_M ** (2.0 - CkCd)
-        except ValueError:
+        except (ValueError, ZeroDivisionError):
             warnings.warn(
-                f"Potential complex number in ER11 r0/rmax LHS (M0/Mm={ratio_M:.2e})"
+                f"Potential complex number or zero-power in ER11 r0/rmax LHS (M0/Mm={ratio_M:.2e})"
             )
             return np.inf
 
@@ -1036,6 +1039,41 @@ def chavas_et_al_2015_profile(
             Returns NaNs for values if calculation fails.
     """
     fcor = abs(fcor)
+
+    # --- Guard against degenerate inputs ---
+    # These make the ER11 angular-momentum equations singular (M0=0, Mm=0, or
+    # zero-denominator in the power-law ratio).  MATLAB's symbolic solver would
+    # also return empty/error for these inputs.  Return NaN gracefully instead
+    # of crashing with ZeroDivisionError deep inside the solver.
+    _nan_arr = np.array([np.nan])
+    _fail_nan = (
+        _nan_arr,
+        _nan_arr,
+        np.nan,
+        np.nan,
+        np.nan,
+        _nan_arr,
+        _nan_arr,
+        np.nan,
+        np.nan,
+        np.nan,
+        np.nan,
+    )
+    if Vmax <= 0.0:
+        warnings.warn(
+            f"chavas_et_al_2015_profile: Vmax={Vmax} <= 0 is unphysical; returning NaN."
+        )
+        return _fail_nan
+    if r0 <= 0.0:
+        warnings.warn(
+            f"chavas_et_al_2015_profile: r0={r0} <= 0 is unphysical; returning NaN."
+        )
+        return _fail_nan
+    if fcor == 0.0:
+        warnings.warn(
+            "chavas_et_al_2015_profile: fcor=0 makes M0=0 and the ER11 power-law singular; returning NaN."
+        )
+        return _fail_nan
 
     # --- Determine Ck/Cd ---
     CkCd = CkCd_input

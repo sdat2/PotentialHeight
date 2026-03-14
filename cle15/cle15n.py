@@ -802,6 +802,12 @@ def chavas_et_al_2015_profile(
         solver = SolverConfig()
 
     fcor = abs(fcor)
+
+    # --- Guard against degenerate inputs ---
+    # These make the ER11 angular-momentum equations singular (M0=0, Mm=0, or
+    # zero-denominator in the power-law ratio).  MATLAB's symbolic solver would
+    # also return empty/error for these inputs.  Return NaN gracefully instead
+    # of crashing with ZeroDivisionError deep inside the compiled kernel.
     _nan = np.array([np.nan])
     _fail = (
         _nan,
@@ -816,6 +822,21 @@ def chavas_et_al_2015_profile(
         np.nan,
         np.nan,
     )
+    if Vmax <= 0.0:
+        warnings.warn(
+            f"chavas_et_al_2015_profile: Vmax={Vmax} <= 0 is unphysical; returning NaN."
+        )
+        return _fail
+    if r0 <= 0.0:
+        warnings.warn(
+            f"chavas_et_al_2015_profile: r0={r0} <= 0 is unphysical; returning NaN."
+        )
+        return _fail
+    if fcor == 0.0:
+        warnings.warn(
+            "chavas_et_al_2015_profile: fcor=0 makes M0=0 and the ER11 power-law singular; returning NaN."
+        )
+        return _fail
 
     # --- Ck/Cd ---
     CkCd = CkCd_input

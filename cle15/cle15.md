@@ -244,21 +244,21 @@ A new test class was added to `test_cle15.py` to cover NaN propagation paths sys
 | **E** | `chavas_et_al_2015_profile` with degenerate inputs (`Vmax=0`, `r0=0`, `w_cool=0`, `fcor=0`) |
 | **F** | Pressure-assumption consistency between `run_cle15` and `profile_from_stats` |
 
-**Results: 22 passed, 4 xfailed** (no failures).
+**Results: 187 passed, 0 xfailed** (as of March 2026 after fixes below).
 
-#### Known bugs documented as `xfail`
+#### Degenerate inputs — bugs found and fixed
 
-The degenerate-input tests (sub-group E) exposed four cases where both implementations raise an unhandled `ZeroDivisionError` rather than returning NaN gracefully:
+The degenerate-input tests (sub-group E) initially exposed four cases where both implementations raised an unhandled `ZeroDivisionError` rather than returning NaN gracefully:
 
-| Test | Module(s) | Root cause |
+| Input | Module(s) | Root cause |
 |---|---|---|
-| `test_profile_nan_structure_on_impossible_vmax` | `cle15n` | `_bisect_rmaxr0_nb` divides by zero when `Vmax=0` |
-| `test_profile_nan_structure_on_zero_r0` | `cle15n` | `_bisect_rmaxr0_nb` computes `drfracr0 = dr / r0` with no guard for `r0=0` |
-| `test_profile_nan_structure_on_zero_fcor` | both | $M_0 = \tfrac{1}{2} f r_0^2 = 0$ makes the ER11 power-law ratio $0^{2-C_k/C_d}$ singular |
+| `Vmax=0` | `cle15n` | `_bisect_rmaxr0_nb` divides by zero in the `abs(dV_err / Vmax)` convergence check |
+| `r0=0` | `cle15n` | `_bisect_rmaxr0_nb` divides by zero computing `rfracrm_actual = r0 / rmax_guess` |
+| `fcor=0` | both | $M_0 = \tfrac{1}{2} f r_0^2 = 0$ makes the ER11 power-law ratio $0^{2-C_k/C_d}$ singular |
 
-Note: `cle15.py` handles `Vmax=0` and `r0=0` gracefully (the bisection bracket collapses to zero); only `cle15n` crashes on these two inputs.  `fcor=0` crashes both modules.  This matches MATLAB, which would also return an empty/error result for `fcor=0` via the symbolic solver.
+**Fix (March 2026):** a guard block was added immediately after `fcor = abs(fcor)` at the top of `chavas_et_al_2015_profile` in both `cle15.py` and `cle15n.py`.  If `Vmax <= 0`, `r0 <= 0`, or `fcor == 0`, the function now issues a `warnings.warn` and returns the NaN sentinel tuple immediately, before any solver code is reached.  Additionally, `except ValueError` was broadened to `except (ValueError, ZeroDivisionError)` in both `_er11_rmax_r0_relation` and `_er11_r0_rmax_relation` in `cle15.py` as a belt-and-suspenders defence.
 
-These are marked `pytest.mark.xfail` with descriptive messages so that fixing an implementation converts the `XFAIL` to `XPASS`, alerting the developer to promote the test to a normal `PASS`.
+Note: `Vmax=0` and `r0=0` are physically meaningless (no storm / no outer boundary).  `fcor=0` (equator) is a genuine singularity in the ER11 theory — MATLAB's symbolic solver also returns empty roots for this case.  The correct model output for all three is NaN.
 
 #### Pressure consistency (`run_cle15` vs. `profile_from_stats`)
 

@@ -1121,23 +1121,15 @@ class TestNanHandling:
     @pytest.mark.parametrize("mod", [cle15, cle15n])
     def test_profile_nan_structure_on_impossible_vmax(self, mod):
         """
-        An impossible Vmax=0 m/s must not raise an unhandled exception; the
-        result should be either all-NaN scalars or a graceful finite fallback.
+        Vmax=0 m/s is unphysical (no storm).  Both implementations must return
+        a NaN result tuple (with a warning) rather than crashing.
 
         MATLAB reference behaviour: when Vmax=0 the ER11 rmax-r0 solve
-        produces empty roots (divide by zero in the power-law ratio), so
-        MATLAB would error without a graceful NaN return.
+        produces empty roots, so MATLAB would error without a graceful return.
 
-        Current status (known bug): ``cle15.cle15`` handles Vmax=0 via the
-        bisection bracket collapsing gracefully, but ``cle15.cle15n``'s numba
-        kernel raises ZeroDivisionError because it has no guard for Vmax==0.
-        Marked xfail for ``cle15n`` until a guard is added.
+        Fix: ``chavas_et_al_2015_profile`` now guards Vmax<=0 at entry and
+        returns the NaN sentinel with a warning in both modules.
         """
-        if mod is cle15n:
-            pytest.xfail(
-                "cle15n._bisect_rmaxr0_nb divides by zero when Vmax=0 "
-                "(no input guard); see known bug."
-            )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
@@ -1150,25 +1142,15 @@ class TestNanHandling:
     @pytest.mark.parametrize("mod", [cle15, cle15n])
     def test_profile_nan_structure_on_zero_r0(self, mod):
         """
-        r0 = 0 is unphysical (no outer boundary).  MATLAB would divide by
-        zero or produce NaN immediately (M0 = 0.5*f*0 = 0, gamma = Cd*f*0/w
-        = 0).  Python must return without crashing and produce NaN or near-
-        zero rmax.
+        r0=0 is unphysical (no outer boundary).  Both implementations must
+        return a NaN result tuple (with a warning) rather than crashing.
 
         MATLAB reference behaviour: ``M0 = 0.5*fcor*r0^2 = 0``, the symbolic
-        solve returns no valid roots (empty set), so MATLAB would error here.
+        solve returns no valid roots, so MATLAB would error here.
 
-        Current status (known bug): ``cle15.cle15`` handles r0=0 gracefully
-        (the bisection bracket collapses to zero); ``cle15.cle15n``'s numba
-        kernel raises ZeroDivisionError because it computes ``drfracr0 =
-        dr_km / r0`` with no guard for r0==0.  Marked xfail for ``cle15n``
-        until a guard is added.
+        Fix: ``chavas_et_al_2015_profile`` now guards r0<=0 at entry and
+        returns the NaN sentinel with a warning in both modules.
         """
-        if mod is cle15n:
-            pytest.xfail(
-                "cle15n._bisect_rmaxr0_nb divides by zero when r0=0 "
-                "(drfracr0 computation has no guard); see known bug."
-            )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
@@ -1197,23 +1179,18 @@ class TestNanHandling:
     @pytest.mark.parametrize("mod", [cle15, cle15n])
     def test_profile_nan_structure_on_zero_fcor(self, mod):
         """
-        fcor = 0 (equator) makes M0 = 0 and the ER11 relation singular.
-        MATLAB would produce empty roots from ``syms solve`` (the LHS ratio
-        ``M0/Mm`` becomes 0, and ``0^(2-CkCd)`` with CkCd>2 is undefined),
-        effectively erroring without a graceful NaN return.
+        fcor=0 (equator) makes M0=0 and the ER11 power-law ratio singular.
+        Both implementations must return a NaN result tuple (with a warning)
+        rather than crashing.
 
-        Current status (known bug): both implementations raise
-        ZeroDivisionError for fcor=0.  In ``cle15.cle15`` the error occurs
-        inside ``_er11_r0_rmax_relation`` at ``ratio_M ** (2.0 - CkCd)``
-        when ratio_M=0.0 and the exponent is negative.  In ``cle15.cle15n``
-        the numba kernel divides by zero.  Both are marked xfail until input
-        validation is added to ``chavas_et_al_2015_profile``.
+        MATLAB reference behaviour: ``syms solve`` returns an empty root set
+        for this degenerate case, effectively erroring without graceful output.
+
+        Fix: ``chavas_et_al_2015_profile`` now guards fcor==0 at entry (after
+        ``fcor = abs(fcor)``) and returns the NaN sentinel with a warning in
+        both modules, avoiding the ZeroDivisionError that previously occurred
+        deep inside the ER11 power-law computation.
         """
-        pytest.xfail(
-            "Both implementations raise ZeroDivisionError for fcor=0 "
-            "(M0=0 makes the ER11 power-law singular); see known bug in "
-            "both cle15.cle15 and cle15.cle15n."
-        )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             try:
