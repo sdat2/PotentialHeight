@@ -278,7 +278,9 @@ A new test class was added to `test_cle15.py` to cover NaN propagation paths sys
 | **E** | `chavas_et_al_2015_profile` with degenerate inputs (`Vmax=0`, `r0=0`, `w_cool=0`, `fcor=0`) |
 | **F** | Pressure-assumption consistency between `run_cle15` and `profile_from_stats` |
 
-**Results: 187 passed, 0 xfailed** (as of March 2026 after fixes below).
+**Results: 194 passed, 0 xfailed** (as of March 2026; includes 7 `TestMatlabRegression` tests added after Octave cross-validation).
+
+The total breaks down as: 187 tests from the March 2026 audit (sub-groups A–F) plus 7 from `TestMatlabRegression`.
 
 #### Degenerate inputs — bugs found and fixed
 
