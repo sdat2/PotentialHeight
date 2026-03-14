@@ -4,7 +4,12 @@ Accuracy vs. cost trade-off for the numba CLE15 solver.
 Sweeps each resolution / iteration knob independently while holding the
 others at their current default values.  Reports timing (ms/call) and
 accuracy (% rmax error relative to the pure-Python reference) for the
-75-case benchmark grid.
+192-case benchmark grid (Vmax 20-90 m/s, r0 300-2000 km,
+f in {3, 5, 7} x 1e-5 s^-1).
+
+Note: r0 = 200 km is excluded because the high-Rossby degenerate regime
+produces large bisection sensitivity that inflates the apparent error
+without reflecting normal solver behaviour (see cle15.md).
 
 Usage::
 
@@ -54,9 +59,14 @@ from .constants import (
     ALPHA_EYE_DEFAULT,
 )
 
-# ── Parameter grid (identical to bench_cle15.py) ─────────────────────────────
+# ── Parameter grid ───────────────────────────────────────────────────────────
+# r0 = 200 km is excluded from the benchmark grid because the high-Rossby
+# degenerate regime (very small r0, very high Vmax, very low f) produces
+# large sensitivity to bisection termination side and inflates the apparent
+# error without reflecting normal solver behaviour.  The instability is
+# documented separately (see cle15.md, MATLAB cross-validation section).
 VMAX_VALS = [20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]
-R0_VALS = [200e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
+R0_VALS = [300e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
 FCOR_VALS = [3e-5, 5e-5, 7e-5]
 
 ALL_CASES: List[Tuple[float, float, float]] = [

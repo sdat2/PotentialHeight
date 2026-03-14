@@ -106,7 +106,9 @@ res = chavas_et_al_2015_profile(..., solver=SolverConfig.precise())
 
 ### Accuracy vs. cost sweep (`bench_precision.py`)
 
-The four knobs were swept independently over a 192-case benchmark grid ($V_\text{max} \in \{20, 30, \ldots, 90\}$ m/s, $r_0 \in \{200, 400, \ldots, 2000\}$ km, $f \in \{3, 5, 7\} \times 10^{-5}$ s$^{-1}$), with rmax error measured relative to the pure-Python reference.  The grid was expanded from the original 75-case grid ($V_\text{max} \in \{30\text{–}70\}$ m/s, $r_0 \in \{400\text{–}1200\}$ km) to cover the full physically meaningful range including tropical-depression intensities and very large or very compact storms.
+The four knobs were swept independently over a 192-case benchmark grid ($V_\text{max} \in \{20, 30, \ldots, 90\}$ m/s, $r_0 \in \{300, 400, \ldots, 2000\}$ km, $f \in \{3, 5, 7\} \times 10^{-5}$ s$^{-1}$), with rmax error measured relative to the pure-Python reference.  The grid was expanded from the original 75-case grid ($V_\text{max} \in \{30\text{–}70\}$ m/s, $r_0 \in \{400\text{–}1200\}$ km) to cover the full physically meaningful range including tropical-depression intensities and very large or very compact storms.
+
+> **Note on $r_0 = 200$ km:** this value is excluded from the benchmark grid because the high-Rossby degenerate regime ($\mathrm{Ro} \gg 1$) produces large sensitivity to bisection termination side, inflating the apparent error without reflecting normal solver behaviour.  The regime exists and is documented in the `TestMatlabRegression` cross-validation section below.
 
 #### `Nr_e04` — E04 Euler grid points (default 200 000)
 
