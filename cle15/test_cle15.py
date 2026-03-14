@@ -21,6 +21,9 @@ Tests are grouped as:
                                 the regressions are tracked)
 9. ``TestNanHandling``        – NaN propagation and failure-mode behaviour,
                                 derived from the MATLAB reference implementation
+10. ``TestMatlabRegression``  – rmax cross-validated against Octave
+                                (ER11E04_nondim_r0input.m, same Python-default
+                                parameters: Cdvary=0, CkCd=0.9)
 
 Run with::
 
@@ -1274,4 +1277,60 @@ class TestNanHandling:
             f"Central pressures agree suspiciously well ({diff:.2f} hPa): "
             f"the known ~2.7 hPa grid offset appears to have disappeared, "
             f"which may indicate the integration method changed."
+        )
+
+
+# ---------------------------------------------------------------------------
+# 10. TestMatlabRegression – rmax values cross-validated against Octave
+#     (ER11E04_nondim_r0input.m run with the same Python-default parameters:
+#      Cdvary=0, C_d=0.0015, w_cool=0.002, CkCdvary=0, CkCd=0.9,
+#      eye_adj=0, alpha_eye=0.5)
+#
+#     Reference values produced by mcle/run_edge_cases.m under Octave 9.4.0.
+#     All normal cases agree to < 1%.  The first case (90 m/s, 200 km, 3e-5)
+#     is the known degenerate high-Ro regime where both solvers are
+#     sensitive to bisection direction; it is tested with a looser tolerance.
+# ---------------------------------------------------------------------------
+class TestMatlabRegression:
+    """Cross-validate rmax against MATLAB/Octave reference (ER11E04_nondim_r0input.m)."""
+
+    # (Vmax m/s, r0 m, fcor s-1, octave_rmax_km, tol_pct, label)
+    _CASES = [
+        # degenerate high-Ro case – both solvers are sensitive here; loose tol
+        (90.0, 200e3, 3e-5, 1.0426, 25.0, "high Vmax small r0 low f (degenerate)"),
+        # well-behaved cases – match to < 1 %
+        (90.0, 200e3, 5e-5, 1.3152, 1.0, "high Vmax small r0 mid f"),
+        (90.0, 200e3, 7e-5, 1.5266, 1.0, "high Vmax small r0 high f"),
+        (20.0, 200e3, 3e-5, 5.4193, 1.0, "low Vmax  small r0 low f"),
+        (90.0, 2000e3, 3e-5, 29.3578, 1.0, "high Vmax large r0 low f"),
+        (20.0, 2000e3, 3e-5, 224.5165, 1.0, "low Vmax  large r0 low f"),
+        (50.0, 800e3, 5e-5, 19.6884, 1.0, "mid Vmax  mid r0  mid f (reference)"),
+    ]
+
+    @pytest.mark.parametrize(
+        "Vmax,r0,fcor,oct_rmax_km,tol_pct,label",
+        _CASES,
+        ids=[c[-1] for c in _CASES],
+    )
+    def test_rmax_matches_octave(self, Vmax, r0, fcor, oct_rmax_km, tol_pct, label):
+        """Python rmax must agree with Octave reference to within tol_pct %."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            result = cle15.chavas_et_al_2015_profile(
+                Vmax,
+                r0,
+                fcor,
+                CDVARY_DEFAULT,
+                CD_DEFAULT,
+                W_COOL_DEFAULT,
+                CKCDVARY_DEFAULT,
+                CK_CD_DEFAULT,
+                EYE_ADJ_DEFAULT,
+                ALPHA_EYE_DEFAULT,
+            )
+        rmax_km = result[2] / 1e3
+        diff_pct = abs(rmax_km - oct_rmax_km) / oct_rmax_km * 100
+        assert diff_pct < tol_pct, (
+            f"{label}: Python rmax={rmax_km:.4f} km, "
+            f"Octave={oct_rmax_km:.4f} km, diff={diff_pct:.2f}% > {tol_pct}%"
         )

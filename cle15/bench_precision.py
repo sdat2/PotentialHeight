@@ -8,7 +8,8 @@ accuracy (% rmax error relative to the pure-Python reference) for the
 
 Usage::
 
-    python -m w22.bench_precision
+    python -m cle15.bench_precision          # print tables only
+    python -m cle15.bench_precision --plot   # also save figures
 
 The four knobs investigated are:
 
@@ -54,8 +55,8 @@ from .constants import (
 )
 
 # ── Parameter grid (identical to bench_cle15.py) ─────────────────────────────
-VMAX_VALS = [30.0, 40.0, 50.0, 60.0, 70.0]
-R0_VALS = [400e3, 600e3, 800e3, 1000e3, 1200e3]
+VMAX_VALS = [20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]
+R0_VALS = [200e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
 FCOR_VALS = [3e-5, 5e-5, 7e-5]
 
 ALL_CASES: List[Tuple[float, float, float]] = [
@@ -265,10 +266,312 @@ def _get_default(name: str) -> int:
     }[name]
 
 
+# ── Plotting ─────────────────────────────────────────────────────────────────
+
+
+def plot_results(
+    sweeps: list,
+    ref_rmax: np.ndarray,
+    rmaxes_fast: np.ndarray,
+    rmaxes_default: np.ndarray,
+) -> None:
+    """
+    Produce and save three figures that show where precision matters most.
+
+    Parameters
+    ----------
+    sweeps:
+        List of four ``SweepResult`` objects (Nr_e04, num_pts_er11,
+        nx_intersect, max_iter) as returned by the four ``_sweep`` calls.
+    ref_rmax:
+        Array of reference rmax values (km) for all 75 cases.
+    rmaxes_fast:
+        Numba rmax estimates at the *fast* preset for each case.
+    rmaxes_default:
+        Numba rmax estimates at the *default* preset for each case.
+    """
+    import os
+
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import Normalize
+    from matplotlib.cm import ScalarMappable
+    from sithom.plot import plot_defaults, label_subplots, get_dim
+
+    from .constants import FIGURE_PATH
+
+    plot_defaults()
+    os.makedirs(FIGURE_PATH, exist_ok=True)
+
+    # ── Colours ───────────────────────────────────────────────────────────────
+    C_TIME = "#2166ac"
+    C_MEAN = "#d6604d"
+    C_MAX = "#f4a582"
+
+    # ── Knob metadata ─────────────────────────────────────────────────────────
+    LOG_KNOBS = {"Nr_e04", "num_pts_er11", "nx_intersect"}
+    DEFAULTS = {
+        "Nr_e04": DEFAULT_NR_E04,
+        "num_pts_er11": DEFAULT_NUM_PTS_ER11,
+        "nx_intersect": DEFAULT_NX_INTERSECT,
+        "max_iter": DEFAULT_MAX_ITER,
+    }
+    LABELS = {
+        "Nr_e04": r"$N_{r,\mathrm{E04}}$",
+        "num_pts_er11": r"$N_{\mathrm{ER11}}$",
+        "nx_intersect": r"$N_{x,\mathrm{intersect}}$",
+        "max_iter": "Max iterations",
+    }
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # Figure 1 – knob sweep accuracy + timing
+    # ═════════════════════════════════════════════════════════════════════════
+    ncols = len(sweeps)
+    fig1, axes = plt.subplots(
+        1, ncols, figsize=get_dim(fraction_of_line_width=1.5, ratio=0.4)
+    )
+
+    for ax, sweep in zip(axes, sweeps):
+        xs = sweep.values
+        log_x = sweep.name in LOG_KNOBS
+
+        ax2 = ax.twinx()
+
+        # Timing (left axis, blue)
+        lns1 = ax.plot(
+            xs,
+            sweep.ms_per_call,
+            color=C_TIME,
+            marker="o",
+            ms=4,
+            lw=1.5,
+            label="ms / call",
+            zorder=3,
+        )
+        ax.set_ylabel("ms / call", color=C_TIME)
+        ax.tick_params(axis="y", labelcolor=C_TIME)
+        if log_x:
+            ax.set_xscale("log")
+
+        # Mean error (right axis, red)
+        lns2 = ax2.plot(
+            xs,
+            sweep.mean_err,
+            color=C_MEAN,
+            marker="s",
+            ms=4,
+            lw=1.5,
+            label="mean err %",
+            zorder=3,
+        )
+        # Max error (right axis, orange)
+        lns3 = ax2.plot(
+            xs,
+            sweep.max_err,
+            color=C_MAX,
+            marker="^",
+            ms=4,
+            lw=1.5,
+            ls="--",
+            label="max err %",
+            zorder=3,
+        )
+        ax2.set_ylabel("rmax error (%)", color=C_MEAN)
+        ax2.tick_params(axis="y", labelcolor=C_MEAN)
+        ax2.set_ylim(bottom=0)
+
+        # Default marker
+        ax.axvline(
+            DEFAULTS[sweep.name],
+            color="0.4",
+            ls=":",
+            lw=1,
+            label="default",
+        )
+
+        ax.set_xlabel(LABELS[sweep.name])
+        ax.set_title(sweep.name.replace("_", " "), fontsize=8)
+
+        # Unified legend (only on first panel)
+        if ax is axes[0]:
+            lns = lns1 + lns2 + lns3
+            labs = [l.get_label() for l in lns]
+            ax.legend(lns, labs, fontsize=7, loc="upper right")
+
+    label_subplots(axes)
+    fig1.suptitle("Solver knob sweep: accuracy vs. cost", y=1.02)
+    fig1.tight_layout()
+    out1 = os.path.join(FIGURE_PATH, "bench_precision_knobs.pdf")
+    fig1.savefig(out1, bbox_inches="tight")
+    plt.close(fig1)
+    print(f"  Saved {out1}")
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # Figure 2 – per-case rmax error heatmaps (fast vs default, by fcor)
+    # ═════════════════════════════════════════════════════════════════════════
+    nf = len(FCOR_VALS)
+    # Use GridSpec with a dedicated narrow colorbar column so the cbar never
+    # overlaps the heatmap panels.
+    from matplotlib.gridspec import GridSpec
+
+    fig2_w, fig2_h = get_dim(fraction_of_line_width=1.0, ratio=1.2)
+    fig2 = plt.figure(figsize=(fig2_w, fig2_h))
+    gs = GridSpec(
+        nf,
+        3,
+        figure=fig2,
+        width_ratios=[1, 1, 0.07],
+        hspace=0.35,
+        wspace=0.45,
+    )
+    axes2 = np.array(
+        [[fig2.add_subplot(gs[fi, ci]) for ci in range(2)] for fi in range(nf)]
+    )
+    cax = fig2.add_subplot(gs[:, 2])  # spans all rows, rightmost column
+
+    # Build (Vmax, r0) error matrices for each fcor
+    Vm = np.array(VMAX_VALS)
+    R0m = np.array(R0_VALS) / 1e3  # km
+
+    all_errs_fast = np.full((len(FCOR_VALS), len(VMAX_VALS), len(R0_VALS)), np.nan)
+    all_errs_def = np.full((len(FCOR_VALS), len(VMAX_VALS), len(R0_VALS)), np.nan)
+
+    for i, (vmax, r0, fcor) in enumerate(ALL_CASES):
+        fi = FCOR_VALS.index(fcor)
+        vi = VMAX_VALS.index(vmax)
+        ri = R0_VALS.index(r0)
+        ref = ref_rmax[i]
+        if np.isfinite(ref) and ref > 0:
+            if np.isfinite(rmaxes_fast[i]):
+                all_errs_fast[fi, vi, ri] = abs(rmaxes_fast[i] - ref) / ref * 100.0
+            if np.isfinite(rmaxes_default[i]):
+                all_errs_def[fi, vi, ri] = abs(rmaxes_default[i] - ref) / ref * 100.0
+
+    vmax_err = np.nanmax([np.nanmax(all_errs_fast), np.nanmax(all_errs_def)])
+    vmax_err = max(vmax_err, 0.01)  # guard against all-zero
+    norm = Normalize(vmin=0, vmax=vmax_err)
+    cmap = "YlOrRd"
+
+    for fi, fcor in enumerate(FCOR_VALS):
+        for ci, (errs, title_suffix) in enumerate(
+            [(all_errs_fast[fi], "fast"), (all_errs_def[fi], "default")]
+        ):
+            ax = axes2[fi, ci]
+            im = ax.imshow(
+                errs.T,  # rows=r0, cols=Vmax
+                origin="lower",
+                aspect="auto",
+                norm=norm,
+                cmap=cmap,
+                interpolation="nearest",
+            )
+            ax.set_xticks(range(len(VMAX_VALS)))
+            ax.set_xticklabels([f"{int(v)}" for v in VMAX_VALS], fontsize=7)
+            ax.set_yticks(range(len(R0_VALS)))
+            ax.set_yticklabels([f"{int(r)}" for r in R0m], fontsize=7)
+            if ci == 0:
+                ax.set_ylabel(r"$r_0$ (km)", fontsize=8)
+                ax.text(
+                    -0.45,
+                    0.5,
+                    rf"$f={fcor*1e5:.0f}\times10^{{-5}}$ s$^{{-1}}$",
+                    transform=ax.transAxes,
+                    va="center",
+                    rotation=90,
+                    fontsize=7,
+                )
+            if fi == 0:
+                ax.set_title(f"preset: {title_suffix}", fontsize=8)
+            if fi == nf - 1:
+                ax.set_xlabel(r"$V_{\max}$ (m s$^{-1}$)", fontsize=8)
+
+    # Shared colourbar in its own dedicated axis
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = fig2.colorbar(sm, cax=cax)
+    cbar.set_label(r"$r_{\mathrm{max}}$ error (%)", fontsize=8)
+
+    label_subplots(axes2.ravel().tolist())
+    fig2.suptitle(
+        "Per-case rmax error: fast vs. default preset\n"
+        r"rows = $f_{\mathrm{cor}}$, columns = solver preset",
+        y=1.01,
+    )
+    out2 = os.path.join(FIGURE_PATH, "bench_precision_regime.pdf")
+    fig2.savefig(out2, bbox_inches="tight")
+    plt.close(fig2)
+    print(f"  Saved {out2}")
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # Figure 3 – fast vs. default rmax scatter, coloured by fcor
+    # ═════════════════════════════════════════════════════════════════════════
+    FCOR_COLORS = ["#1b7837", "#762a83", "#e08214"]
+    fig3, ax3 = plt.subplots(figsize=get_dim(ratio=1.0))
+
+    all_rmax_fast_km = rmaxes_fast / 1e3
+    all_rmax_def_km = rmaxes_default / 1e3
+    ref_km = ref_rmax / 1e3
+
+    for fi, fcor in enumerate(FCOR_VALS):
+        mask = np.array([ALL_CASES[i][2] == fcor for i in range(N)], dtype=bool)
+        mask &= np.isfinite(all_rmax_fast_km) & np.isfinite(all_rmax_def_km)
+        ax3.scatter(
+            all_rmax_def_km[mask],
+            all_rmax_fast_km[mask],
+            color=FCOR_COLORS[fi],
+            s=30,
+            alpha=0.75,
+            label=rf"$f={fcor*1e5:.0f}\times10^{{-5}}$ s$^{{-1}}$",
+            zorder=3,
+        )
+
+    # 1:1 reference line
+    lim_lo = float(np.nanmin([all_rmax_def_km, all_rmax_fast_km])) * 0.95
+    lim_hi = float(np.nanmax([all_rmax_def_km, all_rmax_fast_km])) * 1.05
+    ax3.plot([lim_lo, lim_hi], [lim_lo, lim_hi], "k--", lw=1, zorder=1)
+    ax3.set_xlim(lim_lo, lim_hi)
+    ax3.set_ylim(lim_lo, lim_hi)
+
+    ax3.set_xlabel(r"$r_{\max}$ default preset (km)")
+    ax3.set_ylabel(r"$r_{\max}$ fast preset (km)")
+    ax3.set_title("Fast vs. default preset: rmax comparison")
+
+    # Bias annotation
+    valid_both = np.isfinite(all_rmax_fast_km) & np.isfinite(all_rmax_def_km)
+    bias = np.mean(all_rmax_fast_km[valid_both] - all_rmax_def_km[valid_both])
+    rmse = np.sqrt(
+        np.mean((all_rmax_fast_km[valid_both] - all_rmax_def_km[valid_both]) ** 2)
+    )
+    ax3.text(
+        0.04,
+        0.96,
+        f"bias = {bias:+.2f} km\nRMSE = {rmse:.2f} km",
+        transform=ax3.transAxes,
+        va="top",
+        fontsize=8,
+        bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8),
+    )
+
+    ax3.legend(fontsize=8, loc="lower right")
+    fig3.tight_layout()
+    out3 = os.path.join(FIGURE_PATH, "bench_precision_scatter.pdf")
+    fig3.savefig(out3, bbox_inches="tight")
+    plt.close(fig3)
+    print(f"  Saved {out3}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 
 def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="CLE15-numba accuracy vs. cost sweep")
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="Save diagnostic figures to FIGURE_PATH after the sweeps.",
+    )
+    args = parser.parse_args()
     print("=" * 60)
     print("  CLE15-numba: accuracy vs. cost sweep")
     print(f"  {N} test cases,  {3} timing repeats each")
@@ -389,6 +692,11 @@ def main() -> None:
     print(f"    rmax max  err%:     {np.max(errs_fast):.3f}")
     print(f"    Failures:           {int(np.sum(~np.isfinite(rmaxes_fast)))}/{N}")
     print()
+
+    if args.plot:
+        print("Saving figures …", flush=True)
+        plot_results([r1, r2, r3, r4], ref_rmax, rmaxes_fast, rmaxes_default)
+        print("Done.")
 
 
 if __name__ == "__main__":
