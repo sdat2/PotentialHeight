@@ -1002,6 +1002,29 @@ def chavas_et_al_2015_profile(
         rmax_out = np.nan
         warnings.warn("Final profile has no valid wind speeds.")
 
+    # --- Post-filter: inner Rossby number check ---
+    # The ER11 angular-momentum balance fixes rmax*fcor/Vmax as a function of
+    # CkCd only.  When r0 is so small that it approaches the ER11 intrinsic
+    # rmax, the ER11 and E04 curves become nearly tangent and the bisection
+    # side that "wins" is numerically arbitrary, giving 15-45% errors.
+    # This manifests as an anomalously large inner Rossby number
+    #   Ro_in = Vmax / (fcor * rmax)
+    # The critical value is ~2419 for CkCd=0.9 (ranging from ~2229 at
+    # CkCd=0.7 to ~2640 at CkCd=1.2).  We warn at Ro_in > 2000 — a
+    # conservative margin below the lowest known threshold.
+    if not np.isnan(rmax_out) and rmax_out > 0.0:
+        ro_in = Vmax / (fcor * rmax_out)
+        if ro_in > 2000.0:
+            warnings.warn(
+                f"chavas_et_al_2015_profile: inner Rossby number Ro_in = "
+                f"Vmax/(fcor*rmax) = {ro_in:.0f} > 2000. "
+                f"Input r0={r0/1e3:.0f} km is likely too small for "
+                f"Vmax={Vmax:.0f} m/s, fcor={fcor:.2e}. "
+                "The ER11/E04 curves are nearly tangent; result may have "
+                "15-45% error in rmax. Consider using a larger r0.",
+                stacklevel=3,
+            )
+
     return (
         rr_final,
         VV_final,
