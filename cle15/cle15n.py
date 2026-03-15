@@ -1010,7 +1010,7 @@ def chavas_et_al_2015_profile(
     # This manifests as an anomalously large inner Rossby number
     #   Ro_in = Vmax / (fcor * rmax)
     # The critical value is ~2419 for CkCd=0.9 (ranging from ~2229 at
-    # CkCd=0.7 to ~2640 at CkCd=1.2).  We warn at Ro_in > 2000 — a
+    # CkCd=0.7 to ~2640 at CkCd=1.2).  We return NaN at Ro_in > 2000 — a
     # conservative margin below the lowest known threshold.
     if not np.isnan(rmax_out) and rmax_out > 0.0:
         ro_in = Vmax / (fcor * rmax_out)
@@ -1020,10 +1020,11 @@ def chavas_et_al_2015_profile(
                 f"Vmax/(fcor*rmax) = {ro_in:.0f} > 2000. "
                 f"Input r0={r0/1e3:.0f} km is likely too small for "
                 f"Vmax={Vmax:.0f} m/s, fcor={fcor:.2e}. "
-                "The ER11/E04 curves are nearly tangent; result may have "
-                "15-45% error in rmax. Consider using a larger r0.",
+                "The ER11/E04 curves are nearly tangent; returning NaN. "
+                "Consider using a larger r0.",
                 stacklevel=3,
             )
+            return _fail
 
     return (
         rr_final,

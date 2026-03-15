@@ -1296,7 +1296,7 @@ class TestMatlabRegression:
 
     # (Vmax m/s, r0 m, fcor s-1, octave_rmax_km, tol_pct, label)
     _CASES = [
-        # degenerate high-Ro case – both solvers are sensitive here; loose tol
+        # degenerate high-Ro case – Ro_in > 2000, solver now returns NaN
         (90.0, 200e3, 3e-5, 1.0426, 25.0, "high Vmax small r0 low f (degenerate)"),
         # well-behaved cases – match to < 1 %
         (90.0, 200e3, 5e-5, 1.3152, 1.0, "high Vmax small r0 mid f"),
@@ -1313,7 +1313,12 @@ class TestMatlabRegression:
         ids=[c[-1] for c in _CASES],
     )
     def test_rmax_matches_octave(self, Vmax, r0, fcor, oct_rmax_km, tol_pct, label):
-        """Python rmax must agree with Octave reference to within tol_pct %."""
+        """Python rmax must agree with Octave reference to within tol_pct %.
+
+        For the degenerate case (Vmax=90, r0=200km, f=3e-5) the inner Rossby
+        number Ro_in > 2000 and the solver now returns NaN rather than an
+        unreliable value, so we assert NaN instead of a proximity check.
+        """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             result = cle15.chavas_et_al_2015_profile(
@@ -1329,8 +1334,14 @@ class TestMatlabRegression:
                 ALPHA_EYE_DEFAULT,
             )
         rmax_km = result[2] / 1e3
-        diff_pct = abs(rmax_km - oct_rmax_km) / oct_rmax_km * 100
-        assert diff_pct < tol_pct, (
-            f"{label}: Python rmax={rmax_km:.4f} km, "
-            f"Octave={oct_rmax_km:.4f} km, diff={diff_pct:.2f}% > {tol_pct}%"
-        )
+        if tol_pct >= 25.0:
+            # degenerate case — solver intentionally returns NaN
+            assert np.isnan(
+                rmax_km
+            ), f"{label}: expected NaN (Ro_in > 2000) but got rmax={rmax_km:.4f} km"
+        else:
+            diff_pct = abs(rmax_km - oct_rmax_km) / oct_rmax_km * 100
+            assert diff_pct < tol_pct, (
+                f"{label}: Python rmax={rmax_km:.4f} km, "
+                f"Octave={oct_rmax_km:.4f} km, diff={diff_pct:.2f}% > {tol_pct}%"
+            )

@@ -4,15 +4,15 @@ Accuracy vs. cost trade-off for the numba CLE15 solver.
 Sweeps each resolution / iteration knob independently while holding the
 others at their current default values.  Reports timing (ms/call) and
 accuracy (% rmax error relative to the pure-Python reference) for a
-filtered benchmark grid (Vmax 20-90 m/s, r0 300-2000 km,
-f in {3, 5, 7} x 1e-5 s^-1), with two degenerate regions excluded:
+filtered benchmark grid (Vmax 20-90 m/s, r0 200-2000 km,
+f in {3, 5, 7} x 1e-5 s^-1), with one degenerate region pre-filtered:
 
-- r0 = 200 km: high-Rossby regime (Ro >> 1, small-r0 instability)
 - Ro = Vmax/(f*r0) < 0.2: low-Rossby rotation-dominated regime
   (currently Vmax=20 m/s, r0 in {1600, 2000} km, f=7e-5 s^-1)
 
-Both regimes inflate apparent error without reflecting normal solver
-behaviour and are documented separately in cle15.md.
+Cases with inner Rossby number Ro_in = Vmax/(f*rmax) > 2000 (currently
+only Vmax=90 m/s, r0=200 km, f=3e-5 s^-1) return NaN from both solvers;
+NaN-vs-NaN is counted as correct agreement, not a failure.
 
 Usage::
 
@@ -91,7 +91,7 @@ VMAX_VALS = [20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]
 R0_VALS = [200e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
 FCOR_VALS = [3e-5, 5e-5, 7e-5]
 
-_RO_MIN = 0.2      # minimum outer Rossby number Vmax/(f*r0) to include
+_RO_MIN = 0.2  # minimum outer Rossby number Vmax/(f*r0) to include
 _RO_IN_MAX = 2000.0  # maximum inner Rossby number Vmax/(f*rmax) to include
 # Cases with Ro_in > _RO_IN_MAX have nearly-tangent ER11/E04 curves and
 # 15-45% rmax error; they are excluded post-hoc (rmax is only known after
@@ -733,7 +733,9 @@ def main() -> None:
     print(f"    Speedup:            {ms_default/ms_fast:.1f}×")
     print(f"    rmax mean err%:     {np.mean(errs_fast):.3f}")
     print(f"    rmax max  err%:     {np.max(errs_fast):.3f}")
-    print(f"    Failures:           {int(np.sum(np.isnan(rmaxes_fast) & np.isfinite(ref_rmax)))}/{N}")
+    print(
+        f"    Failures:           {int(np.sum(np.isnan(rmaxes_fast) & np.isfinite(ref_rmax)))}/{N}"
+    )
     print()
 
     if args.plot:
