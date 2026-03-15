@@ -63,28 +63,28 @@ from .constants import (
 )
 
 # ── Parameter grid ───────────────────────────────────────────────────────────
-# Two categories of case are excluded from the benchmark grid:
+# One category of case is pre-filtered from the benchmark grid; a second is
+# handled post-hoc by the _RO_IN_MAX threshold:
 #
-# 1. r0 = 200 km is absent from R0_VALS entirely.  At r0=200 km the ratio
-#    rmax/r0 is as small as 0.006 (e.g. Vmax=90, f=5e-5), so the bisection
-#    must converge to a very small rmaxr0 value.  This makes the benchmark
-#    extremely sensitive to all knob settings (max_iter, nx_intersect,
-#    num_pts_er11, Nr_e04), producing errors of 20-270% at low knob values
-#    that do not reflect normal solver behaviour on realistic inputs.
-#    Additionally, the single case Vmax=90, r0=200 km, f=3e-5 (Ro_in≈2419)
-#    is in the near-tangent instability regime and now returns NaN from both
-#    solvers (documented in TestMatlabRegression and in cle15.md).
-#    At r0 >= 300 km all cases converge cleanly at the lowest knob settings
-#    (max error < 2% even at max_iter=5).
-#
-# 2. Cases with outer Rossby number Ro = Vmax/(f*r0) < 0.2 are filtered out
-#    by _RO_MIN below.  These are genuinely rotation-dominated (Ro << 1):
-#    the storm is much larger than its Rossby length Vmax/f, and both the
-#    physics and the solver enter a degenerate regime.
+# 1. Cases with outer Rossby number Ro = Vmax/(f*r0) < _RO_MIN are excluded
+#    (pre-filter on ALL_CASES).  These are genuinely rotation-dominated (Ro << 1):
+#    the storm is larger than its Rossby length Vmax/f, and both the physics
+#    and the solver enter a degenerate regime.
 #    Currently: Vmax=20 m/s, r0 in {1600, 2000} km, f=7e-5 s^-1
 #    (Ro = 0.179 and 0.143 respectively).
+#
+# 2. Cases with inner Rossby number Ro_in = Vmax/(f*rmax) > _RO_IN_MAX are
+#    handled post-hoc (rmax is only known after the solver runs).  Both the
+#    numba solver (_run_one) and the reference (_get_reference_rmaxes) return
+#    NaN for these cases; chavas_et_al_2015_profile also returns NaN directly.
+#    NaN-vs-NaN is CORRECT AGREEMENT — not a failure — and is excluded from
+#    error statistics via the `valid` mask (np.isfinite on both sides).
+#    The n_fail counter only increments when the numba solver returns NaN but
+#    the reference returns a finite value.
+#    Currently the only affected case at default knob settings is:
+#    Vmax=90 m/s, r0=200 km, f=3e-5 s^-1 (Ro_in≈2879 > 2000).
 VMAX_VALS = [20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]
-R0_VALS = [300e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
+R0_VALS = [200e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
 FCOR_VALS = [3e-5, 5e-5, 7e-5]
 
 _RO_MIN = 0.2      # minimum outer Rossby number Vmax/(f*r0) to include
@@ -276,7 +276,11 @@ def _sweep(
 
         ms = elapsed / N * 1000.0
         valid = np.isfinite(rmaxes) & np.isfinite(ref_rmax)
-        n_fail = int(np.sum(~np.isfinite(rmaxes)))
+        # A "failure" is a case where the numba solver returns NaN but the
+        # reference returns a finite value.  NaN-vs-NaN (both solvers agree
+        # the input is degenerate, e.g. Ro_in > 2000) is correct behaviour
+        # and is NOT counted as a failure.
+        n_fail = int(np.sum(np.isnan(rmaxes) & np.isfinite(ref_rmax)))
         if np.any(valid):
             errs = np.abs(rmaxes[valid] - ref_rmax[valid]) / ref_rmax[valid] * 100.0
             mean_e = float(np.mean(errs))
@@ -744,7 +748,7 @@ def main() -> None:
     print(f"    Speedup:            {ms_default/ms_fast:.1f}×")
     print(f"    rmax mean err%:     {np.mean(errs_fast):.3f}")
     print(f"    rmax max  err%:     {np.max(errs_fast):.3f}")
-    print(f"    Failures:           {int(np.sum(~np.isfinite(rmaxes_fast)))}/{N}")
+    print(f"    Failures:           {int(np.sum(np.isnan(rmaxes_fast) & np.isfinite(ref_rmax)))}/{N}")
     print()
 
     if args.plot:
