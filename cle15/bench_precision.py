@@ -19,12 +19,16 @@ Usage::
     python -m cle15.bench_precision          # print tables only
     python -m cle15.bench_precision --plot   # also save figures
 
-The four knobs investigated are:
+The three knobs investigated are:
 
-1. ``Nr_e04``         – E04 Euler grid points  (default 200 000)
-2. ``num_pts_er11``   – ER11 points inside the bisection kernel  (default 5 000)
-3. ``nx_intersect``   – intersection-check grid points  (default 4 000)
-4. ``max_iter``       – bisection iterations  (default 50)
+1. ``num_pts_er11``   – ER11 points inside the bisection kernel  (default 5 000)
+2. ``nx_intersect``   – intersection-check grid points  (default 4 000)
+3. ``max_iter``       – bisection iterations  (default 50)
+
+Note: ``Nr_e04`` (E04 Euler grid points) is *not* swept because the E04
+function clamps ``Nr`` at ``int(1/drfracr0)`` = 1 000 for normal r0 values
+(10 000 for r0 < 200 km or r0 > 2 500 km), so varying it above that cap
+has no effect on either timing or accuracy.
 """
 
 from __future__ import annotations
@@ -316,7 +320,6 @@ def _print_result(r: SweepResult) -> None:
 
 def _get_default(name: str) -> int:
     return {
-        "Nr_e04": DEFAULT_NR_E04,
         "num_pts_er11": DEFAULT_NUM_PTS_ER11,
         "nx_intersect": DEFAULT_NX_INTERSECT,
         "max_iter": DEFAULT_MAX_ITER,
@@ -338,8 +341,8 @@ def plot_results(
     Parameters
     ----------
     sweeps:
-        List of four ``SweepResult`` objects (Nr_e04, num_pts_er11,
-        nx_intersect, max_iter) as returned by the four ``_sweep`` calls.
+        List of three ``SweepResult`` objects (num_pts_er11, nx_intersect,
+        max_iter) as returned by the three ``_sweep`` calls.
     ref_rmax:
         Array of reference rmax values (km) for all 75 cases.
     rmaxes_fast:
@@ -365,15 +368,13 @@ def plot_results(
     C_MAX = "#f4a582"
 
     # ── Knob metadata ─────────────────────────────────────────────────────────
-    LOG_KNOBS = {"Nr_e04", "num_pts_er11", "nx_intersect"}
+    LOG_KNOBS = {"num_pts_er11", "nx_intersect"}
     DEFAULTS = {
-        "Nr_e04": DEFAULT_NR_E04,
         "num_pts_er11": DEFAULT_NUM_PTS_ER11,
         "nx_intersect": DEFAULT_NX_INTERSECT,
         "max_iter": DEFAULT_MAX_ITER,
     }
     LABELS = {
-        "Nr_e04": r"$N_{r,\mathrm{E04}}$",
         "num_pts_er11": r"$N_{\mathrm{ER11}}$",
         "nx_intersect": r"$N_{x,\mathrm{intersect}}$",
         "max_iter": "Max iterations",
@@ -642,27 +643,11 @@ def main() -> None:
 
     print("\nWarming up numba JIT …", flush=True)
     _warmup()
-    # Also warm up with a call using the smallest knob values so all
-    # compiled specialisations are cached before we start timing.
-    _run_one(50.0, 800e3, 5e-5, 1000, 100, 100, 5)
     print("  Done.", flush=True)
 
-    # ── 1. E04 grid resolution ────────────────────────────────────────────────
-    nr_vals = [1_000, 2_000, 5_000, 10_000, 20_000, 50_000, 100_000, 200_000, 500_000]
-    r1 = _sweep(
-        "Nr_e04",
-        nr_vals,
-        ref_rmax,
-        Nr_e04_fn=lambda v: v,
-        num_pts_fn=lambda _: DEFAULT_NUM_PTS_ER11,
-        nx_fn=lambda _: DEFAULT_NX_INTERSECT,
-        max_iter_fn=lambda _: DEFAULT_MAX_ITER,
-    )
-    _print_result(r1)
-
-    # ── 2. ER11 points inside bisection ──────────────────────────────────────
+    # ── 1. ER11 points inside bisection ──────────────────────────────────────
     er11_vals = [50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000]
-    r2 = _sweep(
+    r1 = _sweep(
         "num_pts_er11",
         er11_vals,
         ref_rmax,
@@ -671,11 +656,11 @@ def main() -> None:
         nx_fn=lambda _: DEFAULT_NX_INTERSECT,
         max_iter_fn=lambda _: DEFAULT_MAX_ITER,
     )
-    _print_result(r2)
+    _print_result(r1)
 
-    # ── 3. Intersection grid resolution ──────────────────────────────────────
+    # ── 2. Intersection grid resolution ──────────────────────────────────────
     nx_vals = [50, 100, 200, 500, 1_000, 2_000, 4_000, 8_000]
-    r3 = _sweep(
+    r2 = _sweep(
         "nx_intersect",
         nx_vals,
         ref_rmax,
@@ -684,11 +669,11 @@ def main() -> None:
         nx_fn=lambda v: v,
         max_iter_fn=lambda _: DEFAULT_MAX_ITER,
     )
-    _print_result(r3)
+    _print_result(r2)
 
-    # ── 4. Bisection iterations ───────────────────────────────────────────────
+    # ── 3. Bisection iterations ───────────────────────────────────────────────
     iter_vals = [5, 10, 15, 20, 30, 50, 75, 100]
-    r4 = _sweep(
+    r3 = _sweep(
         "max_iter",
         iter_vals,
         ref_rmax,
@@ -697,14 +682,14 @@ def main() -> None:
         nx_fn=lambda _: DEFAULT_NX_INTERSECT,
         max_iter_fn=lambda v: v,
     )
-    _print_result(r4)
+    _print_result(r3)
 
     # ── Summary: optimised cheap preset ──────────────────────────────────────
     print(f"\n{'─'*60}")
     print("  Optimised 'fast' preset (from sweep results):")
-    FAST = dict(Nr_e04=10_000, num_pts_er11=500, nx_intersect=500, max_iter=20)
+    FAST = dict(num_pts_er11=500, nx_intersect=500, max_iter=20)
     print(
-        f"    Nr_e04={FAST['Nr_e04']:,}  num_pts_er11={FAST['num_pts_er11']:,}"
+        f"    num_pts_er11={FAST['num_pts_er11']:,}"
         f"  nx_intersect={FAST['nx_intersect']:,}  max_iter={FAST['max_iter']}"
     )
 
@@ -716,7 +701,7 @@ def main() -> None:
                 Vmax,
                 r0,
                 fcor,
-                FAST["Nr_e04"],
+                DEFAULT_NR_E04,
                 FAST["num_pts_er11"],
                 FAST["nx_intersect"],
                 FAST["max_iter"],
@@ -753,7 +738,7 @@ def main() -> None:
 
     if args.plot:
         print("Saving figures …", flush=True)
-        plot_results([r1, r2, r3, r4], ref_rmax, rmaxes_fast, rmaxes_default)
+        plot_results([r1, r2, r3], ref_rmax, rmaxes_fast, rmaxes_default)
         print("Done.")
 
 
