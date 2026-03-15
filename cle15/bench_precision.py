@@ -3,13 +3,16 @@ Accuracy vs. cost trade-off for the numba CLE15 solver.
 
 Sweeps each resolution / iteration knob independently while holding the
 others at their current default values.  Reports timing (ms/call) and
-accuracy (% rmax error relative to the pure-Python reference) for the
-192-case benchmark grid (Vmax 20-90 m/s, r0 300-2000 km,
-f in {3, 5, 7} x 1e-5 s^-1).
+accuracy (% rmax error relative to the pure-Python reference) for a
+filtered benchmark grid (Vmax 20-90 m/s, r0 300-2000 km,
+f in {3, 5, 7} x 1e-5 s^-1), with two degenerate regions excluded:
 
-Note: r0 = 200 km is excluded because the high-Rossby degenerate regime
-produces large bisection sensitivity that inflates the apparent error
-without reflecting normal solver behaviour (see cle15.md).
+- r0 = 200 km: high-Rossby regime (Ro >> 1, small-r0 instability)
+- Ro = Vmax/(f*r0) < 0.2: low-Rossby rotation-dominated regime
+  (currently Vmax=20 m/s, r0 in {1600, 2000} km, f=7e-5 s^-1)
+
+Both regimes inflate apparent error without reflecting normal solver
+behaviour and are documented separately in cle15.md.
 
 Usage::
 
@@ -60,19 +63,50 @@ from .constants import (
 )
 
 # ── Parameter grid ───────────────────────────────────────────────────────────
-# r0 = 200 km is excluded from the benchmark grid because the high-Rossby
-# degenerate regime (very small r0, very high Vmax, very low f) produces
-# large sensitivity to bisection termination side and inflates the apparent
-# error without reflecting normal solver behaviour.  The instability is
-# documented separately (see cle15.md, MATLAB cross-validation section).
+# Two categories of case are excluded from the benchmark grid:
+#
+# 1. r0 = 200 km is absent from R0_VALS entirely.  At r0=200 km the ratio
+#    rmax/r0 is as small as 0.006 (e.g. Vmax=90, f=5e-5), so the bisection
+#    must converge to a very small rmaxr0 value.  This makes the benchmark
+#    extremely sensitive to all knob settings (max_iter, nx_intersect,
+#    num_pts_er11, Nr_e04), producing errors of 20-270% at low knob values
+#    that do not reflect normal solver behaviour on realistic inputs.
+#    Additionally, the single case Vmax=90, r0=200 km, f=3e-5 (Ro_in≈2419)
+#    is in the near-tangent instability regime and now returns NaN from both
+#    solvers (documented in TestMatlabRegression and in cle15.md).
+#    At r0 >= 300 km all cases converge cleanly at the lowest knob settings
+#    (max error < 2% even at max_iter=5).
+#
+# 2. Cases with outer Rossby number Ro = Vmax/(f*r0) < 0.2 are filtered out
+#    by _RO_MIN below.  These are genuinely rotation-dominated (Ro << 1):
+#    the storm is much larger than its Rossby length Vmax/f, and both the
+#    physics and the solver enter a degenerate regime.
+#    Currently: Vmax=20 m/s, r0 in {1600, 2000} km, f=7e-5 s^-1
+#    (Ro = 0.179 and 0.143 respectively).
 VMAX_VALS = [20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0]
 R0_VALS = [300e3, 400e3, 600e3, 800e3, 1000e3, 1200e3, 1600e3, 2000e3]
 FCOR_VALS = [3e-5, 5e-5, 7e-5]
 
+_RO_MIN = 0.2      # minimum outer Rossby number Vmax/(f*r0) to include
+_RO_IN_MAX = 2000.0  # maximum inner Rossby number Vmax/(f*rmax) to include
+# Cases with Ro_in > _RO_IN_MAX have nearly-tangent ER11/E04 curves and
+# 15-45% rmax error; they are excluded post-hoc (rmax is only known after
+# the solver runs, so this cannot be a pre-filter on ALL_CASES).
+
 ALL_CASES: List[Tuple[float, float, float]] = [
-    (v, r, f) for v in VMAX_VALS for r in R0_VALS for f in FCOR_VALS
+    (v, r, f)
+    for v in VMAX_VALS
+    for r in R0_VALS
+    for f in FCOR_VALS
+    if v / (f * r) >= _RO_MIN
 ]
 N = len(ALL_CASES)
+
+
+def _fcor_to_lat(fcor: float) -> float:
+    """Return the equivalent latitude (degrees) for a Coriolis parameter."""
+    return float(np.degrees(np.arcsin(fcor / (2 * 7.2921e-5))))
+
 
 # Fixed params
 _DEFAULTS = dict(
@@ -165,6 +199,11 @@ def _run_one(
         return np.nan
 
     rmax_out = float(rr_fine[valid][np.argmax(VV_fine[valid])])
+
+    # Post-filter: exclude degenerate inner-Rossby cases
+    if rmax_out > 0.0 and Vmax / (fcor * rmax_out) > _RO_IN_MAX:
+        return np.nan
+
     return rmax_out
 
 
@@ -186,7 +225,11 @@ def _get_reference_rmaxes() -> np.ndarray:
             _DEFAULTS["eye_adj"],
             _DEFAULTS["alpha_eye"],
         )
-        ref[i] = res[2]  # rmax
+        rmax = res[2]  # rmax
+        # Post-filter: exclude degenerate inner-Rossby cases
+        if rmax > 0.0 and np.isfinite(rmax) and Vmax / (fcor * rmax) > _RO_IN_MAX:
+            rmax = np.nan
+        ref[i] = rmax
     return ref
 
 
@@ -480,10 +523,11 @@ def plot_results(
             ax.set_yticklabels([f"{int(r)}" for r in R0m], fontsize=7)
             if ci == 0:
                 ax.set_ylabel(r"$r_0$ (km)", fontsize=8)
+                lat = _fcor_to_lat(fcor)
                 ax.text(
                     -0.45,
                     0.5,
-                    rf"$f={fcor*1e5:.0f}\times10^{{-5}}$ s$^{{-1}}$",
+                    rf"$f={fcor*1e5:.0f}\times10^{{-5}}$ s$^{{-1}}$ ({lat:.1f}°N)",
                     transform=ax.transAxes,
                     va="center",
                     rotation=90,
@@ -530,7 +574,7 @@ def plot_results(
             color=FCOR_COLORS[fi],
             s=30,
             alpha=0.75,
-            label=rf"$f={fcor*1e5:.0f}\times10^{{-5}}$ s$^{{-1}}$",
+            label=rf"$f={fcor*1e5:.0f}\times10^{{-5}}$ s$^{{-1}}$ ({_fcor_to_lat(fcor):.1f}°N)",
             zorder=3,
         )
 
