@@ -38,6 +38,44 @@ However:
 python -m worst.vary_gamma_beta
 
 python -m worst.vary_ns
+
+python -m worst.vary_noise
+
+python -m worst.vary_nonstationary
+```
+
+## Non-stationary synthetic EVT experiment
+
+`worst.vary_nonstationary` is a general statistical simulation for the rebuttal point
+that observations are non-stationary under climate change. It generates annual
+block maxima from a bounded GEV where the true upper bound evolves linearly,
+then compares four fits:
+
+1. `stationary_unbounded`
+2. `stationary_bounded`
+3. `nonstationary_unbounded`
+4. `nonstationary_bounded`
+
+The script writes:
+
+- data to `data/worst/vary_nonstationary_*.nc`
+- figure to `img/worst/vary_nonstationary_*.pdf`
+
+You can tune parameters in `worst/config/vary_nonstationary.yaml`, especially
+`z_star_trend`, `n_years`, and `z_star_assumed_sigma`.
+
+Caching and replot workflow:
+
+- Recompute simulations and redraw figure:
+
+```bash
+python -m worst.vary_nonstationary use_cache=false
+```
+
+- Replot only from cached data (no simulation rerun):
+
+```bash
+python -m worst.vary_nonstationary plot_only=true use_cache=true
 ```
 
 ```text
