@@ -2,10 +2,12 @@
 
 Pipeline, per storm:
   1. download the storm's netCDF from Hugging Face (``HF_REPO``);
-  2. extract the simulated surge (SSH = WD + DEM) at the nearest *wet* mesh node
-     to each NOAA CO-OPS gauge in the regional box;
+  2. extract the simulated surge (SSH = WD + DEM) at the nearest *wet* mesh element
+     centroid (the archived dual-graph node) to each NOAA CO-OPS gauge in the box;
   3. fetch + de-tide the gauge record (:func:`comp.coops.observed_residual`);
-  4. compare peak surge and peak timing, tag "clean" pairs, score skill.
+  4. score peak surge (bias/RMSE/correlation, with bootstrap CIs and a within-storm
+     spatial correlation), the full hydrograph (:func:`timeseries_skill`), and peak
+     timing; tag "clean" pairs and regenerate the paper figures + LaTeX table.
 
 ADCIRC here is surge-only (no tides), so we always compare against the de-tided
 observed residual rather than total water level.
@@ -66,6 +68,31 @@ def _nearest_wet(tree: cKDTree, WD: np.ndarray, lon: float, lat: float
     return None, None
 
 
+def timeseries_skill(sim: pd.Series, obs: pd.Series
+                     ) -> Tuple[float, float, int]:
+    """Temporal skill of the simulated surge hydrograph against the observed
+    residual: ``(corr, rmse, n_overlap)`` over the gauges' common time window.
+
+    The simulated surge (2-hourly) is linearly interpolated onto the observed
+    (hourly) residual times within the overlap, so this scores the whole storm
+    time series, not just its peak. Returns NaNs if the overlap is too short or
+    either series is flat (correlation undefined).
+    """
+    if sim.empty or obs.empty:
+        return (np.nan, np.nan, 0)
+    lo, hi = max(sim.index[0], obs.index[0]), min(sim.index[-1], obs.index[-1])
+    o = obs.loc[lo:hi].dropna()
+    if o.size < C.TS_MIN_OVERLAP:
+        return (np.nan, np.nan, int(o.size))
+    st = sim.index.astype("int64").to_numpy()
+    si = np.interp(o.index.astype("int64").to_numpy(), st, sim.values)
+    err = si - o.values
+    rmse = float(np.sqrt((err ** 2).mean()))
+    if np.std(si) == 0 or np.std(o.values) == 0:
+        return (np.nan, rmse, int(o.size))
+    return (float(np.corrcoef(o.values, si)[0, 1]), rmse, int(o.size))
+
+
 def validate_storm(storm: str, fname: str, gauges: List[Gauge]
                    ) -> Tuple[List[dict], Dict[str, tuple]]:
     """Return (rows, series) for one storm. ``series[name] = (sim, obs)``."""
@@ -89,10 +116,12 @@ def validate_storm(storm: str, fname: str, gauges: List[Gauge]
         sim = pd.Series(ssh[:, idx], index=t)
         series[name] = (sim, obs)
         timing = (sim.idxmax() - obs.idxmax()).total_seconds() / 3600.0
+        ts_r, ts_rmse, ts_n = timeseries_skill(sim, obs)
         rows.append(dict(
             storm=storm, sid=sid, name=name, setting=classify_setting(name),
             node_deg=round(dist, 3), sim_peak=round(float(sim.max()), 2),
             obs_peak=round(float(obs.max()), 2), peak_dt_hr=round(timing, 1),
+            ts_r=round(ts_r, 3), ts_rmse=round(ts_rmse, 3), ts_n=ts_n,
             method=method, n_obs=int(obs.size),
         ))
     return rows, series
@@ -103,11 +132,11 @@ def add_flags(df: pd.DataFrame) -> pd.DataFrame:
     df["sid"] = df["sid"].astype(str)  # robust to CSV round-trip parsing sid as int
     df["failed"] = [(s, i) in C.KNOWN_FAILED for s, i in zip(df.storm, df.sid)]
     df["poor_event"] = df.storm.isin(C.POOR_SURGE_EVENTS)
-    df["clean"] = (
-        (df.peak_dt_hr.abs() <= C.MAX_TIMING_HR)
-        & (df.obs_peak >= C.MIN_OBS_PEAK_M)
-        & ~df.failed
-    )
+    # ``valid``: a real, meaningful-surge gauge record (NOT conditioned on timing),
+    # so timing skill can be reported without selecting on the very quantity scored.
+    df["valid"] = (df.obs_peak >= C.MIN_OBS_PEAK_M) & ~df.failed
+    # ``clean``: ``valid`` and the peak is simultaneous -- used for peak-skill scoring.
+    df["clean"] = df.valid & (df.peak_dt_hr.abs() <= C.MAX_TIMING_HR)
     return df
 
 
@@ -120,6 +149,37 @@ def metrics(d: pd.DataFrame) -> Tuple[float, float, float]:
             float(np.corrcoef(d.obs_peak, d.sim_peak)[0, 1]))
 
 
+def within_storm_r(d: pd.DataFrame) -> float:
+    """Across-gauge correlation of peak surge after removing each storm's mean,
+    i.e. the spatial skill with between-storm magnitude differences taken out
+    (a stricter test than the pooled r, which the storm spread inflates)."""
+    if d.storm.nunique() < 1 or len(d) < 3:
+        return np.nan
+    o = d.obs_peak - d.groupby("storm").obs_peak.transform("mean")
+    s = d.sim_peak - d.groupby("storm").sim_peak.transform("mean")
+    if o.std() == 0 or s.std() == 0:
+        return np.nan
+    return float(np.corrcoef(o, s)[0, 1])
+
+
+def bootstrap_ci(d: pd.DataFrame, n: int = C.N_BOOTSTRAP,
+                 seed: int = C.BOOTSTRAP_SEED) -> Dict[str, Tuple[float, float]]:
+    """5-95% percentile CIs for pooled (bias, RMSE, r) by resampling pairs."""
+    rng = np.random.default_rng(seed)
+    err = (d.sim_peak - d.obs_peak).to_numpy()
+    obs, sim = d.obs_peak.to_numpy(), d.sim_peak.to_numpy()
+    bias, rmse, r = [], [], []
+    for _ in range(n):
+        k = rng.integers(0, len(d), len(d))
+        e = err[k]
+        bias.append(e.mean())
+        rmse.append(np.sqrt((e ** 2).mean()))
+        o, s = obs[k], sim[k]
+        r.append(np.corrcoef(o, s)[0, 1] if o.std() and s.std() else np.nan)
+    pct = lambda a: (float(np.nanpercentile(a, 5)), float(np.nanpercentile(a, 95)))
+    return {"bias": pct(bias), "rmse": pct(rmse), "r": pct(r)}
+
+
 def report(df: pd.DataFrame) -> None:
     cln = df[df.clean]
     print("\n=== PER-STORM (clean pairs) ===")
@@ -127,10 +187,27 @@ def report(df: pd.DataFrame) -> None:
         d = cln[cln.storm == storm]
         if len(d):
             b, e, r = metrics(d)
-            print(f"  {storm:14s} n={len(d):2d}  bias={b:+.2f}  RMSE={e:.2f}  r={r:.2f}")
+            tsr = d.ts_r.median()
+            print(f"  {storm:14s} n={len(d):2d}  bias={b:+.2f}  RMSE={e:.2f}  "
+                  f"r_peak={r:.2f}  r_series(med)={tsr:.2f}")
     b, e, r = metrics(cln)
-    print(f"\nOVERALL clean (n={len(cln)}): bias={b:+.2f} m  RMSE={e:.2f} m  r={r:.2f}")
-    print(f"clean median |peak timing| = {cln.peak_dt_hr.abs().median():.1f} h")
+    ci = bootstrap_ci(cln)
+    print(f"\nOVERALL clean (n={len(cln)}):")
+    print(f"  peak bias = {b:+.2f} m  [{ci['bias'][0]:+.2f}, {ci['bias'][1]:+.2f}]")
+    print(f"  peak RMSE = {e:.2f} m  [{ci['rmse'][0]:.2f}, {ci['rmse'][1]:.2f}]")
+    print(f"  peak r    = {r:.2f}    [{ci['r'][0]:.2f}, {ci['r'][1]:.2f}]")
+    print(f"  within-storm spatial r = {within_storm_r(cln):.2f} "
+          f"(between-storm magnitude removed)")
+    print(f"  time-series r   median={cln.ts_r.median():.2f}  mean={cln.ts_r.mean():.2f}")
+    print(f"  time-series RMSE median={cln.ts_rmse.median():.2f} m")
+    # Timing reported over ``valid`` (meaningful surge, not gauge-failed) WITHOUT
+    # the timing gate, so it does not select on the quantity being reported.
+    val = df[df.valid]
+    within = (val.peak_dt_hr.abs() <= C.MAX_TIMING_HR).mean()
+    print(f"  median |peak timing| over valid pairs (n={len(val)}) = "
+          f"{val.peak_dt_hr.abs().median():.1f} h; "
+          f"{100 * within:.0f}% within {C.MAX_TIMING_HR:.0f} h")
+    print("--- by setting (clean) ---")
     for setting in ("open-coast", "semi-enclosed"):
         d = cln[cln.setting == setting]
         b, e, r = metrics(d)
@@ -138,7 +215,14 @@ def report(df: pd.DataFrame) -> None:
     print(f"de-tide methods: {dict(df.method.value_counts())}")
 
 
-def scatter(df: pd.DataFrame, path: str) -> None:
+def _savefig(fig, paths: List[str], dpi: int) -> None:
+    """Save one figure to several paths (e.g. a quick-look PNG and a paper PDF)."""
+    for p in paths:
+        fig.savefig(p, dpi=dpi)
+        print(f"wrote {p}")
+
+
+def scatter(df: pd.DataFrame, paths: List[str]) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -165,11 +249,11 @@ def scatter(df: pd.DataFrame, path: str) -> None:
     ax.set_title(f"Peak surge: historical ADCIRC vs NOAA residual\n"
                  f"clean n={len(cln)}: bias={b:+.2f} m  RMSE={e:.2f} m  r={r:.2f}")
     ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.3)
-    fig.tight_layout(); fig.savefig(path, dpi=135)
-    print(f"wrote {path}")
+    fig.tight_layout()
+    _savefig(fig, paths, dpi=135)
 
 
-def plot_examples(panels: List[Tuple[str, str]], path: str,
+def plot_examples(panels: List[Tuple[str, str]], paths: List[str],
                   ncol: int = 3) -> None:
     """Plot simulated surge vs de-tided observed residual for chosen (storm, gauge).
 
@@ -191,16 +275,61 @@ def plot_examples(panels: List[Tuple[str, str]], path: str,
         if not match:
             ax.set_title(f"{gname}\n(no data)", fontsize=8); continue
         sim, obs = cache[storm][match[0]]
+        tsr, _, _ = timeseries_skill(sim, obs)
         ax.plot(sim.index, sim.values, color="tab:blue", lw=1.6, label="ADCIRC surge")
         ax.plot(obs.index, obs.values, color="black", lw=1.1, label="NOAA residual")
-        ax.set_title(f"{storm}: {match[0][:24]}", fontsize=8, loc="left")
+        rtxt = "" if np.isnan(tsr) else f"  (r={tsr:.2f})"
+        ax.set_title(f"{storm}: {match[0][:24]}{rtxt}", fontsize=8, loc="left")
         ax.set_ylabel("surge (m)"); ax.grid(alpha=0.3)
         for lab in ax.get_xticklabels():
             lab.set_rotation(30); lab.set_fontsize(6); lab.set_ha("right")
     for ax in axes.ravel()[len(panels):]:
         ax.set_visible(False)
     axes.ravel()[0].legend(fontsize=7, loc="upper left")
-    fig.tight_layout(); fig.savefig(path, dpi=150)
+    fig.tight_layout()
+    _savefig(fig, paths, dpi=150)
+
+
+def latex_table(df: pd.DataFrame, path: str) -> None:
+    """Write the per-storm skill ``tabular`` that the appendix \\inputs.
+
+    Emits only the ``tabular`` environment (the surrounding ``table`` float,
+    caption and label live in ``paper/appendix.tex``), so the prose stays
+    hand-edited while every number is generated -- they cannot drift apart.
+    Storms in ``POOR_SURGE_EVENTS`` are flagged with a ``$^{\\dagger}$``.
+    Columns: storm, n, peak bias, peak RMSE, peak r, median time-series r.
+    """
+    cln = df[df.clean]
+    lines = [
+        "% GENERATED by comp.validate.latex_table -- do not edit by hand.",
+        r"\begin{tabular}{lrrrrr}",
+        r"  \hline \hline",
+        r"  \textbf{Storm} & \textbf{$n$} & \textbf{Bias (m)} & "
+        r"\textbf{RMSE (m)} & \textbf{$r_{\mathrm{peak}}$} & "
+        r"\textbf{$r_{\mathrm{series}}$} \\",
+        r"  \hline",
+    ]
+    for storm in C.STORMS:                      # fixed (chronological) order
+        d = cln[cln.storm == storm]
+        if not len(d):
+            continue
+        b, e, r = metrics(d)
+        tsr = d.ts_r.median()
+        dag = r"$^{\dagger}$" if storm in C.POOR_SURGE_EVENTS else ""
+        name = storm.replace(" ", " (", 1) + ")"     # "Katrina 2005" -> "Katrina (2005)"
+        lines.append(f"  {name}{dag} & {len(d)} & ${b:+.2f}$ & {e:.2f} & "
+                     f"{r:.2f} & {tsr:.2f} \\\\")
+    b, e, r = metrics(cln)
+    lines += [
+        r"  \hline",
+        rf"  \textbf{{All storms}} & \textbf{{{len(cln)}}} & "
+        rf"$\mathbf{{{b:+.2f}}}$ & \textbf{{{e:.2f}}} & \textbf{{{r:.2f}}} & "
+        rf"\textbf{{{cln.ts_r.median():.2f}}} \\",
+        r"  \hline \hline",
+        r"\end{tabular}",
+    ]
+    with open(path, "w") as fh:
+        fh.write("\n".join(lines) + "\n")
     print(f"wrote {path}")
 
 
@@ -222,7 +351,18 @@ def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
     out_csv = os.path.join(C.OUT_PATH, "val_summary.csv")
     df.to_csv(out_csv, index=False)
     report(df)
-    scatter(df, os.path.join(C.FIGURE_PATH, "val_scatter.png"))
+
+    # Paper artifacts: quick-look PNGs under the module, final PDFs and the
+    # generated LaTeX table straight to the thesis tree (see constants).
+    scatter(df, [os.path.join(C.FIGURE_PATH, "val_scatter.png"),
+                 os.path.join(C.PAPER_IMG_PATH, "comp_val_scatter.pdf")])
+    # Only regenerate the example panels on a full sweep (they need the example
+    # storms, which a --storms subset may not include).
+    if storms is None:
+        plot_examples(C.EXAMPLE_PANELS,
+                      [os.path.join(C.FIGURE_PATH, "val_examples.png"),
+                       os.path.join(C.PAPER_IMG_PATH, "comp_val_examples.pdf")])
+        latex_table(df, os.path.join(C.PAPER_TEX_PATH, "comp_val_table.tex"))
     print(f"wrote {out_csv}")
     return df
 
