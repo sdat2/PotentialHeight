@@ -42,6 +42,27 @@ def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000) -> np.ndarr
     return gev.sample(n).numpy()
 
 
+def _adam_optimizer(learning_rate: float):
+    """Return a Keras-compatible Adam optimizer.
+
+    Uses the legacy optimizer when available, otherwise falls back to the
+    standard Keras 3 Adam implementation.
+
+    Examples
+    --------
+    >>> optimizer = _adam_optimizer(0.01)
+    >>> np.isclose(float(optimizer.learning_rate), 0.01)
+    True
+    """
+    legacy = getattr(tf.keras.optimizers, "legacy", None)
+    if legacy is not None and hasattr(legacy, "Adam"):
+        try:
+            return legacy.Adam(learning_rate=learning_rate)
+        except Exception:
+            pass
+    return tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+
 def fit_gev_upper_bound_not_known(
     data: np.ndarray,
     opt_steps: int = 1000,
@@ -112,7 +133,7 @@ def fit_gev_upper_bound_not_known(
     #    return -log_likelihood(loc, scale, concentration, data)
 
     # Set up the optimizer
-    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=lr)
+    optimizer = _adam_optimizer(learning_rate=lr)
 
     # Define the training step
     @tf.function
@@ -180,7 +201,7 @@ def fit_gev_upper_bound_known(
     )
 
     # Define the optimizer
-    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=lr)
+    optimizer = _adam_optimizer(learning_rate=lr)
 
     def neg_log_likelihood(
         beta: tf.Variable, neg_gamma: tf.Variable, data: np.ndarray

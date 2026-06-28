@@ -1,0 +1,37 @@
+z_star_start: 7.0 # m, baseline upper bound at start of record
+z_star_trend:
+  min: 0.0 # m/year
+  max: 0.03 # m/year
+  steps: 11
+beta: 1.0 # m
+gamma: -0.2 # dimensionless, Weibull class
+n_years: 80 # annual block maxima length
+seed_steps_Nr: 300 # number of Monte Carlo resamples
+seed_offset: 0
+z_star_assumed_sigma: 0.25 # m uncertainty in the assumed upper bound level
+bound_uncertainty_mode: systematic # systematic (one offset per experiment) | per_year
+upper_bound_padding: 0.005 # m padding if observed max exceeds assumed bound
+quantiles:
+  - 0.01
+  - 0.002
+fit:
+  maxiter: 1000
+  lr: 0.01
+  alpha_guess: 0.0
+  beta_guess: 1.0
+  gamma_guess: -0.1
+  force_weibull: false
+# Cache controls for simulation vs plotting workflow.
+use_cache: true # load cached netCDF if present; set false to recompute
+reload: null # deprecated alias for use_cache; kept for compatibility
+plot_only: false # if true, skip simulation and only regenerate figure from cache
+figure:
+  lp: 0.05
+  up: 0.95
+  show_stationary_reference: false
+verbose: false
+color:
+  stationary_unbounded: '#d95f02'
+  stationary_bounded: '#18520c'
+  nonstationary_unbounded: '#1f77b4'
+  nonstationary_bounded: '#2ca02c'

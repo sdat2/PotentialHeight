@@ -33,6 +33,9 @@ REQUIRED: List[str] = [
     "joblib",  # to parallize more easily potential size calculation (tcpips/w22)
     "ujson",  # to read/write json dictionaries more flexibly (tcpips)
     "statsmodels",  # to calculate trends with Newey-West standard errors (tcpips)
+    "huggingface_hub",  # to download historical surge datasets (comp)
+    "utide",  # to de-tide tide-gauge records for surge validation (comp)
+    "scipy",  # nearest-node KD-tree for gauge matching (comp)
 ]
 
 
@@ -61,7 +64,7 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "w22", "adforce", "adbo", "worst", "cle15"],
+    packages=["tcpips", "w22", "adforce", "adbo", "worst", "cle15", "comp"],
     package_dir={
         "tcpips": "tcpips",  # Calculate potential intensity and prerequisites for potential size
         "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab (octave), calculate potential size
@@ -69,5 +72,6 @@ setup(
         "adbo": "adbo",  # All of the tensorflow/trieste Bayesian optimization stuff
         "worst": "worst",  # Extreme value theory using the upper bound limit using tensorflow for fitting.
         "cle15": "cle15",  # Chavas, Lin & Emanuel (2015) TC wind profile implementations
+        "comp": "comp",  # Compare historical ADCIRC surge against de-tided NOAA tide gauges
     },
 )
