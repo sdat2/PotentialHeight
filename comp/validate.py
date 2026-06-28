@@ -215,42 +215,55 @@ def report(df: pd.DataFrame) -> None:
     print(f"de-tide methods: {dict(df.method.value_counts())}")
 
 
-def _savefig(fig, paths: List[str], dpi: int) -> None:
-    """Save one figure to several paths (e.g. a quick-look PNG and a paper PDF)."""
+def _setup_plt():
+    """Headless matplotlib with the repo's paper style (sithom STIXGeneral serif,
+    Computer-Modern mathtext, STD colour cycle) applied, so comp figures match the
+    rest of the paper rather than matplotlib defaults."""
+    import matplotlib
+    matplotlib.use("Agg")
+    from sithom.plot import plot_defaults
+    plot_defaults()
+    import matplotlib.pyplot as plt
+    return plt
+
+
+def _savefig(fig, paths: List[str]) -> None:
+    """Save one figure to several paths (e.g. a quick-look PNG and a paper PDF).
+    Figures are sized via sithom.get_dim to the LaTeX text width, so they are
+    included at width=\\linewidth with no rescaling (and thus no font-size drift)."""
     for p in paths:
-        fig.savefig(p, dpi=dpi)
+        fig.savefig(p, bbox_inches="tight")
         print(f"wrote {p}")
 
 
 def scatter(df: pd.DataFrame, paths: List[str]) -> None:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    plt = _setup_plt()
+    from sithom.plot import get_dim
 
     cln = df[df.clean]
-    b, e, r = metrics(cln)
-    fig, ax = plt.subplots(figsize=(7.2, 7.2))
+    # sized for inclusion at 0.7\linewidth (see appendix) so fonts match body text
+    fig, ax = plt.subplots(figsize=get_dim(fraction_of_line_width=0.7, ratio=1.0))
     storms = list(df.storm.unique())
     colors = plt.cm.turbo(np.linspace(0.05, 0.95, len(storms)))
     for s, c in zip(storms, colors):
         sc = df[(df.storm == s) & df.clean]
         sx = df[(df.storm == s) & ~df.clean]
-        ax.scatter(sc.obs_peak, sc.sim_peak, color=[c], label=s, s=36, zorder=3)
+        ax.scatter(sc.obs_peak, sc.sim_peak, color=[c], label=s, s=22, zorder=3)
         ax.scatter(sx.obs_peak, sx.sim_peak, facecolors="none", edgecolors=[c],
-                   alpha=0.35, s=28, zorder=2)
+                   alpha=0.35, s=18, zorder=2)
     m = max(df.obs_peak.max(), df.sim_peak.max()) * 1.1 + 0.3
-    ax.plot([0, m], [0, m], "k--", alpha=0.5)
+    ax.plot([0, m], [0, m], "k--", alpha=0.5, lw=0.8)
     if len(cln) > 1:
         sl, ic = np.polyfit(cln.obs_peak, cln.sim_peak, 1)
-        ax.plot([0, m], [ic, sl * m + ic], color="0.3", lw=1, label=f"fit slope={sl:.2f}")
+        ax.plot([0, m], [ic, sl * m + ic], color="0.3", lw=1, label=f"fit (slope {sl:.2f})")
     ax.set_xlim(0, m); ax.set_ylim(0, m)
-    ax.set_xlabel("Observed peak residual (m)")
-    ax.set_ylabel("Simulated peak surge (m)")
-    ax.set_title(f"Peak surge: historical ADCIRC vs NOAA residual\n"
-                 f"clean n={len(cln)}: bias={b:+.2f} m  RMSE={e:.2f} m  r={r:.2f}")
-    ax.legend(fontsize=7, ncol=2); ax.grid(alpha=0.3)
-    fig.tight_layout()
-    _savefig(fig, paths, dpi=135)
+    ax.set_aspect("equal")
+    ax.set_xlabel("Observed peak residual [m]")
+    ax.set_ylabel("Simulated peak surge [m]")
+    ax.legend(fontsize=5, ncol=2, loc="upper left", framealpha=0.9)
+    ax.grid(alpha=0.3)
+    _savefig(fig, paths)
+    plt.close(fig)
 
 
 def plot_examples(panels: List[Tuple[str, str]], paths: List[str],
@@ -259,35 +272,34 @@ def plot_examples(panels: List[Tuple[str, str]], paths: List[str],
 
     ``panels`` is a list of ``(storm, gauge_name)`` tuples.
     """
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    plt = _setup_plt()
+    from sithom.plot import get_dim, label_subplots, OX_BLUE
 
     gauges = gulf_gauges()
     cache: Dict[str, Dict[str, tuple]] = {}
     nrow = int(np.ceil(len(panels) / ncol))
-    fig, axes = plt.subplots(nrow, ncol, figsize=(4.0 * ncol, 2.4 * nrow),
-                             squeeze=False)
+    fig, axes = plt.subplots(nrow, ncol, figsize=get_dim(ratio=0.62), squeeze=False)
     for ax, (storm, gname) in zip(axes.ravel(), panels):
         if storm not in cache:
             _, cache[storm] = validate_storm(storm, C.STORMS[storm], gauges)
         match = [k for k in cache[storm] if gname.lower() in k.lower()]
         if not match:
-            ax.set_title(f"{gname}\n(no data)", fontsize=8); continue
+            ax.set_title(f"{gname} (no data)", fontsize=7); continue
         sim, obs = cache[storm][match[0]]
         tsr, _, _ = timeseries_skill(sim, obs)
-        ax.plot(sim.index, sim.values, color="tab:blue", lw=1.6, label="ADCIRC surge")
-        ax.plot(obs.index, obs.values, color="black", lw=1.1, label="NOAA residual")
-        rtxt = "" if np.isnan(tsr) else f"  (r={tsr:.2f})"
-        ax.set_title(f"{storm}: {match[0][:24]}{rtxt}", fontsize=8, loc="left")
-        ax.set_ylabel("surge (m)"); ax.grid(alpha=0.3)
+        ax.plot(sim.index, sim.values, color=OX_BLUE, lw=1.3, label="ADCIRC surge")
+        ax.plot(obs.index, obs.values, color="black", lw=0.9, label="NOAA residual")
+        rtxt = "" if np.isnan(tsr) else f" ($r={tsr:.2f}$)"
+        ax.set_title(f"{storm}: {match[0][:22]}{rtxt}", fontsize=6.5, loc="left")
+        ax.set_ylabel("surge [m]"); ax.grid(alpha=0.3)
         for lab in ax.get_xticklabels():
-            lab.set_rotation(30); lab.set_fontsize(6); lab.set_ha("right")
+            lab.set_rotation(30); lab.set_fontsize(5.5); lab.set_ha("right")
     for ax in axes.ravel()[len(panels):]:
         ax.set_visible(False)
-    axes.ravel()[0].legend(fontsize=7, loc="upper left")
-    fig.tight_layout()
-    _savefig(fig, paths, dpi=150)
+    axes.ravel()[0].legend(fontsize=6, loc="upper left")
+    label_subplots(axes.ravel().tolist()[:len(panels)], override="outside", fontsize=8)
+    _savefig(fig, paths)
+    plt.close(fig)
 
 
 def latex_table(df: pd.DataFrame, path: str) -> None:

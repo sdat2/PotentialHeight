@@ -103,4 +103,5 @@ concentrate at shallow semi-enclosed bay/pass gauges during direct landfalls.
 
 ## Dependencies
 
-`huggingface_hub`, `utide`, `xarray`, `scipy`, `pandas`, `requests`, `matplotlib`.
+`huggingface_hub`, `utide`, `xarray`, `scipy`, `pandas`, `requests`, `matplotlib`,
+`sithom` (paper figure style: `plot_defaults`, `get_dim`, `label_subplots`).

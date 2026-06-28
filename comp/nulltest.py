@@ -157,27 +157,30 @@ def lag_curve(storms: Optional[List[str]] = None,
 def plot(g: Dict, w: Dict, lag: Optional[pd.DataFrame], paths: List[str]) -> None:
     import matplotlib
     matplotlib.use("Agg")
+    from sithom.plot import plot_defaults, get_dim, label_subplots, BRICK_RED, OX_BLUE
+    plot_defaults()
     import matplotlib.pyplot as plt
 
     ncol = 3 if lag is not None else 2
-    fig, ax = plt.subplots(1, ncol, figsize=(4.2 * ncol, 3.6))
+    fig, ax = plt.subplots(1, ncol, figsize=get_dim(ratio=0.33))
     for a, res, title in [(ax[0], g, "Global permutation"),
                           (ax[1], w, "Within-storm permutation")]:
-        a.hist(res["null"], bins=40, color="0.7", edgecolor="none")
+        a.hist(res["null"], bins=40, color="0.75", edgecolor="none")
         obs = res.get("observed", res.get("observed_pooled"))
-        a.axvline(obs, color="tab:red", lw=2, label=f"observed r={obs:.2f}")
-        a.set_title(f"{title}\nnull max={res['null_max']:.2f}, p={res['p']:.1e}", fontsize=9)
-        a.set_xlabel("correlation r"); a.legend(fontsize=8)
+        a.axvline(obs, color=BRICK_RED, lw=1.8, label=f"observed $r={obs:.2f}$")
+        a.set_title(f"{title}\n(null max ${res['null_max']:.2f}$, $p<10^{{-3}}$)", fontsize=7)
+        a.set_xlabel("correlation $r$"); a.legend(fontsize=6)
+    ax[0].set_ylabel("count")
     if lag is not None:
         a = ax[2]
-        a.plot(lag.lag_days, lag.median_ts_r, "o-", color="tab:blue")
+        a.plot(lag.lag_days, lag.median_ts_r, "o-", color=OX_BLUE, ms=4)
         a.axvline(0, color="0.5", ls=":")
-        a.set_title("Temporal-lag null\n(time-series r vs sim shift)", fontsize=9)
-        a.set_xlabel("simulated-surge lag (days)"); a.set_ylabel("median time-series r")
+        a.set_title("Temporal-lag null", fontsize=7)
+        a.set_xlabel("simulated-surge lag [days]"); a.set_ylabel("median time-series $r$")
         a.grid(alpha=0.3)
-    fig.tight_layout()
+    label_subplots(ax.ravel().tolist()[:ncol], override="outside", fontsize=8)
     for p in paths:
-        fig.savefig(p, dpi=140)
+        fig.savefig(p, bbox_inches="tight")
         print(f"wrote {p}")
 
 
