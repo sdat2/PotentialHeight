@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 from omegaconf import DictConfig
 from scipy.stats import genextreme
+from scipy.optimize import minimize
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 from tqdm import tqdm
@@ -101,13 +102,54 @@ def fit_stationary_bounded(
     )
 
 
+def _fit_method(fit: DictConfig) -> str:
+    """Optimiser for the non-stationary fits: 'lbfgs' (default) or 'adam'."""
+    if "method" in fit and fit.method is not None:
+        return str(fit.method)
+    return "lbfgs"
+
+
+def _ns_lbfgs_unbounded(data, time_axis, fit, force_weibull):
+    """L-BFGS MLE of (alpha0, alpha1, beta, gamma); loc(t)=alpha0+alpha1 t."""
+    def nll(p):
+        a0, a1, beta = p[0], p[1], np.exp(p[2])
+        gamma = -np.exp(p[3]) if force_weibull else p[3]
+        lp = genextreme.logpdf(data, c=-gamma, loc=a0 + a1 * time_axis, scale=beta)
+        return 1e12 if not np.all(np.isfinite(lp)) else -float(np.sum(lp))
+    a0 = _fit_value(fit, "alpha_guess", float(np.mean(data)))
+    a1 = float(np.polyfit(time_axis, data, 1)[0]) if len(data) > 1 else 0.0
+    bg = _fit_value(fit, "beta_guess", 1.0)
+    gg = _fit_value(fit, "gamma_guess", -0.1)
+    x0 = [a0, a1, float(np.log(max(bg, 1e-3))),
+          float(np.log(max(-gg, 1e-3)) if force_weibull else gg)]
+    r = minimize(nll, x0, method="L-BFGS-B")
+    gamma = float(-np.exp(r.x[3]) if force_weibull else r.x[3])
+    return float(r.x[0]), float(r.x[1]), float(np.exp(r.x[2])), gamma
+
+
+def _ns_lbfgs_bounded(data, z_star_assumed_t, fit):
+    """L-BFGS MLE of (beta, gamma) with known time-varying bound; loc(t)=z*(t)+beta/gamma."""
+    def nll(p):
+        beta, gamma = np.exp(p[0]), -np.exp(p[1])
+        lp = genextreme.logpdf(data, c=-gamma, loc=z_star_assumed_t + beta / gamma, scale=beta)
+        return 1e12 if not np.all(np.isfinite(lp)) else -float(np.sum(lp))
+    bg = _fit_value(fit, "beta_guess", 1.0)
+    gg = _fit_value(fit, "gamma_guess", -0.1)
+    r = minimize(nll, [float(np.log(max(bg, 1e-3))), float(np.log(max(-gg, 1e-3)))],
+                 method="L-BFGS-B")
+    return float(np.exp(r.x[0])), float(-np.exp(r.x[1]))
+
+
 def fit_nonstationary_unbounded(
     data: np.ndarray,
     time_axis: np.ndarray,
     fit: DictConfig,
     verbose: bool = False,
 ) -> Tuple[float, float, float, float]:
-    """Fit non-stationary unbounded GEV with linear alpha(t) using TensorFlow Adam."""
+    """Fit non-stationary unbounded GEV with linear alpha(t); L-BFGS by default, Adam optional."""
+    force_weibull = bool(fit.force_weibull) if "force_weibull" in fit else False
+    if _fit_method(fit) == "lbfgs":
+        return _ns_lbfgs_unbounded(data, time_axis, fit, force_weibull)
     data_tf = tf.convert_to_tensor(data, dtype=tf.float32)
     t_tf = tf.convert_to_tensor(time_axis, dtype=tf.float32)
 
@@ -177,7 +219,9 @@ def fit_nonstationary_bounded(
     fit: DictConfig,
     verbose: bool = False,
 ) -> Tuple[float, float]:
-    """Fit non-stationary bounded GEV with known z_star(t) using TensorFlow Adam."""
+    """Fit non-stationary bounded GEV with known z_star(t); L-BFGS by default, Adam optional."""
+    if _fit_method(fit) == "lbfgs":
+        return _ns_lbfgs_bounded(data, z_star_assumed_t, fit)
     data_tf = tf.convert_to_tensor(data, dtype=tf.float32)
     z_star_tf = tf.convert_to_tensor(z_star_assumed_t, dtype=tf.float32)
 
