@@ -7,6 +7,7 @@ worstsurge
    adbo
    adforce
    cle15
+   comp
    setup
    surgenet
    tcpips

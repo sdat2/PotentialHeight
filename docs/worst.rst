@@ -20,6 +20,14 @@ worst.sci module
    :undoc-members:
    :show-inheritance:
 
+worst.sigma\_robustness module
+------------------------------
+
+.. automodule:: worst.sigma_robustness
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 worst.tens module
 -----------------
 
@@ -48,6 +56,14 @@ worst.vary\_noise module
 ------------------------
 
 .. automodule:: worst.vary_noise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+worst.vary\_nonstationary module
+--------------------------------
+
+.. automodule:: worst.vary_nonstationary
    :members:
    :undoc-members:
    :show-inheritance:
