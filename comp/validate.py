@@ -12,10 +12,18 @@ Pipeline, per storm:
 ADCIRC here is surge-only (no tides), so we always compare against the de-tided
 observed residual rather than total water level.
 
+Each storm's de-tided ``(sim, obs)`` series are cached as Parquet under
+``data/comp/ts_cache/`` on a full sweep (write-through), keyed by the node-selection +
+de-tiding parameters so the cache self-invalidates if those change. ``--examples-only``
+then regenerates the example-panel figure from that cache without re-running the (slow)
+utide de-tiding.
+
 Run::
 
-    python -m comp.validate                # full sweep, all STORMS
+    python -m comp.validate                # full sweep, all STORMS (populates the cache)
     python -m comp.validate --storms "Ida 2021" "Katrina 2005"
+    python -m comp.validate --examples-only         # just the example figure, from cache (fast)
+    python -m comp.validate --examples-only --refresh-cache   # recompute the series first
 """
 
 from __future__ import annotations
@@ -93,6 +101,82 @@ def timeseries_skill(sim: pd.Series, obs: pd.Series
     return (float(np.corrcoef(o.values, si)[0, 1]), rmse, int(o.size))
 
 
+# --------------------------------------------------------------------------- #
+# Per-storm time-series cache. The de-tided (sim, obs) series are the slow part
+# (utide harmonic fits per gauge), so we store one storm's whole ``series`` dict as
+# a tidy long-format Parquet table (columns: gauge, kind in {sim,obs}, time, value;
+# plus a ``tag`` column holding the parameter version). Parquet is typed,
+# language-agnostic and preserves the datetime index exactly -- unlike a pickle it is
+# not tied to the Python/pandas version and is safe to read. The ``tag`` is built
+# from the node-selection + de-tiding parameters, so the cache self-invalidates if any
+# change; ``refresh=True`` forces a recompute.
+# --------------------------------------------------------------------------- #
+def _ts_cache_tag() -> str:
+    """Version tag from every parameter that affects the cached series.
+
+    The leading ``v1`` is a manual schema/algorithm version: bump it if the de-tiding or
+    node-selection *code* (not just these constants) changes, to invalidate stale caches.
+    """
+    return (f"v1|deg{C.MAX_NODE_DEG}|wet{C.WET_MIN_M}|knn{C.KNN}"
+            f"|ut{C.UTIDE_MIN_SAMPLES}|box{C.GAUGE_BOX}")
+
+
+def _series_cache_path(storm: str) -> str:
+    return os.path.join(C.TS_CACHE, storm.replace(" ", "_") + ".parquet")
+
+
+def _save_series_cache(storm: str, series: Dict[str, tuple]) -> None:
+    try:
+        frames = []
+        for name, (sim, obs) in series.items():
+            for kind, s in (("sim", sim), ("obs", obs)):
+                frames.append(pd.DataFrame({
+                    "gauge": name, "kind": kind,
+                    "time": pd.DatetimeIndex(s.index),
+                    "value": np.asarray(s.values, dtype=float)}))
+        df = (pd.concat(frames, ignore_index=True) if frames
+              else pd.DataFrame(columns=["gauge", "kind", "time", "value"]))
+        df["tag"] = _ts_cache_tag()
+        df.to_parquet(_series_cache_path(storm), index=False)
+    except Exception as e:  # pragma: no cover - caching must never break the pipeline
+        print(f"  (warning: could not cache {storm} series: {e})")
+
+
+def _load_series_cache(storm: str) -> Optional[Dict[str, tuple]]:
+    """Return the cached series dict, or ``None`` on miss / stale tag / unreadable."""
+    path = _series_cache_path(storm)
+    if not os.path.exists(path):
+        return None
+    try:
+        df = pd.read_parquet(path)
+        if df.empty or df["tag"].iloc[0] != _ts_cache_tag():
+            return None                       # parameters changed -> recompute
+        series: Dict[str, tuple] = {}
+        for name, grp in df.groupby("gauge", sort=False):
+            grp = grp.sort_values("time")
+            sim = grp.loc[grp.kind == "sim"].set_index("time")["value"]
+            obs = grp.loc[grp.kind == "obs"].set_index("time")["value"]
+            series[name] = (sim, obs)
+        return series
+    except Exception:
+        return None                           # unreadable / schema drift -> recompute
+
+
+def load_storm_series(storm: str, fname: str, gauges: List[Gauge],
+                      refresh: bool = False) -> Dict[str, tuple]:
+    """Cached accessor for one storm's ``{gauge: (sim, obs)}`` series.
+
+    Reads the pickle when present and current; otherwise runs the full
+    :func:`validate_storm` (which write-through populates the cache).
+    """
+    if not refresh:
+        cached = _load_series_cache(storm)
+        if cached is not None:
+            return cached
+    _, series = validate_storm(storm, fname, gauges)
+    return series
+
+
 def validate_storm(storm: str, fname: str, gauges: List[Gauge]
                    ) -> Tuple[List[dict], Dict[str, tuple]]:
     """Return (rows, series) for one storm. ``series[name] = (sim, obs)``."""
@@ -124,6 +208,7 @@ def validate_storm(storm: str, fname: str, gauges: List[Gauge]
             ts_r=round(ts_r, 3), ts_rmse=round(ts_rmse, 3), ts_n=ts_n,
             method=method, n_obs=int(obs.size),
         ))
+    _save_series_cache(storm, series)         # write-through: a full sweep populates the cache
     return rows, series
 
 
@@ -260,44 +345,53 @@ def scatter(df: pd.DataFrame, paths: List[str]) -> None:
     ax.set_aspect("equal")
     ax.set_xlabel("Observed peak residual [m]")
     ax.set_ylabel("Simulated peak surge [m]")
-    ax.legend(fontsize=5, ncol=2, loc="upper left", framealpha=0.9)
+    ax.legend(fontsize=6, ncol=2, loc="upper left", framealpha=0.9,
+              handletextpad=0.3, columnspacing=0.8, labelspacing=0.25)
     ax.grid(alpha=0.3)
     _savefig(fig, paths)
     plt.close(fig)
 
 
 def plot_examples(panels: List[Tuple[str, str]], paths: List[str],
-                  ncol: int = 3) -> None:
+                  ncol: int = 2, refresh: bool = False) -> None:
     """Plot simulated surge vs de-tided observed residual for chosen (storm, gauge).
 
-    ``panels`` is a list of ``(storm, gauge_name)`` tuples.
+    ``panels`` is a list of ``(storm, gauge_name)`` tuples. The per-storm series are
+    loaded from the time-series cache (:func:`load_storm_series`), so regenerating this
+    figure is instant once the cache exists; pass ``refresh=True`` to rebuild it.
     """
     plt = _setup_plt()
-    from sithom.plot import get_dim, label_subplots, OX_BLUE
+    import matplotlib.dates as mdates
+    from sithom.plot import get_dim, OX_BLUE
 
     gauges = gulf_gauges()
     cache: Dict[str, Dict[str, tuple]] = {}
     nrow = int(np.ceil(len(panels) / ncol))
-    fig, axes = plt.subplots(nrow, ncol, figsize=get_dim(ratio=0.62), squeeze=False)
-    for ax, (storm, gname) in zip(axes.ravel(), panels):
+    # taller (ratio ~1) for the stacked rows; wider 2-col panels give the date axis room.
+    fig, axes = plt.subplots(nrow, ncol, figsize=get_dim(ratio=0.95), squeeze=False)
+    for i, (ax, (storm, gname)) in enumerate(zip(axes.ravel(), panels)):
+        letter = f"({chr(97 + i)}) "                      # panel id in the (left) title -> no label clash
         if storm not in cache:
-            _, cache[storm] = validate_storm(storm, C.STORMS[storm], gauges)
+            cache[storm] = load_storm_series(storm, C.STORMS[storm], gauges, refresh=refresh)
         match = [k for k in cache[storm] if gname.lower() in k.lower()]
         if not match:
-            ax.set_title(f"{gname} (no data)", fontsize=7); continue
+            ax.set_title(f"{letter}{gname} (no data)", fontsize=7, loc="left"); continue
         sim, obs = cache[storm][match[0]]
         tsr, _, _ = timeseries_skill(sim, obs)
         ax.plot(sim.index, sim.values, color=OX_BLUE, lw=1.3, label="ADCIRC surge")
         ax.plot(obs.index, obs.values, color="black", lw=0.9, label="NOAA residual")
         rtxt = "" if np.isnan(tsr) else f" ($r={tsr:.2f}$)"
-        ax.set_title(f"{storm}: {match[0][:22]}{rtxt}", fontsize=6.5, loc="left")
+        gauge = match[0][:24].rstrip(", ")            # trim long names without a dangling comma
+        ax.set_title(f"{letter}{storm}: {gauge}{rtxt}", fontsize=7, loc="left")
         ax.set_ylabel("surge [m]"); ax.grid(alpha=0.3)
+        # few, short date ticks ("Aug 24") instead of ~10 crowded "2005-08-24" labels
+        ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=3, maxticks=5))
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
         for lab in ax.get_xticklabels():
-            lab.set_rotation(30); lab.set_fontsize(5.5); lab.set_ha("right")
+            lab.set_rotation(30); lab.set_fontsize(6); lab.set_ha("right")
     for ax in axes.ravel()[len(panels):]:
         ax.set_visible(False)
     axes.ravel()[0].legend(fontsize=6, loc="upper left")
-    label_subplots(axes.ravel().tolist()[:len(panels)], override="outside", fontsize=8)
     _savefig(fig, paths)
     plt.close(fig)
 
@@ -383,7 +477,19 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--storms", nargs="*", default=None,
                     help="subset of storm names (default: all)")
-    run(ap.parse_args().storms)
+    ap.add_argument("--examples-only", action="store_true",
+                    help="regenerate only the example-panel figure from the cached "
+                         "time series (no sweep) -- instant once the cache exists")
+    ap.add_argument("--refresh-cache", action="store_true",
+                    help="force-recompute the cached time series instead of reading it")
+    a = ap.parse_args()
+    if a.examples_only:
+        plot_examples(C.EXAMPLE_PANELS,
+                      [os.path.join(C.FIGURE_PATH, "val_examples.png"),
+                       os.path.join(C.PAPER_IMG_PATH, "comp_val_examples.pdf")],
+                      refresh=a.refresh_cache)
+        return
+    run(a.storms)
 
 
 if __name__ == "__main__":

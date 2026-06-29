@@ -19,11 +19,17 @@ All quantities are for the reference Weibull-domain GEV
 The PDFs are written straight into the thesis ``img/`` tree (located like :mod:`comp`), so
 re-running reproduces exactly what the paper ``\\includegraphics``-es -- no manual copy step.
 
+The slow Monte-Carlo is cached to NetCDF under ``data/worst/`` (like
+:func:`worst.sigma_robustness.get_sigma_ds`): the first call builds ``evt_saturation.nc`` /
+``evt_crossover.nc``, and subsequent calls re-read them, so restyling or relabelling a figure
+is instant and never re-simulates. Pass ``--refresh`` (or ``refresh=True``) to recompute.
+
 Run::
 
-    python -m worst.evt_theory            # regenerate both figures + print the numbers
-    python -m worst.evt_theory --quick    # fewer samples/seeds (faster, rougher sim)
-    python -m worst.evt_theory --diagnostics-only   # print ground-truth table, no figures
+    python -m worst.evt_theory            # both figures (builds caches on first run)
+    python -m worst.evt_theory --refresh  # recompute the cached simulations, then plot
+    python -m worst.evt_theory --quick    # fewer samples/seeds when (re)building caches
+    python -m worst.evt_theory --diagnostics-only   # ground-truth validation table
 
 The simulation uses self-contained scipy Nelder--Mead GEV fits (Weibull-forced, ``xi<0``)
 rather than :mod:`worst.tens`, so the theory figures are decoupled from the estimator code
@@ -37,6 +43,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+import xarray as xr
 from scipy.optimize import minimize
 from scipy.stats import genextreme
 
@@ -44,7 +51,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from .constants import FIGURE_PATH, PROJ_PATH
+from sithom.plot import get_dim, label_subplots, plot_defaults
+
+from .constants import DATA_PATH, FIGURE_PATH, PROJ_PATH
 
 # the GEV negative log-likelihoods return a large finite penalty for infeasible parameters,
 # which routinely trips numpy's overflow/divide warnings during the optimiser's line search.
@@ -60,6 +69,11 @@ W = {k: -np.log(-np.log(1 - p)) for k, p in RPS.items()}   # Gumbel reduced vari
 B_INF_REF = {100: 1.369, 500: 2.390}
 C_P_REF = {100: 0.177, 500: 0.292}
 E_GN_50 = 2.1                               # E[G_n] safeguard gap at n=50 (Lemma: gap law)
+
+# simulation caches (NetCDF, like worst.sigma_robustness) -- the slow Monte-Carlo is cached so
+# re-plotting / restyling is instant; pass refresh=True (or `--refresh`) to recompute.
+SAT_CACHE = os.path.join(DATA_PATH, "evt_saturation.nc")
+CROSS_CACHE = os.path.join(DATA_PATH, "evt_crossover.nc")
 
 
 # --- output path: write paper PDFs into the thesis img/ tree ---------------
@@ -304,53 +318,99 @@ def closed_form_crossover(R_II: float, n: int, b_inf: float, c_p: float, e_gn_50
 
 
 # ======================================================================================
-#  Figures
+#  Cached simulation datasets (slow Monte-Carlo; built once, re-read for plotting)
 # ======================================================================================
-def make_saturation_fig(size: int = 3_000_000, out_dir: str | None = None) -> dict:
-    """Generate ``evt_saturation.pdf`` and return ``{rp: b_inf}``."""
-    out_dir = out_dir or _paper_img_path()
+def get_saturation_ds(size: int = 3_000_000, refresh: bool = False) -> xr.Dataset:
+    """Pseudo-true bias curve + Gumbel plateau, cached to :data:`SAT_CACHE`.
+
+    ``bias(rp, u)``, ``b_inf(rp)``, ``c_p(rp)``; attrs ``mu_g, sig_g``.
+    """
+    if os.path.exists(SAT_CACHE) and not refresh:
+        return xr.open_dataset(SAT_CACHE)
     b_inf, (mu_g, sig_g) = gumbel_plateau(size)
     us = np.r_[np.linspace(0.0, 12, 25)[1:], 16, 22, 30, 45, 70, 120, 250, 500.0]
     bias, cp = saturating_bias_curve(us, size)
-    print(f"  Gumbel pseudo-true: mu_G={mu_g:.4f} sig_G={sig_g:.4f}")
-    for k in RPS:
-        print(f"  b_inf(RV{k}) = {b_inf[k]:.3f} m   c_p(RV{k}) ~ {cp[k]:.3f}")
+    rp = list(RPS)
+    ds = xr.Dataset(
+        {"bias": (("rp", "u"), np.array([bias[k] for k in rp])),
+         "b_inf": (("rp",), np.array([b_inf[k] for k in rp])),
+         "c_p": (("rp",), np.array([cp[k] for k in rp]))},
+        coords={"rp": rp, "u": us},
+        attrs={"mu_g": float(mu_g), "sig_g": float(sig_g), "size": int(size)},
+    )
+    ds.to_netcdf(SAT_CACHE)
+    print(f"  cached -> {SAT_CACHE}")
+    return ds
+
+
+def get_crossover_ds(n_rep: int = 700, refresh: bool = False) -> xr.Dataset:
+    """Simulated unbounded range ``R_II(n)`` and clipped crossover ``crossover(n)`` (RV500),
+    cached to :data:`CROSS_CACHE`."""
+    if os.path.exists(CROSS_CACHE) and not refresh:
+        return xr.open_dataset(CROSS_CACHE)
+    ns = np.array([25, 35, 50, 70, 100, 150, 250, 400])
+    rII_s, cx_s = np.zeros(len(ns)), np.zeros(len(ns))
+    for i, n in enumerate(ns):
+        rII_s[i], _, cx_s[i], _, _ = simulate_crossover(int(n), n_rep=n_rep)
+        print(f"  n={int(n):4d}  R_II={rII_s[i]:.2f}  crossover={cx_s[i]:.2f} m")
+    ds = xr.Dataset(
+        {"R_II": (("n",), rII_s), "crossover": (("n",), cx_s)},
+        coords={"n": ns}, attrs={"n_rep": int(n_rep)},
+    )
+    ds.to_netcdf(CROSS_CACHE)
+    print(f"  cached -> {CROSS_CACHE}")
+    return ds
+
+
+# ======================================================================================
+#  Figures (plot from the cached datasets -- restyling is instant, no resimulation)
+# ======================================================================================
+def make_saturation_fig(ds: xr.Dataset | None = None, out_dir: str | None = None,
+                        size: int = 3_000_000, refresh: bool = False) -> xr.Dataset:
+    """Generate ``evt_saturation.pdf`` from the cached saturation dataset."""
+    out_dir = out_dir or _paper_img_path()
+    ds = ds if ds is not None else get_saturation_ds(size=size, refresh=refresh)
+    plot_defaults()
+    us = ds.u.values
 
     def _logfit(b):                               # the (wrong) local log fit, for the overlay
         return min(((np.sum((b - (A := np.sum(b * np.log(1 + us / U)) / np.sum(np.log(1 + us / U) ** 2))
                              * np.log(1 + us / U)) ** 2), A, U)
                     for U in np.linspace(0.2, 30, 400)), key=lambda t: t[0])
 
-    fig, axs = plt.subplots(1, 2, figsize=(8.6, 3.5))
+    fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=0.5))
     uplot = np.linspace(0, 60, 400)
     for ax, k in zip(axs, (100, 500)):
-        _, A, U = _logfit(bias[k])
-        ax.plot(us, bias[k], "o", ms=3.2, color="#1f77b4", label=r"pseudo-true $b_p(u)$", zorder=5)
-        ax.axhline(b_inf[k], ls="--", color="#2ca02c", lw=1.4,
-                   label=fr"Gumbel-limit plateau $b_\infty={b_inf[k]:.2f}$")
+        b = ds.bias.sel(rp=k).values
+        b_inf = float(ds.b_inf.sel(rp=k)); cp = float(ds.c_p.sel(rp=k))
+        _, A, U = _logfit(b)
+        ax.plot(us, b, "o", ms=3.0, color="#1f77b4", label=r"pseudo-true $b_p(u)$", zorder=5)
+        ax.axhline(b_inf, ls="--", color="#2ca02c", lw=1.4,
+                   label=fr"plateau $b_\infty={b_inf:.2f}$")
         ax.plot(uplot, A * np.log(1 + uplot / U), ":", color="#d62728", lw=1.5,
-                label="local log fit (diverges)")
-        ax.plot([0, 6], [0, 6 * cp[k]], "-", color="grey", lw=1.0, label=r"Fisher slope $c_p$")
-        ax.set_xlim(0, 60); ax.set_ylim(0, max(b_inf[k] * 1.25, A * np.log(1 + 60 / U)))
+                label="local log fit")
+        ax.plot([0, 6], [0, 6 * cp], "-", color="grey", lw=1.0, label=r"Fisher slope $c_p$")
+        ax.set_xlim(0, 60); ax.set_ylim(0, max(b_inf * 1.25, A * np.log(1 + 60 / U)))
         ax.set_xlabel(r"bound margin $u=\hat z^*-z^*$ [m]"); ax.set_title(f"RV{k}")
         ax.grid(alpha=0.3)
-    axs[0].set_ylabel("pseudo-true bias $b_p$ [m]"); axs[0].legend(fontsize=7, loc="lower right")
+    axs[0].set_ylabel(r"pseudo-true bias $b_p$ [m]"); axs[0].legend(fontsize=7, loc="lower right")
+    label_subplots(axs.ravel().tolist(), override="outside")
     out = os.path.join(out_dir, "evt_saturation.pdf")
     fig.tight_layout(); fig.savefig(out); plt.close(fig)
     print("  wrote", out)
-    return b_inf
+    return ds
 
 
-def make_closedform_fig(n_rep: int = 700, out_dir: str | None = None) -> None:
-    """Generate ``evt_closedform.pdf`` (RV500): simulated crossover, saturating closed form,
-    and the existence window."""
+def make_closedform_fig(ds: xr.Dataset | None = None, out_dir: str | None = None,
+                       n_rep: int = 700, refresh: bool = False) -> None:
+    """Generate ``evt_closedform.pdf`` (RV500) from the cached crossover dataset: simulated
+    crossover, saturating closed form, and the existence window."""
     out_dir = out_dir or _paper_img_path()
+    ds = ds if ds is not None else get_crossover_ds(n_rep=n_rep, refresh=refresh)
+    plot_defaults()
     b_inf, c_p = B_INF_REF[500], C_P_REF[500]
-    ns = np.array([25, 35, 50, 70, 100, 150, 250, 400])
-    rII_s, cx_s = np.zeros(len(ns)), np.zeros(len(ns))
-    for i, n in enumerate(ns):
-        rII_s[i], _, cx_s[i], _, _ = simulate_crossover(int(n), n_rep=n_rep)
-        print(f"  n={int(n):4d}  R_II={rII_s[i]:.2f}  crossover={cx_s[i]:.2f} m")
+    ns = ds.n.values
+    rII_s, cx_s = ds.R_II.values, ds.crossover.values
 
     # smooth R_II(n) ~ A n^{-1/2} fit to the simulated ranges, for the closed form / window
     A = np.exp(np.mean(np.log(rII_s) + 0.5 * np.log(ns)))
@@ -372,30 +432,31 @@ def make_closedform_fig(n_rep: int = 700, out_dir: str | None = None) -> None:
     n_hi = nn[np.argmin(np.abs(rii_n - up))]
     print(f"  R_II ~ {A:.2f} n^-1/2 ;  window n_hi ~ {n_hi:.0f} yr ,  n_lo ~ {n_lo:.0f} yr")
 
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(10.6, 4.2))
-    axL.plot(ng, cl, "-", color="#d62728", lw=1.8, label="saturating closed form")
-    axL.plot(ns, cx_s, "k*", ms=12, label="full GEV-fit simulation")
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=get_dim(ratio=0.5))
+    axL.plot(ng, cl, "-", color="#d62728", lw=1.6, label="saturating closed form")
+    axL.plot(ns, cx_s, "k*", ms=8, label="full GEV-fit simulation")
     axL.plot(ng, se_asymp(ng), ":", color="grey", lw=1.2, label=r"asymptotic $\mathrm{SE}(\hat z^*)$")
     axL.set_xscale("log"); axL.set_yscale("log")
-    axL.set_xlabel("record length $n$ [years]"); axL.set_ylabel(r"crossover $\sigma^*$ [m]")
-    axL.set_title("Crossover vs record length (RV500)")
-    axL.legend(fontsize=8.5); axL.grid(alpha=0.3, which="both")
+    axL.set_xlabel(r"record length $n$ [years]"); axL.set_ylabel(r"crossover $\sigma^*$ [m]")
+    axL.set_title("Crossover (RV500)")
+    axL.legend(fontsize=7); axL.grid(alpha=0.3, which="both")
     axL.annotate(r"closed form $\approx1.6\times$ sim",
                  (70, closed_form_crossover(float(RII(70)), 70, b_inf, c_p)), (90, 8.5),
-                 fontsize=8, color="#d62728", arrowprops=dict(arrowstyle="->", color="#d62728", lw=0.8))
+                 fontsize=7, color="#d62728", arrowprops=dict(arrowstyle="->", color="#d62728", lw=0.8))
 
     axR.fill_between(nn, 0.05, 12, where=(rii_n > saf) & (rii_n < up), color="green", alpha=0.07)
-    axR.plot(nn, rii_n, color="#1f77b4", lw=1.8, label=r"data range $R_{II}\sim n^{-1/2}$")
-    axR.plot(nn, saf, color="#ff7f0e", lw=1.8, label=r"lower edge $c_p\bar G\sim n^{-|\xi|}$")
-    axR.plot(nn, up, color="#9467bd", lw=1.8, label=r"upper edge $b_\infty+c_p\bar G$")
+    axR.plot(nn, rii_n, color="#1f77b4", lw=1.6, label=r"data range $R_{II}\sim n^{-1/2}$")
+    axR.plot(nn, saf, color="#ff7f0e", lw=1.6, label=r"lower edge $c_p\bar G\sim n^{-|\xi|}$")
+    axR.plot(nn, up, color="#9467bd", lw=1.6, label=r"upper edge $b_\infty+c_p\bar G$")
     for nt, lab, dy in ((n_lo, fr"$n_{{\rm lo}}\approx{n_lo:.0f}$ yr", 0.12),
                         (n_hi, fr"$n_{{\rm hi}}\approx{n_hi:.0f}$ yr", 5.0)):
-        axR.axvline(nt, ls="--", color="k", lw=0.9); axR.text(nt * 1.04, dy, lab, fontsize=8)
-    axR.text(np.sqrt(n_hi * n_lo), 0.5, "bound helps\n(window)", ha="center", fontsize=8, color="green")
+        axR.axvline(nt, ls="--", color="k", lw=0.9); axR.text(nt * 1.04, dy, lab, fontsize=7)
+    axR.text(np.sqrt(n_hi * n_lo), 0.5, "bound helps\n(window)", ha="center", fontsize=7, color="green")
     axR.set_xscale("log"); axR.set_yscale("log"); axR.set_ylim(0.08, 12)
-    axR.set_xlabel("record length $n$ [years]"); axR.set_ylabel("[m]")
-    axR.set_title(r"Existence window $n_{\rm hi}<n<n_{\rm lo}$"); axR.legend(fontsize=8, loc="lower left")
+    axR.set_xlabel(r"record length $n$ [years]"); axR.set_ylabel("[m]")
+    axR.set_title("Existence window"); axR.legend(fontsize=7, loc="lower left")
     axR.grid(alpha=0.3, which="both")
+    label_subplots([axL, axR], override="outside")
     out = os.path.join(out_dir, "evt_closedform.pdf")
     fig.tight_layout(); fig.savefig(out); plt.close(fig)
     print("  wrote", out)
@@ -415,6 +476,8 @@ def diagnostics(n_rep: int = 800) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--quick", action="store_true", help="fewer samples/seeds (faster, rougher)")
+    ap.add_argument("--refresh", action="store_true",
+                    help="recompute and overwrite the cached simulation datasets")
     ap.add_argument("--diagnostics-only", action="store_true", help="print the table, skip figures")
     a = ap.parse_args()
     size = 500_000 if a.quick else 3_000_000
@@ -422,12 +485,12 @@ def main() -> None:
     if a.diagnostics_only:
         diagnostics(n_rep=200 if a.quick else 800)
         return
+    # build/refresh the caches once; plotting then reads them (restyling needs no resimulation)
     print("evt_saturation.pdf:")
-    make_saturation_fig(size=size)
+    make_saturation_fig(size=size, refresh=a.refresh)
     print("evt_closedform.pdf:")
-    make_closedform_fig(n_rep=n_rep)
-    print("\nground-truth diagnostics:")
-    diagnostics(n_rep=200 if a.quick else 800)
+    make_closedform_fig(n_rep=n_rep, refresh=a.refresh)
+    print("(run with --diagnostics-only for the ground-truth validation table)")
 
 
 if __name__ == "__main__":

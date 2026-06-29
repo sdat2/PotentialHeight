@@ -34,6 +34,8 @@ For each storm:
 ```bash
 python -m comp.validate                       # full 14-storm sweep
 python -m comp.validate --storms "Ida 2021"   # one storm (skips example panels + table)
+python -m comp.validate --examples-only       # just the example figure, from cache (fast)
+python -m comp.validate --examples-only --refresh-cache   # recompute the cached series first
 ```
 
 A full sweep regenerates **everything the paper uses**, in one step, so the figures, the
@@ -46,8 +48,14 @@ table and the prose cannot drift apart:
 | per-storm LaTeX table        | `<thesis>/paper/comp_val_table.tex` (`\input` by the appendix) |
 | summary table                | `data/comp/out/val_summary.csv` |
 
+The slow step is the per-gauge `utide` de-tiding. A full sweep **caches** each storm's
+de-tided `(sim, obs)` series as Parquet under `data/comp/ts_cache/` (write-through), keyed by
+the node-selection + de-tiding parameters so the cache self-invalidates if any of those change.
+`--examples-only` then re-renders `comp_val_examples.pdf` from that cache in seconds (vs minutes)
+— use it to iterate on the figure's layout without re-detiding; `--refresh-cache` forces a recompute.
+
 The thesis tree is located by searching for `paper/appendix.tex`; override with the
-`WORSTSURGE_PAPER_ROOT` env var. Downloads/cache live under `data/comp/` (git-ignored).
+`WORSTSURGE_PAPER_ROOT` env var. Downloads/caches live under `data/comp/` (git-ignored).
 
 ## Is the signal real? (negative controls + sensitivity)
 
@@ -103,5 +111,5 @@ concentrate at shallow semi-enclosed bay/pass gauges during direct landfalls.
 
 ## Dependencies
 
-`huggingface_hub`, `utide`, `xarray`, `scipy`, `pandas`, `requests`, `matplotlib`,
+`huggingface_hub`, `utide`, `xarray`, `scipy`, `pandas`, `pyarrow`, `requests`, `matplotlib`,
 `sithom` (paper figure style: `plot_defaults`, `get_dim`, `label_subplots`).

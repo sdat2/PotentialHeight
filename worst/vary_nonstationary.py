@@ -21,7 +21,7 @@ from tensorflow_probability import distributions as tfd
 from tqdm import tqdm
 from sithom.plot import get_dim, label_subplots, plot_defaults
 from .constants import CONFIG_PATH, DATA_PATH, FIGURE_PATH
-from .utils import alpha_from_z_star_beta_gamma
+from .utils import alpha_from_z_star_beta_gamma, legend_below
 from .tens import fit_gev_upper_bound_not_known, fit_gev_upper_bound_known
 
 FIT_NAMES = [
@@ -728,21 +728,21 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
         ax.set_xlabel(r"upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
         ax.set_xlim(float(trends.min()), float(trends.max())); ax.margins(x=0)
     axs[0, 0].set_ylabel("return value [m]")
-    axs[0, 0].legend(fontsize=6, loc="upper left")
+    axs[0, 0].legend(fontsize=7, loc="upper left")
     label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout()
     f1 = os.path.join(FIGURE_PATH, f"vary_nonstationary_rv_{name}.pdf")
     plt.savefig(f1); plt.close(); print("wrote", f1)
 
     # --- Figure 2: bias (top) and 5-95% range (bottom) vs trend --------------
-    fig, axs = plt.subplots(2, len(rps), figsize=get_dim(ratio=0.62), sharex=True,
+    fig, axs = plt.subplots(2, len(rps), figsize=get_dim(ratio=0.85), sharex=True,
                             squeeze=False)
     for j, rp in enumerate(rps):
         for fit in FIT_NAMES:
             kw = dict(color=_NS_COLORS[fit], linestyle=_NS_LINESTYLE[fit], lw=1.6,
                       marker=("o" if "nonstationary" in fit else None), markersize=3)
-            axs[0, j].plot(trends, bias.sel(fit=fit, rp=rp), **kw)
-            axs[1, j].plot(trends, width.sel(fit=fit, rp=rp), label=FIT_LABELS[fit], **kw)
+            axs[0, j].plot(trends, bias.sel(fit=fit, rp=rp), label=FIT_LABELS[fit], **kw)
+            axs[1, j].plot(trends, width.sel(fit=fit, rp=rp), **kw)
         axs[0, j].axhline(0.0, color="grey", ls="--", lw=0.8)
         axs[0, j].set_title(f"RV{int(rp)}")
         axs[1, j].set_xlabel(r"upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
@@ -750,11 +750,11 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
             ax.set_xlim(float(trends.min()), float(trends.max())); ax.margins(x=0)
     axs[0, 0].set_ylabel("bias [m]")
     axs[1, 0].set_ylabel("5--95% range [m]")
-    axs[1, 0].legend(fontsize=6, loc="upper left")
+    legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")
-    fig.tight_layout()
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
     f2 = os.path.join(FIGURE_PATH, f"vary_nonstationary_bias_range_{name}.pdf")
-    plt.savefig(f2); plt.close(); print("wrote", f2)
+    plt.savefig(f2, bbox_inches="tight"); plt.close(); print("wrote", f2)
 
     # --- console summary (bias, 5-95% range, range ratio II-ns/I-ns) ---------
     it = int(np.argmin(np.abs(trends - 0.01)))

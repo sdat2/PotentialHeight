@@ -135,6 +135,19 @@ def plot_sample_points(
     ax.set_xlabel("Return Period (RP) $p$ [years]")
 
 
+def legend_below(fig, ax, ncol: int = 2, fontsize: int = 8, y: float = -0.02) -> None:
+    """Place a single shared legend *below* the figure, drawn from ``ax``'s handles.
+
+    Multi-panel EVT figures fill their axes (flat bias/range curves leave no empty corner),
+    so an in-axes legend overlaps the data. A figure-level legend below the panels keeps every
+    series visible. Pair with ``fig.tight_layout(rect=[0, 0.08, 1, 1])`` (to reserve the strip)
+    and ``fig.savefig(out, bbox_inches="tight")`` (so the legend is not clipped).
+    """
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, ncol=ncol, fontsize=fontsize, loc="lower center",
+               bbox_to_anchor=(0.5, y), frameon=False)
+
+
 def retry_wrapper(max_retries: int = 10) -> callable:
     """Retry wrapper. If a function fails flakeily, then wrap with this to retry it a few times.
 

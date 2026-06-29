@@ -15,6 +15,7 @@ DATA_PATH = os.path.join(PROJ_PATH, "data")
 COMP_DATA_PATH = os.path.join(DATA_PATH, "comp")          # caches (git-ignored)
 HF_STORM_CACHE = os.path.join(COMP_DATA_PATH, "hf_storms")  # downloaded storm netCDFs
 COOPS_CACHE = os.path.join(COMP_DATA_PATH, "coops_cache")   # raw CO-OPS responses
+TS_CACHE = os.path.join(COMP_DATA_PATH, "ts_cache")        # per-storm de-tided time series (Parquet)
 FIGURE_PATH = os.path.join(PROJ_PATH, "img", "comp")       # quick-look PNGs (tracked)
 OUT_PATH = os.path.join(COMP_DATA_PATH, "out")             # summary tables / metrics
 
@@ -40,7 +41,7 @@ PAPER_ROOT = _find_paper_root()
 PAPER_IMG_PATH = str(PAPER_ROOT / "img") if PAPER_ROOT else FIGURE_PATH
 PAPER_TEX_PATH = str(PAPER_ROOT / "paper") if PAPER_ROOT else OUT_PATH
 
-for _p in (COMP_DATA_PATH, HF_STORM_CACHE, COOPS_CACHE, FIGURE_PATH, OUT_PATH,
+for _p in (COMP_DATA_PATH, HF_STORM_CACHE, COOPS_CACHE, TS_CACHE, FIGURE_PATH, OUT_PATH,
            PAPER_IMG_PATH, PAPER_TEX_PATH):
     os.makedirs(_p, exist_ok=True)
 

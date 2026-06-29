@@ -36,6 +36,7 @@ REQUIRED: List[str] = [
     "huggingface_hub",  # to download historical surge datasets (comp)
     "utide",  # to de-tide tide-gauge records for surge validation (comp)
     "scipy",  # nearest-node KD-tree for gauge matching (comp)
+    "pyarrow",  # Parquet cache of de-tided gauge time series (comp)
 ]
 
 

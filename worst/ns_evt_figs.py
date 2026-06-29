@@ -26,8 +26,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from sithom.plot import get_dim, label_subplots, plot_defaults
+
 from .constants import DATA_PATH
 from .evt_theory import _paper_img_path
+from .utils import legend_below
 
 FITS = ["stationary_unbounded", "stationary_bounded",
         "nonstationary_unbounded", "nonstationary_bounded"]
@@ -57,24 +60,28 @@ def _bias_range(ds: xr.Dataset):
 
 
 def _panel(ds: xr.Dataset, xc: str, xlabel: str, out: str, title: str):
+    plot_defaults()
     bias, width = _bias_range(ds)
     x = ds[xc].values
     rps = ds.rp.values.tolist()
-    fig, axs = plt.subplots(2, len(rps), figsize=(9.2, 6.4), sharex=True, squeeze=False)
+    fig, axs = plt.subplots(2, len(rps), figsize=get_dim(ratio=0.85), sharex=True, squeeze=False)
     for j, rp in enumerate(rps):
         for f in FITS:
-            kw = dict(color=COL[f], ls=LS[f], lw=1.7,
-                      marker=("o" if "nonstationary" in f else None), ms=3)
-            axs[0, j].plot(x, bias.sel(fit=f, rp=rp), **kw)
-            axs[1, j].plot(x, width.sel(fit=f, rp=rp), label=LAB[f], **kw)
+            kw = dict(color=COL[f], ls=LS[f], lw=1.6,
+                      marker=("o" if "nonstationary" in f else None), markersize=3)
+            axs[0, j].plot(x, bias.sel(fit=f, rp=rp), label=LAB[f], **kw)
+            axs[1, j].plot(x, width.sel(fit=f, rp=rp), **kw)
         axs[0, j].axhline(0, color="grey", ls="--", lw=0.8)
         axs[0, j].set_title(f"RV{int(rp)}")
         axs[1, j].set_xlabel(xlabel)
         for ax in (axs[0, j], axs[1, j]):
             ax.grid(alpha=0.3); ax.margins(x=0)
     axs[0, 0].set_ylabel("bias [m]"); axs[1, 0].set_ylabel("5--95% range [m]")
-    axs[1, 0].legend(fontsize=7, loc="upper left"); fig.suptitle(title, fontsize=11)
-    fig.tight_layout(); fig.savefig(out); plt.close(fig)
+    legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
+    fig.suptitle(title, fontsize=10)
+    label_subplots(axs.ravel().tolist(), override="outside")
+    fig.tight_layout(rect=[0, 0.07, 1, 1])
+    fig.savefig(out, bbox_inches="tight"); plt.close(fig)
     print("  wrote", out)
     return bias, width
 
