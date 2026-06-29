@@ -17,10 +17,10 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Cache Conda environment
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ env.CONDA }}/envs
         key: ${{ runner.os }}-conda-${{ matrix.python-version }}-v2-${{ hashFiles('env.yml', 'setup.py') }}
@@ -28,7 +28,7 @@ jobs:
           ${{ runner.os }}-conda-${{ matrix.python-version }}-v2-
 
     - name: Setup Conda Environment with Mamba 🐍
-      uses: conda-incubator/setup-miniconda@v3
+      uses: conda-incubator/setup-miniconda@v4
       with:
         python-version: ${{ matrix.python-version }}
         environment-file: env.yml
