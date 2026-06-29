@@ -20,6 +20,8 @@ import xarray as xr
 from omegaconf import OmegaConf
 from tqdm import tqdm
 
+from sithom.plot import get_dim, label_subplots, plot_defaults
+
 from .constants import CONFIG_PATH, DATA_PATH, FIGURE_PATH
 from .vary_nonstationary import FIT_LABELS, FIT_NAMES, run_single_experiment
 
@@ -68,29 +70,36 @@ def get_sigma_ds(n_seed: int = 120, maxiter: int = 600) -> xr.Dataset:
 
 
 def plot_sigma_ds(ds: xr.Dataset) -> None:
-    """Bias (top) and 5--95% range (bottom) vs sigma_z*, per return period."""
+    """Bias (top) and 5--95% range (bottom) vs sigma_z*, per return period.
+
+    Matches the paper figure style (sithom serif via ``plot_defaults``, text-width
+    sizing via ``get_dim``, (a)--(d) panel labels) and the sibling
+    ``vary_nonstationary`` bias/range figure it accompanies."""
     import matplotlib.pyplot as plt
+    plot_defaults()
 
     err = ds.rv_est - ds.rv_true
     bias = err.mean("seed", skipna=True)
     width = (ds.rv_est.quantile(0.95, "seed", skipna=True)
              - ds.rv_est.quantile(0.05, "seed", skipna=True))
     rps = ds.rp.values.tolist()
-    fig, axs = plt.subplots(2, len(rps), figsize=(9.2, 6.4), sharex=True, squeeze=False)
+    fig, axs = plt.subplots(2, len(rps), figsize=get_dim(ratio=0.62), sharex=True,
+                            squeeze=False)
     for j, rp in enumerate(rps):
         for f in FIT_NAMES:
-            kw = dict(color=_COLORS[f], ls=_LS[f], lw=1.7,
-                      marker=("o" if "nonstationary" in f else None), ms=3)
+            kw = dict(color=_COLORS[f], ls=_LS[f], lw=1.6,
+                      marker=("o" if "nonstationary" in f else None), markersize=3)
             axs[0, j].plot(ds.sigma, bias.sel(fit=f, rp=rp), **kw)
             axs[1, j].plot(ds.sigma, width.sel(fit=f, rp=rp), label=FIT_LABELS[f], **kw)
         axs[0, j].axhline(0, color="grey", ls="--", lw=0.8)
-        axs[0, j].set_title(f"RV{int(rp)}  (trend = {TREND} m/yr)")
+        axs[0, j].set_title(f"RV{int(rp)}  (trend $= {TREND}$ m year$^{{-1}}$)")
         axs[1, j].set_xlabel(r"bound level uncertainty $\sigma_{z^*}$ [m]")
         for ax in (axs[0, j], axs[1, j]):
             ax.grid(alpha=0.3)
     axs[0, 0].set_ylabel("bias [m]")
     axs[1, 0].set_ylabel("5--95% range [m]")
-    axs[1, 0].legend(fontsize=7, loc="upper left")
+    axs[1, 0].legend(fontsize=6, loc="upper left")
+    label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout()
     out = os.path.join(FIGURE_PATH, "sigma_robustness.pdf")
     fig.savefig(out)
