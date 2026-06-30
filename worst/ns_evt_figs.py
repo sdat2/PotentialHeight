@@ -72,13 +72,19 @@ def _panel(ds: xr.Dataset, xc: str, xlabel: str, out: str, title: str):
             axs[0, j].plot(x, bias.sel(fit=f, rp=rp), label=LAB[f], **kw)
             axs[1, j].plot(x, width.sel(fit=f, rp=rp), **kw)
         axs[0, j].axhline(0, color="grey", ls="--", lw=0.8)
-        axs[0, j].set_title(f"RV{int(rp)}")
+        axs[0, j].set_title(f"1-in-{int(rp)} yr")
         axs[1, j].set_xlabel(xlabel)
         for ax in (axs[0, j], axs[1, j]):
             ax.grid(alpha=0.3); ax.margins(x=0)
     axs[0, 0].set_ylabel("bias [m]"); axs[1, 0].set_ylabel("5--95% range [m]")
+    # Range-row y-limit: keep the informative fits in frame and let a blown-up
+    # stationary-bounded (I-s) range run off the top rather than squashing the rest.
+    keep = [f for f in FITS if f != "stationary_bounded"]
+    rmax = float(width.sel(fit=keep).max())
+    if float(width.sel(fit="stationary_bounded").max()) > 1.25 * rmax:
+        for jj in range(len(rps)):
+            axs[1, jj].set_ylim(0, 1.12 * rmax)
     legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
-    fig.suptitle(title, fontsize=10)
     label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout(rect=[0, 0.07, 1, 1])
     fig.savefig(out, bbox_inches="tight"); plt.close(fig)

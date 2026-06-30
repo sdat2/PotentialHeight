@@ -54,6 +54,7 @@ import matplotlib.pyplot as plt
 from sithom.plot import get_dim, label_subplots, plot_defaults
 
 from .constants import DATA_PATH, FIGURE_PATH, PROJ_PATH
+from .utils import legend_below
 
 # the GEV negative log-likelihoods return a large finite penalty for infeasible parameters,
 # which routinely trips numpy's overflow/divide warnings during the optimiser's line search.
@@ -391,12 +392,13 @@ def make_saturation_fig(ds: xr.Dataset | None = None, out_dir: str | None = None
                 label="local log fit")
         ax.plot([0, 6], [0, 6 * cp], "-", color="grey", lw=1.0, label=r"Fisher slope $c_p$")
         ax.set_xlim(0, 60); ax.set_ylim(0, max(b_inf * 1.25, A * np.log(1 + 60 / U)))
-        ax.set_xlabel(r"bound margin $u=\hat z^*-z^*$ [m]"); ax.set_title(f"RV{k}")
+        ax.set_xlabel(r"bound margin $u=\hat z^*-z^*$ [m]"); ax.set_title(f"1-in-{k} yr")
         ax.grid(alpha=0.3)
-    axs[0].set_ylabel(r"pseudo-true bias $b_p$ [m]"); axs[0].legend(fontsize=7, loc="lower right")
+    axs[0].set_ylabel(r"pseudo-true bias $b_p$ [m]")
+    legend_below(fig, axs[0], ncol=4)                # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")
     out = os.path.join(out_dir, "evt_saturation.pdf")
-    fig.tight_layout(); fig.savefig(out); plt.close(fig)
+    fig.tight_layout(rect=[0, 0.08, 1, 1]); fig.savefig(out, bbox_inches="tight"); plt.close(fig)
     print("  wrote", out)
     return ds
 
@@ -438,8 +440,8 @@ def make_closedform_fig(ds: xr.Dataset | None = None, out_dir: str | None = None
     axL.plot(ng, se_asymp(ng), ":", color="grey", lw=1.2, label=r"asymptotic $\mathrm{SE}(\hat z^*)$")
     axL.set_xscale("log"); axL.set_yscale("log")
     axL.set_xlabel(r"record length $n$ [years]"); axL.set_ylabel(r"crossover $\sigma^*$ [m]")
-    axL.set_title("Crossover (RV500)")
-    axL.legend(fontsize=7); axL.grid(alpha=0.3, which="both")
+    axL.set_title("Crossover, 1-in-500 yr")
+    axL.legend(fontsize=7, loc="lower left", framealpha=0.95); axL.grid(alpha=0.3, which="both")
     axL.annotate(r"closed form $\approx1.6\times$ sim",
                  (70, closed_form_crossover(float(RII(70)), 70, b_inf, c_p)), (90, 8.5),
                  fontsize=7, color="#d62728", arrowprops=dict(arrowstyle="->", color="#d62728", lw=0.8))
@@ -454,7 +456,7 @@ def make_closedform_fig(ds: xr.Dataset | None = None, out_dir: str | None = None
     axR.text(np.sqrt(n_hi * n_lo), 0.5, "bound helps\n(window)", ha="center", fontsize=7, color="green")
     axR.set_xscale("log"); axR.set_yscale("log"); axR.set_ylim(0.08, 12)
     axR.set_xlabel(r"record length $n$ [years]"); axR.set_ylabel("[m]")
-    axR.set_title("Existence window"); axR.legend(fontsize=7, loc="lower left")
+    axR.set_title("Existence window"); axR.legend(fontsize=7, loc="upper right", framealpha=0.95)
     axR.grid(alpha=0.3, which="both")
     label_subplots([axL, axR], override="outside")
     out = os.path.join(out_dir, "evt_closedform.pdf")
