@@ -20,9 +20,13 @@ at the University of Cambridge.
    MAIN_README.md
    tcpips
    w22
+   cle15
    adforce
    adbo
+   comp
    worst
+   surgenet
+   about
 
 
 Indices and tables

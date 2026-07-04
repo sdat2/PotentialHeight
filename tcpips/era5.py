@@ -9,7 +9,6 @@ The script is designed to download the data to calculate potential intensity (PI
 import os
 import uuid
 import shutil
-import cdsapi
 from typing import List, Literal, Optional
 import numpy as np
 import tempfile
@@ -234,6 +233,8 @@ def download_single_levels(
     print(
         f"Downloading single-level data for years {years[0]}-{years[-1]} to {chunk_file_name}"
     )
+    import cdsapi  # lazy: only needed for CDS downloads (pip install .[cmip])
+
     c = cdsapi.Client()
     c.retrieve(
         "reanalysis-era5-single-levels-monthly-means",
@@ -327,6 +328,8 @@ def download_pressure_levels(
                     os.remove(file_path)
             print(f"Downloaded pressure-level data to {output_path}")
         return
+    import cdsapi  # lazy: only needed for CDS downloads (pip install .[cmip])
+
     c = cdsapi.Client()
     c.retrieve(
         "reanalysis-era5-pressure-levels-monthly-means",

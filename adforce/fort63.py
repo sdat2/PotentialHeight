@@ -18,7 +18,7 @@ from sithom.place import BoundingBox, Point
 from sithom.xr import plot_units
 from sithom.plot import label_subplots, plot_defaults
 from .mesh import select_nearby, bbox_mesh  # select_coast, filter_mesh,
-from .constants import NO_BBOX, NEW_ORLEANS
+from .constants import NO_BBOX, NEW_ORLEANS, DATA_ROOT
 from .fort22datatree import read_fort22
 
 plot_defaults()
@@ -166,10 +166,13 @@ def kat2() -> None:
     figure_dir = os.path.join(FIGURE_PATH, "kat2")
     os.makedirs(figure_dir, exist_ok=True)
 
+    data_folder = os.path.join(DATA_ROOT, "kat2")
+    print("Resolved data_folder:", data_folder)
+
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     for station in range(len(tide_ds.lon)):
         fig, axs = plot_nearby(
-            data_folder="/work/n01/n01/sithom/adcirc-swan/kat2/",
+            data_folder=data_folder,
             point=Point(
                 tide_ds.isel(stationid=station).lon.values,
                 tide_ds.isel(stationid=station).lat.values,
@@ -200,10 +203,15 @@ if __name__ == "__main__":
     figure_dir = os.path.join(FIGURE_PATH, "hresmeshnws12")
     os.makedirs(figure_dir, exist_ok=True)
 
+    data_folder = os.path.join(
+        DATA_ROOT, "testsuite", "adcirc", "adcirc_katria_2d-highres"
+    )
+    print("Resolved data_folder:", data_folder)
+
     tide_ds = xr.open_dataset(KATRINA_TIDE_NC)
     for station in range(len(tide_ds.lon)):
         fig, axs = plot_nearby(
-            data_folder="/work/n01/n01/sithom/adcirc-swan/testsuite/adcirc/adcirc_katria_2d-highres",
+            data_folder=data_folder,
             point=Point(
                 tide_ds.isel(stationid=station).lon.values,
                 tide_ds.isel(stationid=station).lat.values,

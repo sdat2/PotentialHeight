@@ -1,8 +1,31 @@
 from typing import Optional
 import os
 import xarray as xr
-import datatree as dt
 from .constants import DATA_PATH
+
+
+def _open_datatree(path: str):
+    """Open a grouped netCDF file as a datatree, whatever the xarray vintage.
+
+    DataTree was merged into xarray core in 2024.10 (``xr.open_datatree``);
+    the standalone ``xarray-datatree`` package is archived. Prefer the core
+    implementation when available and only fall back to the archived shim on
+    older xarray (e.g. 2024.2).
+
+    Args:
+        path (str): Path to a netCDF file with groups (e.g. fort.22.nc).
+
+    Returns:
+        DataTree: ``xarray.DataTree`` on xarray >= 2024.10, else
+            ``datatree.DataTree`` from the archived package.
+    """
+    if hasattr(xr, "open_datatree"):
+        return xr.open_datatree(path)
+    # Lazy import so environments with modern xarray never need (or touch)
+    # the archived xarray-datatree package.
+    import datatree
+
+    return datatree.open_datatree(path)
 
 
 def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
@@ -16,4 +39,4 @@ def read_fort22(fort22_path: Optional[str] = None) -> xr.Dataset:
     """
     if fort22_path is None:
         fort22_path = os.path.join(DATA_PATH, "fort.22.nc")
-    return dt.open_datatree(fort22_path)
+    return _open_datatree(fort22_path)

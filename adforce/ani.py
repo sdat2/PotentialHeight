@@ -18,7 +18,7 @@ from sithom.plot import axis_formatter
 from sithom.time import timeit
 from .mesh import bbox_mesh, xr_loader
 from .fort22datatree import read_fort22
-from .constants import NO_BBOX, NEW_ORLEANS, FIGURE_PATH
+from .constants import NO_BBOX, NEW_ORLEANS, FIGURE_PATH, DATA_ROOT
 from .config import load_config
 from .fort22 import create_fort22
 from .geo import line_with_impact_pyproj as line_with_impact
@@ -472,8 +472,9 @@ def run_animation() -> None:
     parser.add_argument(
         "--path_in",
         type=str,
-        default="/work/n01/n01/sithom/adcirc-swan/exp/angle_test/exp_004",
-        help="path to data",
+        default=None,
+        help="path to data (defaults to <DATA_ROOT>/exp/angle_test/exp_004; "
+        "set WORSTSURGE_DATA_ROOT to change the root)",
     )
     parser.add_argument(
         "--step_size", type=int, default=10, help="step size for animation"
@@ -488,6 +489,10 @@ def run_animation() -> None:
     parser.add_argument("--winds", action="store_true", help="plot winds with heights")
 
     args = parser.parse_args()
+
+    if args.path_in is None:
+        args.path_in = os.path.join(DATA_ROOT, "exp", "angle_test", "exp_004")
+    print("Resolved path_in:", args.path_in)
 
     if args.winds:
         ani_heights_and_winds(
@@ -511,7 +516,7 @@ def run_animation() -> None:
 
 @timeit
 def single_wind_and_height_step(
-    path_in: str = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049",  # "/work/n02/n02/sdat2/adcirc-swan/exp/notide-mid-2025",
+    path_in: Optional[str] = None,
     time_i: Optional[int] = 380,
     coarsen: int = 2,
     bbox: Optional[BoundingBox] = NO_BBOX,
@@ -525,7 +530,9 @@ def single_wind_and_height_step(
     Plot a single snapshot of height and wind.
 
     Args:
-        path_in (str, optional): path to data. Defaults to "/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049".
+        path_in (Optional[str], optional): path to data. Defaults to None, which
+            resolves to "<DATA_ROOT>/tcpips/exp/new-orleans-2015/exp_0049"
+            (DATA_ROOT from adforce.constants; override with WORSTSURGE_DATA_ROOT).
         time_i (Optional[int], optional): time index. Defaults to 380. If None, we find the maximum maxele for the observation location.
         coarsen (int, optional): coarsen the wind data by this factor. Defaults to 2.
         bbox (Optional[BoundingBox], optional): bounding box. Defaults to NO_BBOX.
@@ -537,6 +544,12 @@ def single_wind_and_height_step(
 
     """
     plot_defaults()
+
+    if path_in is None:
+        path_in = os.path.join(
+            DATA_ROOT, "tcpips", "exp", "new-orleans-2015", "exp_0049"
+        )
+    print("Resolved path_in:", path_in)
 
     regenerate_fort22_if_does_not_exist(path_in)
 
@@ -779,8 +792,10 @@ def single_wind_and_height_step(
 if __name__ == "__main__":
     # python -m adforce.ani
     # run_animation()
+    print("Using ADCIRC data root:", DATA_ROOT)
+    # previously "/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/exp/2d-ani-ei/exp_0049"
     single_wind_and_height_step(
-        path_in="/mnt/lustre/a2fs-work2/work/n02/n02/sdat2/adcirc-swan/worstsurge/exp/2d-ani-ei/exp_0049",
+        path_in=os.path.join(DATA_ROOT, "worstsurge", "exp", "2d-ani-ei", "exp_0049"),
         bbox=NO_BBOX.pad(1),
         time_i=300,
         coarsen=3,
@@ -788,7 +803,9 @@ if __name__ == "__main__":
         figure_name="2015_asym_2d_new_orleans_snapshot.pdf",
     )
     single_wind_and_height_step(
-        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/new-orleans-2015/exp_0049",
+        path_in=os.path.join(
+            DATA_ROOT, "tcpips", "exp", "new-orleans-2015", "exp_0049"
+        ),
         bbox=NO_BBOX.pad(1),
         time_i=300,
         coarsen=3,
@@ -796,7 +813,7 @@ if __name__ == "__main__":
         figure_name="2015_worst_mid_notide_snapshot.pdf",
     )
     single_wind_and_height_step(
-        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/8761724-2015/exp_0049",
+        path_in=os.path.join(DATA_ROOT, "tcpips", "exp", "8761724-2015", "exp_0049"),
         bbox=NO_BBOX.pad(1),
         time_i=360,
         coarsen=3,
@@ -806,7 +823,7 @@ if __name__ == "__main__":
     from .constants import MIAMI, GALVERSTON
 
     single_wind_and_height_step(
-        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/miami-2015/exp_0049",
+        path_in=os.path.join(DATA_ROOT, "tcpips", "exp", "miami-2015", "exp_0049"),
         bbox=MIAMI.bbox(),
         time_i=360,
         coarsen=3,
@@ -816,7 +833,9 @@ if __name__ == "__main__":
         y_pos=-0.05,
     )
     single_wind_and_height_step(
-        path_in="/work/n01/n01/sithom/adcirc-swan/tcpips/exp/galverston-2015/exp_0049",
+        path_in=os.path.join(
+            DATA_ROOT, "tcpips", "exp", "galverston-2015", "exp_0049"
+        ),
         bbox=GALVERSTON.bbox(),
         time_i=360,
         coarsen=3,

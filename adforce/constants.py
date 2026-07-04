@@ -1,6 +1,7 @@
 """Constants for adforce package."""
 
 import os
+import warnings
 from pathlib import Path
 from pyproj import Geod
 from sithom.place import BoundingBox, Point
@@ -31,17 +32,41 @@ SRC_PATH = Path(__file__).parent
 SETUP_PATH = os.path.join(SRC_PATH, "setup")
 
 
-# check if we are in n01 or n02
+# check if we are in n01 or n02 consortium of ARCHER2
 if "n01/n01" in SRC_PATH.as_posix():
     CON = "n01"
 elif "n02/n02" in SRC_PATH.as_posix():
     CON = "n02"
 else:
     CON = None
-    print("src path", SRC_PATH.as_posix())
-    # raise Warning(
-    #    "Not in n01 or n02 consortium of archer2, file paths may not be correct"
-    # )
+
+# Root directory where the ADCIRC experiment inputs/outputs live
+# (e.g. {DATA_ROOT}/exp/..., {DATA_ROOT}/tcpips/exp/...).
+# Resolution order:
+#   1. WORSTSURGE_DATA_ROOT environment variable (highest priority, any machine),
+#   2. ARCHER2 consortium detection (n01/n02) from the source checkout path,
+#   3. the historical ARCHER2 n01 path (ultimate fallback, unchanged behaviour).
+ARCHER2_N01_DATA_ROOT = "/work/n01/n01/sithom/adcirc-swan"
+ARCHER2_N02_DATA_ROOT = "/work/n02/n02/sdat2/adcirc-swan"
+
+_env_data_root = os.environ.get("WORSTSURGE_DATA_ROOT")
+if _env_data_root:
+    DATA_ROOT = _env_data_root
+elif CON == "n02":
+    DATA_ROOT = ARCHER2_N02_DATA_ROOT
+else:
+    DATA_ROOT = ARCHER2_N01_DATA_ROOT
+    if CON is None:
+        warnings.warn(
+            "adforce.constants: unrecognized machine (source path "
+            f"'{SRC_PATH.as_posix()}' is not in the n01 or n02 consortium of "
+            "ARCHER2). Falling back to the ARCHER2 n01 ADCIRC data root "
+            f"'{ARCHER2_N01_DATA_ROOT}', which is probably wrong on this "
+            "machine. Set the WORSTSURGE_DATA_ROOT environment variable to "
+            "point at the directory containing your ADCIRC experiment "
+            "outputs.",
+            stacklevel=2,
+        )
 
 PROJ_PATH = Path(SRC_PATH).parent
 DATA_PATH = os.path.join(PROJ_PATH, "data")

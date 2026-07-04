@@ -153,9 +153,9 @@ def process_all_bo_runs(
 
     Args:
         base_exp_dir: The root directory where all BO folders live
-                      (e.g., '/work/n01/n01/sithom/adcirc-swan/tcpips/exp').
+                      (e.g., '<DATA_ROOT>/tcpips/exp').
         output_base_dir: The target directory to save .nc files
-                         (e.g., '/work/n01/n01/sithom/adcirc-swan/SurgenetTestPH').
+                         (e.g., '<DATA_ROOT>/SurgenetTestPH').
         folder_names: A list of string names for the subfolders within
                       `base_exp_dir` to process.
         skip_existing: If True, skips processing if the output .nc file
@@ -208,8 +208,13 @@ if __name__ == "__main__":
     print("Doctests complete.\n")
 
     # 2. Define your batch job parameters
-    BASE_EXP_DIR = "/work/n01/n01/sithom/adcirc-swan/tcpips/exp"
-    OUTPUT_DATA_DIR = "/work/n01/n01/sithom/adcirc-swan/SurgeNetTestPH"
+    # (root from adforce.constants.DATA_ROOT; override with WORSTSURGE_DATA_ROOT)
+    from adforce.constants import DATA_ROOT
+
+    BASE_EXP_DIR = os.path.join(DATA_ROOT, "tcpips", "exp")
+    OUTPUT_DATA_DIR = os.path.join(DATA_ROOT, "SurgeNetTestPH")
+    print("Resolved BASE_EXP_DIR:", BASE_EXP_DIR)
+    print("Resolved OUTPUT_DATA_DIR:", OUTPUT_DATA_DIR)
 
     # This is the raw string you provided
     RAW_FOLDER_LIST_STRING = """galverston-2015-1 galverson-2015-2 galverston-2015-3 galverston-2100-1 galverston-2100-2 galverston-2100-3 miami-2015-1 miami-2015-2 miami-2015-3 miami-2100-1 miami-2100-2 miami-2100-3 new-orleans-2015-1 new-orleans-2015-2 new-orleans-2015-3 new-orleans-2100-1 new-orleans-2100-2 new-orleans-2100-3"""

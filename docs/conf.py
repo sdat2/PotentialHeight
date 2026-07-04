@@ -12,7 +12,6 @@
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 import os
 import sys
-from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(".."))
 
@@ -43,18 +42,52 @@ extensions = [
 ]
 
 
-# C and fortran settings:
-
 ## intersphinx
 
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3.8", None),
-    "sphinx": ("http://www.sphinx-doc.org/en/stable", None),
-    "sphinxfortran": ("http://sphinx-fortran.readthedocs.io/en/latest/", None),
-    "numpy": ("http://docs.scipy.org/doc/numpy/", None),
-    "scipy": ("http://docs.scipy.org/doc/scipy/reference/", None),
+    "python": ("https://docs.python.org/3.10", None),
+    "sphinx": ("https://www.sphinx-doc.org/en/master", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "matplotlib": ("https://matplotlib.org/stable", None),
 }
+
+## autodoc
+
+# Heavy optional dependencies mocked so the API docs build with only the core
+# install (ReadTheDocs installs the package without the [bo]/[cmip]/[mpi]
+# extras). Only packages actually imported at module level by the documented
+# packages are listed (checked by grep):
+#   tensorflow/tensorflow_probability - adbo.exp, adbo.gp_exp, worst.tens,
+#       worst.vary_nonstationary, surgenet.toy_example
+#   trieste, gpflow                   - adbo.exp, adbo.gp_exp
+#   intake, xmip                      - tcpips.pangeo
+#   xesmf                             - tcpips.regrid
+#   cdsapi                            - tcpips.era5
+#   dask_mpi                          - tcpips.era5_ps_calc
+#   dask_jobqueue                     - tcpips.run_dask_calculation
+#   adcircpy                          - adforce.generate_training_data
+#       (not in install_requires at all)
+#   numba                             - cle15.cle15n
+#       (not in install_requires; remove from this list if added there)
+# Not mocked because they are only imported inside functions and so cannot
+# break the docs build: utide, huggingface_hub (comp), mpi4py, oct2py.
+# Not mocked because they are core install_requires: imageio, datatree
+# (xarray-datatree), slurmpy, tcpyPI (tcpypi), hydra/omegaconf.
+autodoc_mock_imports = [
+    "tensorflow",
+    "tensorflow_probability",
+    "trieste",
+    "gpflow",
+    "intake",
+    "xmip",
+    "xesmf",
+    "cdsapi",
+    "dask_mpi",
+    "dask_jobqueue",
+    "adcircpy",
+    "numba",
+]
 
 # mathjax.
 
@@ -68,7 +101,16 @@ templates_path = ["_templates"]
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+# README.md, lang.txt and requirements.txt are docs-tooling files, not
+# documentation sources (they otherwise trigger "not in any toctree" warnings).
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "README.md",
+    "lang.txt",
+    "requirements.txt",
+]
 
 
 # filetype mapping
@@ -91,8 +133,9 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 
-# html_static_path = ["_static"]
-html_static_path = [Path("_static")]
+# No custom static files are shipped; an empty list avoids the sphinx warning
+# about a nonexistent _static directory.
+html_static_path = []
 
 
 # html_logo = "images/geograph_logo.png"
@@ -100,7 +143,6 @@ html_static_path = [Path("_static")]
 html_theme_options = {
     "style_nav_header_background": "#a0a0a0",
     "logo_only": True,
-    "display_version": True,
 }
 
 # html_favicon = 'images/geograph_logo_small.png'

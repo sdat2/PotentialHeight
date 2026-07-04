@@ -337,10 +337,12 @@ def calculate_pi(
     out_ds.attrs["V_reduc"] = V_reduc
     out_ds.attrs["CKCD"] = CKCD
     out_ds.attrs["ptop"] = PTOP
-    ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
+    # NB: attach provenance to out_ds (the dataset that is saved), not the
+    # discarded input ds — previously these attrs were silently lost.
+    out_ds.attrs["pi_calculated_at_git_hash"] = get_git_revision_hash(
         path=str(PROJECT_PATH)
     )
-    ds.attrs["pi_calculated_at_time"] = time_stamp()
+    out_ds.attrs["pi_calculated_at_time"] = time_stamp()
     # print("Calculated potential intensity:", out_ds)
 
     return standard_name_to_long_name(out_ds)

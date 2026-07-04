@@ -273,8 +273,13 @@ def plot_gps(
 
 if __name__ == "__main__":
     # python -m adbo.ani
+    from adforce.constants import DATA_ROOT
+
+    # previously "/work/n02/n02/sdat2/adcirc-swan/exp/old/2d-ani-new-redo-4"
+    path_in = os.path.join(DATA_ROOT, "exp", "old", "2d-ani-new-redo-4")
+    print("Resolved path_in:", path_in)
     plot_gps(
-        path_in="/work/n02/n02/sdat2/adcirc-swan/exp/old/2d-ani-new-redo-4",
+        path_in=path_in,
         add_name="",
         plot_acq=True,
         save_pdf={

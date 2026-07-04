@@ -18,6 +18,10 @@ sphinx:
 # Optionally set the version of Python and requirements required to build your docs
 python:
    install:
+    # Core install only — deliberately NO heavy extras ([bo]/[cmip]/[mpi]/
+    # [comp] in setup.py): tensorflow/trieste, intake/xesmf, mpi4py etc. are
+    # not needed to build the docs and should be mocked via
+    # autodoc_mock_imports in docs/conf.py instead.
     - method: pip
       path: .
     - requirements: docs/requirements.txt
