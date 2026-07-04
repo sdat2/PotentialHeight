@@ -6,6 +6,7 @@ are easier to use/test without waiting for tensorflow to load.
 
 from typing import Callable, Optional, List, Tuple
 import os
+import copy
 import json
 import yaml
 import numpy as np
@@ -102,6 +103,27 @@ def objective_f(
     exp_dir = cfg["exp_dir"]
     print("dimension_inputs", dimension_inputs)
 
+    # Size--intensity tradeoff mode: when "vmax" is a BO dimension, each
+    # sampled intensity gets its own CLE15 profile generated on the potential
+    # size curve r(V) (see w22.tradeoff), instead of the fixed profile_name.
+    tradeoff_curve = None
+    if "vmax" in cfg["constraints"]["order"]:
+        # lazy import: pulls in the numba CLE15 kernels, only needed here
+        from w22.tradeoff import TradeoffCurve
+
+        if not cfg.get("curve_path"):
+            raise ValueError(
+                "constraints include 'vmax' but no curve_path was supplied; "
+                "generate one with w22.tradeoff.generate_curve and pass it "
+                "to run_bayesopt_exp(curve_path=...)."
+            )
+        tradeoff_curve = TradeoffCurve.from_file(cfg["curve_path"])
+        print(
+            f"objective_f: size-intensity tradeoff mode, curve "
+            f"{cfg['curve_path']} (vmax in [{tradeoff_curve.v_min:.2f}, "
+            f"{tradeoff_curve.v_max:.2f}] m/s gradient wind)"
+        )
+
     # When resuming an interrupted experiment, reload the ledger of completed
     # evaluations so that (a) call numbering continues after the last completed
     # run instead of overwriting exp_0000 onwards, and (b) previously saved
@@ -185,13 +207,26 @@ def objective_f(
             wrap_cfg.files.run_folder = tmp_dir
             # delete fort.22.nc after run
             wrap_cfg.files.low_storage = True
-            wrap_cfg.tc.profile_name.value = cfg["profile_name"]
+            if tradeoff_curve is not None:
+                # storm on the size-intensity tradeoff curve: generate the
+                # CLE15 profile for this sampled intensity and store it in
+                # the run folder (self-describing provenance; fort22 accepts
+                # a direct .json path in place of a profile name).
+                profile_json = os.path.join(tmp_dir, "profile.json")
+                tradeoff_curve.profile(inputs["vmax"], out_path=profile_json)
+                wrap_cfg.tc.profile_name.value = profile_json
+            else:
+                wrap_cfg.tc.profile_name.value = cfg["profile_name"]
             wrap_cfg.adcirc.attempted_observation_location.value = [
                 cfg["obs_lon"],
                 cfg["obs_lat"],
             ]
             wrap_cfg.adcirc["resolution"].value = cfg["resolution"]
             for inp in inputs:
+                if inp == "vmax":
+                    # handled above via the tradeoff-curve profile; not a
+                    # track parameter in the adforce tc config
+                    continue
                 if inp != "displacement":
                     if inp == "trans_speed":
                         wrap_cfg.tc["translation_speed"].value = inputs[inp]
@@ -762,6 +797,7 @@ def run_bayesopt_exp(
     kernel: str = "Matern52",  # Matern32, Matern52, SE
     wrap_test: bool = False,
     resume: bool = True,
+    curve_path: Optional[str] = None,
 ) -> None:
     """
     Run a Bayesian Optimisation experiment.
@@ -785,7 +821,50 @@ def run_bayesopt_exp(
         resume (bool, optional): Whether to resume a partially-completed
             experiment by reusing the ADCIRC evaluations already saved on disk
             (see ``rebuild_initial_data``). Defaults to True.
+        curve_path (Optional[str], optional): Path to a stored size-intensity
+            tradeoff curve (``w22.tradeoff.generate_curve``). Required when
+            the constraints include a "vmax" dimension: each BO sample then
+            gets a CLE15 profile generated at its sampled intensity on the
+            curve, and missing vmax bounds are filled from the curve domain
+            ([Cat-1, potential intensity], gradient wind). Defaults to None.
     """
+    if "vmax" in constraints["order"]:
+        # avoid mutating a shared constraints dict (e.g. module default)
+        constraints = copy.deepcopy(constraints)
+        if curve_path is None:
+            raise ValueError(
+                "constraints include 'vmax' but curve_path is None; generate "
+                "a tradeoff curve with w22.tradeoff.generate_curve first."
+            )
+        # lazy import: pulls in the numba CLE15 kernels
+        from w22.tradeoff import TradeoffCurve
+
+        _curve = TradeoffCurve.from_file(curve_path)
+        vmax_c = constraints.setdefault("vmax", {})
+        # fill missing bounds from the curve; clip explicit ones to its domain
+        vmax_c["min"] = (
+            _curve.v_min
+            if vmax_c.get("min") is None
+            else max(float(vmax_c["min"]), _curve.v_min)
+        )
+        vmax_c["max"] = (
+            _curve.v_max
+            if vmax_c.get("max") is None
+            else min(float(vmax_c["max"]), _curve.v_max)
+        )
+        vmax_c.setdefault("units", "m/s (gradient wind)")
+        if vmax_c["min"] >= vmax_c["max"]:
+            raise ValueError(
+                f"Empty vmax range [{vmax_c['min']}, {vmax_c['max']}] after "
+                f"clipping to the curve domain [{_curve.v_min:.2f}, "
+                f"{_curve.v_max:.2f}] m/s."
+            )
+        print(
+            f"run_bayesopt_exp: vmax dimension in "
+            f"[{vmax_c['min']:.2f}, {vmax_c['max']:.2f}] m/s (gradient wind), "
+            f"profiles from {curve_path}"
+        )
+
     if root_exp_direc is None:
         root_exp_direc = os.environ.get(EXP_DIR_ENV_VAR, EXP_PATH)
         print(
@@ -808,6 +887,7 @@ def run_bayesopt_exp(
         "resolution": resolution,
         "exp_dir": direc,
         "resume": resume,
+        "curve_path": curve_path,
     }
 
     if run_exists(exp_name, num_runs=num_total_runs, root_exp_direc=root_exp_direc):

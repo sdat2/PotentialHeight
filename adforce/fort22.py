@@ -486,9 +486,16 @@ def create_fort22(nc_path: str, grid_config: dict, tc_config: dict) -> None:
     # Create a new netCDF4 file
     ds = nc.Dataset(os.path.join(nc_path, "fort.22.nc"), "w", format="NETCDF4")
     if "profile_name" in tc_config:
-        tc_config["profile_path"]["value"] = os.path.join(
-            CLE_DATA_PATH, f"{tc_config['profile_name']['value']}.json"
-        )
+        profile_name = str(tc_config["profile_name"]["value"])
+        if profile_name.endswith(".json"):
+            # a direct path to a profile JSON (e.g. a per-sample profile
+            # written into the run folder by the adbo tradeoff-curve loop)
+            tc_config["profile_path"]["value"] = profile_name
+        else:
+            # a bare name resolved against the shared w22 data directory
+            tc_config["profile_path"]["value"] = os.path.join(
+                CLE_DATA_PATH, f"{profile_name}.json"
+            )
         print("TC profile path", tc_config["profile_path"]["value"])
     # Create the "Main" group (rank 1)
     main_group = ds.createGroup("Main")

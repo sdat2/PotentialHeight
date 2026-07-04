@@ -51,11 +51,6 @@ Some plotting entry points are driven from commented-out calls in the module
 `__main__` blocks (noted below); uncomment the relevant call and run
 `python -m <module>`.
 
-Figures 1 (methodology schematic) and 4 (Bayesian-optimization flow chart) are
-TikZ diagrams drawn directly in the paper source — no repository script.
-Tables 1 (abbreviations) and 2 (framework parameters) are hand-written in the
-paper source.
-
 ### Main text
 
 | Paper item | Command | Key inputs | Output | SLURM job |

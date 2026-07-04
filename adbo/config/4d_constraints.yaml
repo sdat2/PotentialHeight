@@ -1,0 +1,30 @@
+# 4D Bayesian-optimization constraints: the 3D track parameters plus the
+# storm intensity "vmax" (maximum gradient-level azimuthal wind, m/s).
+# With a vmax dimension, run_bayesopt_exp requires curve_path pointing at a
+# stored size-intensity tradeoff curve (w22.tradeoff.generate_curve); each
+# sampled vmax then gets its CLE15 profile generated at the corresponding
+# potential size r(V), so every sampled storm lies on the tradeoff frontier.
+angle:
+  min: -80
+  max: 80
+  units: degrees
+trans_speed:
+  min: 0
+  max: 15
+  units: m/s
+displacement:
+  min: -2
+  max: 2
+  units: degrees
+vmax:
+  # null bounds are filled from the tradeoff curve domain:
+  # [Cat-1 (33 m/s at 10 m -> 33/v_reduc gradient), potential intensity V_p].
+  # Explicit numeric bounds are clipped to the curve domain.
+  min: null
+  max: null
+  units: m/s (gradient wind)
+order: # order of input features
+  - angle
+  - trans_speed
+  - displacement
+  - vmax
