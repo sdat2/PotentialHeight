@@ -276,8 +276,11 @@ def qair2rh(
             press = press
         else:
             raise ValueError("press units not recognized")
-    # saturation vapour pressure assuming temp in degC
-    # and using buck equation
+    # saturation vapour pressure assuming temp in degC.
+    # NOTE: this is the Bolton (1980) Magnus-type approximation, NOT the
+    # Arden Buck equation implemented in buck_sat_vap_pressure() above;
+    # the two agree to well under 1% over 0-40 degC (see
+    # tests/test_thermo_consistency.py), but don't let them drift further.
     es = 6.112 * np.exp(17.67 * temp / (temp + 243.5))
     # vapour pressure from specific humidity
     e = qair * press / (0.378 * qair + 0.622)

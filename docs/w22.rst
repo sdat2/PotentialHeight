@@ -60,10 +60,10 @@ w22.stats2 module
    :undoc-members:
    :show-inheritance:
 
-w22.test module
----------------
+w22.test_figures module
+-----------------------
 
-.. automodule:: w22.test
+.. automodule:: w22.test_figures
    :members:
    :undoc-members:
    :show-inheritance:

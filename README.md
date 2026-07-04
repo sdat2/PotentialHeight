@@ -22,7 +22,7 @@ Calculates tropical cyclone potential size following Wang et al. (2022). The imp
 # Calculate example potential sizes
 python -m w22.ps
 # Run tests against W22
-python -m w22.test
+python -m w22.test_figures
 ```
 
 ### `cle15`
@@ -78,6 +78,10 @@ Key scripts:
 python -m adbo.exp_1d --test True --exp_name test
 ```
 
+### `comp`
+
+ - Compare the outputs of adforce to tidal gauges from the historical record.
+
 ### `worst`
 
 Statistical worst-case GEV fit with `scipy` (`sci.py`) and `tensorflow` (`tens.py`). Explores the effect of knowing the upper bound ahead of time on sampling uncertainty and bias. Uses `hydra` for config management.
@@ -99,6 +103,7 @@ Early-stage work on a graph neural network (GNN) emulator for storm surge, train
 adbo/        Bayesian optimization loop (trieste)
 adforce/     ADCIRC wrapper and forcing utilities
 cle15/       CLE15 wind profile implementations (pure-Python & Numba)
+comp/        Compare adforce to tidal gauges.
 data/        Key input data (fort.22.nc, IBTrACS, ERA5, CMIP6, etc.)
 docs/        ReadTheDocs source
 img/         Key figures

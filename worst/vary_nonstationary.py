@@ -351,9 +351,17 @@ def run_single_experiment(
         fit=fit_cfg,
         verbose=bool(config.verbose),
     )
+    # The elementwise clip above keeps z*(t) >= data(t), but the *mean* bound
+    # handed to the stationary fit can still fall below the sample maximum,
+    # which leaves no feasible parameters. Clip it to the empirical max plus
+    # padding, as in vary_noise.py.
+    z_star_assumed_stationary = max(
+        float(np.mean(z_star_assumed_t)),
+        float(data.max()) + float(config.upper_bound_padding),
+    )
     alpha_sb, beta_sb, gamma_sb = fit_stationary_bounded(
         data,
-        float(np.mean(z_star_assumed_t)),
+        z_star_assumed_stationary,
         fit=fit_cfg,
         verbose=bool(config.verbose),
     )
@@ -414,6 +422,7 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
     rv_est = np.full((len(FIT_NAMES), len(quantiles), len(seeds), len(trends)), np.nan)
     rv_true = np.full((len(quantiles), len(seeds), len(trends)), np.nan)
 
+    n_failed = 0
     for i_trend, trend in enumerate(tqdm(trends, desc="Trend")):
         for i_seed, seed in enumerate(seeds):
             try:
@@ -426,10 +435,18 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
                 rv_est[:, :, i_seed, i_trend] = est
                 rv_true[:, i_seed, i_trend] = tru
             except Exception as exc:
+                n_failed += 1
                 if config.verbose:
                     print(
                         f"Fit failed for trend={trend:.4f}, seed={seed}: {exc}",
                     )
+
+    n_experiments = len(seeds) * len(trends)
+    n_degenerate = int(np.isnan(rv_est).any(axis=(0, 1)).sum()) - n_failed
+    print(
+        f"Seed-experiments raising errors: {n_failed}/{n_experiments}; "
+        f"with degenerate (NaN) fits: {n_degenerate}/{n_experiments}"
+    )
 
     ds = xr.Dataset(
         data_vars={

@@ -81,6 +81,16 @@ def _fit_lbfgs_known(
 
     x0 = [float(np.log(max(beta_guess, 1e-3))), float(np.log(max(-gamma_guess, 1e-3)))]
     res = minimize(obj, x0, method="L-BFGS-B")
+    if not np.isfinite(res.fun) or res.fun >= 1e12:
+        # Degenerate fit: the optimizer never left the infeasible-penalty region
+        # (e.g. the assumed bound z* lies below the sample maximum, so every
+        # parameter choice gives zero likelihood). Return NaNs so downstream
+        # skipna reductions drop this fit instead of ingesting garbage values.
+        print(
+            f"Degenerate bounded GEV fit (nll={float(res.fun):.3g}, "
+            f"z_star={z_star:.4g}, data max={float(np.max(data)):.4g}); returning NaNs."
+        )
+        return float("nan"), float("nan"), float("nan")
     beta, gamma = float(np.exp(res.x[0])), float(-np.exp(res.x[1]))
     return float(alpha_from_z_star_beta_gamma(z_star, beta, gamma)), beta, gamma
 

@@ -4,9 +4,14 @@ Test solutions against Wang 2022 figure and paper data
 """
 
 import os
+import shutil
 import numpy as np
+import pytest
 import xarray as xr
 import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")  # non-interactive backend so tests can run headless
 import matplotlib.pyplot as plt
 from sithom.plot import plot_defaults, label_subplots
 from .constants import (
@@ -16,7 +21,6 @@ from .constants import (
     GAS_CONSTANT,
     GAS_CONSTANT_FOR_WATER_VAPOR,
 )
-from cle15.cle15m import run_cle15
 from .w22_carnot import wang_consts, wang_diff
 from .ps import point_solution_ps
 from .utils import buck_sat_vap_pressure
@@ -24,6 +28,31 @@ from .solve import bisection
 from .utils import absolute_angular_momentum, carnot_efficiency
 
 # need to compare w_pbl, wout, Q_s, -Q_gibbs, W_PBL surplus
+
+# Resource guards for pytest.mark.skipif: the figure reproduction tests need
+# the data digitized from the Wang (2022) figures, and test_figure_4 also
+# needs GNU Octave to run the original CLE15 implementation (cle15.cle15m).
+W22_DATA_PATH = os.path.join(DATA_PATH, "w22")
+OCTAVE_MISSING = shutil.which("octave") is None
+FIGURE_4_DATA_MISSING = [
+    name
+    for name in (
+        "4a-cle15.csv",
+        "4a-w22.csv",
+        "4b-Wpbl.csv",
+        "4b-Qs.csv",
+        "4b-Qgibbs.csv",
+        "4b-Wout.csv",
+        "4b-Wpbl-surplus.csv",
+    )
+    if not os.path.exists(os.path.join(W22_DATA_PATH, name))
+]
+FIGURE_5_DATA_MISSING = [
+    name
+    for name in ("5a-vp-div-f.csv", "5a-vcarnot-div-f.csv")
+    if not os.path.exists(os.path.join(W22_DATA_PATH, name))
+]
+RUN_SLOW_TESTS = os.environ.get("W22_SLOW_TESTS", "0").lower() in ("1", "true")
 
 
 def w_out(
@@ -190,7 +219,22 @@ def v_carnot(
     )
 
 
+@pytest.mark.skipif(
+    OCTAVE_MISSING,
+    reason="GNU Octave not found on PATH (required by cle15.cle15m.run_cle15)",
+)
+@pytest.mark.skipif(
+    bool(FIGURE_4_DATA_MISSING),
+    reason=f"Missing Wang (2022) digitized data files: {FIGURE_4_DATA_MISSING}",
+)
+@pytest.mark.skipif(
+    not RUN_SLOW_TESTS,
+    reason="Slow: ~95 Octave subprocess calls take minutes; set W22_SLOW_TESTS=1 "
+    "to run (test_wang_2022_canonical_point covers the fast numeric check)",
+)
 def test_figure_4():
+    from cle15.cle15m import run_cle15
+
     plot_defaults()
     # read csv test data
     cle15_test = pd.read_csv(os.path.join(DATA_PATH, "w22", "4a-cle15.csv"))
@@ -507,6 +551,57 @@ def test_figure_4():
     plt.close()
 
 
+def test_wang_2022_canonical_point():
+    """Golden-value test for the canonical Wang (2022) example of figure 4a.
+
+    Uses the pure python/numba CLE15 implementation (cle15.cle15n) via
+    point_solution_ps, so it needs no Octave and no input data files.
+    Inputs (as in test_figure_4): w_cool = 0.002 m s-1, supergradient
+    factor = 1.2, vmax = 83 m s-1, T0 = 200 K, Ts = SST - 1 = 299 K,
+    environmental humidity = 0.9, msl = 1015 mbar, rho_air = 1.225 kg m-3,
+    fcor = 5e-5 s-1. Wang (2022) finds r0 = 2193 km, rmax = 64 km and
+    pm = 944 mbar for this case.
+    """
+    omega = 2 * np.pi / (60 * 60 * 24)
+    lat = np.degrees(np.arcsin(5e-5 / (2 * omega)))
+    vsg = 83 / 1.2  # vmax = 83 m s-1, supergradient factor = 1.2
+    soln_ds = point_solution_ps(
+        xr.Dataset(
+            data_vars={
+                "sst": 300 - TEMP_0K,  # deg C
+                "supergradient_factor": 1.2,  # dimensionless
+                "t0": 200,  #  K
+                "w_cool": 0.002,  # m s-1
+                "vmax": vsg,  # m s-1
+                "msl": 1015,  # mbar
+                "rho_air": 1.225,  # kg m-3
+                "env_humidity": 0.9,
+                "cd_ck": 1,
+                "cd": 0.0015,
+            },
+            coords={"lat": lat},
+        ),
+        pressure_assumption="isothermal",
+    )
+    r0_km = float(soln_ds.r0.values) / 1000
+    rmax_km = float(soln_ds.rmax.values) / 1000
+    pm_mbar = float(soln_ds.pm.values) / 100
+    pc_mbar = float(soln_ds.pc.values) / 100
+    # (a) loose check against the values quoted in Wang (2022)
+    assert np.isclose(r0_km, 2193, rtol=0.05), f"r0 {r0_km} km != W22 2193 km"
+    assert np.isclose(rmax_km, 64, rtol=0.10), f"rmax {rmax_km} km != W22 64 km"
+    assert np.isclose(pm_mbar, 944, atol=5), f"pm {pm_mbar} mbar != W22 944 mbar"
+    # (b) tight regression pins on our numba solution to catch numerical drift
+    assert np.isclose(r0_km, 2136.94, atol=2.0), f"r0 {r0_km} km drifted"
+    assert np.isclose(rmax_km, 59.14, atol=0.5), f"rmax {rmax_km} km drifted"
+    assert np.isclose(pm_mbar, 940.44, atol=0.5), f"pm {pm_mbar} mbar drifted"
+    assert np.isclose(pc_mbar, 880.84, atol=0.5), f"pc {pc_mbar} mbar drifted"
+
+
+@pytest.mark.skipif(
+    bool(FIGURE_5_DATA_MISSING),
+    reason=f"Missing Wang (2022) digitized data files: {FIGURE_5_DATA_MISSING}",
+)
 def test_figure_5():
     from matplotlib.ticker import FuncFormatter, MultipleLocator
 
@@ -725,7 +820,7 @@ def make_matlab_v_python_plot(add_name: str = ""):
 
 
 # if __name__ == "__main__":
-# python -m w22.test --name archer2-slurm
+# python -m w22.test_figures --name archer2-slurm
 # test_figure_4()
 # test_figure_5()
 # import argparse
@@ -737,7 +832,11 @@ def make_matlab_v_python_plot(add_name: str = ""):
 
 
 if __name__ == "__main__":
-    # python -m w22.test
+    # python -m w22.test_figures
 
     print(v_carnot())
-    make_matlab_v_python_plot()
+    test_wang_2022_canonical_point()
+    if not FIGURE_5_DATA_MISSING:
+        test_figure_5()
+    if os.path.exists(os.path.join(DATA_PATH, "cle15", "octave-vs-python.csv")):
+        make_matlab_v_python_plot()

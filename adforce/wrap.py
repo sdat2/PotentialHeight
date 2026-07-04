@@ -15,7 +15,19 @@ from .config import save_config
 
 
 def observe_max_point(cfg: DictConfig) -> float:
-    """Observe the ADCIRC model."""
+    """Observe the ADCIRC model.
+
+    Args:
+        cfg (DictConfig): configuration.
+
+    Returns:
+        float: max water level at the node nearest the observation point.
+
+    Raises:
+        ValueError: If the max water level is NaN or unphysically large
+            (e.g. a netCDF fill value like 9.96921e36), indicating a
+            failed or dry ADCIRC run.
+    """
     mele_ds = xr_loader(os.path.join(cfg.files.run_folder, "maxele.63.nc"))
     # print("mele_ds", mele_ds)
     xs = mele_ds.x.values
@@ -36,6 +48,15 @@ def observe_max_point(cfg: DictConfig) -> float:
         mele_ds.isel(node=min_p)["depth"].values,
         " m",
     )
+
+    # guard against NaN/netCDF fill values (e.g. 9.96921e36) from failed or dry runs
+    if not np.isfinite(maxele) or abs(maxele) >= 100:
+        raise ValueError(
+            f"Invalid max water level {maxele} m at node {min_p} "
+            f"(lon, lat) = ({point[0]}, {point[1]}) "
+            f"for run folder {cfg.files.run_folder}: "
+            "ADCIRC run probably failed or the observation point stayed dry."
+        )
 
     return maxele
 
@@ -106,7 +127,7 @@ def main(cfg: DictConfig) -> float:
     Returns:
         float: float.
     """
-    cfg["name"] == str(cfg["name"])
+    cfg["name"] = str(cfg["name"])  # ensure name is a string (hydra may parse it as int)
     cfg.files["run_folder"] = os.path.join(str(cfg.files.exp_path), str(cfg.name))
     return idealized_tc_observe(cfg)
 

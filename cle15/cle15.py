@@ -1805,7 +1805,7 @@ if __name__ == "__main__":
 
         pp = (
             pressure_from_wind(
-                rr, VV, p0=1000 * 100, fcor=fcor_in, rho0=RHO_AIR_DEFAULT
+                rr, VV, p0=BACKGROUND_PRESSURE, fcor=fcor_in, rho0=RHO_AIR_DEFAULT
             )
             / 100
         )

@@ -10,6 +10,12 @@ def pressures_profile(  # add pressure profile to wind profile
     rr: np.ndarray,  # radii [m]
     vv: np.ndarray,  # wind speeds [m/s]
     fcor: float = 5e-5,  # fcor [s-1] = 2 * omega * sin(lat)
+    # NOTE: these defaults differ from w22.constants (BACKGROUND_PRESSURE =
+    # 1016 hPa, RHO_AIR_DEFAULT = 1.225 kg m-3). They only matter on the
+    # fallback path in read_profile() when a CLE profile JSON lacks a "p"
+    # key; profiles written by w22/cle15 carry their own pressures. If that
+    # fallback is ever load-bearing, unify these with w22.constants first
+    # (the ~6% rho0 difference scales the pressure deficit almost linearly).
     p0: float = 1015 * 100,  # [Pa]
     rho0: float = 1.15,  # [kg m-3]
 ) -> np.ndarray:

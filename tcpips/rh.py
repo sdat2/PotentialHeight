@@ -20,7 +20,12 @@ def saturation_pressure(temperature: float) -> float:
     Returns:
         float: Saturation pressure in hPa.
     """
-    # Constants for the Magnus-Tetens approximation
+    # Constants for the Magnus-Tetens approximation.
+    # NOTE: this deliberately simple approximation differs slightly from the
+    # Arden Buck equation used in w22.utils.buck_sat_vap_pressure (and the
+    # Bolton 1980 form inlined in w22.utils.qair2rh); all three agree to
+    # within ~1-2% over 0-40 degC (guarded by tests/test_thermo_consistency.py).
+    # If precision ever matters here, consolidate on one shared implementation.
     a = 6.1078  # hPa
     b = 17.1
     c = 235  # degrees Celsius

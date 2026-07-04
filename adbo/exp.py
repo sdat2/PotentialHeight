@@ -179,7 +179,18 @@ def objective_f(
                     file.write(yaml_str)
             else:
                 # wrap_cfg.tc["displacement"].value = x
-                real_result = idealized_tc_observe(wrap_cfg)
+                try:
+                    real_result = idealized_tc_observe(wrap_cfg)
+                except ValueError as e:
+                    # fail loudly rather than feeding NaN/fill values to the GP
+                    print(
+                        f"Rejected run: call_number={call_number}, "
+                        f"run_folder={tmp_dir}, query={inputs}, error={e}"
+                    )
+                    raise ValueError(
+                        f"BayesOpt objective failed at query point {inputs} "
+                        f"(call_number={call_number}, run_folder={tmp_dir})"
+                    ) from e
                 # out_path=tmp_dir,
                 # profile_name=profile_name,
                 # resolution=resolution,

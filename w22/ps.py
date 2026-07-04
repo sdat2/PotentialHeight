@@ -22,8 +22,6 @@ from .constants import (
     DATA_PATH,
     PROJECT_PATH,
     W_COOL_DEFAULT,
-    GAS_CONSTANT,
-    GAS_CONSTANT_FOR_WATER_VAPOR,
     SUPERGRADIENT_FACTOR,
     LOWER_RADIUS_BISECTION,
     UPPER_RADIUS_BISECTION,
@@ -266,11 +264,9 @@ def calculate_ps13_ufunc(
     coriolis_parameter = abs(coriolis_parameter_from_lat(lat))
     near_surface_air_temperature = sst + TEMP_0K - TEMP_DIFF
     water_vapour_pressure = rh * buck_sat_vap_pressure(near_surface_air_temperature)
-    rho_air = (p_a * 100 - water_vapour_pressure) / (
-        GAS_CONSTANT * near_surface_air_temperature
-    ) + water_vapour_pressure / (
-        GAS_CONSTANT_FOR_WATER_VAPOR * near_surface_air_temperature
-    )
+    # shared helper (same formula as before); keeps this in lockstep with
+    # the other call sites if the moist-air density calculation ever changes
+    rho_air = rho_air_f(p_a, near_surface_air_temperature, water_vapour_pressure)
 
     def try_for_r0_v(r0: float, vmax: float):
         pm_cle, rmax_cle, _ = run_cle15(

@@ -350,6 +350,11 @@ def gen_ps_f(
 def add_psfc_u10(
     ds: nc.Dataset,
     tc_config: Optional[dict] = None,
+    # NOTE: only used for blank (tc_config=None) fields. Differs from the
+    # ambient pressure assumed elsewhere (w22.constants.BACKGROUND_PRESSURE =
+    # 1016 hPa; adforce.profile fallback = 1015 hPa; profile far-field comes
+    # from the CLE profile itself). If blank and profile-driven grids are
+    # ever mixed in one fort.22.nc, unify these to avoid a pressure seam.
     background_pressure: float = 1010,
     v_reduc: float = 0.8,
     geoid: Literal["pyproj", "sphere"] = "sphere",
