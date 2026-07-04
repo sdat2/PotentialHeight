@@ -123,6 +123,74 @@ def test_curve_file_roundtrip(curve_dataset, tmp_path) -> None:
     assert loaded.r0(v_mid) > loaded.rmax(v_mid) > 0
 
 
+def test_env_from_point_ds(tmp_path) -> None:
+    """Environment extraction from a synthetic point_timeseries product."""
+    import pandas as pd
+    import xarray as xr
+
+    from w22.tradeoff import env_from_point_ds
+
+    times = pd.to_datetime(["2025-08-15", "2097-08-15"])
+    ds = xr.Dataset(
+        data_vars={
+            "vmax_3": (["time"], [83.0, 90.0]),
+            "msl": (["time"], [1015.0, 1013.0]),
+            "sst": (["time"], [26.85, 29.0]),
+            "t0": (["time"], [200.0, 198.0]),
+            "rh": (["time"], [90.0, 85.0]),  # percent-formatted on purpose
+        },
+        coords={"time": times, "lat": 29.5, "lon": -90.0},
+    )
+    env = env_from_point_ds(ds, 2025)
+    assert env["vmax"] == 83.0
+    assert env["lat"] == 29.5
+    assert abs(env["rh"] - 0.9) < 1e-9, "percent rh should be converted"
+    env97 = env_from_point_ds(ds, 2097)
+    assert env97["vmax"] == 90.0
+    with pytest.raises(ValueError):
+        env_from_point_ds(ds, 2050)
+    # file path input also works
+    path = os.path.join(tmp_path, "point.nc")
+    ds.to_netcdf(path)
+    assert env_from_point_ds(path, 2025) == env
+
+
+def test_sweep_vmax_wrap_test(curve_dataset, tmp_path) -> None:
+    """1D intensity sweep in wrap_test mode: ledger, profiles, and resume."""
+    from adbo.plot_tradeoff import plot_vmax_sweep
+    from adbo.sweep_vmax import sweep_vmax
+
+    curve_nc = os.path.join(tmp_path, "curve.nc")
+    curve_dataset.to_netcdf(curve_nc)
+    ledger = sweep_vmax(
+        curve_nc=curve_nc,
+        exp_name="sweep_smoke",
+        num=4,
+        root_exp_direc=str(tmp_path),
+        wrap_test=True,
+    )
+    assert len(ledger) == 4
+    v_lo = CAT1_10M / V_REDUC_DEFAULT
+    vmaxes = [rec["vmax"] for rec in ledger.values()]
+    assert np.isclose(min(vmaxes), v_lo) and np.isclose(max(vmaxes), ENV["vmax"])
+    exp_dir = os.path.join(tmp_path, "sweep_smoke")
+    for i in range(4):
+        assert os.path.exists(os.path.join(exp_dir, f"exp_{i:04}", "profile.json"))
+    # resume: a second call runs nothing new but returns the full ledger
+    ledger2 = sweep_vmax(
+        curve_nc=curve_nc,
+        exp_name="sweep_smoke",
+        num=4,
+        root_exp_direc=str(tmp_path),
+        wrap_test=True,
+        resume=True,
+    )
+    assert ledger2.keys() == ledger.keys()
+    # the sweep plot renders from the ledger
+    fig = plot_vmax_sweep(exp_dir)
+    assert os.path.exists(fig)
+
+
 def test_4d_bo_wrap_test_smoke(curve_dataset, tmp_path) -> None:
     """End-to-end 4D BO in wrap_test mode: each sample gets an on-curve
     profile.json in its run folder and vmax lands in the ledger."""
@@ -171,3 +239,8 @@ def test_4d_bo_wrap_test_smoke(curve_dataset, tmp_path) -> None:
         bo_cfg = json.load(f)
     assert bo_cfg["curve_path"] == curve_nc
     assert bo_cfg["constraints"]["vmax"]["min"] is not None
+    # the 4D-samples plot renders from the ledger + bo-config
+    from adbo.plot_tradeoff import plot_4d_samples
+
+    fig = plot_4d_samples(exp_dir)
+    assert os.path.exists(fig)

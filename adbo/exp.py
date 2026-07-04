@@ -41,6 +41,7 @@ from sithom.io import write_json
 import matplotlib.pyplot as plt
 from adforce.wrap import idealized_tc_observe, get_default_config
 from adforce.constants import NEW_ORLEANS
+from .wrap_utils import build_wrap_config
 from .ani import plot_gps
 from .rescale import rescale_inverse
 from .constants import FIGURE_PATH, EXP_PATH, CONFIG_PATH, PROJECT_PATH
@@ -199,44 +200,12 @@ def objective_f(
                 name: float(real_queries[i][j])
                 for j, name in enumerate(cfg["constraints"]["order"])
             }
-            wrap_cfg = get_default_config()
-
-            print("read config", wrap_cfg)
             # I want to generalize this so it's relative to the observation point not New Orleans
             tmp_dir = temp_dir()
-            wrap_cfg.files.run_folder = tmp_dir
-            # delete fort.22.nc after run
-            wrap_cfg.files.low_storage = True
-            if tradeoff_curve is not None:
-                # storm on the size-intensity tradeoff curve: generate the
-                # CLE15 profile for this sampled intensity and store it in
-                # the run folder (self-describing provenance; fort22 accepts
-                # a direct .json path in place of a profile name).
-                profile_json = os.path.join(tmp_dir, "profile.json")
-                tradeoff_curve.profile(inputs["vmax"], out_path=profile_json)
-                wrap_cfg.tc.profile_name.value = profile_json
-            else:
-                wrap_cfg.tc.profile_name.value = cfg["profile_name"]
-            wrap_cfg.adcirc.attempted_observation_location.value = [
-                cfg["obs_lon"],
-                cfg["obs_lat"],
-            ]
-            wrap_cfg.adcirc["resolution"].value = cfg["resolution"]
-            for inp in inputs:
-                if inp == "vmax":
-                    # handled above via the tradeoff-curve profile; not a
-                    # track parameter in the adforce tc config
-                    continue
-                if inp != "displacement":
-                    if inp == "trans_speed":
-                        wrap_cfg.tc["translation_speed"].value = inputs[inp]
-                    else:
-                        wrap_cfg.tc[inp].value = inputs[inp]
-                if inp == "displacement":
-                    wrap_cfg.tc.impact_location.value = [
-                        cfg["obs_lon"] + inputs["displacement"],
-                        cfg["obs_lat"],
-                    ]
+            wrap_cfg = build_wrap_config(
+                cfg, inputs, tmp_dir, tradeoff_curve=tradeoff_curve
+            )
+            print("read config", wrap_cfg)
             # if "displacement" in inputs:
             #    # assume impact lon relative to New Orleans
             #    inputs["impact_lon"] = NEW_ORLEANS.lon + inputs["displacement"]

@@ -206,6 +206,69 @@ def generate_curve(
     return path
 
 
+def env_from_point_ds(
+    ds_or_path,
+    year: int,
+    lat: Optional[float] = None,
+) -> dict:
+    """Extract a tradeoff-curve environment from a point-timeseries dataset.
+
+    Works with the August point files written by ``w22.ps_runs.point_timeseries``
+    (``w22/data/{place}_august_{exp}_{model}_{member}_{assumption}_pi{v}new.nc``),
+    which carry the potential-size inputs (``sst`` [degC], ``msl`` [mbar],
+    ``rh`` [0-1], ``t0`` [K]) alongside the potential intensity (``vmax_3``
+    or ``vmax``, gradient level).
+
+    Args:
+        ds_or_path: An ``xr.Dataset`` or a path to one.
+        year (int): Calendar year to select (nearest time step is used).
+        lat (float, optional): Latitude override [degN]. Defaults to the
+            dataset's ``lat`` coordinate.
+
+    Returns:
+        dict: Environment for :func:`tradeoff_ds` /
+            :func:`generate_curve`.
+    """
+    ds = (
+        xr.open_dataset(ds_or_path)
+        if isinstance(ds_or_path, (str, os.PathLike))
+        else ds_or_path
+    )
+    years = np.array([int(str(t)[:4]) for t in np.asarray(ds.time.values)])
+    if year not in years:
+        raise ValueError(
+            f"env_from_point_ds: year {year} not in dataset years "
+            f"[{years.min()}-{years.max()}]"
+        )
+    tp = ds.isel(time=int(np.argmax(years == year)))
+
+    pi_name = "vmax_3" if "vmax_3" in tp else "vmax"
+    missing = [k for k in (pi_name, "msl", "sst", "t0", "rh") if k not in tp]
+    if missing:
+        raise ValueError(
+            f"env_from_point_ds: dataset missing variables {missing}; "
+            "expected a point_timeseries product with the PS inputs retained."
+        )
+    if lat is None:
+        if "lat" not in ds.coords:
+            raise ValueError(
+                "env_from_point_ds: no lat coordinate; pass lat= explicitly."
+            )
+        lat = float(ds["lat"].values)
+
+    rh = float(tp["rh"].values)
+    if rh > 1.5:  # tolerate percent-formatted rh
+        rh /= 100.0
+    return {
+        "vmax": float(tp[pi_name].values),
+        "msl": float(tp["msl"].values),
+        "sst": float(tp["sst"].values),
+        "t0": float(tp["t0"].values),
+        "lat": lat,
+        "rh": rh,
+    }
+
+
 class TradeoffCurve:
     """Interpolated size--intensity tradeoff curve with profile generation.
 

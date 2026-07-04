@@ -81,6 +81,8 @@ Typical resources: 1 node × 128 tasks, `--time` 12–24 h unless noted.
 | `bo_along_coast.slurm` | same along-coast runs on the n02 account (currently batch "3" active, others commented) | along-coast reruns |
 | `n01_bo_m32_ei.slurm` | `adbo.exp_3d --exp_name=bo-m32-ei --kernel=Matern52 --daf=ei` | GP-kernel/acquisition comparison run |
 | `n01_create_test_set.slurm` | `python -m adbo.create_test_set` | potential-height test set (best BO run per location) for SurgeNet |
+| `sweep_v_no.slurm` | curve gen (`w22.tradeoff`) + `adbo.sweep_vmax` New Orleans {2025, 2097}, fixed track (**edit to the 3D optimum**) | 1D intensity sweep along the size-intensity tradeoff curve r(V) + `vmax_sweep.pdf` |
+| `bo_4d_no.slurm` | curve gen (`w22.tradeoff`) + `adbo.exp_4d` New Orleans {2025, 2097}, 35+35 samples | 4D BO (track + on-curve intensity) + `bo_4d_samples.pdf`; resumable on rerun |
 
 ## `worst` — EVT fits
 
