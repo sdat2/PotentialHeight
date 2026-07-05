@@ -340,7 +340,7 @@ def scatter(df: pd.DataFrame, paths: List[str]) -> None:
     ax.plot([0, m], [0, m], "k--", alpha=0.5, lw=0.8)
     if len(cln) > 1:
         sl, ic = np.polyfit(cln.obs_peak, cln.sim_peak, 1)
-        ax.plot([0, m], [ic, sl * m + ic], color="0.3", lw=1, label=f"fit (slope {sl:.2f})")
+        ax.plot([0, m], [ic, sl * m + ic], color="0.3", lw=1, label=f"Fit (slope {sl:.2f})")
     ax.set_xlim(0, m); ax.set_ylim(0, m)
     ax.set_aspect("equal")
     ax.set_xlabel("Observed peak residual [m]")
@@ -378,12 +378,14 @@ def plot_examples(panels: List[Tuple[str, str]], paths: List[str],
             ax.set_title(f"{letter}{gname} (no data)", fontsize=7, loc="left"); continue
         sim, obs = cache[storm][match[0]]
         tsr, _, _ = timeseries_skill(sim, obs)
-        ax.plot(sim.index, sim.values, color=OX_BLUE, lw=1.3, label="ADCIRC surge")
+        # contrasting pair (dark blue vs black was too similar): model in
+        # orange, observations in black — a colour-blind-safe combination
+        ax.plot(sim.index, sim.values, color="tab:orange", lw=1.3, label="ADCIRC surge")
         ax.plot(obs.index, obs.values, color="black", lw=0.9, label="NOAA residual")
         rtxt = "" if np.isnan(tsr) else f" ($r={tsr:.2f}$)"
         gauge = match[0][:24].rstrip(", ")            # trim long names without a dangling comma
         ax.set_title(f"{letter}{storm}: {gauge}{rtxt}", fontsize=7, loc="left")
-        ax.set_ylabel("surge [m]"); ax.grid(alpha=0.3)
+        ax.set_ylabel("Surge [m]"); ax.grid(alpha=0.3)
         # few, short date ticks ("Aug 24") instead of ~10 crowded "2005-08-24" labels
         ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=3, maxticks=5))
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))

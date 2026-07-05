@@ -731,7 +731,7 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
                             squeeze=False)
     for j, rp in enumerate(rps):
         ax = axs[0, j]
-        ax.plot(trends, true_mn.sel(rp=rp), color="black", lw=1.8, label="true")
+        ax.plot(trends, true_mn.sel(rp=rp), color="black", lw=1.8, label="True")
         ax.fill_between(trends, tlo.sel(rp=rp), thi.sel(rp=rp), color="black", alpha=0.10)
         for fit in ("nonstationary_unbounded", "nonstationary_bounded"):
             ax.plot(trends, est_mn.sel(fit=fit, rp=rp), color=_NS_COLORS[fit], lw=1.4,
@@ -742,9 +742,9 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
             ax.plot(trends, est_mn.sel(fit=fit, rp=rp), color=_NS_COLORS[fit],
                     lw=1.0, ls=":", label=FIT_LABELS[fit])
         ax.set_title(f"RV{int(rp)}")
-        ax.set_xlabel(r"upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
+        ax.set_xlabel(r"Upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
         ax.set_xlim(float(trends.min()), float(trends.max())); ax.margins(x=0)
-    axs[0, 0].set_ylabel("return value [m]")
+    axs[0, 0].set_ylabel("Return value [m]")
     axs[0, 0].legend(fontsize=7, loc="upper left")
     label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout()
@@ -762,10 +762,10 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
             axs[1, j].plot(trends, width.sel(fit=fit, rp=rp), **kw)
         axs[0, j].axhline(0.0, color="grey", ls="--", lw=0.8)
         axs[0, j].set_title(f"RV{int(rp)}")
-        axs[1, j].set_xlabel(r"upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
+        axs[1, j].set_xlabel(r"Upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
         for ax in (axs[0, j], axs[1, j]):
             ax.set_xlim(float(trends.min()), float(trends.max())); ax.margins(x=0)
-    axs[0, 0].set_ylabel("bias [m]")
+    axs[0, 0].set_ylabel("Bias [m]")
     axs[1, 0].set_ylabel("5--95% range [m]")
     legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")

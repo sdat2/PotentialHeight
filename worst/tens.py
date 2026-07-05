@@ -4,7 +4,7 @@ Sometimes breaks for no clear reason; in that case fit is retried 9 further time
 It is very unlikely that the optimization will fail 10 times in a row, so this should be sufficient.
 """
 
-from typing import Tuple
+from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
@@ -50,6 +50,8 @@ def _fit_lbfgs_not_known(
     force_weibull: bool,
 ) -> Tuple[float, float, float]:
     """L-BFGS MLE of (alpha, beta, gamma); beta>0 via log, gamma<0 if force_weibull."""
+    # float64 guard: finite-difference gradients stall on float32 inputs
+    data = np.asarray(data, dtype=np.float64)
 
     def obj(p: np.ndarray) -> float:
         alpha, beta = p[0], np.exp(p[1])
@@ -74,6 +76,8 @@ def _fit_lbfgs_known(
     gamma_guess: float,
 ) -> Tuple[float, float, float]:
     """L-BFGS MLE of (beta, gamma) with the upper bound fixed; alpha = z* + beta/gamma."""
+    # float64 guard: finite-difference gradients stall on float32 inputs
+    data = np.asarray(data, dtype=np.float64)
 
     def obj(p: np.ndarray) -> float:
         beta, gamma = np.exp(p[0]), -np.exp(p[1])  # beta>0, gamma<0
@@ -123,7 +127,10 @@ def gen_data(alpha: float, beta: float, gamma: float, n: int = 1000) -> np.ndarr
         np.ndarray: Generated sample data.
     """
     gev = tfd.GeneralizedExtremeValue(loc=alpha, scale=beta, concentration=gamma)
-    return gev.sample(n).numpy()
+    # float64: scipy L-BFGS-B's finite-difference gradients (eps ~1e-8) are
+    # meaningless on a float32-quantized likelihood surface and the fit can
+    # silently terminate at the initial guess.
+    return gev.sample(n).numpy().astype(np.float64)
 
 
 def _adam_optimizer(learning_rate: float):
@@ -151,7 +158,7 @@ def fit_gev_upper_bound_not_known(
     data: np.ndarray,
     opt_steps: int = 1000,
     lr: float = 0.01,
-    alpha_guess: float = 0.0,
+    alpha_guess: Optional[float] = None,
     beta_guess: float = 1.0,
     gamma_guess: float = -0.1,
     force_weibull: bool = False,
@@ -165,7 +172,10 @@ def fit_gev_upper_bound_not_known(
         data (np.ndarray): Data to fit the GEV distribution to.
         opt_steps (int, optional): Optimization steps. Defaults to 1000.
         lr (float, optional): Learning rate. Defaults to 0.01.
-        alpha_guess (float, optional): Initial location. Defaults to 0.0.
+        alpha_guess (Optional[float], optional): Initial location. Defaults to
+            None, meaning ``mean(data)`` — a fixed 0.0 start is a strawman
+            when the generating location is far from zero and can send the
+            unbounded fit to a spurious heavy-tailed optimum.
         beta_guess (float, optional): Initial scale. Defaults to 1.0.
         gamma_guess (float, optional): Initial concentration. Defaults to -0.1.
         force_weibull (bool, optional): Force gamma<0. Defaults to False.
@@ -174,6 +184,8 @@ def fit_gev_upper_bound_not_known(
     Returns:
         Tuple[float, float, float]: Estimated alpha, beta, gamma.
     """
+    if alpha_guess is None:
+        alpha_guess = float(np.mean(data))
     if method == "lbfgs":
         return _fit_lbfgs_not_known(data, alpha_guess, beta_guess, gamma_guess, force_weibull)
     if method != "adam":

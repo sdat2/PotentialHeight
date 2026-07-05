@@ -94,15 +94,20 @@ def observed_residual(station: str, lat: float, year: int,
     ``"pred"`` (CO-OPS predictions fallback) or ``"none"``.
     """
     import utide
-    from matplotlib.dates import date2num
 
     wl = fetch_year(station, year)
     if wl.size >= UTIDE_MIN_SAMPLES:
         try:
-            t = date2num(wl.index.to_pydatetime())
-            coef = utide.solve(t, wl.values, lat=lat, method="robust",
+            # Pass the DatetimeIndex directly: feeding matplotlib date2num
+            # floats to utide 0.3.1 breaks its astronomical arguments under
+            # matplotlib's modern (1970) epoch, and the solve silently
+            # selects ZERO constituents (residual keeps the full tide).
+            # Verified on Grand Isle 2020: date2num path -> empty constituent
+            # list, tide std 0.03 m; DatetimeIndex -> SA/K1/O1 amplitudes
+            # 0.16/0.12/0.12 m, tide std 0.17 m. Same fix as comp.annual_max.
+            coef = utide.solve(wl.index, wl.values, lat=lat, method="robust",
                                trend=True, conf_int="none", verbose=False)
-            tide = utide.reconstruct(t, coef, verbose=False).h
+            tide = utide.reconstruct(wl.index, coef, verbose=False).h
             resid = pd.Series(wl.values - tide, index=wl.index)
             return resid.loc[start:end], "utide"
         except Exception as e:  # pragma: no cover - sparse/odd records

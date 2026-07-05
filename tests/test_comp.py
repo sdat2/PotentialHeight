@@ -249,13 +249,17 @@ def test_regression_headline_numbers():
     df = pd.read_csv(SUMMARY_CSV)
     df["sid"] = df["sid"].astype(str)
     clean = df[df.clean]
+    # Pins regenerated 2026-07-05 after fixing the utide date2num bug in
+    # comp/coops.py (the old sweep's "de-tided" residuals still contained the
+    # tide; the fix improved bias -0.30 -> -0.20, RMSE 0.54 -> 0.50, and
+    # median time-series r 0.65 -> 0.80).
     bias, rmse, r = metrics(clean)
-    assert len(clean) == 152
-    assert bias == pytest.approx(-0.30, abs=0.02)
-    assert rmse == pytest.approx(0.54, abs=0.02)
-    assert r == pytest.approx(0.887, abs=0.01)
-    assert within_storm_r(clean) == pytest.approx(0.858, abs=0.02)
-    assert clean.ts_r.median() == pytest.approx(0.65, abs=0.03)
+    assert len(clean) == 126
+    assert bias == pytest.approx(-0.20, abs=0.02)
+    assert rmse == pytest.approx(0.50, abs=0.02)
+    assert r == pytest.approx(0.885, abs=0.01)
+    assert within_storm_r(clean) == pytest.approx(0.885, abs=0.02)
+    assert clean.ts_r.median() == pytest.approx(0.80, abs=0.03)
 
 
 @pytest.mark.skipif(not os.path.exists(SUMMARY_CSV),
@@ -263,10 +267,11 @@ def test_regression_headline_numbers():
 def test_regression_per_storm_counts():
     df = pd.read_csv(SUMMARY_CSV)
     counts = df[df.clean].groupby("storm").size().to_dict()
-    # a few anchor storms; full set is 14 storms / 152 clean pairs
-    assert counts["Delta 2020"] == 24
-    assert counts["Nicholas 2021"] == 21
-    assert counts["Katrina 2005"] == 7
+    # a few anchor storms; full set is 14 storms / 126 clean pairs
+    # (regenerated 2026-07-05 with the fixed utide de-tiding)
+    assert counts["Delta 2020"] == 21
+    assert counts["Nicholas 2021"] == 10
+    assert counts["Katrina 2005"] == 4
 
 
 # --------------------------------------------------------------------------- #
@@ -405,8 +410,10 @@ def test_regression_population_and_methods():
     df["sid"] = df["sid"].astype(str)
     assert len(df) == 432
     assert df.storm.nunique() == 14
-    assert df.valid.sum() == 354
-    assert df.clean.sum() == 152
+    # regenerated 2026-07-05 with the fixed utide de-tiding: real de-tiding
+    # shifts which (storm, gauge) pairs pass the validity/clean gates
+    assert df.valid.sum() == 279
+    assert df.clean.sum() == 126
     assert df.failed.sum() == 2
     methods = dict(df.method.value_counts())
     assert methods.get("utide") == 410 and methods.get("pred") == 22

@@ -147,7 +147,7 @@ def plot_4d_samples(
 
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.scatter(
-        v[is_init], z[is_init], marker="x", color="tab:blue", label="initial design"
+        v[is_init], z[is_init], marker="x", color="tab:blue", label="Initial design"
     )
     if (~is_init).any():
         sc = ax.scatter(
@@ -156,9 +156,9 @@ def plot_4d_samples(
             c=calls[~is_init],
             marker="o",
             cmap="viridis",
-            label="acquisition",
+            label="Acquisition",
         )
-        plt.colorbar(sc, ax=ax, label="evaluation index")
+        plt.colorbar(sc, ax=ax, label="Evaluation index")
     if len(z):
         i_best = int(np.nanargmax(z))
         ax.plot(v[i_best], z[i_best], "*", color="tab:orange", markersize=15)

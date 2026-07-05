@@ -12,7 +12,7 @@ quantiles: # 1 in 100 year and 1 in 500 year quantiles
   - 0.002
 fit: # settings for the fitting
   # initial values for the parameters for fit
-  alpha_guess: 0.0
+  alpha_guess: null # null -> start unbounded fit at mean(data); a fixed 0.0 is a strawman when alpha is far from 0
   beta_guess: 1.0
   gamma_guess: -0.1
   # adam optimizer settings

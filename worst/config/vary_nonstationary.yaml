@@ -17,7 +17,7 @@ quantiles:
 fit:
   maxiter: 1000
   lr: 0.01
-  alpha_guess: 0.0
+  alpha_guess: null # null -> start unbounded fit at mean(data); a fixed 0.0 is a strawman when alpha is far from 0
   beta_guess: 1.0
   gamma_guess: -0.1
   force_weibull: false

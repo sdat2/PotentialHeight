@@ -76,7 +76,7 @@ def _panel(ds: xr.Dataset, xc: str, xlabel: str, out: str, title: str):
         axs[1, j].set_xlabel(xlabel)
         for ax in (axs[0, j], axs[1, j]):
             ax.grid(alpha=0.3); ax.margins(x=0)
-    axs[0, 0].set_ylabel("bias [m]"); axs[1, 0].set_ylabel("5--95% range [m]")
+    axs[0, 0].set_ylabel("Bias [m]"); axs[1, 0].set_ylabel("5--95% range [m]")
     # Range-row y-limit: keep the informative fits in frame and let a blown-up
     # stationary-bounded (I-s) range run off the top rather than squashing the rest.
     keep = [f for f in FITS if f != "stationary_bounded"]
@@ -99,7 +99,7 @@ def make_trend_fig(out_dir: str | None = None) -> None:
     nc = _latest("vary_nonstationary_*_ny_80_Nr_*_sigma_0.25.nc")
     print("  trend sweep:", os.path.basename(nc))
     dt = xr.open_dataset(nc)
-    bias, width = _panel(dt, "trend", r"upper-bound trend, $dz^*/dt$ [m yr$^{-1}$]",
+    bias, width = _panel(dt, "trend", r"Upper-bound trend, $dz^*/dt$ [m yr$^{-1}$]",
                          os.path.join(out_dir, "evt_ns_bias_range.pdf"),
                          "Non-stationary EVT: bias and 5--95% range vs trend")
     it = int(np.argmin(np.abs(dt.trend.values - 0.01)))
@@ -118,7 +118,7 @@ def make_sigma_fig(out_dir: str | None = None) -> None:
     nc = _latest("sigma_robustness_*.nc")
     print("  sigma sweep:", os.path.basename(nc))
     dss = xr.open_dataset(nc)
-    _panel(dss, "sigma", r"bound level uncertainty $\sigma_{z^*}$ [m]",
+    _panel(dss, "sigma", r"Bound level uncertainty $\sigma_{z^*}$ [m]",
            os.path.join(out_dir, "evt_ns_sigma.pdf"),
            "Non-stationary EVT: robustness to bound uncertainty")
     w = dss.rv_est.quantile(0.95, "seed") - dss.rv_est.quantile(0.05, "seed")

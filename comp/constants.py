@@ -123,3 +123,16 @@ BOOTSTRAP_SEED = 0    # fixed so reported CIs are reproducible
 
 # Minimum hourly samples in a calendar year for a stable utide harmonic fit.
 UTIDE_MIN_SAMPLES = 2000
+
+# --- annual-maximum pipeline (comp.annual_max) ------------------------------
+ANNUAL_MAX_CACHE = os.path.join(COMP_DATA_PATH, "annual_max")  # residuals + annual maxima
+os.makedirs(ANNUAL_MAX_CACHE, exist_ok=True)
+AM_START_YEAR = 1980   # default year range for annual-maximum extraction
+AM_END_YEAR = 2025
+# A year only contributes an annual maximum if at least this fraction of its
+# hours have data. Below this the annual maximum is likely biased low (the true
+# peak may fall in a gap) and the harmonic fit degrades. 0.8 keeps most usable
+# years at long-record Gulf gauges while excluding badly broken ones.
+MIN_YEAR_COVERAGE = 0.8
+COOPS_RETRIES = 3      # re-requests for a year whose cached response is a transport failure
+COOPS_SLEEP_S = 0.5    # polite pause after each live (non-cached) CO-OPS request

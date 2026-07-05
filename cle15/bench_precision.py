@@ -418,7 +418,7 @@ def plot_results(
             marker="s",
             ms=4,
             lw=1.5,
-            label="mean err %",
+            label="Mean err %",
             zorder=3,
         )
         # Max error (right axis, orange)
@@ -430,10 +430,10 @@ def plot_results(
             ms=4,
             lw=1.5,
             ls="--",
-            label="max err %",
+            label="Max err %",
             zorder=3,
         )
-        ax2.set_ylabel("rmax error (%)", color=C_MEAN)
+        ax2.set_ylabel(r"$r_{\mathrm{max}}$ error (%)", color=C_MEAN)
         ax2.tick_params(axis="y", labelcolor=C_MEAN)
         ax2.set_ylim(bottom=0)
 
@@ -443,11 +443,11 @@ def plot_results(
             color="0.4",
             ls=":",
             lw=1,
-            label="default",
+            label="Default",
         )
 
         ax.set_xlabel(LABELS[sweep.name])
-        ax.set_title(sweep.name.replace("_", " "), fontsize=8)
+        ax.set_title(sweep.name.replace("_", " ").capitalize(), fontsize=8)
 
         # Unified legend (only on first panel)
         if ax is axes[0]:
@@ -539,7 +539,7 @@ def plot_results(
                     fontsize=7,
                 )
             if fi == 0:
-                ax.set_title(f"preset: {title_suffix}", fontsize=8)
+                ax.set_title(f"Preset: {title_suffix}", fontsize=8)
             if fi == nf - 1:
                 ax.set_xlabel(r"$V_{\max}$ (m s$^{-1}$)", fontsize=8)
 

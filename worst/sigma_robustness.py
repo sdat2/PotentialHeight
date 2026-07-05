@@ -94,10 +94,10 @@ def plot_sigma_ds(ds: xr.Dataset) -> None:
             axs[1, j].plot(ds.sigma, width.sel(fit=f, rp=rp), **kw)
         axs[0, j].axhline(0, color="grey", ls="--", lw=0.8)
         axs[0, j].set_title(f"RV{int(rp)}  (trend $= {TREND}$ m year$^{{-1}}$)")
-        axs[1, j].set_xlabel(r"bound level uncertainty $\sigma_{z^*}$ [m]")
+        axs[1, j].set_xlabel(r"Bound level uncertainty $\sigma_{z^*}$ [m]")
         for ax in (axs[0, j], axs[1, j]):
             ax.grid(alpha=0.3)
-    axs[0, 0].set_ylabel("bias [m]")
+    axs[0, 0].set_ylabel("Bias [m]")
     axs[1, 0].set_ylabel("5--95% range [m]")
     legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")

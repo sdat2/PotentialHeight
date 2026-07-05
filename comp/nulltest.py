@@ -169,18 +169,18 @@ def plot(g: Dict, w: Dict, lag: Optional[pd.DataFrame], paths: List[str]) -> Non
                                          (ax[1], w, "Within-storm permutation")]):
         a.hist(res["null"], bins=40, color="0.75", edgecolor="none")
         obs = res.get("observed", res.get("observed_pooled"))
-        a.axvline(obs, color=BRICK_RED, lw=1.8, label=f"observed $r={obs:.2f}$")
+        a.axvline(obs, color=BRICK_RED, lw=1.8, label=f"Observed $r={obs:.2f}$")
         a.set_title(f"({chr(97 + i)}) {title}\n(null max ${res['null_max']:.2f}$, $p<10^{{-3}}$)",
                     fontsize=7, loc="left")
-        a.set_xlabel("correlation $r$"); a.legend(fontsize=6)
-    ax[0].set_ylabel("count")
+        a.set_xlabel("Correlation $r$"); a.legend(fontsize=6)
+    ax[0].set_ylabel("Count")
     if lag is not None:
         a = ax[2]
         a.plot(lag.lag_days, lag.median_ts_r, "o-", color=OX_BLUE, ms=4)
         a.axvline(0, color="0.5", ls=":")
         a.set_title("(c) Temporal-lag null", fontsize=7, loc="left")
         # short label: the long form overhangs the narrow panel and clips the "]"
-        a.set_xlabel("lag [days]"); a.set_ylabel("median time-series $r$")
+        a.set_xlabel("Lag [days]"); a.set_ylabel("Median time-series $r$")
         a.grid(alpha=0.3)
     for p in paths:
         fig.savefig(p, bbox_inches="tight")

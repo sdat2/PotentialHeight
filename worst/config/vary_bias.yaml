@@ -1,0 +1,39 @@
+z_star: 7 # m, true upper bound of the generating GEV
+beta: 1 # m, true scale
+gammas: # generating GEV shapes: second experiment axis (tolerance to bias vs tail shape)
+  - -0.4
+  - -0.2
+  - -0.1
+bias: # systematic bias b added to the assumed upper bound [m]
+  min: -3
+  max: 3
+  steps: 13
+sigmas: # random error s.d. of the assumed upper bound [m]
+  - 0.0
+  - 0.5
+  - 1.0
+  - 2.0
+ns: 50 # number of samples per resample
+seed_steps_Nr: 600 # number of Monte Carlo resamples
+seed_offset: 0
+upper_bound_padding: 0.005 # m, padding when clipping the assumed bound to the empirical max
+quantiles: # 1 in 100 year and 1 in 500 year quantiles
+  - 0.01
+  - 0.002
+fit: # settings for the fitting (lbfgs default in worst.tens; adam settings kept for parity)
+  alpha_guess: null # null -> start unbounded fit at mean(data); 0.0 diverges for gamma far from -0.2
+  beta_guess: 1.0
+  gamma_guess: -0.1
+  steps: 1000
+  lr: 0.01
+  force_weibull: false
+regenerate: false # if true, recompute even if the cached netCDF exists
+data_dir: null # override output directory for the cached netCDF (used by tests)
+figure:
+  lp: 0.05 # lower percentile to plot
+  up: 0.95 # upper percentile to plot
+verbose: false # whether to print out the progress of fitting
+color:
+  true_gev: black
+  max_known: '#18520c'
+  max_unknown: '#d95f02'

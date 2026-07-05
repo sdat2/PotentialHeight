@@ -385,16 +385,16 @@ def make_saturation_fig(ds: xr.Dataset | None = None, out_dir: str | None = None
         b = ds.bias.sel(rp=k).values
         b_inf = float(ds.b_inf.sel(rp=k)); cp = float(ds.c_p.sel(rp=k))
         _, A, U = _logfit(b)
-        ax.plot(us, b, "o", ms=3.0, color="#1f77b4", label=r"pseudo-true $b_p(u)$", zorder=5)
+        ax.plot(us, b, "o", ms=3.0, color="#1f77b4", label=r"Pseudo-true $b_p(u)$", zorder=5)
         ax.axhline(b_inf, ls="--", color="#2ca02c", lw=1.4,
-                   label=fr"plateau $b_\infty={b_inf:.2f}$")
+                   label=fr"Plateau $b_\infty={b_inf:.2f}$")
         ax.plot(uplot, A * np.log(1 + uplot / U), ":", color="#d62728", lw=1.5,
-                label="local log fit")
+                label="Local log fit")
         ax.plot([0, 6], [0, 6 * cp], "-", color="grey", lw=1.0, label=r"Fisher slope $c_p$")
         ax.set_xlim(0, 60); ax.set_ylim(0, max(b_inf * 1.25, A * np.log(1 + 60 / U)))
-        ax.set_xlabel(r"bound margin $u=\hat z^*-z^*$ [m]"); ax.set_title(f"1-in-{k} yr")
+        ax.set_xlabel(r"Bound margin $u=\hat z^*-z^*$ [m]"); ax.set_title(f"1-in-{k} yr")
         ax.grid(alpha=0.3)
-    axs[0].set_ylabel(r"pseudo-true bias $b_p$ [m]")
+    axs[0].set_ylabel(r"Pseudo-true bias $b_p$ [m]")
     legend_below(fig, axs[0], ncol=4)                # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")
     out = os.path.join(out_dir, "evt_saturation.pdf")
@@ -435,27 +435,27 @@ def make_closedform_fig(ds: xr.Dataset | None = None, out_dir: str | None = None
     print(f"  R_II ~ {A:.2f} n^-1/2 ;  window n_hi ~ {n_hi:.0f} yr ,  n_lo ~ {n_lo:.0f} yr")
 
     fig, (axL, axR) = plt.subplots(1, 2, figsize=get_dim(ratio=0.5))
-    axL.plot(ng, cl, "-", color="#d62728", lw=1.6, label="saturating closed form")
-    axL.plot(ns, cx_s, "k*", ms=8, label="full GEV-fit simulation")
-    axL.plot(ng, se_asymp(ng), ":", color="grey", lw=1.2, label=r"asymptotic $\mathrm{SE}(\hat z^*)$")
+    axL.plot(ng, cl, "-", color="#d62728", lw=1.6, label="Saturating closed form")
+    axL.plot(ns, cx_s, "k*", ms=8, label="Full GEV-fit simulation")
+    axL.plot(ng, se_asymp(ng), ":", color="grey", lw=1.2, label=r"Asymptotic $\mathrm{SE}(\hat z^*)$")
     axL.set_xscale("log"); axL.set_yscale("log")
-    axL.set_xlabel(r"record length $n$ [years]"); axL.set_ylabel(r"crossover $\sigma^*$ [m]")
+    axL.set_xlabel(r"Record length $n$ [years]"); axL.set_ylabel(r"Crossover $\sigma^*$ [m]")
     axL.set_title("Crossover, 1-in-500 yr")
     axL.legend(fontsize=7, loc="lower left", framealpha=0.95); axL.grid(alpha=0.3, which="both")
-    axL.annotate(r"closed form $\approx1.6\times$ sim",
+    axL.annotate(r"Closed form $\approx1.6\times$ sim",
                  (70, closed_form_crossover(float(RII(70)), 70, b_inf, c_p)), (90, 8.5),
                  fontsize=7, color="#d62728", arrowprops=dict(arrowstyle="->", color="#d62728", lw=0.8))
 
     axR.fill_between(nn, 0.05, 12, where=(rii_n > saf) & (rii_n < up), color="green", alpha=0.07)
-    axR.plot(nn, rii_n, color="#1f77b4", lw=1.6, label=r"data range $R_{II}\sim n^{-1/2}$")
-    axR.plot(nn, saf, color="#ff7f0e", lw=1.6, label=r"lower edge $c_p\bar G\sim n^{-|\xi|}$")
-    axR.plot(nn, up, color="#9467bd", lw=1.6, label=r"upper edge $b_\infty+c_p\bar G$")
+    axR.plot(nn, rii_n, color="#1f77b4", lw=1.6, label=r"Data range $R_{II}\sim n^{-1/2}$")
+    axR.plot(nn, saf, color="#ff7f0e", lw=1.6, label=r"Lower edge $c_p\bar G\sim n^{-|\xi|}$")
+    axR.plot(nn, up, color="#9467bd", lw=1.6, label=r"Upper edge $b_\infty+c_p\bar G$")
     for nt, lab, dy in ((n_lo, fr"$n_{{\rm lo}}\approx{n_lo:.0f}$ yr", 0.12),
                         (n_hi, fr"$n_{{\rm hi}}\approx{n_hi:.0f}$ yr", 5.0)):
         axR.axvline(nt, ls="--", color="k", lw=0.9); axR.text(nt * 1.04, dy, lab, fontsize=7)
-    axR.text(np.sqrt(n_hi * n_lo), 0.5, "bound helps\n(window)", ha="center", fontsize=7, color="green")
+    axR.text(np.sqrt(n_hi * n_lo), 0.5, "Bound helps\n(window)", ha="center", fontsize=7, color="green")
     axR.set_xscale("log"); axR.set_yscale("log"); axR.set_ylim(0.08, 12)
-    axR.set_xlabel(r"record length $n$ [years]"); axR.set_ylabel("[m]")
+    axR.set_xlabel(r"Record length $n$ [years]"); axR.set_ylabel("[m]")
     axR.set_title("Existence window"); axR.legend(fontsize=7, loc="upper right", framealpha=0.95)
     axR.grid(alpha=0.3, which="both")
     label_subplots([axL, axR], override="outside")

@@ -1,433 +1,433 @@
 storm,sid,name,setting,node_deg,sim_peak,obs_peak,peak_dt_hr,ts_r,ts_rmse,ts_n,method,n_obs,failed,poor_event,valid,clean
-Barry 2019,8764227,"LAWMA, Amerada Pass",open-coast,0.084,1.82,1.9,-0.9,0.751,0.563,136,utide,136,False,False,True,True
-Barry 2019,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,1.82,1.6,0.1,0.654,0.573,136,utide,136,False,False,True,True
-Barry 2019,8761724,Grand Isle,open-coast,0.037,0.78,0.64,0.1,0.813,0.154,136,utide,136,False,False,True,True
-Barry 2019,8768094,Calcasieu Pass,open-coast,0.035,0.1,0.53,-1.9,0.106,0.459,136,utide,136,False,False,True,True
-Barry 2019,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.2,0.52,-0.9,0.501,0.178,136,utide,136,False,False,True,True
-Barry 2019,8766072,Freshwater Canal Locks,semi-enclosed,0.029,1.0,1.11,-15.9,0.279,0.512,136,utide,136,False,False,True,False
-Barry 2019,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.57,0.99,15.1,0.236,0.368,136,utide,136,False,False,True,False
-Barry 2019,8761305,Shell Beach,open-coast,0.062,0.67,0.95,-10.9,0.516,0.309,136,utide,136,False,False,True,False
-Barry 2019,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.2,0.91,15.1,0.055,0.29,136,utide,136,False,False,True,False
-Barry 2019,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.26,0.83,39.1,0.058,0.317,136,utide,136,False,False,True,False
-Barry 2019,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.18,0.78,14.1,0.052,0.29,136,utide,136,False,False,True,False
-Barry 2019,8735391,Dog River Bridge,semi-enclosed,0.03,0.23,0.74,17.1,0.056,0.288,136,utide,136,False,False,True,False
-Barry 2019,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.23,0.74,14.1,0.077,0.281,136,utide,136,False,False,True,False
-Barry 2019,8737048,Mobile State Docks,semi-enclosed,0.042,0.27,0.71,15.1,0.067,0.291,136,utide,136,False,False,True,False
-Barry 2019,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.16,0.66,15.1,0.08,0.271,136,utide,136,False,False,True,False
-Barry 2019,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.61,0.66,-8.9,0.565,0.201,136,utide,136,False,False,True,False
-Barry 2019,8735180,Dauphin Island,open-coast,0.009,0.1,0.62,-47.9,0.094,0.234,136,utide,136,False,False,True,False
-Barry 2019,8729210,Panama City Beach,open-coast,0.006,0.07,0.57,-20.9,0.094,0.235,136,utide,136,False,False,True,False
-Barry 2019,8729840,Pensacola,open-coast,0.01,0.07,0.51,-48.9,0.039,0.224,136,utide,136,False,False,True,False
-Barry 2019,8729108,Panama City,open-coast,0.002,0.06,0.47,-21.9,0.135,0.207,136,utide,136,False,False,True,False
-Barry 2019,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.07,0.45,7.1,0.151,0.435,136,utide,136,False,False,True,False
-Barry 2019,8728690,Apalachicola,open-coast,0.005,0.05,0.41,36.1,0.247,0.227,136,utide,136,False,False,True,False
-Barry 2019,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.06,0.35,7.1,0.186,0.347,136,utide,136,False,False,False,False
-Barry 2019,8770808,High Island,open-coast,0.084,0.06,0.34,3.1,0.109,0.377,136,utide,136,False,False,False,False
-Barry 2019,8770971,Rollover Pass,open-coast,0.048,0.06,0.34,0.1,0.107,0.365,136,utide,136,False,False,False,False
-Barry 2019,8772471,Freeport Harbor,open-coast,0.053,0.06,0.34,6.1,0.23,0.263,136,utide,136,False,False,False,False
-Barry 2019,8771450,Galveston Pier 21,open-coast,0.051,0.06,0.3,6.1,0.186,0.302,136,utide,136,False,False,False,False
-Barry 2019,8771972,San Luis Pass,open-coast,0.054,0.06,0.23,6.1,0.156,0.263,136,utide,136,False,False,False,False
-Barry 2019,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.06,0.22,6.1,0.212,0.273,136,utide,136,False,False,False,False
-Barry 2019,8772985,Sargent,open-coast,0.042,0.06,0.15,7.1,0.193,0.197,136,utide,136,False,False,False,False
-Barry 2019,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.05,0.14,61.1,0.349,0.164,136,utide,136,False,False,False,False
-Barry 2019,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.03,0.13,67.1,0.272,0.212,136,utide,136,False,False,False,False
-Barry 2019,8773701,Port O'Connor,open-coast,0.114,0.05,0.09,58.1,0.397,0.142,136,utide,136,False,False,False,False
-Barry 2019,8775237,Port Aransas,open-coast,0.069,0.03,0.06,66.1,0.292,0.175,136,utide,136,False,False,False,False
-Barry 2019,8773146,Matagorda City,open-coast,0.112,0.06,0.01,5.1,0.198,0.175,136,utide,136,False,False,False,False
-Barry 2019,8775792,Packery Channel,semi-enclosed,0.083,0.02,-0.03,-17.9,0.232,0.139,136,utide,136,False,False,False,False
-Barry 2019,8776139,S. Bird Island,open-coast,0.066,0.02,-0.11,-31.9,-0.261,0.139,136,utide,136,False,False,False,False
-Delta 2020,8766072,Freshwater Canal Locks,semi-enclosed,0.029,1.86,2.62,1.1,0.853,0.285,164,utide,164,False,False,True,True
-Delta 2020,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.41,1.75,0.1,0.812,0.197,166,utide,166,False,False,True,True
-Delta 2020,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,1.22,1.57,0.1,0.775,0.214,166,utide,166,False,False,True,True
-Delta 2020,8768094,Calcasieu Pass,open-coast,0.035,1.5,1.49,0.1,0.733,0.224,166,utide,166,False,False,True,True
-Delta 2020,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.36,1.12,-0.9,0.651,0.253,166,utide,166,False,False,True,True
-Delta 2020,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.3,1.04,-3.9,0.691,0.248,166,utide,166,False,False,True,True
-Delta 2020,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.2,1.0,5.1,0.632,0.232,166,utide,166,False,False,True,True
-Delta 2020,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.19,1.0,-2.9,0.556,0.231,166,utide,166,False,False,True,True
-Delta 2020,8735391,Dog River Bridge,semi-enclosed,0.03,0.26,0.97,-3.9,0.624,0.233,166,utide,166,False,False,True,True
-Delta 2020,8737048,Mobile State Docks,semi-enclosed,0.042,0.31,0.93,-3.9,0.672,0.233,166,utide,166,False,False,True,True
-Delta 2020,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.84,0.89,1.1,0.612,0.219,166,utide,166,False,False,True,True
-Delta 2020,8771972,San Luis Pass,open-coast,0.054,0.33,0.84,-2.9,0.708,0.257,166,utide,166,False,False,True,True
-Delta 2020,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.19,0.78,-3.9,0.567,0.232,166,utide,166,False,False,True,True
-Delta 2020,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.14,0.69,-2.9,0.683,0.255,166,utide,166,False,False,True,True
-Delta 2020,8771450,Galveston Pier 21,open-coast,0.051,0.41,0.66,-1.9,0.662,0.208,166,utide,166,False,False,True,True
-Delta 2020,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.37,0.66,-2.9,0.666,0.214,166,utide,166,False,False,True,True
-Delta 2020,8775237,Port Aransas,open-coast,0.069,0.14,0.62,-2.9,0.709,0.235,166,utide,166,False,False,True,True
-Delta 2020,8772471,Freeport Harbor,open-coast,0.053,0.29,0.61,2.1,0.605,0.26,166,utide,166,False,False,True,True
-Delta 2020,8761724,Grand Isle,open-coast,0.037,0.18,0.58,-3.9,0.517,0.183,166,utide,166,False,False,True,True
-Delta 2020,8729210,Panama City Beach,open-coast,0.006,0.08,0.57,5.1,0.553,0.227,166,utide,166,False,False,True,True
-Delta 2020,8735180,Dauphin Island,open-coast,0.009,0.12,0.57,-1.9,0.467,0.204,166,utide,166,False,False,True,True
-Delta 2020,8728690,Apalachicola,open-coast,0.005,0.1,0.52,4.1,0.431,0.236,166,utide,166,False,False,True,True
-Delta 2020,8772985,Sargent,open-coast,0.042,0.23,0.51,5.1,0.556,0.228,166,utide,166,False,False,True,True
-Delta 2020,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.06,0.47,-0.9,0.293,0.192,166,utide,166,False,False,True,True
-Delta 2020,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.2,0.95,6.1,0.622,0.227,166,utide,166,False,False,True,False
-Delta 2020,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.15,0.66,-12.9,0.721,0.253,166,utide,166,False,False,True,False
-Delta 2020,8761305,Shell Beach,open-coast,0.062,0.06,0.63,-16.9,0.07,0.272,166,utide,166,False,False,True,False
-Delta 2020,8773701,Port O'Connor,open-coast,0.114,0.15,0.6,-12.9,0.592,0.239,166,utide,166,False,False,True,False
-Delta 2020,8729840,Pensacola,open-coast,0.01,0.1,0.58,7.1,0.6,0.216,166,utide,166,False,False,True,False
-Delta 2020,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.47,0.57,6.1,0.584,0.217,166,utide,166,False,False,True,False
-Delta 2020,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.11,0.56,-6.9,0.403,0.206,166,utide,166,False,False,True,False
-Delta 2020,8729108,Panama City,open-coast,0.002,0.08,0.53,9.1,0.536,0.221,166,utide,166,False,False,True,False
-Delta 2020,8775792,Packery Channel,semi-enclosed,0.083,0.14,0.51,-7.9,0.581,0.204,166,utide,166,False,False,True,False
-Delta 2020,8773146,Matagorda City,open-coast,0.112,0.19,0.5,-9.9,0.335,0.222,166,utide,166,False,False,True,False
-Delta 2020,8770971,Rollover Pass,open-coast,0.048,0.47,0.41,-7.9,0.208,0.224,166,utide,166,False,False,True,False
-Delta 2020,8770808,High Island,open-coast,0.084,0.48,0.38,32.1,0.101,0.214,166,utide,166,False,False,False,False
-Delta 2020,8776139,S. Bird Island,open-coast,0.066,0.14,0.38,-11.9,0.295,0.171,166,utide,166,False,False,False,False
-Gustav 2008,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,3.0,2.95,0.1,0.86,0.31,274,utide,274,False,False,True,True
-Gustav 2008,8761305,Shell Beach,open-coast,0.062,3.48,2.63,-1.9,0.837,0.409,274,utide,274,False,False,True,True
-Gustav 2008,8741533,Pascagoula NOAA Lab,open-coast,0.026,1.41,1.66,1.1,0.796,0.262,274,utide,274,False,False,True,True
-Gustav 2008,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,2.56,1.39,-2.9,0.464,0.254,270,utide,270,False,False,True,True
-Gustav 2008,8761724,Grand Isle,open-coast,0.037,3.1,1.35,-0.9,0.661,0.285,271,utide,271,False,False,True,True
-Gustav 2008,8736897,Coast Guard Sector Mobile,open-coast,0.019,1.11,1.33,-1.9,0.711,0.3,274,utide,274,False,False,True,True
-Gustav 2008,8737048,Mobile State Docks,semi-enclosed,0.042,1.11,1.18,-1.9,0.684,0.299,274,utide,274,False,False,True,True
-Gustav 2008,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.58,1.18,0.1,0.816,0.234,274,utide,274,False,False,True,True
-Gustav 2008,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.13,1.05,1.1,0.542,0.289,274,utide,274,False,False,True,True
-Gustav 2008,8729840,Pensacola,open-coast,0.01,0.56,0.98,0.1,0.775,0.221,274,utide,274,False,False,True,True
-Gustav 2008,8735180,Dauphin Island,open-coast,0.009,0.61,0.97,1.1,0.777,0.229,274,utide,274,False,False,True,True
-Gustav 2008,8729108,Panama City,open-coast,0.002,0.52,0.8,-2.9,0.66,0.211,274,utide,274,False,False,True,True
-Gustav 2008,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.43,0.79,-32.9,0.505,0.316,274,utide,274,False,False,True,False
+Barry 2019,8764227,"LAWMA, Amerada Pass",open-coast,0.084,1.82,1.97,-0.9,0.776,0.606,136,utide,136,False,False,True,True
+Barry 2019,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,1.82,1.75,-2.9,0.728,0.58,136,utide,136,False,False,True,True
+Barry 2019,8766072,Freshwater Canal Locks,semi-enclosed,0.029,1.0,1.4,-5.9,0.456,0.501,136,utide,136,False,False,True,True
+Barry 2019,8761724,Grand Isle,open-coast,0.037,0.78,0.92,0.1,0.924,0.121,136,utide,136,False,False,True,True
+Barry 2019,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.2,0.43,-4.9,0.753,0.133,136,utide,136,False,False,True,True
+Barry 2019,8761305,Shell Beach,open-coast,0.062,0.67,0.89,-7.9,0.673,0.332,136,utide,136,False,False,True,False
+Barry 2019,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.57,0.87,15.1,0.415,0.362,136,utide,136,False,False,True,False
+Barry 2019,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.18,0.73,6.1,0.028,0.256,136,utide,136,False,False,True,False
+Barry 2019,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.2,0.71,15.1,0.026,0.256,136,utide,136,False,False,True,False
+Barry 2019,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.26,0.67,39.1,0.112,0.301,136,utide,136,False,False,True,False
+Barry 2019,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.61,0.64,-8.9,0.764,0.131,136,utide,136,False,False,True,False
+Barry 2019,8768094,Calcasieu Pass,open-coast,0.035,0.1,0.62,-6.9,0.268,0.474,136,utide,136,False,False,True,False
+Barry 2019,8735391,Dog River Bridge,semi-enclosed,0.03,0.23,0.58,10.1,0.083,0.261,136,utide,136,False,False,True,False
+Barry 2019,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.23,0.55,18.1,0.115,0.253,136,utide,136,False,False,True,False
+Barry 2019,8737048,Mobile State Docks,semi-enclosed,0.042,0.27,0.53,39.1,0.137,0.263,136,utide,136,False,False,True,False
+Barry 2019,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.07,0.53,16.1,0.285,0.466,136,utide,136,False,False,True,False
+Barry 2019,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.16,0.52,10.1,0.078,0.258,136,utide,136,False,False,True,False
+Barry 2019,8735180,Dauphin Island,open-coast,0.009,0.1,0.45,-28.9,-0.037,0.216,136,utide,136,False,False,True,False
+Barry 2019,8770808,High Island,open-coast,0.084,0.06,0.42,13.1,0.215,0.405,136,utide,136,False,False,True,False
+Barry 2019,8770971,Rollover Pass,open-coast,0.048,0.06,0.4,15.1,0.212,0.396,136,utide,136,False,False,True,False
+Barry 2019,8729210,Panama City Beach,open-coast,0.006,0.07,0.39,-20.9,-0.139,0.174,136,utide,136,False,False,False,False
+Barry 2019,8729840,Pensacola,open-coast,0.01,0.07,0.39,-32.9,-0.197,0.201,136,utide,136,False,False,False,False
+Barry 2019,8728690,Apalachicola,open-coast,0.005,0.05,0.32,40.1,0.139,0.14,136,utide,136,False,False,False,False
+Barry 2019,8729108,Panama City,open-coast,0.002,0.06,0.3,-24.9,-0.125,0.142,136,utide,136,False,False,False,False
+Barry 2019,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.06,0.28,20.1,0.34,0.375,136,utide,136,False,False,False,False
+Barry 2019,8771450,Galveston Pier 21,open-coast,0.051,0.06,0.28,18.1,0.329,0.327,136,utide,136,False,False,False,False
+Barry 2019,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.06,0.25,12.1,0.344,0.304,136,utide,136,False,False,False,False
+Barry 2019,8771972,San Luis Pass,open-coast,0.054,0.06,0.25,69.1,0.243,0.293,136,utide,136,False,False,False,False
+Barry 2019,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.05,0.25,70.1,0.488,0.148,136,utide,136,False,False,False,False
+Barry 2019,8772471,Freeport Harbor,open-coast,0.053,0.06,0.23,6.1,0.469,0.238,136,utide,136,False,False,False,False
+Barry 2019,8773701,Port O'Connor,open-coast,0.114,0.05,0.18,66.1,0.447,0.143,136,utide,136,False,False,False,False
+Barry 2019,8772985,Sargent,open-coast,0.042,0.06,0.15,7.1,0.227,0.208,136,utide,136,False,False,False,False
+Barry 2019,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.03,0.15,72.1,0.587,0.081,136,utide,136,False,False,False,False
+Barry 2019,8775237,Port Aransas,open-coast,0.069,0.03,0.11,71.1,0.511,0.085,136,utide,136,False,False,False,False
+Barry 2019,8773146,Matagorda City,open-coast,0.112,0.06,0.09,5.1,0.143,0.175,136,utide,136,False,False,False,False
+Barry 2019,8775792,Packery Channel,semi-enclosed,0.083,0.02,0.05,-12.9,0.148,0.088,136,utide,136,False,False,False,False
+Barry 2019,8776139,S. Bird Island,open-coast,0.066,0.02,0.01,-33.9,-0.56,0.092,136,utide,136,False,False,False,False
+Delta 2020,8766072,Freshwater Canal Locks,semi-enclosed,0.029,1.86,2.69,1.1,0.944,0.224,164,utide,164,False,False,True,True
+Delta 2020,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.41,1.65,0.1,0.917,0.114,166,utide,166,False,False,True,True
+Delta 2020,8768094,Calcasieu Pass,open-coast,0.035,1.5,1.61,0.1,0.869,0.144,166,utide,166,False,False,True,True
+Delta 2020,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,1.22,1.48,1.1,0.868,0.134,166,utide,166,False,False,True,True
+Delta 2020,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.84,1.09,1.1,0.822,0.13,166,utide,166,False,False,True,True
+Delta 2020,8771972,San Luis Pass,open-coast,0.054,0.33,0.94,-3.9,0.78,0.185,166,utide,166,False,False,True,True
+Delta 2020,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.36,0.83,-0.9,0.883,0.119,166,utide,166,False,False,True,True
+Delta 2020,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.3,0.78,-3.9,0.88,0.125,166,utide,166,False,False,True,True
+Delta 2020,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.37,0.77,-3.9,0.732,0.141,166,utide,166,False,False,True,True
+Delta 2020,8771450,Galveston Pier 21,open-coast,0.051,0.41,0.74,-1.9,0.759,0.133,166,utide,166,False,False,True,True
+Delta 2020,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.2,0.72,5.1,0.838,0.11,166,utide,166,False,False,True,True
+Delta 2020,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.47,0.71,-1.9,0.759,0.123,166,utide,166,False,False,True,True
+Delta 2020,8735391,Dog River Bridge,semi-enclosed,0.03,0.26,0.7,-3.9,0.831,0.108,166,utide,166,False,False,True,True
+Delta 2020,8772471,Freeport Harbor,open-coast,0.053,0.29,0.69,-3.9,0.803,0.149,166,utide,166,False,False,True,True
+Delta 2020,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.19,0.68,-2.9,0.817,0.098,166,utide,166,False,False,True,True
+Delta 2020,8737048,Mobile State Docks,semi-enclosed,0.042,0.31,0.65,-3.9,0.866,0.113,166,utide,166,False,False,True,True
+Delta 2020,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.15,0.59,-1.9,0.921,0.154,166,utide,166,False,False,True,True
+Delta 2020,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.19,0.5,-3.9,0.8,0.102,166,utide,166,False,False,True,True
+Delta 2020,8772985,Sargent,open-coast,0.042,0.23,0.5,-0.9,0.644,0.139,166,utide,166,False,False,True,True
+Delta 2020,8773146,Matagorda City,open-coast,0.112,0.19,0.42,-5.9,0.389,0.148,166,utide,166,False,False,True,True
+Delta 2020,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.11,0.41,-1.9,0.853,0.116,166,utide,166,False,False,True,True
+Delta 2020,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.2,0.67,6.1,0.851,0.102,166,utide,166,False,False,True,False
+Delta 2020,8770971,Rollover Pass,open-coast,0.048,0.47,0.56,-7.9,0.166,0.158,166,utide,166,False,False,True,False
+Delta 2020,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.14,0.54,6.1,0.914,0.149,166,utide,166,False,False,True,False
+Delta 2020,8770808,High Island,open-coast,0.084,0.48,0.48,-8.9,-0.04,0.163,166,utide,166,False,False,True,False
+Delta 2020,8773701,Port O'Connor,open-coast,0.114,0.15,0.47,-7.9,0.748,0.147,166,utide,166,False,False,True,False
+Delta 2020,8775237,Port Aransas,open-coast,0.069,0.14,0.46,6.1,0.903,0.137,166,utide,166,False,False,True,False
+Delta 2020,8761724,Grand Isle,open-coast,0.037,0.18,0.38,-1.9,0.935,0.076,166,utide,166,False,False,False,False
+Delta 2020,8729840,Pensacola,open-coast,0.01,0.1,0.37,2.1,0.835,0.1,166,utide,166,False,False,False,False
+Delta 2020,8775792,Packery Channel,semi-enclosed,0.083,0.14,0.35,-6.9,0.717,0.12,166,utide,166,False,False,False,False
+Delta 2020,8729210,Panama City Beach,open-coast,0.006,0.08,0.34,-1.9,0.757,0.111,166,utide,166,False,False,False,False
+Delta 2020,8735180,Dauphin Island,open-coast,0.009,0.12,0.34,-5.9,0.719,0.08,166,utide,166,False,False,False,False
+Delta 2020,8728690,Apalachicola,open-coast,0.005,0.1,0.33,-6.9,0.642,0.128,166,utide,166,False,False,False,False
+Delta 2020,8776139,S. Bird Island,open-coast,0.066,0.14,0.33,-8.9,0.35,0.149,166,utide,166,False,False,False,False
+Delta 2020,8761305,Shell Beach,open-coast,0.062,0.06,0.3,-16.9,0.249,0.154,166,utide,166,False,False,False,False
+Delta 2020,8729108,Panama City,open-coast,0.002,0.08,0.28,2.1,0.764,0.102,166,utide,166,False,False,False,False
+Delta 2020,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.06,0.2,3.1,0.526,0.063,166,utide,166,False,False,False,False
+Gustav 2008,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,3.0,2.88,0.1,0.917,0.219,274,utide,274,False,False,True,True
+Gustav 2008,8761305,Shell Beach,open-coast,0.062,3.48,2.64,-1.9,0.853,0.406,274,utide,274,False,False,True,True
+Gustav 2008,8741533,Pascagoula NOAA Lab,open-coast,0.026,1.41,1.56,1.1,0.904,0.159,274,utide,274,False,False,True,True
+Gustav 2008,8761724,Grand Isle,open-coast,0.037,3.1,1.36,-0.9,0.72,0.257,271,utide,271,False,False,True,True
+Gustav 2008,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,2.56,1.28,-2.9,0.549,0.197,270,utide,270,False,False,True,True
+Gustav 2008,8736897,Coast Guard Sector Mobile,open-coast,0.019,1.11,1.26,-0.9,0.823,0.206,274,utide,274,False,False,True,True
+Gustav 2008,8737048,Mobile State Docks,semi-enclosed,0.042,1.11,1.13,-0.9,0.795,0.214,274,utide,274,False,False,True,True
+Gustav 2008,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.58,1.1,0.1,0.919,0.173,274,utide,274,False,False,True,True
+Gustav 2008,8729840,Pensacola,open-coast,0.01,0.56,0.92,0.1,0.915,0.121,274,utide,274,False,False,True,True
+Gustav 2008,8735180,Dauphin Island,open-coast,0.009,0.61,0.88,4.1,0.912,0.131,274,utide,274,False,False,True,True
+Gustav 2008,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.13,0.88,1.1,0.58,0.256,274,utide,274,False,False,True,True
+Gustav 2008,8729108,Panama City,open-coast,0.002,0.52,0.68,-1.9,0.913,0.073,274,utide,274,False,False,True,True
+Gustav 2008,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.43,0.68,-30.9,0.577,0.245,274,utide,274,False,False,True,False
 Gustav 2008,8770971,Rollover Pass,open-coast,0.048,0.19,0.61,-8.9,0.115,0.214,272,pred,286,False,False,True,False
-Gustav 2008,8768094,Calcasieu Pass,open-coast,0.035,0.24,0.56,-8.9,0.349,0.265,274,utide,274,False,False,True,False
-Gustav 2008,8728690,Apalachicola,open-coast,0.005,0.74,0.37,163.1,0.072,0.235,100,utide,100,False,False,False,False
-Gustav 2008,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.18,0.33,-7.9,0.288,0.253,274,utide,274,False,False,False,False
-Gustav 2008,8771450,Galveston Pier 21,open-coast,0.051,0.17,0.3,-7.9,0.291,0.227,274,utide,274,False,False,False,False
+Gustav 2008,8768094,Calcasieu Pass,open-coast,0.035,0.24,0.43,-6.9,0.492,0.191,274,utide,274,False,False,True,False
+Gustav 2008,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.18,0.32,-6.9,0.517,0.129,274,utide,274,False,False,False,False
+Gustav 2008,8771450,Galveston Pier 21,open-coast,0.051,0.17,0.2,-6.9,0.436,0.167,274,utide,274,False,False,False,False
 Gustav 2008,8773701,Port O'Connor,open-coast,0.114,0.11,0.15,12.1,0.18,0.149,274,pred,288,False,False,False,False
 Gustav 2008,8775237,Port Aransas,open-coast,0.069,0.13,0.15,-9.9,0.249,0.131,274,pred,288,False,False,False,False
 Gustav 2008,8775792,Packery Channel,semi-enclosed,0.083,0.13,0.1,50.1,0.148,0.099,268,pred,281,False,False,False,False
-Harvey 2017,8775237,Port Aransas,open-coast,0.069,0.88,1.57,-1.9,0.444,0.193,412,utide,412,False,True,True,True
-Harvey 2017,8775792,Packery Channel,semi-enclosed,0.083,0.4,1.33,-3.9,0.088,0.227,412,utide,412,False,True,True,True
-Harvey 2017,8773701,Port O'Connor,open-coast,0.114,1.05,0.81,0.1,0.654,0.193,412,utide,412,False,True,True,True
-Harvey 2017,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,1.05,0.68,1.1,0.585,0.17,403,utide,403,False,True,True,True
-Harvey 2017,8761305,Shell Beach,open-coast,0.062,0.22,0.58,2.1,0.552,0.206,412,utide,412,False,True,True,True
-Harvey 2017,8770808,High Island,open-coast,0.084,0.73,1.25,-46.9,0.16,0.563,412,utide,412,False,True,True,False
-Harvey 2017,8771972,San Luis Pass,open-coast,0.054,0.56,0.97,63.1,0.801,0.243,412,utide,412,False,True,True,False
-Harvey 2017,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.7,0.96,11.1,0.539,0.195,412,utide,412,False,True,True,False
-Harvey 2017,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.65,0.94,-19.9,0.518,0.24,412,utide,412,False,True,True,False
-Harvey 2017,8772471,Freeport Harbor,open-coast,0.053,0.5,0.9,66.1,0.726,0.211,412,utide,412,False,True,True,False
-Harvey 2017,8770971,Rollover Pass,open-coast,0.048,0.72,0.88,24.1,0.562,0.245,412,utide,412,False,True,True,False
-Harvey 2017,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.58,0.87,12.1,0.453,0.21,412,utide,412,False,True,True,False
-Harvey 2017,8772985,Sargent,open-coast,0.042,0.54,0.87,-88.9,0.338,0.39,412,utide,412,False,True,True,False
-Harvey 2017,8773146,Matagorda City,open-coast,0.112,0.67,0.85,-8.9,0.352,0.357,412,utide,412,False,True,True,False
-Harvey 2017,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.78,0.82,16.1,0.649,0.223,412,utide,412,False,True,True,False
-Harvey 2017,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.74,0.8,-11.9,0.729,0.211,412,utide,412,False,True,True,False
-Harvey 2017,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.6,0.8,-12.9,0.791,0.217,412,utide,412,False,True,True,False
-Harvey 2017,8771450,Galveston Pier 21,open-coast,0.051,0.63,0.76,-11.9,0.763,0.206,412,utide,412,False,True,True,False
-Harvey 2017,8768094,Calcasieu Pass,open-coast,0.035,0.72,0.72,14.1,0.618,0.218,412,utide,412,False,True,True,False
-Harvey 2017,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.26,0.7,12.1,0.484,0.178,412,utide,412,False,True,True,False
-Harvey 2017,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.18,0.68,13.1,0.445,0.171,412,utide,412,False,True,True,False
-Harvey 2017,8735391,Dog River Bridge,semi-enclosed,0.03,0.23,0.64,11.1,0.44,0.17,412,utide,412,False,True,True,False
-Harvey 2017,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.16,0.64,10.1,0.455,0.17,412,utide,412,False,True,True,False
-Harvey 2017,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.26,0.64,15.1,0.513,0.201,412,utide,412,False,True,True,False
-Harvey 2017,8737048,Mobile State Docks,semi-enclosed,0.042,0.26,0.62,11.1,0.503,0.166,412,utide,412,False,True,True,False
-Harvey 2017,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.16,0.58,10.1,0.422,0.163,412,utide,412,False,True,True,False
-Harvey 2017,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.17,0.57,11.1,0.44,0.163,412,utide,412,False,True,True,False
-Harvey 2017,8776139,S. Bird Island,open-coast,0.066,0.36,0.55,-7.9,-0.415,0.184,412,utide,412,False,True,True,False
-Harvey 2017,8729840,Pensacola,open-coast,0.01,0.08,0.44,13.1,0.376,0.133,412,utide,412,False,True,True,False
-Harvey 2017,8735180,Dauphin Island,open-coast,0.009,0.1,0.42,15.1,0.396,0.146,412,utide,412,False,True,True,False
-Harvey 2017,8761724,Grand Isle,open-coast,0.037,0.18,0.4,-21.9,0.496,0.131,412,utide,412,False,True,True,False
-Harvey 2017,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.12,0.37,-21.9,0.414,0.139,412,utide,412,False,True,False,False
-Harvey 2017,8728690,Apalachicola,open-coast,0.005,0.09,0.32,225.1,0.154,0.162,412,utide,412,False,True,False,False
-Harvey 2017,8729210,Panama City Beach,open-coast,0.006,0.07,0.32,-9.9,0.255,0.141,412,utide,412,False,True,False,False
-Harvey 2017,8729108,Panama City,open-coast,0.002,0.07,0.3,-17.9,0.24,0.133,412,utide,412,False,True,False,False
-Harvey 2017,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.88,0.3,12.1,0.157,0.182,393,utide,393,False,True,False,False
-Harvey 2017,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.06,0.29,13.1,0.293,0.14,412,utide,412,False,True,False,False
-Ida 2021,8761305,Shell Beach,open-coast,0.062,2.33,2.05,2.1,0.788,0.454,220,utide,220,False,False,True,True
-Ida 2021,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.61,1.2,2.1,0.767,0.279,220,utide,220,False,False,True,True
-Ida 2021,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.97,1.17,4.1,0.823,0.265,220,utide,220,False,False,True,True
-Ida 2021,8737048,Mobile State Docks,semi-enclosed,0.042,1.0,1.12,3.1,0.839,0.243,220,utide,220,False,False,True,True
-Ida 2021,8735391,Dog River Bridge,semi-enclosed,0.03,0.83,1.05,4.1,0.795,0.252,220,utide,220,False,False,True,True
-Ida 2021,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.44,1.03,0.1,0.689,0.234,220,utide,220,False,False,True,True
-Ida 2021,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.56,1.02,1.1,0.744,0.277,220,utide,220,False,False,True,True
-Ida 2021,8770971,Rollover Pass,open-coast,0.048,0.02,0.41,-2.9,0.208,0.21,220,utide,220,False,False,True,True
-Ida 2021,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.02,0.4,3.1,0.295,0.214,220,utide,220,False,False,True,True
-Ida 2021,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,1.73,2.16,-7.9,0.889,0.356,220,utide,220,False,False,True,False
-Ida 2021,8761724,Grand Isle,open-coast,0.037,4.23,1.48,-0.9,0.68,0.394,220,utide,220,True,False,False,False
-Ida 2021,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.69,1.18,-12.9,0.825,0.293,220,utide,220,False,False,True,False
-Ida 2021,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,2.87,0.98,2.1,0.676,0.245,76,utide,76,True,False,False,False
-Ida 2021,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.58,0.95,7.1,0.787,0.263,220,utide,220,False,False,True,False
-Ida 2021,8735180,Dauphin Island,open-coast,0.009,0.31,0.81,25.1,0.724,0.245,220,utide,220,False,False,True,False
-Ida 2021,8728690,Apalachicola,open-coast,0.005,0.3,0.78,40.1,0.398,0.209,220,utide,220,False,False,True,False
-Ida 2021,8729840,Pensacola,open-coast,0.01,0.24,0.7,34.1,0.681,0.238,220,utide,220,False,False,True,False
-Ida 2021,8729210,Panama City Beach,open-coast,0.006,0.24,0.63,39.1,0.46,0.187,220,utide,220,False,False,True,False
-Ida 2021,8729108,Panama City,open-coast,0.002,0.29,0.57,41.1,0.46,0.191,220,utide,220,False,False,True,False
-Ida 2021,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.45,0.53,-9.9,0.469,0.234,220,utide,220,False,False,True,False
-Ida 2021,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.02,0.5,13.1,0.4,0.227,220,utide,220,False,False,True,False
-Ida 2021,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.54,0.49,-10.9,0.408,0.281,220,utide,220,False,False,True,False
-Ida 2021,8772471,Freeport Harbor,open-coast,0.053,0.01,0.39,150.1,0.196,0.201,220,utide,220,False,False,False,False
-Ida 2021,8770808,High Island,open-coast,0.084,0.02,0.38,-3.9,0.216,0.203,220,utide,220,False,False,False,False
-Ida 2021,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.01,0.38,-1.9,0.351,0.187,220,utide,220,False,False,False,False
-Ida 2021,8771972,San Luis Pass,open-coast,0.054,0.01,0.38,144.1,0.335,0.177,220,utide,220,False,False,False,False
-Ida 2021,8771450,Galveston Pier 21,open-coast,0.051,0.02,0.37,-1.9,0.336,0.196,220,utide,220,False,False,False,False
-Ida 2021,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.02,0.36,4.1,0.326,0.212,220,utide,220,False,False,False,False
-Ida 2021,8768094,Calcasieu Pass,open-coast,0.035,0.03,0.34,-5.9,0.285,0.198,220,utide,220,False,False,False,False
-Ida 2021,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.02,0.3,146.1,0.179,0.153,220,utide,220,False,False,False,False
-Ida 2021,8773701,Port O'Connor,open-coast,0.114,0.02,0.28,144.1,0.15,0.135,220,utide,220,False,False,False,False
-Ida 2021,8772985,Sargent,open-coast,0.042,0.02,0.27,142.1,0.136,0.149,220,utide,220,False,False,False,False
-Ida 2021,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.01,0.23,-59.9,0.109,0.15,220,utide,220,False,False,False,False
-Ida 2021,8773146,Matagorda City,open-coast,0.112,0.02,0.22,138.1,0.084,0.119,220,utide,220,False,False,False,False
-Ida 2021,8775237,Port Aransas,open-coast,0.069,0.01,0.22,13.1,0.107,0.129,220,utide,220,False,False,False,False
-Ida 2021,8776139,S. Bird Island,open-coast,0.066,0.01,0.09,4.1,-0.097,0.061,220,utide,220,False,False,False,False
-Ida 2021,8775792,Packery Channel,semi-enclosed,0.083,0.01,0.07,-65.9,-0.212,0.074,89,utide,89,False,False,False,False
-Idalia 2023,8728690,Apalachicola,open-coast,0.005,0.45,0.87,-1.9,0.383,0.24,304,utide,304,False,False,True,True
-Idalia 2023,8729108,Panama City,open-coast,0.002,0.21,0.77,4.1,0.335,0.219,304,utide,304,False,False,True,True
-Idalia 2023,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.14,0.66,4.1,0.097,0.254,304,utide,304,False,False,True,True
-Idalia 2023,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.14,0.63,4.1,0.131,0.233,304,utide,304,False,False,True,True
-Idalia 2023,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.13,0.61,3.1,0.13,0.23,304,utide,304,False,False,True,True
-Idalia 2023,8735391,Dog River Bridge,semi-enclosed,0.03,0.14,0.6,4.1,0.091,0.232,304,utide,304,False,False,True,True
-Idalia 2023,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.16,0.6,4.1,0.043,0.244,304,utide,304,False,False,True,True
-Idalia 2023,8729840,Pensacola,open-coast,0.01,0.16,0.59,4.1,0.254,0.206,304,utide,304,False,False,True,True
-Idalia 2023,8735180,Dauphin Island,open-coast,0.009,0.13,0.59,3.1,0.175,0.21,304,utide,304,False,False,True,True
-Idalia 2023,8761305,Shell Beach,open-coast,0.062,0.15,0.59,4.1,0.133,0.227,304,utide,304,False,False,True,True
-Idalia 2023,8737048,Mobile State Docks,semi-enclosed,0.042,0.16,0.55,4.1,0.028,0.234,304,utide,304,False,False,True,True
-Idalia 2023,8761724,Grand Isle,open-coast,0.037,0.05,0.44,3.1,0.029,0.2,304,utide,304,False,False,True,True
-Idalia 2023,8729210,Panama City Beach,open-coast,0.006,0.2,0.82,7.1,0.298,0.23,304,utide,304,False,False,True,False
-Idalia 2023,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.15,0.65,9.1,0.146,0.23,304,utide,304,False,False,True,False
-Idalia 2023,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.15,0.64,7.1,0.131,0.233,304,utide,304,False,False,True,False
-Idalia 2023,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.07,0.52,86.1,0.028,0.236,304,utide,304,False,False,True,False
-Idalia 2023,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.05,0.51,36.1,0.12,0.206,304,utide,304,False,False,True,False
-Idalia 2023,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.05,0.45,34.1,0.07,0.197,304,utide,304,False,False,True,False
-Idalia 2023,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.08,0.44,85.1,0.033,0.223,304,utide,304,False,False,True,False
-Idalia 2023,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.05,0.44,59.1,-0.036,0.244,304,utide,304,False,False,True,False
-Idalia 2023,8771367,Sabine Offshore Light,open-coast,0.047,0.05,0.43,95.1,0.05,0.26,304,utide,304,False,False,True,False
-Idalia 2023,8772471,Freeport Harbor,open-coast,0.053,0.05,0.4,97.1,0.095,0.215,304,utide,304,False,False,True,False
-Idalia 2023,8770808,High Island,open-coast,0.084,0.05,0.35,60.1,-0.019,0.196,304,utide,304,False,False,False,False
-Idalia 2023,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.05,0.35,61.1,0.012,0.228,304,utide,304,False,False,False,False
-Idalia 2023,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.05,0.35,12.1,0.043,0.215,304,utide,304,False,False,False,False
-Idalia 2023,8768094,Calcasieu Pass,open-coast,0.035,0.06,0.34,36.1,-0.017,0.217,304,utide,304,False,False,False,False
-Idalia 2023,8770971,Rollover Pass,open-coast,0.048,0.05,0.33,60.1,0.005,0.191,304,utide,304,False,False,False,False
-Idalia 2023,8771450,Galveston Pier 21,open-coast,0.051,0.05,0.32,62.1,0.068,0.195,304,utide,304,False,False,False,False
-Idalia 2023,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.05,0.3,62.1,0.079,0.174,304,utide,304,False,False,False,False
-Idalia 2023,8771972,San Luis Pass,open-coast,0.054,0.05,0.28,63.1,0.091,0.166,304,utide,304,False,False,False,False
-Idalia 2023,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.05,0.25,64.1,0.119,0.169,304,utide,304,False,False,False,False
-Idalia 2023,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.05,0.22,38.1,0.118,0.179,304,utide,304,False,False,False,False
-Idalia 2023,8773146,Matagorda City,open-coast,0.112,0.05,0.21,11.1,0.132,0.093,304,utide,304,False,False,False,False
-Idalia 2023,8773701,Port O'Connor,open-coast,0.114,0.05,0.21,10.1,0.104,0.124,304,utide,304,False,False,False,False
-Idalia 2023,8775237,Port Aransas,open-coast,0.069,0.05,0.21,15.1,0.105,0.136,304,utide,304,False,False,False,False
-Idalia 2023,8772985,Sargent,open-coast,0.042,0.05,0.2,11.1,0.093,0.128,304,utide,304,False,False,False,False
-Idalia 2023,8775792,Packery Channel,semi-enclosed,0.083,0.04,0.1,9.1,0.341,0.07,304,utide,304,False,False,False,False
-Idalia 2023,8776139,S. Bird Island,open-coast,0.066,0.04,0.06,3.1,0.515,0.046,304,utide,304,False,False,False,False
+Gustav 2008,8728690,Apalachicola,open-coast,0.005,0.74,0.09,165.1,0.064,0.046,100,utide,100,False,False,False,False
+Harvey 2017,8775237,Port Aransas,open-coast,0.069,0.88,1.57,-1.9,0.514,0.15,412,utide,412,False,True,True,True
+Harvey 2017,8775792,Packery Channel,semi-enclosed,0.083,0.4,1.35,-3.9,0.097,0.218,412,utide,412,False,True,True,True
+Harvey 2017,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.18,0.6,2.1,0.687,0.085,412,utide,412,False,True,True,True
+Harvey 2017,8737048,Mobile State Docks,semi-enclosed,0.042,0.26,0.56,2.1,0.772,0.088,412,utide,412,False,True,True,True
+Harvey 2017,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.26,0.55,2.1,0.761,0.089,412,utide,412,False,True,True,True
+Harvey 2017,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.16,0.55,2.1,0.697,0.087,412,utide,412,False,True,True,True
+Harvey 2017,8735391,Dog River Bridge,semi-enclosed,0.03,0.23,0.49,2.1,0.731,0.08,412,utide,412,False,True,True,True
+Harvey 2017,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.17,0.47,4.1,0.72,0.075,412,utide,412,False,True,True,True
+Harvey 2017,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.16,0.41,5.1,0.69,0.074,412,utide,412,False,True,True,True
+Harvey 2017,8770808,High Island,open-coast,0.084,0.73,1.38,-57.9,0.148,0.568,412,utide,412,False,True,True,False
+Harvey 2017,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.7,0.93,11.1,0.746,0.124,412,utide,412,False,True,True,False
+Harvey 2017,8771972,San Luis Pass,open-coast,0.054,0.56,0.92,63.1,0.841,0.218,412,utide,412,False,True,True,False
+Harvey 2017,8772985,Sargent,open-coast,0.042,0.54,0.91,-93.9,0.343,0.394,412,utide,412,False,True,True,False
+Harvey 2017,8772471,Freeport Harbor,open-coast,0.053,0.5,0.88,66.1,0.862,0.126,412,utide,412,False,True,True,False
+Harvey 2017,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.65,0.87,-19.9,0.689,0.15,412,utide,412,False,True,True,False
+Harvey 2017,8773146,Matagorda City,open-coast,0.112,0.67,0.87,-8.9,0.349,0.363,412,utide,412,False,True,True,False
+Harvey 2017,8770971,Rollover Pass,open-coast,0.048,0.72,0.86,45.1,0.601,0.217,412,utide,412,False,True,True,False
+Harvey 2017,8773701,Port O'Connor,open-coast,0.114,1.05,0.83,-15.9,0.679,0.175,412,utide,412,False,True,True,False
+Harvey 2017,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.58,0.8,12.1,0.704,0.114,412,utide,412,False,True,True,False
+Harvey 2017,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.6,0.79,-11.9,0.854,0.183,412,utide,412,False,True,True,False
+Harvey 2017,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.78,0.78,16.1,0.805,0.137,412,utide,412,False,True,True,False
+Harvey 2017,8771450,Galveston Pier 21,open-coast,0.051,0.63,0.74,-11.9,0.858,0.152,412,utide,412,False,True,True,False
+Harvey 2017,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.74,0.72,-11.9,0.855,0.133,412,utide,412,False,True,True,False
+Harvey 2017,8761305,Shell Beach,open-coast,0.062,0.22,0.66,-8.9,0.641,0.156,412,utide,412,False,True,True,False
+Harvey 2017,8768094,Calcasieu Pass,open-coast,0.035,0.72,0.64,-16.9,0.773,0.134,412,utide,412,False,True,True,False
+Harvey 2017,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,1.05,0.63,6.1,0.729,0.101,403,utide,403,False,True,True,False
+Harvey 2017,8776139,S. Bird Island,open-coast,0.066,0.36,0.58,-7.9,-0.421,0.179,412,utide,412,False,True,True,False
+Harvey 2017,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.26,0.52,6.1,0.748,0.112,412,utide,412,False,True,True,False
+Harvey 2017,8761724,Grand Isle,open-coast,0.037,0.18,0.32,-1.9,0.803,0.061,412,utide,412,False,True,False,False
+Harvey 2017,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.88,0.31,11.1,0.283,0.085,393,utide,393,False,True,False,False
+Harvey 2017,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.12,0.3,-0.9,0.726,0.062,412,utide,412,False,True,False,False
+Harvey 2017,8735180,Dauphin Island,open-coast,0.009,0.1,0.28,8.1,0.634,0.062,412,utide,412,False,True,False,False
+Harvey 2017,8729840,Pensacola,open-coast,0.01,0.08,0.23,13.1,0.647,0.044,412,utide,412,False,True,False,False
+Harvey 2017,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.06,0.23,36.1,0.559,0.06,412,utide,412,False,True,False,False
+Harvey 2017,8729210,Panama City Beach,open-coast,0.006,0.07,0.13,12.1,0.37,0.042,412,utide,412,False,True,False,False
+Harvey 2017,8728690,Apalachicola,open-coast,0.005,0.09,0.1,143.1,0.119,0.047,412,utide,412,False,True,False,False
+Harvey 2017,8729108,Panama City,open-coast,0.002,0.07,0.1,28.1,0.354,0.037,412,utide,412,False,True,False,False
+Ida 2021,8761305,Shell Beach,open-coast,0.062,2.33,2.15,2.1,0.815,0.452,220,utide,220,False,False,True,True
+Ida 2021,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.69,1.12,5.1,0.918,0.254,220,utide,220,False,False,True,True
+Ida 2021,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.44,1.09,0.1,0.858,0.195,220,utide,220,False,False,True,True
+Ida 2021,8737048,Mobile State Docks,semi-enclosed,0.042,1.0,1.06,-0.9,0.903,0.21,220,utide,220,False,False,True,True
+Ida 2021,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.56,1.06,-5.9,0.845,0.239,220,utide,220,False,False,True,True
+Ida 2021,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.61,1.03,2.1,0.875,0.235,220,utide,220,False,False,True,True
+Ida 2021,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,1.73,2.18,-6.9,0.929,0.334,220,utide,220,False,False,True,False
+Ida 2021,8761724,Grand Isle,open-coast,0.037,4.23,1.61,-0.9,0.768,0.357,220,utide,220,True,False,False,False
+Ida 2021,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.97,1.17,22.1,0.889,0.236,220,utide,220,False,False,True,False
+Ida 2021,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,2.87,1.07,2.1,0.829,0.211,76,utide,76,True,False,False,False
+Ida 2021,8735391,Dog River Bridge,semi-enclosed,0.03,0.83,1.03,22.1,0.889,0.211,220,utide,220,False,False,True,False
+Ida 2021,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.58,0.93,21.1,0.903,0.22,220,utide,220,False,False,True,False
+Ida 2021,8735180,Dauphin Island,open-coast,0.009,0.31,0.77,25.1,0.887,0.198,220,utide,220,False,False,True,False
+Ida 2021,8729840,Pensacola,open-coast,0.01,0.24,0.72,33.1,0.818,0.195,220,utide,220,False,False,True,False
+Ida 2021,8728690,Apalachicola,open-coast,0.005,0.3,0.62,43.1,0.492,0.151,220,utide,220,False,False,True,False
+Ida 2021,8729210,Panama City Beach,open-coast,0.006,0.24,0.53,33.1,0.661,0.122,220,utide,220,False,False,True,False
+Ida 2021,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.02,0.53,13.1,0.545,0.178,220,utide,220,False,False,True,False
+Ida 2021,8729108,Panama City,open-coast,0.002,0.29,0.51,36.1,0.642,0.122,220,utide,220,False,False,True,False
+Ida 2021,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.45,0.43,61.1,0.64,0.171,220,utide,220,False,False,True,False
+Ida 2021,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.54,0.42,63.1,0.491,0.27,220,utide,220,False,False,True,False
+Ida 2021,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.02,0.41,10.1,0.504,0.186,220,utide,220,False,False,True,False
+Ida 2021,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.02,0.37,-7.9,0.476,0.185,220,utide,220,False,False,False,False
+Ida 2021,8770808,High Island,open-coast,0.084,0.02,0.36,41.1,0.326,0.184,220,utide,220,False,False,False,False
+Ida 2021,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.01,0.36,10.1,0.512,0.168,220,utide,220,False,False,False,False
+Ida 2021,8768094,Calcasieu Pass,open-coast,0.035,0.03,0.35,12.1,0.467,0.166,220,utide,220,False,False,False,False
+Ida 2021,8770971,Rollover Pass,open-coast,0.048,0.02,0.35,42.1,0.316,0.185,220,utide,220,False,False,False,False
+Ida 2021,8771972,San Luis Pass,open-coast,0.054,0.01,0.35,139.1,0.5,0.166,220,utide,220,False,False,False,False
+Ida 2021,8771450,Galveston Pier 21,open-coast,0.051,0.02,0.34,11.1,0.527,0.164,220,utide,220,False,False,False,False
+Ida 2021,8772985,Sargent,open-coast,0.042,0.02,0.31,132.1,0.284,0.155,220,utide,220,False,False,False,False
+Ida 2021,8772471,Freeport Harbor,open-coast,0.053,0.01,0.3,139.1,0.379,0.152,220,utide,220,False,False,False,False
+Ida 2021,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.02,0.25,131.1,0.303,0.132,220,utide,220,False,False,False,False
+Ida 2021,8773146,Matagorda City,open-coast,0.112,0.02,0.24,130.1,0.239,0.139,220,utide,220,False,False,False,False
+Ida 2021,8773701,Port O'Connor,open-coast,0.114,0.02,0.22,144.1,0.35,0.126,220,utide,220,False,False,False,False
+Ida 2021,8775237,Port Aransas,open-coast,0.069,0.01,0.22,7.1,0.345,0.105,220,utide,220,False,False,False,False
+Ida 2021,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.01,0.22,7.1,0.317,0.106,220,utide,220,False,False,False,False
+Ida 2021,8776139,S. Bird Island,open-coast,0.066,0.01,0.12,-11.9,0.171,0.073,220,utide,220,False,False,False,False
+Ida 2021,8775792,Packery Channel,semi-enclosed,0.083,0.01,0.05,-67.9,-0.585,0.072,89,utide,89,False,False,False,False
+Idalia 2023,8728690,Apalachicola,open-coast,0.005,0.45,0.61,-0.9,0.739,0.134,304,utide,304,False,False,True,True
+Idalia 2023,8729210,Panama City Beach,open-coast,0.006,0.2,0.5,5.1,0.589,0.138,304,utide,304,False,False,True,True
+Idalia 2023,8729108,Panama City,open-coast,0.002,0.21,0.46,0.1,0.615,0.132,304,utide,304,False,False,True,True
+Idalia 2023,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.15,0.4,7.1,0.412,0.14,304,utide,304,False,False,True,False
+Idalia 2023,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.14,0.39,3.1,0.118,0.183,304,utide,304,False,False,False,False
+Idalia 2023,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.15,0.38,2.1,0.319,0.136,304,utide,304,False,False,False,False
+Idalia 2023,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.14,0.38,3.1,0.323,0.158,304,utide,304,False,False,False,False
+Idalia 2023,8761305,Shell Beach,open-coast,0.062,0.15,0.38,-189.9,0.06,0.197,304,utide,304,False,False,False,False
+Idalia 2023,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.05,0.35,-6.9,-0.213,0.146,304,utide,304,False,False,False,False
+Idalia 2023,8729840,Pensacola,open-coast,0.01,0.16,0.34,4.1,0.489,0.142,304,utide,304,False,False,False,False
+Idalia 2023,8735180,Dauphin Island,open-coast,0.009,0.13,0.34,3.1,0.373,0.137,304,utide,304,False,False,False,False
+Idalia 2023,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.07,0.34,86.1,-0.065,0.137,304,utide,304,False,False,False,False
+Idalia 2023,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.13,0.33,1.1,0.303,0.141,304,utide,304,False,False,False,False
+Idalia 2023,8735391,Dog River Bridge,semi-enclosed,0.03,0.14,0.29,3.1,0.215,0.126,304,utide,304,False,False,False,False
+Idalia 2023,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.05,0.29,26.1,-0.15,0.142,304,utide,304,False,False,False,False
+Idalia 2023,8771367,Sabine Offshore Light,open-coast,0.047,0.05,0.29,27.1,-0.092,0.137,304,utide,304,False,False,False,False
+Idalia 2023,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.05,0.28,42.1,0.281,0.133,304,utide,304,False,False,False,False
+Idalia 2023,8761724,Grand Isle,open-coast,0.037,0.05,0.28,-25.9,0.019,0.15,304,utide,304,False,False,False,False
+Idalia 2023,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.05,0.28,6.1,0.14,0.137,304,utide,304,False,False,False,False
+Idalia 2023,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.08,0.28,85.1,-0.057,0.127,304,utide,304,False,False,False,False
+Idalia 2023,8768094,Calcasieu Pass,open-coast,0.035,0.06,0.27,27.1,-0.193,0.138,304,utide,304,False,False,False,False
+Idalia 2023,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.16,0.26,4.1,0.053,0.131,304,utide,304,False,False,False,False
+Idalia 2023,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.05,0.26,28.1,-0.063,0.138,304,utide,304,False,False,False,False
+Idalia 2023,8771450,Galveston Pier 21,open-coast,0.051,0.05,0.26,27.1,-0.059,0.137,304,utide,304,False,False,False,False
+Idalia 2023,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.05,0.26,28.1,-0.02,0.134,304,utide,304,False,False,False,False
+Idalia 2023,8772471,Freeport Harbor,open-coast,0.053,0.05,0.25,29.1,0.111,0.121,304,utide,304,False,False,False,False
+Idalia 2023,8737048,Mobile State Docks,semi-enclosed,0.042,0.16,0.24,2.1,-0.011,0.128,304,utide,304,False,False,False,False
+Idalia 2023,8770808,High Island,open-coast,0.084,0.05,0.23,-74.9,-0.114,0.131,304,utide,304,False,False,False,False
+Idalia 2023,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.05,0.23,20.1,0.19,0.117,304,utide,304,False,False,False,False
+Idalia 2023,8771972,San Luis Pass,open-coast,0.054,0.05,0.22,29.1,0.063,0.12,304,utide,304,False,False,False,False
+Idalia 2023,8770971,Rollover Pass,open-coast,0.048,0.05,0.21,25.1,-0.088,0.129,304,utide,304,False,False,False,False
+Idalia 2023,8775237,Port Aransas,open-coast,0.069,0.05,0.2,6.1,0.184,0.102,304,utide,304,False,False,False,False
+Idalia 2023,8773146,Matagorda City,open-coast,0.112,0.05,0.19,11.1,0.045,0.11,304,utide,304,False,False,False,False
+Idalia 2023,8773701,Port O'Connor,open-coast,0.114,0.05,0.19,3.1,0.016,0.117,304,utide,304,False,False,False,False
+Idalia 2023,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.05,0.18,-0.9,0.298,0.1,304,utide,304,False,False,False,False
+Idalia 2023,8772985,Sargent,open-coast,0.042,0.05,0.16,11.1,0.164,0.086,304,utide,304,False,False,False,False
+Idalia 2023,8775792,Packery Channel,semi-enclosed,0.083,0.04,0.13,-5.9,0.529,0.084,304,utide,304,False,False,False,False
+Idalia 2023,8776139,S. Bird Island,open-coast,0.066,0.04,0.12,165.1,0.731,0.079,304,utide,304,False,False,False,False
 Ike 2008,8770971,Rollover Pass,open-coast,0.048,4.07,3.43,4.1,0.902,0.317,288,pred,297,False,False,True,True
-Ike 2008,8768094,Calcasieu Pass,open-coast,0.035,5.14,3.12,-1.9,0.77,0.546,340,utide,340,False,False,True,True
-Ike 2008,8771450,Galveston Pier 21,open-coast,0.051,2.49,2.96,-0.9,0.689,0.494,335,utide,335,False,False,True,True
-Ike 2008,8766072,Freshwater Canal Locks,semi-enclosed,0.029,2.64,2.65,4.1,0.685,0.536,340,utide,340,False,False,True,True
-Ike 2008,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,3.05,2.47,5.1,0.855,0.365,283,utide,283,False,False,True,True
+Ike 2008,8768094,Calcasieu Pass,open-coast,0.035,5.14,3.05,3.1,0.778,0.515,340,utide,340,False,False,True,True
+Ike 2008,8766072,Freshwater Canal Locks,semi-enclosed,0.029,2.64,2.89,4.1,0.708,0.49,340,utide,340,False,False,True,True
+Ike 2008,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,3.05,2.88,5.1,0.907,0.401,283,utide,283,False,False,True,True
+Ike 2008,8771450,Galveston Pier 21,open-coast,0.051,2.49,2.86,5.1,0.7,0.461,335,utide,335,False,False,True,True
 Ike 2008,8775792,Packery Channel,semi-enclosed,0.083,0.3,0.78,3.1,0.733,0.225,334,pred,353,False,False,True,True
-Ike 2008,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.99,2.95,258.1,0.603,0.656,340,utide,340,False,False,True,False
-Ike 2008,8761305,Shell Beach,open-coast,0.062,1.45,2.63,254.1,0.652,0.529,340,utide,340,False,False,True,False
-Ike 2008,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.43,2.0,12.1,0.081,0.668,340,utide,340,False,False,True,False
-Ike 2008,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.53,1.66,253.1,0.643,0.476,340,utide,340,False,False,True,False
-Ike 2008,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.55,1.41,7.1,0.767,0.369,330,utide,330,False,False,True,False
-Ike 2008,8761724,Grand Isle,open-coast,0.037,0.72,1.35,265.1,0.742,0.465,211,utide,211,False,False,True,False
-Ike 2008,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.44,1.33,256.1,0.612,0.456,340,utide,340,False,False,True,False
-Ike 2008,8737048,Mobile State Docks,semi-enclosed,0.042,0.44,1.18,256.1,0.618,0.439,340,utide,340,False,False,True,False
-Ike 2008,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.22,1.18,254.1,0.627,0.369,340,utide,340,False,False,True,False
-Ike 2008,8735180,Dauphin Island,open-coast,0.009,0.41,1.08,12.1,0.675,0.386,340,utide,340,False,False,True,False
+Ike 2008,8729108,Panama City,open-coast,0.002,0.43,0.69,2.1,0.707,0.193,340,utide,340,False,False,True,True
+Ike 2008,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.99,2.88,258.1,0.596,0.575,340,utide,340,False,False,True,False
+Ike 2008,8761305,Shell Beach,open-coast,0.062,1.45,2.64,254.1,0.662,0.511,340,utide,340,False,False,True,False
+Ike 2008,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.43,1.92,9.1,0.099,0.624,340,utide,340,False,False,True,False
+Ike 2008,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.53,1.56,253.1,0.658,0.389,340,utide,340,False,False,True,False
+Ike 2008,8761724,Grand Isle,open-coast,0.037,0.72,1.36,265.1,0.75,0.45,211,utide,211,False,False,True,False
+Ike 2008,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.55,1.28,263.1,0.834,0.284,330,utide,330,False,False,True,False
+Ike 2008,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.44,1.26,257.1,0.64,0.369,340,utide,340,False,False,True,False
+Ike 2008,8737048,Mobile State Docks,semi-enclosed,0.042,0.44,1.13,257.1,0.645,0.36,340,utide,340,False,False,True,False
+Ike 2008,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.22,1.1,254.1,0.654,0.287,340,utide,340,False,False,True,False
 Ike 2008,8773701,Port O'Connor,open-coast,0.114,0.3,1.06,9.1,0.63,0.295,340,pred,360,False,False,True,False
-Ike 2008,8729840,Pensacola,open-coast,0.01,0.42,1.05,9.1,0.674,0.369,340,utide,340,False,False,True,False
-Ike 2008,8729108,Panama City,open-coast,0.002,0.43,0.96,7.1,0.611,0.309,340,utide,340,False,False,True,False
 Ike 2008,8775237,Port Aransas,open-coast,0.069,0.3,0.96,8.1,0.842,0.257,339,pred,359,False,False,True,False
-Ike 2008,8728690,Apalachicola,open-coast,0.005,0.64,0.68,-24.9,0.489,0.283,66,utide,66,False,False,True,False
-Isaac 2012,8761305,Shell Beach,open-coast,0.062,4.13,2.94,2.1,0.939,0.353,280,utide,280,False,False,True,True
-Isaac 2012,8761724,Grand Isle,open-coast,0.037,1.67,1.42,0.1,0.841,0.206,280,utide,280,False,False,True,True
-Isaac 2012,8728690,Apalachicola,open-coast,0.005,0.78,1.06,-0.9,0.744,0.214,280,utide,280,False,False,True,True
-Isaac 2012,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.66,0.99,-2.9,0.809,0.213,280,utide,280,False,False,True,True
-Isaac 2012,8729108,Panama City,open-coast,0.002,0.51,0.94,3.1,0.714,0.197,280,utide,280,False,False,True,True
-Isaac 2012,8729840,Pensacola,open-coast,0.01,0.59,0.88,4.1,0.815,0.195,280,utide,280,False,False,True,True
-Isaac 2012,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,2.84,2.53,-8.9,0.936,0.261,280,utide,280,False,False,True,False
-Isaac 2012,8741533,Pascagoula NOAA Lab,open-coast,0.026,1.23,1.46,-9.9,0.884,0.234,280,utide,280,False,False,True,False
-Isaac 2012,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.86,1.34,-7.9,0.837,0.26,280,utide,280,False,False,True,False
-Isaac 2012,8737048,Mobile State Docks,semi-enclosed,0.042,1.11,1.26,-10.9,0.868,0.217,280,utide,280,False,False,True,False
-Isaac 2012,8735391,Dog River Bridge,semi-enclosed,0.03,1.06,1.25,-8.9,0.869,0.215,280,utide,280,False,False,True,False
-Isaac 2012,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.97,1.23,-8.9,0.876,0.215,280,utide,280,False,False,True,False
-Isaac 2012,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.62,1.15,-13.9,0.789,0.262,280,utide,280,False,False,True,False
-Isaac 2012,8735180,Dauphin Island,open-coast,0.009,0.65,0.98,-7.9,0.854,0.214,280,utide,280,False,False,True,False
-Isaac 2012,8764227,"LAWMA, Amerada Pass",open-coast,0.084,0.96,0.71,-12.9,0.633,0.3,280,utide,280,False,False,True,False
+Ike 2008,8729840,Pensacola,open-coast,0.01,0.42,0.92,250.1,0.73,0.274,340,utide,340,False,False,True,False
+Ike 2008,8735180,Dauphin Island,open-coast,0.009,0.41,0.9,10.1,0.737,0.294,340,utide,340,False,False,True,False
+Ike 2008,8728690,Apalachicola,open-coast,0.005,0.64,0.41,-29.9,-0.133,0.178,66,utide,66,False,False,True,False
+Isaac 2012,8761305,Shell Beach,open-coast,0.062,4.13,3.11,4.1,0.954,0.318,280,utide,280,False,False,True,True
+Isaac 2012,8761724,Grand Isle,open-coast,0.037,1.67,1.15,0.1,0.879,0.143,280,utide,280,False,False,True,True
+Isaac 2012,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.66,1.0,-2.9,0.942,0.142,280,utide,280,False,False,True,True
+Isaac 2012,8728690,Apalachicola,open-coast,0.005,0.78,0.92,-1.9,0.895,0.113,280,utide,280,False,False,True,True
+Isaac 2012,8729840,Pensacola,open-coast,0.01,0.59,0.83,1.1,0.918,0.097,280,utide,280,False,False,True,True
+Isaac 2012,8729108,Panama City,open-coast,0.002,0.51,0.63,3.1,0.888,0.085,280,utide,280,False,False,True,True
+Isaac 2012,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,2.84,2.23,-9.9,0.963,0.186,280,utide,280,False,False,True,False
+Isaac 2012,8741533,Pascagoula NOAA Lab,open-coast,0.026,1.23,1.19,-9.9,0.943,0.144,280,utide,280,False,False,True,False
+Isaac 2012,8737048,Mobile State Docks,semi-enclosed,0.042,1.11,1.06,-13.9,0.929,0.133,280,utide,280,False,False,True,False
+Isaac 2012,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.86,1.04,-7.9,0.917,0.166,280,utide,280,False,False,True,False
+Isaac 2012,8735391,Dog River Bridge,semi-enclosed,0.03,1.06,0.99,-12.9,0.94,0.118,280,utide,280,False,False,True,False
+Isaac 2012,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.97,0.98,8.1,0.947,0.121,280,utide,280,False,False,True,False
+Isaac 2012,8735180,Dauphin Island,open-coast,0.009,0.65,0.94,9.1,0.941,0.122,280,utide,280,False,False,True,False
+Isaac 2012,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.62,0.92,-20.9,0.881,0.168,280,utide,280,False,False,True,False
 Isaac 2012,8770971,Rollover Pass,open-coast,0.048,0.04,0.54,-25.9,0.819,0.268,275,pred,307,False,False,True,False
-Isaac 2012,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.21,0.52,-22.9,0.722,0.218,280,utide,280,False,False,True,False
-Isaac 2012,8768094,Calcasieu Pass,open-coast,0.035,0.06,0.41,150.1,0.708,0.199,280,utide,280,False,False,True,False
-Isaac 2012,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.04,0.35,41.1,0.553,0.197,280,utide,280,False,False,False,False
-Isaac 2012,8771450,Galveston Pier 21,open-coast,0.051,0.04,0.34,58.1,0.614,0.172,280,utide,280,False,False,False,False
-Isaac 2012,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.06,0.33,150.1,0.683,0.197,280,utide,280,False,False,False,False
+Isaac 2012,8764227,"LAWMA, Amerada Pass",open-coast,0.084,0.96,0.52,-12.9,0.801,0.238,280,utide,280,False,False,True,False
+Isaac 2012,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.21,0.29,-22.9,0.865,0.13,280,utide,280,False,False,False,False
+Isaac 2012,8768094,Calcasieu Pass,open-coast,0.035,0.06,0.19,150.1,0.918,0.084,280,utide,280,False,False,False,False
+Isaac 2012,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.06,0.19,146.1,0.936,0.091,280,utide,280,False,False,False,False
+Isaac 2012,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.04,0.19,53.1,0.906,0.076,280,utide,280,False,False,False,False
+Isaac 2012,8771450,Galveston Pier 21,open-coast,0.051,0.04,0.18,53.1,0.913,0.064,280,utide,280,False,False,False,False
 Isaac 2012,8773701,Port O'Connor,open-coast,0.114,0.05,0.18,145.1,-0.086,0.103,209,pred,241,False,False,False,False
 Isaac 2012,8775237,Port Aransas,open-coast,0.069,0.04,0.18,131.1,0.581,0.118,205,pred,226,False,False,False,False
-Katrina 2005,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,1.15,2.05,0.1,0.84,0.328,178,utide,178,False,False,True,True
-Katrina 2005,8729840,Pensacola,open-coast,0.01,0.69,1.7,0.1,0.92,0.35,178,utide,178,False,False,True,True
-Katrina 2005,8735180,Dauphin Island,open-coast,0.009,0.91,1.67,-0.9,0.892,0.281,178,utide,178,False,False,True,True
-Katrina 2005,8761724,Grand Isle,open-coast,0.037,0.46,1.54,-2.9,-0.211,0.448,178,utide,178,False,False,True,True
-Katrina 2005,8729210,Panama City Beach,open-coast,0.006,0.41,1.06,1.1,0.832,0.32,178,utide,178,False,False,True,True
-Katrina 2005,8728690,Apalachicola,open-coast,0.005,0.33,0.99,2.1,0.813,0.332,178,utide,178,False,False,True,True
-Katrina 2005,8729108,Panama City,open-coast,0.002,0.41,0.89,1.1,0.8,0.292,178,utide,178,False,False,True,True
+Katrina 2005,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,1.15,1.87,0.1,0.864,0.294,178,utide,178,False,False,True,True
+Katrina 2005,8735180,Dauphin Island,open-coast,0.009,0.91,1.64,-0.9,0.932,0.267,178,utide,178,False,False,True,True
+Katrina 2005,8729840,Pensacola,open-coast,0.01,0.69,1.61,0.1,0.937,0.349,178,utide,178,False,False,True,True
+Katrina 2005,8761724,Grand Isle,open-coast,0.037,0.46,1.4,-2.9,-0.129,0.419,178,utide,178,False,False,True,True
+Katrina 2005,8729210,Panama City Beach,open-coast,0.006,0.41,0.97,-7.9,0.893,0.292,178,utide,178,False,False,True,False
+Katrina 2005,8728690,Apalachicola,open-coast,0.005,0.33,0.85,-23.9,0.875,0.292,178,utide,178,False,False,True,False
+Katrina 2005,8729108,Panama City,open-coast,0.002,0.41,0.83,-6.9,0.869,0.258,178,utide,178,False,False,True,False
 Katrina 2005,8770971,Rollover Pass,open-coast,0.048,0.13,0.53,8.1,-0.088,0.226,174,pred,212,False,False,True,False
-Katrina 2005,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.11,0.53,24.1,-0.028,0.225,178,utide,178,False,False,True,False
-Katrina 2005,8771450,Galveston Pier 21,open-coast,0.051,0.11,0.53,20.1,-0.008,0.209,178,utide,178,False,False,True,False
-Katrina 2005,8768094,Calcasieu Pass,open-coast,0.035,0.15,0.49,20.1,-0.093,0.233,178,utide,178,False,False,True,False
+Katrina 2005,8768094,Calcasieu Pass,open-coast,0.035,0.15,0.43,28.1,-0.164,0.198,178,utide,178,False,False,True,False
+Katrina 2005,8771450,Galveston Pier 21,open-coast,0.051,0.11,0.42,20.1,0.014,0.17,178,utide,178,False,False,True,False
+Katrina 2005,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.11,0.38,10.1,-0.046,0.161,178,utide,178,False,False,False,False
 Katrina 2005,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.18,0.37,29.1,0.2,0.173,149,pred,168,False,False,False,False
 Katrina 2005,8775237,Port Aransas,open-coast,0.069,0.08,0.34,21.1,0.696,0.126,178,pred,216,False,False,False,False
 Katrina 2005,8773701,Port O'Connor,open-coast,0.114,0.09,0.24,22.1,0.758,0.078,133,pred,167,False,False,False,False
-Katrina 2005,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.37,0.2,95.1,0.125,0.113,48,utide,48,False,False,False,False
 Katrina 2005,8775792,Packery Channel,semi-enclosed,0.083,0.08,0.19,27.1,0.729,0.07,176,pred,213,False,False,False,False
-Laura 2020,8768094,Calcasieu Pass,open-coast,0.035,2.41,2.77,0.1,0.754,0.289,220,utide,220,False,False,True,True
-Laura 2020,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.58,1.44,-1.9,0.601,0.306,220,utide,220,False,False,True,True
-Laura 2020,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,1.42,1.38,-1.9,0.628,0.307,220,utide,220,False,False,True,True
-Laura 2020,8771450,Galveston Pier 21,open-coast,0.051,0.78,1.11,1.1,0.202,0.292,220,utide,220,False,False,True,True
-Laura 2020,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.74,1.1,1.1,0.09,0.318,220,utide,220,False,False,True,True
-Laura 2020,8772471,Freeport Harbor,open-coast,0.053,0.59,1.1,1.1,0.384,0.285,220,utide,220,False,False,True,True
-Laura 2020,8770971,Rollover Pass,open-coast,0.048,0.61,1.08,-2.9,-0.133,0.34,220,utide,220,False,False,True,True
-Laura 2020,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.71,1.07,1.1,0.077,0.344,220,utide,220,False,False,True,True
-Laura 2020,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.85,0.92,1.1,0.236,0.269,220,utide,220,False,False,True,True
-Laura 2020,8770808,High Island,open-coast,0.084,0.75,0.76,-3.9,-0.106,0.308,220,utide,220,False,False,True,True
-Laura 2020,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.22,0.73,1.1,0.598,0.184,220,utide,220,False,False,True,True
-Laura 2020,8773701,Port O'Connor,open-coast,0.114,0.22,0.69,0.1,0.612,0.175,220,utide,220,False,False,True,True
-Laura 2020,8772985,Sargent,open-coast,0.042,0.36,0.63,-0.9,0.379,0.194,220,utide,220,False,False,True,True
-Laura 2020,8728690,Apalachicola,open-coast,0.005,0.14,0.56,-1.9,0.385,0.221,220,utide,220,False,False,True,True
-Laura 2020,8773146,Matagorda City,open-coast,0.112,0.28,0.55,0.1,0.356,0.176,220,utide,220,False,False,True,True
-Laura 2020,8766072,Freshwater Canal Locks,semi-enclosed,0.029,3.06,0.95,7.1,0.609,0.271,168,utide,168,False,False,True,False
-Laura 2020,8771972,San Luis Pass,open-coast,0.054,0.8,0.94,6.1,0.26,0.287,220,utide,220,False,False,True,False
-Laura 2020,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.19,0.91,-10.9,0.508,0.334,220,utide,220,False,False,True,False
-Laura 2020,8761305,Shell Beach,open-coast,0.062,0.25,0.82,7.1,0.437,0.339,220,utide,220,False,False,True,False
-Laura 2020,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.23,0.75,-15.9,0.52,0.217,220,utide,220,False,False,True,False
-Laura 2020,8761724,Grand Isle,open-coast,0.037,0.32,0.73,-13.9,0.547,0.216,220,utide,220,False,False,True,False
-Laura 2020,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.16,0.71,16.1,0.527,0.253,220,utide,220,False,False,True,False
-Laura 2020,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.12,0.7,17.1,0.476,0.251,220,utide,220,False,False,True,False
-Laura 2020,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.13,0.67,28.1,0.455,0.234,220,utide,220,False,False,True,False
-Laura 2020,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.13,0.66,27.1,0.488,0.225,220,utide,220,False,False,True,False
-Laura 2020,8735391,Dog River Bridge,semi-enclosed,0.03,0.15,0.65,16.1,0.519,0.229,220,utide,220,False,False,True,False
-Laura 2020,8737048,Mobile State Docks,semi-enclosed,0.042,0.16,0.65,16.1,0.549,0.233,220,utide,220,False,False,True,False
-Laura 2020,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.12,0.63,28.1,0.524,0.229,220,utide,220,False,False,True,False
-Laura 2020,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.32,0.61,7.1,0.532,0.184,220,utide,220,False,False,True,False
-Laura 2020,8735180,Dauphin Island,open-coast,0.009,0.09,0.58,51.1,0.488,0.231,220,utide,220,False,False,True,False
-Laura 2020,8775237,Port Aransas,open-coast,0.069,0.32,0.58,7.1,0.574,0.164,220,utide,220,False,False,True,False
-Laura 2020,8729210,Panama City Beach,open-coast,0.006,0.1,0.56,52.1,0.346,0.192,220,utide,220,False,False,True,False
-Laura 2020,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.09,0.55,29.1,0.435,0.193,220,utide,220,False,False,True,False
-Laura 2020,8729108,Panama City,open-coast,0.002,0.1,0.5,53.1,0.427,0.176,220,utide,220,False,False,True,False
-Laura 2020,8729840,Pensacola,open-coast,0.01,0.09,0.5,54.1,0.53,0.195,220,utide,220,False,False,True,False
-Laura 2020,8775792,Packery Channel,semi-enclosed,0.083,0.33,0.38,3.1,0.58,0.123,220,utide,220,False,False,False,False
-Laura 2020,8776139,S. Bird Island,open-coast,0.066,0.32,0.21,-0.9,0.52,0.128,220,utide,220,False,False,False,False
+Katrina 2005,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.37,0.08,91.1,0.52,0.047,48,utide,48,False,False,False,False
+Laura 2020,8768094,Calcasieu Pass,open-coast,0.035,2.41,2.45,0.1,0.796,0.215,220,utide,220,False,False,True,True
+Laura 2020,8764227,"LAWMA, Amerada Pass",open-coast,0.022,1.58,1.17,-1.9,0.52,0.293,220,utide,220,False,False,True,True
+Laura 2020,8772471,Freeport Harbor,open-coast,0.053,0.59,0.89,0.1,0.557,0.192,220,utide,220,False,False,True,True
+Laura 2020,8770971,Rollover Pass,open-coast,0.048,0.61,0.86,3.1,-0.201,0.283,220,utide,220,False,False,True,True
+Laura 2020,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.74,0.85,1.1,0.231,0.225,220,utide,220,False,False,True,True
+Laura 2020,8770808,High Island,open-coast,0.084,0.75,0.64,4.1,-0.199,0.248,220,utide,220,False,False,True,True
+Laura 2020,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.32,0.63,2.1,0.55,0.125,220,utide,220,False,False,True,True
+Laura 2020,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.22,0.53,-3.9,0.683,0.124,220,utide,220,False,False,True,True
+Laura 2020,8775237,Port Aransas,open-coast,0.069,0.32,0.53,1.1,0.584,0.113,220,utide,220,False,False,True,True
+Laura 2020,8773701,Port O'Connor,open-coast,0.114,0.22,0.48,0.1,0.656,0.128,220,utide,220,False,False,True,True
+Laura 2020,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.23,0.47,3.1,0.783,0.129,220,utide,220,False,False,True,True
+Laura 2020,8772985,Sargent,open-coast,0.042,0.36,0.46,-0.9,0.439,0.14,220,utide,220,False,False,True,True
+Laura 2020,8761724,Grand Isle,open-coast,0.037,0.32,0.44,3.1,0.792,0.112,220,utide,220,False,False,True,True
+Laura 2020,8773146,Matagorda City,open-coast,0.112,0.28,0.41,-2.9,0.382,0.134,220,utide,220,False,False,True,True
+Laura 2020,8766072,Freshwater Canal Locks,semi-enclosed,0.029,3.06,1.15,7.1,0.81,0.227,168,utide,168,False,False,True,False
+Laura 2020,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,1.42,1.06,-8.9,0.551,0.271,220,utide,220,False,False,True,False
+Laura 2020,8771972,San Luis Pass,open-coast,0.054,0.8,0.95,12.1,0.331,0.227,220,utide,220,False,False,True,False
+Laura 2020,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.71,0.91,9.1,0.218,0.251,220,utide,220,False,False,True,False
+Laura 2020,8771450,Galveston Pier 21,open-coast,0.051,0.78,0.88,9.1,0.3,0.218,220,utide,220,False,False,True,False
+Laura 2020,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.85,0.81,9.1,0.296,0.208,220,utide,220,False,False,True,False
+Laura 2020,8761305,Shell Beach,open-coast,0.062,0.25,0.68,41.1,0.493,0.241,220,utide,220,False,False,True,False
+Laura 2020,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.19,0.53,6.1,0.675,0.207,220,utide,220,False,False,True,False
+Laura 2020,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.16,0.38,13.1,0.656,0.122,220,utide,220,False,False,False,False
+Laura 2020,8737048,Mobile State Docks,semi-enclosed,0.042,0.16,0.36,13.1,0.665,0.112,220,utide,220,False,False,False,False
+Laura 2020,8735391,Dog River Bridge,semi-enclosed,0.03,0.15,0.35,34.1,0.651,0.107,220,utide,220,False,False,False,False
+Laura 2020,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.12,0.34,44.1,0.649,0.109,220,utide,220,False,False,False,False
+Laura 2020,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.12,0.34,34.1,0.629,0.124,220,utide,220,False,False,False,False
+Laura 2020,8728690,Apalachicola,open-coast,0.005,0.14,0.33,2.1,0.508,0.091,220,utide,220,False,False,False,False
+Laura 2020,8735180,Dauphin Island,open-coast,0.009,0.09,0.33,43.1,0.572,0.111,220,utide,220,False,False,False,False
+Laura 2020,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.13,0.33,21.1,0.644,0.107,220,utide,220,False,False,False,False
+Laura 2020,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.13,0.33,25.1,0.628,0.111,220,utide,220,False,False,False,False
+Laura 2020,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.09,0.32,45.1,0.562,0.115,220,utide,220,False,False,False,False
+Laura 2020,8775792,Packery Channel,semi-enclosed,0.083,0.33,0.28,0.1,0.621,0.075,220,utide,220,False,False,False,False
+Laura 2020,8729840,Pensacola,open-coast,0.01,0.09,0.25,45.1,0.689,0.071,220,utide,220,False,False,False,False
+Laura 2020,8729210,Panama City Beach,open-coast,0.006,0.1,0.23,52.1,0.476,0.067,220,utide,220,False,False,False,False
+Laura 2020,8729108,Panama City,open-coast,0.002,0.1,0.2,45.1,0.57,0.057,220,utide,220,False,False,False,False
+Laura 2020,8776139,S. Bird Island,open-coast,0.066,0.32,0.18,-4.9,0.595,0.057,220,utide,220,False,False,False,False
 Laura 2020,8771367,Sabine Offshore Light,open-coast,0.047,0.59,-7.04,17.1,0.643,7.51,161,pred,162,False,False,False,False
-Michael 2018,8728690,Apalachicola,open-coast,0.005,2.53,2.31,0.1,0.893,0.289,214,utide,214,False,False,True,True
-Michael 2018,8729108,Panama City,open-coast,0.002,0.34,1.6,4.1,0.659,0.331,214,utide,214,False,False,True,True
-Michael 2018,8729210,Panama City Beach,open-coast,0.006,0.52,1.11,3.1,0.727,0.3,214,utide,214,False,False,True,True
-Michael 2018,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.31,0.75,-1.9,0.409,0.322,214,utide,214,False,False,True,True
-Michael 2018,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.33,0.7,-3.9,0.214,0.341,214,utide,214,False,False,True,True
-Michael 2018,8737048,Mobile State Docks,semi-enclosed,0.042,0.34,0.64,-4.9,0.189,0.329,214,utide,214,False,False,True,True
-Michael 2018,8761305,Shell Beach,open-coast,0.062,0.26,1.05,22.1,0.579,0.453,214,utide,214,False,False,True,False
-Michael 2018,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.24,0.98,44.1,0.386,0.427,214,utide,214,False,False,True,False
-Michael 2018,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.26,0.83,18.1,0.488,0.348,214,utide,214,False,False,True,False
-Michael 2018,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.11,0.82,54.1,0.167,0.388,214,utide,214,False,False,True,False
-Michael 2018,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.3,0.78,19.1,0.4,0.33,214,utide,214,False,False,True,False
-Michael 2018,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.13,0.77,50.1,0.226,0.389,214,utide,214,False,False,True,False
-Michael 2018,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.11,0.77,50.1,0.306,0.414,214,utide,214,False,False,True,False
-Michael 2018,8735180,Dauphin Island,open-coast,0.009,0.32,0.76,19.1,0.577,0.326,214,utide,214,False,False,True,False
-Michael 2018,8770971,Rollover Pass,open-coast,0.048,0.12,0.74,45.1,0.352,0.382,214,utide,214,False,False,True,False
-Michael 2018,8772471,Freeport Harbor,open-coast,0.053,0.1,0.72,111.1,0.281,0.397,214,utide,214,False,False,True,False
-Michael 2018,8729840,Pensacola,open-coast,0.01,0.24,0.71,18.1,0.678,0.312,214,utide,214,False,False,True,False
-Michael 2018,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.26,0.71,19.1,0.448,0.322,214,utide,214,False,False,True,False
-Michael 2018,8771972,San Luis Pass,open-coast,0.054,0.1,0.71,106.1,0.44,0.462,165,utide,165,False,False,True,False
-Michael 2018,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.14,0.69,50.1,0.209,0.351,214,utide,214,False,False,True,False
-Michael 2018,8768094,Calcasieu Pass,open-coast,0.035,0.14,0.69,53.1,0.253,0.38,214,utide,214,False,False,True,False
-Michael 2018,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.1,0.69,47.1,0.409,0.409,214,utide,214,False,False,True,False
-Michael 2018,8735391,Dog River Bridge,semi-enclosed,0.03,0.27,0.68,20.1,0.267,0.322,214,utide,214,False,False,True,False
-Michael 2018,8761724,Grand Isle,open-coast,0.037,0.11,0.68,106.1,0.358,0.339,214,utide,214,False,False,True,False
-Michael 2018,8771450,Galveston Pier 21,open-coast,0.051,0.11,0.68,48.1,0.373,0.395,214,utide,214,False,False,True,False
-Michael 2018,8770808,High Island,open-coast,0.084,0.12,0.67,45.1,0.326,0.373,214,utide,214,False,False,True,False
-Michael 2018,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.15,0.66,51.1,0.224,0.328,214,utide,214,False,False,True,False
-Michael 2018,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.11,0.65,104.1,0.329,0.318,214,utide,214,False,False,True,False
-Michael 2018,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.12,0.65,15.1,0.393,0.319,214,utide,214,False,False,True,False
-Michael 2018,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.14,0.61,33.1,0.073,0.37,214,utide,214,False,False,True,False
-Michael 2018,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.12,0.6,28.1,0.224,0.386,214,utide,214,False,False,True,False
-Michael 2018,8775237,Port Aransas,open-coast,0.069,0.14,0.58,25.1,0.097,0.375,214,utide,214,False,False,True,False
-Michael 2018,8772985,Sargent,open-coast,0.042,0.1,0.57,109.1,0.235,0.389,214,utide,214,False,False,True,False
-Michael 2018,8773701,Port O'Connor,open-coast,0.114,0.12,0.57,105.1,0.243,0.389,214,utide,214,False,False,True,False
-Michael 2018,8773146,Matagorda City,open-coast,0.112,0.11,0.54,83.1,0.145,0.408,214,utide,214,False,False,True,False
-Michael 2018,8775792,Packery Channel,semi-enclosed,0.083,0.14,0.51,25.1,0.045,0.355,214,utide,214,False,False,True,False
-Michael 2018,8776139,S. Bird Island,open-coast,0.066,0.15,0.47,21.1,-0.112,0.326,214,utide,214,False,False,True,False
-Nate 2017,8741533,Pascagoula NOAA Lab,open-coast,0.026,1.83,1.95,0.1,0.847,0.35,178,utide,178,False,False,True,True
-Nate 2017,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,1.55,1.82,-0.9,0.812,0.36,178,utide,178,False,False,True,True
-Nate 2017,8738043,West Fowl River Bridge,semi-enclosed,0.054,1.37,1.78,-1.9,0.742,0.375,178,utide,178,False,False,True,True
-Nate 2017,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,1.28,1.75,-1.9,0.721,0.432,178,utide,178,False,False,True,True
-Nate 2017,8736897,Coast Guard Sector Mobile,open-coast,0.019,1.38,1.72,-0.9,0.84,0.358,178,utide,178,False,False,True,True
-Nate 2017,8737048,Mobile State Docks,semi-enclosed,0.042,1.4,1.66,-2.9,0.825,0.338,178,utide,178,False,False,True,True
-Nate 2017,8761305,Shell Beach,open-coast,0.062,1.69,1.54,-2.9,0.756,0.481,178,utide,178,False,False,True,True
-Nate 2017,8735391,Dog River Bridge,semi-enclosed,0.03,1.18,1.48,-1.9,0.813,0.337,178,utide,178,False,False,True,True
-Nate 2017,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.71,1.23,0.1,0.808,0.346,178,utide,178,False,False,True,True
-Nate 2017,8735180,Dauphin Island,open-coast,0.009,0.3,0.97,5.1,0.743,0.343,178,utide,178,False,False,True,True
-Nate 2017,8729840,Pensacola,open-coast,0.01,0.24,0.93,-1.9,0.788,0.358,178,utide,178,False,False,True,True
-Nate 2017,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.29,0.75,-0.9,0.504,0.318,178,utide,178,False,False,True,True
-Nate 2017,8761724,Grand Isle,open-coast,0.037,0.1,0.65,3.1,-0.303,0.375,178,utide,178,False,False,True,True
-Nate 2017,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.08,0.64,1.1,-0.079,0.354,178,utide,178,False,False,True,True
-Nate 2017,8728690,Apalachicola,open-coast,0.005,0.11,0.98,7.1,0.568,0.363,178,utide,178,False,False,True,False
-Nate 2017,8729210,Panama City Beach,open-coast,0.006,0.15,0.87,9.1,0.681,0.34,178,utide,178,False,False,True,False
-Nate 2017,8729108,Panama City,open-coast,0.002,0.16,0.77,7.1,0.639,0.324,178,utide,178,False,False,True,False
-Nate 2017,8771972,San Luis Pass,open-coast,0.054,0.04,0.77,112.1,0.46,0.474,178,utide,178,False,False,True,False
-Nate 2017,8772471,Freeport Harbor,open-coast,0.053,0.04,0.7,26.1,0.459,0.438,178,utide,178,False,False,True,False
-Nate 2017,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.07,0.69,24.1,0.366,0.428,178,utide,178,False,False,True,False
-Nate 2017,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.04,0.68,111.1,0.42,0.438,178,utide,178,False,False,True,False
-Nate 2017,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.06,0.67,24.1,0.276,0.391,178,utide,178,False,False,True,False
-Nate 2017,8770971,Rollover Pass,open-coast,0.048,0.05,0.64,20.1,0.185,0.424,178,utide,178,False,False,True,False
-Nate 2017,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.03,0.64,70.1,0.339,0.438,178,utide,178,False,False,True,False
-Nate 2017,8771450,Galveston Pier 21,open-coast,0.051,0.04,0.63,110.1,0.396,0.44,178,utide,178,False,False,True,False
-Nate 2017,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.04,0.63,110.1,0.371,0.452,178,utide,178,False,False,True,False
-Nate 2017,8772985,Sargent,open-coast,0.042,0.03,0.62,87.1,0.506,0.452,178,utide,178,False,False,True,False
-Nate 2017,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.03,0.62,-23.9,0.381,0.435,178,utide,178,False,False,True,False
-Nate 2017,8773146,Matagorda City,open-coast,0.112,0.03,0.61,53.1,0.463,0.458,178,utide,178,False,False,True,False
-Nate 2017,8775237,Port Aransas,open-coast,0.069,0.03,0.61,70.1,0.341,0.445,178,utide,178,False,False,True,False
-Nate 2017,8768094,Calcasieu Pass,open-coast,0.035,0.08,0.6,24.1,0.324,0.399,178,utide,178,False,False,True,False
-Nate 2017,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.06,0.59,23.1,0.073,0.346,178,utide,178,False,False,True,False
-Nate 2017,8773701,Port O'Connor,open-coast,0.114,0.03,0.57,-24.9,0.249,0.446,178,utide,178,False,False,True,False
-Nate 2017,8770808,High Island,open-coast,0.084,0.05,0.56,19.1,0.113,0.37,178,utide,178,False,False,True,False
-Nate 2017,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.07,0.55,-12.9,0.039,0.312,178,utide,178,False,False,True,False
-Nate 2017,8775792,Packery Channel,semi-enclosed,0.083,0.03,0.55,12.1,0.087,0.442,178,utide,178,False,False,True,False
-Nate 2017,8776139,S. Bird Island,open-coast,0.066,0.03,0.52,10.1,0.089,0.416,178,utide,178,False,False,True,False
-Nicholas 2021,8772471,Freeport Harbor,open-coast,0.053,1.06,1.31,1.1,0.704,0.248,112,utide,112,False,False,True,True
-Nicholas 2021,8771972,San Luis Pass,open-coast,0.054,1.18,1.22,0.1,0.808,0.217,112,utide,112,False,False,True,True
-Nicholas 2021,8772985,Sargent,open-coast,0.042,1.01,1.04,-0.9,0.494,0.332,112,utide,112,False,False,True,True
-Nicholas 2021,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,1.09,1.0,-2.9,0.716,0.238,112,utide,112,False,False,True,True
-Nicholas 2021,8770971,Rollover Pass,open-coast,0.048,1.18,0.98,-2.9,0.163,0.397,112,utide,112,False,False,True,True
-Nicholas 2021,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,1.19,0.96,1.1,0.691,0.263,112,utide,112,False,False,True,True
-Nicholas 2021,8771450,Galveston Pier 21,open-coast,0.051,0.98,0.85,-2.9,0.722,0.233,112,utide,112,False,False,True,True
-Nicholas 2021,8773146,Matagorda City,open-coast,0.112,0.81,0.81,-1.9,0.365,0.334,112,utide,112,False,False,True,True
-Nicholas 2021,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.62,0.78,-0.9,0.554,0.233,112,utide,112,False,False,True,True
-Nicholas 2021,8770808,High Island,open-coast,0.084,1.2,0.76,-3.9,0.036,0.409,112,utide,112,False,False,True,True
-Nicholas 2021,8773701,Port O'Connor,open-coast,0.114,0.62,0.76,-0.9,0.635,0.228,112,utide,112,False,False,True,True
-Nicholas 2021,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.12,0.68,3.1,0.446,0.256,112,utide,112,False,False,True,True
-Nicholas 2021,8735391,Dog River Bridge,semi-enclosed,0.03,0.13,0.66,2.1,0.44,0.244,112,utide,112,False,False,True,True
-Nicholas 2021,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.11,0.66,2.1,0.46,0.243,112,utide,112,False,False,True,True
-Nicholas 2021,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.15,0.66,2.1,0.454,0.253,112,utide,112,False,False,True,True
-Nicholas 2021,8737048,Mobile State Docks,semi-enclosed,0.042,0.15,0.61,2.1,0.451,0.24,112,utide,112,False,False,True,True
-Nicholas 2021,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.1,0.6,1.1,0.44,0.26,112,utide,112,False,False,True,True
-Nicholas 2021,8735180,Dauphin Island,open-coast,0.009,0.07,0.59,2.1,0.434,0.216,112,utide,112,False,False,True,True
-Nicholas 2021,8729840,Pensacola,open-coast,0.01,0.04,0.5,1.1,0.476,0.205,112,utide,112,False,False,True,True
-Nicholas 2021,8729108,Panama City,open-coast,0.002,0.03,0.44,2.1,0.338,0.2,112,utide,112,False,False,True,True
-Nicholas 2021,8728690,Apalachicola,open-coast,0.005,0.05,0.4,-3.9,0.115,0.218,112,utide,112,False,False,True,True
-Nicholas 2021,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.27,0.96,26.1,0.415,0.303,112,utide,112,False,False,True,False
-Nicholas 2021,8761305,Shell Beach,open-coast,0.062,0.25,0.75,27.1,0.24,0.275,112,utide,112,False,False,True,False
-Nicholas 2021,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.54,0.67,-12.9,0.442,0.223,112,utide,112,False,False,True,False
-Nicholas 2021,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.53,0.66,10.1,0.402,0.266,112,utide,112,False,False,True,False
-Nicholas 2021,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.5,0.65,-12.9,0.382,0.237,112,utide,112,False,False,True,False
-Nicholas 2021,8770822,"Texas Point, Sabine Pass",open-coast,0.023,1.13,0.65,6.1,0.548,0.263,112,utide,112,False,False,True,False
-Nicholas 2021,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.14,0.62,26.1,0.438,0.258,112,utide,112,False,False,True,False
-Nicholas 2021,8768094,Calcasieu Pass,open-coast,0.035,0.8,0.54,-20.9,0.469,0.244,112,utide,112,False,False,True,False
-Nicholas 2021,8761724,Grand Isle,open-coast,0.037,0.11,0.5,24.1,0.41,0.192,112,utide,112,False,False,True,False
-Nicholas 2021,8729210,Panama City Beach,open-coast,0.006,0.03,0.47,-31.9,0.344,0.217,112,utide,112,False,False,True,False
-Nicholas 2021,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.04,0.43,25.1,0.301,0.205,80,utide,80,False,False,True,False
-Nicholas 2021,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.21,0.42,-10.9,0.182,0.231,112,utide,112,False,False,True,False
-Nicholas 2021,8775237,Port Aransas,open-coast,0.069,0.21,0.39,-10.9,0.247,0.212,112,utide,112,False,False,False,False
-Nicholas 2021,8775792,Packery Channel,semi-enclosed,0.083,0.18,0.29,-12.9,0.034,0.203,112,utide,112,False,False,False,False
-Nicholas 2021,8776139,S. Bird Island,open-coast,0.066,0.18,0.22,-17.9,-0.368,0.2,112,utide,112,False,False,False,False
+Michael 2018,8728690,Apalachicola,open-coast,0.005,2.53,2.43,0.1,0.93,0.233,214,utide,214,False,False,True,True
+Michael 2018,8729108,Panama City,open-coast,0.002,0.34,1.53,4.1,0.689,0.261,214,utide,214,False,False,True,True
+Michael 2018,8729210,Panama City Beach,open-coast,0.006,0.52,1.12,3.1,0.808,0.221,214,utide,214,False,False,True,True
+Michael 2018,8761305,Shell Beach,open-coast,0.062,0.26,0.81,20.1,0.532,0.322,214,utide,214,False,False,True,False
+Michael 2018,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.24,0.78,44.1,0.338,0.308,214,utide,214,False,False,True,False
+Michael 2018,8729840,Pensacola,open-coast,0.01,0.24,0.74,13.1,0.701,0.231,214,utide,214,False,False,True,False
+Michael 2018,8735180,Dauphin Island,open-coast,0.009,0.32,0.67,15.1,0.596,0.234,214,utide,214,False,False,True,False
+Michael 2018,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.3,0.67,11.1,0.376,0.244,214,utide,214,False,False,True,False
+Michael 2018,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.31,0.65,15.1,0.385,0.235,214,utide,214,False,False,True,False
+Michael 2018,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.26,0.64,11.1,0.496,0.251,214,utide,214,False,False,True,False
+Michael 2018,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.26,0.56,11.1,0.384,0.237,214,utide,214,False,False,True,False
+Michael 2018,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.11,0.52,45.1,0.04,0.213,214,utide,214,False,False,True,False
+Michael 2018,8735391,Dog River Bridge,semi-enclosed,0.03,0.27,0.5,12.1,0.128,0.248,214,utide,214,False,False,True,False
+Michael 2018,8737048,Mobile State Docks,semi-enclosed,0.042,0.34,0.5,11.1,0.038,0.262,214,utide,214,False,False,True,False
+Michael 2018,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.12,0.5,15.1,0.407,0.209,214,utide,214,False,False,True,False
+Michael 2018,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.33,0.49,13.1,0.069,0.264,214,utide,214,False,False,True,False
+Michael 2018,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.15,0.49,-59.9,0.17,0.191,214,utide,214,False,False,True,False
+Michael 2018,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.14,0.48,-59.9,0.156,0.218,214,utide,214,False,False,True,False
+Michael 2018,8768094,Calcasieu Pass,open-coast,0.035,0.14,0.48,58.1,0.101,0.209,214,utide,214,False,False,True,False
+Michael 2018,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.11,0.46,100.1,0.372,0.207,214,utide,214,False,False,True,False
+Michael 2018,8761724,Grand Isle,open-coast,0.037,0.11,0.46,106.1,0.348,0.214,214,utide,214,False,False,True,False
+Michael 2018,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.13,0.44,55.1,0.076,0.196,214,utide,214,False,False,True,False
+Michael 2018,8770971,Rollover Pass,open-coast,0.048,0.12,0.42,45.1,0.076,0.218,214,utide,214,False,False,True,False
+Michael 2018,8770808,High Island,open-coast,0.084,0.12,0.4,56.1,0.009,0.211,214,utide,214,False,False,True,False
+Michael 2018,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.11,0.39,58.1,0.197,0.218,214,utide,214,False,False,False,False
+Michael 2018,8771972,San Luis Pass,open-coast,0.054,0.1,0.39,116.1,0.395,0.25,165,utide,165,False,False,False,False
+Michael 2018,8771450,Galveston Pier 21,open-coast,0.051,0.11,0.38,59.1,0.211,0.213,214,utide,214,False,False,False,False
+Michael 2018,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.1,0.38,44.1,0.237,0.212,214,utide,214,False,False,False,False
+Michael 2018,8772471,Freeport Harbor,open-coast,0.053,0.1,0.35,102.1,0.289,0.214,214,utide,214,False,False,False,False
+Michael 2018,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.14,0.34,26.1,-0.081,0.212,214,utide,214,False,False,False,False
+Michael 2018,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.12,0.33,28.1,0.053,0.214,214,utide,214,False,False,False,False
+Michael 2018,8775237,Port Aransas,open-coast,0.069,0.14,0.33,25.1,-0.102,0.21,214,utide,214,False,False,False,False
+Michael 2018,8772985,Sargent,open-coast,0.042,0.1,0.32,102.1,0.046,0.198,214,utide,214,False,False,False,False
+Michael 2018,8773701,Port O'Connor,open-coast,0.114,0.12,0.31,26.1,-0.02,0.209,214,utide,214,False,False,False,False
+Michael 2018,8773146,Matagorda City,open-coast,0.112,0.11,0.3,88.1,-0.073,0.211,214,utide,214,False,False,False,False
+Michael 2018,8775792,Packery Channel,semi-enclosed,0.083,0.14,0.28,21.1,-0.111,0.187,214,utide,214,False,False,False,False
+Michael 2018,8776139,S. Bird Island,open-coast,0.066,0.15,0.26,21.1,-0.117,0.165,214,utide,214,False,False,False,False
+Nate 2017,8741533,Pascagoula NOAA Lab,open-coast,0.026,1.83,1.72,0.1,0.894,0.271,178,utide,178,False,False,True,True
+Nate 2017,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,1.55,1.66,-1.9,0.85,0.28,178,utide,178,False,False,True,True
+Nate 2017,8738043,West Fowl River Bridge,semi-enclosed,0.054,1.37,1.6,-1.9,0.764,0.302,178,utide,178,False,False,True,True
+Nate 2017,8736897,Coast Guard Sector Mobile,open-coast,0.019,1.38,1.46,-1.9,0.865,0.271,178,utide,178,False,False,True,True
+Nate 2017,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,1.28,1.45,-1.9,0.778,0.332,178,utide,178,False,False,True,True
+Nate 2017,8737048,Mobile State Docks,semi-enclosed,0.042,1.4,1.44,-2.9,0.842,0.265,178,utide,178,False,False,True,True
+Nate 2017,8761305,Shell Beach,open-coast,0.062,1.69,1.36,-1.9,0.732,0.421,178,utide,178,False,False,True,True
+Nate 2017,8735391,Dog River Bridge,semi-enclosed,0.03,1.18,1.25,-1.9,0.846,0.257,178,utide,178,False,False,True,True
+Nate 2017,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.71,1.01,0.1,0.852,0.267,178,utide,178,False,False,True,True
+Nate 2017,8729210,Panama City Beach,open-coast,0.006,0.15,0.8,0.1,0.789,0.271,178,utide,178,False,False,True,True
+Nate 2017,8729840,Pensacola,open-coast,0.01,0.24,0.8,-5.9,0.805,0.287,178,utide,178,False,False,True,True
+Nate 2017,8735180,Dauphin Island,open-coast,0.009,0.3,0.74,5.1,0.828,0.264,178,utide,178,False,False,True,True
+Nate 2017,8729108,Panama City,open-coast,0.002,0.16,0.66,1.1,0.753,0.259,178,utide,178,False,False,True,True
+Nate 2017,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.29,0.57,0.1,0.567,0.261,178,utide,178,False,False,True,True
+Nate 2017,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.08,0.44,-1.9,-0.099,0.279,178,utide,178,False,False,True,True
+Nate 2017,8728690,Apalachicola,open-coast,0.005,0.11,0.77,11.1,0.706,0.31,178,utide,178,False,False,True,False
+Nate 2017,8771972,San Luis Pass,open-coast,0.054,0.04,0.66,112.1,0.46,0.383,178,utide,178,False,False,True,False
+Nate 2017,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.04,0.6,88.1,0.467,0.349,178,utide,178,False,False,True,False
+Nate 2017,8775237,Port Aransas,open-coast,0.069,0.03,0.6,77.1,0.286,0.376,178,utide,178,False,False,True,False
+Nate 2017,8771450,Galveston Pier 21,open-coast,0.051,0.04,0.59,112.1,0.438,0.355,178,utide,178,False,False,True,False
+Nate 2017,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.03,0.58,76.1,0.287,0.375,178,utide,178,False,False,True,False
+Nate 2017,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,0.04,0.57,113.1,0.424,0.355,178,utide,178,False,False,True,False
+Nate 2017,8772985,Sargent,open-coast,0.042,0.03,0.55,87.1,0.522,0.364,178,utide,178,False,False,True,False
+Nate 2017,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.03,0.54,37.1,0.383,0.339,178,utide,178,False,False,True,False
+Nate 2017,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.06,0.53,92.1,0.404,0.276,178,utide,178,False,False,True,False
+Nate 2017,8772471,Freeport Harbor,open-coast,0.053,0.04,0.53,91.1,0.511,0.351,178,utide,178,False,False,True,False
+Nate 2017,8770822,"Texas Point, Sabine Pass",open-coast,0.023,0.07,0.52,90.1,0.457,0.315,178,utide,178,False,False,True,False
+Nate 2017,8773146,Matagorda City,open-coast,0.112,0.03,0.52,43.1,0.477,0.355,178,utide,178,False,False,True,False
+Nate 2017,8761724,Grand Isle,open-coast,0.037,0.1,0.51,6.1,-0.304,0.303,178,utide,178,False,False,True,False
+Nate 2017,8775792,Packery Channel,semi-enclosed,0.083,0.03,0.51,76.1,0.217,0.377,178,utide,178,False,False,True,False
+Nate 2017,8768094,Calcasieu Pass,open-coast,0.035,0.08,0.5,92.1,0.388,0.306,178,utide,178,False,False,True,False
+Nate 2017,8773701,Port O'Connor,open-coast,0.114,0.03,0.5,43.1,0.285,0.35,178,utide,178,False,False,True,False
+Nate 2017,8770971,Rollover Pass,open-coast,0.048,0.05,0.48,88.1,0.353,0.315,178,utide,178,False,False,True,False
+Nate 2017,8776139,S. Bird Island,open-coast,0.066,0.03,0.46,12.1,0.321,0.383,178,utide,178,False,False,True,False
+Nate 2017,8770808,High Island,open-coast,0.084,0.05,0.45,87.1,0.276,0.255,178,utide,178,False,False,True,False
+Nate 2017,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.06,0.42,33.1,0.269,0.238,178,utide,178,False,False,True,False
+Nate 2017,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.07,0.37,119.1,0.258,0.206,178,utide,178,False,False,False,False
+Nicholas 2021,8772471,Freeport Harbor,open-coast,0.053,1.06,1.01,1.1,0.923,0.141,112,utide,112,False,False,True,True
+Nicholas 2021,8771972,San Luis Pass,open-coast,0.054,1.18,1.0,0.1,0.917,0.159,112,utide,112,False,False,True,True
+Nicholas 2021,8772985,Sargent,open-coast,0.042,1.01,0.9,-0.9,0.623,0.282,112,utide,112,False,False,True,True
+Nicholas 2021,8773701,Port O'Connor,open-coast,0.114,0.62,0.87,0.1,0.811,0.187,112,utide,112,False,False,True,True
+Nicholas 2021,8773767,Matagorda Bay Entrance Channel,semi-enclosed,0.059,0.62,0.85,0.1,0.862,0.171,112,utide,112,False,False,True,True
+Nicholas 2021,8771486,Galveston Railroad Bridge,semi-enclosed,0.101,1.09,0.8,-2.9,0.839,0.193,112,utide,112,False,False,True,True
+Nicholas 2021,8773146,Matagorda City,open-coast,0.112,0.81,0.79,-0.9,0.51,0.282,112,utide,112,False,False,True,True
+Nicholas 2021,8770971,Rollover Pass,open-coast,0.048,1.18,0.75,-2.9,0.058,0.388,112,utide,112,False,False,True,True
+Nicholas 2021,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,1.19,0.72,1.1,0.883,0.224,112,utide,112,False,False,True,True
+Nicholas 2021,8771450,Galveston Pier 21,open-coast,0.051,0.98,0.64,-2.9,0.865,0.187,112,utide,112,False,False,True,True
+Nicholas 2021,8768094,Calcasieu Pass,open-coast,0.035,0.8,0.73,-9.9,0.651,0.18,112,utide,112,False,False,True,False
+Nicholas 2021,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.53,0.71,-6.9,0.689,0.128,112,utide,112,False,False,True,False
+Nicholas 2021,8747437,Bay Waveland Yacht Club,semi-enclosed,0.006,0.27,0.61,25.1,0.553,0.156,112,utide,112,False,False,True,False
+Nicholas 2021,8770822,"Texas Point, Sabine Pass",open-coast,0.023,1.13,0.59,-6.9,0.685,0.218,112,utide,112,False,False,True,False
+Nicholas 2021,8770808,High Island,open-coast,0.084,1.2,0.57,-11.9,-0.095,0.406,112,utide,112,False,False,True,False
+Nicholas 2021,8764227,"LAWMA, Amerada Pass",open-coast,0.022,0.54,0.47,-16.9,0.728,0.104,112,utide,112,False,False,True,False
+Nicholas 2021,8761305,Shell Beach,open-coast,0.062,0.25,0.44,27.1,0.274,0.154,112,utide,112,False,False,True,False
+Nicholas 2021,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.14,0.41,21.1,0.715,0.119,112,utide,112,False,False,True,False
+Nicholas 2021,8764314,"Eugene Island, North of, Atchafalaya Bay",semi-enclosed,0.015,0.5,0.41,-15.9,0.802,0.081,112,utide,112,False,False,True,False
+Nicholas 2021,8739803,Bayou La Batre Bridge,semi-enclosed,0.033,0.12,0.4,19.1,0.701,0.127,112,utide,112,False,False,True,False
+Nicholas 2021,8738043,West Fowl River Bridge,semi-enclosed,0.054,0.1,0.39,18.1,0.651,0.134,112,utide,112,False,False,False,False
+Nicholas 2021,8775241,"Aransas, Aransas Pass",open-coast,0.065,0.21,0.37,-2.9,0.627,0.163,112,utide,112,False,False,False,False
+Nicholas 2021,8775237,Port Aransas,open-coast,0.069,0.21,0.35,-2.9,0.606,0.16,112,utide,112,False,False,False,False
+Nicholas 2021,8735523,East Fowl River Bridge,semi-enclosed,0.027,0.11,0.32,23.1,0.729,0.106,112,utide,112,False,False,False,False
+Nicholas 2021,8735391,Dog River Bridge,semi-enclosed,0.03,0.13,0.31,23.1,0.669,0.102,112,utide,112,False,False,False,False
+Nicholas 2021,8736897,Coast Guard Sector Mobile,open-coast,0.019,0.15,0.31,22.1,0.672,0.112,112,utide,112,False,False,False,False
+Nicholas 2021,8775792,Packery Channel,semi-enclosed,0.083,0.18,0.3,-6.9,0.136,0.204,112,utide,112,False,False,False,False
+Nicholas 2021,8737048,Mobile State Docks,semi-enclosed,0.042,0.15,0.27,22.1,0.667,0.097,112,utide,112,False,False,False,False
+Nicholas 2021,8735180,Dauphin Island,open-coast,0.009,0.07,0.26,2.1,0.822,0.085,112,utide,112,False,False,False,False
+Nicholas 2021,8761724,Grand Isle,open-coast,0.037,0.11,0.24,22.1,0.798,0.068,112,utide,112,False,False,False,False
+Nicholas 2021,8728690,Apalachicola,open-coast,0.005,0.05,0.23,-5.9,0.408,0.078,112,utide,112,False,False,False,False
+Nicholas 2021,8729840,Pensacola,open-coast,0.01,0.04,0.23,18.1,0.855,0.097,112,utide,112,False,False,False,False
+Nicholas 2021,8729210,Panama City Beach,open-coast,0.006,0.03,0.21,-20.9,0.791,0.088,112,utide,112,False,False,False,False
+Nicholas 2021,8776139,S. Bird Island,open-coast,0.066,0.18,0.21,-10.9,-0.263,0.191,112,utide,112,False,False,False,False
+Nicholas 2021,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.04,0.19,20.1,0.885,0.069,80,utide,80,False,False,False,False
+Nicholas 2021,8729108,Panama City,open-coast,0.002,0.03,0.16,-5.9,0.824,0.07,112,utide,112,False,False,False,False
 Rita 2005,8770971,Rollover Pass,open-coast,0.048,0.83,1.46,-0.9,-0.275,0.573,192,pred,212,False,False,True,True
-Rita 2005,8735180,Dauphin Island,open-coast,0.009,0.2,0.92,5.1,0.787,0.319,196,utide,196,False,False,True,True
-Rita 2005,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.17,0.92,5.1,0.727,0.324,196,utide,196,False,False,True,True
-Rita 2005,8729840,Pensacola,open-coast,0.01,0.18,0.87,3.1,0.754,0.323,196,utide,196,False,False,True,True
-Rita 2005,8728690,Apalachicola,open-coast,0.005,0.26,0.84,3.1,0.696,0.28,196,utide,196,False,False,True,True
-Rita 2005,8729210,Panama City Beach,open-coast,0.006,0.18,0.81,-1.9,0.635,0.286,196,utide,196,False,False,True,True
-Rita 2005,8729108,Panama City,open-coast,0.002,0.17,0.7,-2.9,0.631,0.262,196,utide,196,False,False,True,True
+Rita 2005,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.47,1.21,-2.9,0.9,0.381,196,utide,196,False,False,True,True
+Rita 2005,8761724,Grand Isle,open-coast,0.037,0.58,1.12,1.1,0.915,0.338,196,utide,196,False,False,True,True
+Rita 2005,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.27,1.0,-1.9,0.879,0.339,196,utide,196,False,False,True,True
+Rita 2005,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,0.17,0.81,0.1,0.874,0.285,196,utide,196,False,False,True,True
+Rita 2005,8735180,Dauphin Island,open-coast,0.009,0.2,0.75,-1.9,0.899,0.29,196,utide,196,False,False,True,True
+Rita 2005,8728690,Apalachicola,open-coast,0.005,0.26,0.71,-0.9,0.846,0.194,196,utide,196,False,False,True,True
+Rita 2005,8729840,Pensacola,open-coast,0.01,0.18,0.66,-4.9,0.881,0.282,196,utide,196,False,False,True,True
 Rita 2005,8775237,Port Aransas,open-coast,0.069,0.13,0.64,5.1,0.722,0.202,193,pred,213,False,False,True,True
 Rita 2005,8773701,Port O'Connor,open-coast,0.114,0.12,0.56,2.1,0.351,0.17,128,pred,146,False,False,True,True
 Rita 2005,8775792,Packery Channel,semi-enclosed,0.083,0.15,0.44,-1.9,0.667,0.144,189,pred,209,False,False,True,True
 Rita 2005,8766072,Freshwater Canal Locks,semi-enclosed,0.029,3.12,1.43,7.1,0.365,0.435,148,pred,149,False,False,True,False
-Rita 2005,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.47,1.31,-16.9,0.819,0.388,196,utide,196,False,False,True,False
-Rita 2005,8768094,Calcasieu Pass,open-coast,0.035,5.49,1.25,6.1,0.02,0.382,146,utide,146,False,False,True,False
-Rita 2005,8761724,Grand Isle,open-coast,0.037,0.58,1.22,-12.9,0.85,0.36,196,utide,196,False,False,True,False
-Rita 2005,8741533,Pascagoula NOAA Lab,open-coast,0.026,0.27,1.05,7.1,0.806,0.323,196,utide,196,False,False,True,False
-Rita 2005,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.59,0.87,-18.9,-0.029,0.465,196,utide,196,False,False,True,False
-Rita 2005,8771450,Galveston Pier 21,open-coast,0.051,0.51,0.86,23.1,-0.009,0.435,196,utide,196,False,False,True,False
+Rita 2005,8768094,Calcasieu Pass,open-coast,0.035,5.49,1.2,14.1,-0.247,0.382,146,utide,146,False,False,True,False
+Rita 2005,8771450,Galveston Pier 21,open-coast,0.051,0.51,1.11,15.1,0.075,0.408,196,utide,196,False,False,True,False
+Rita 2005,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.59,1.07,17.1,0.07,0.425,196,utide,196,False,False,True,False
+Rita 2005,8729210,Panama City Beach,open-coast,0.006,0.18,0.61,7.1,0.813,0.226,196,utide,196,False,False,True,False
+Rita 2005,8729108,Panama City,open-coast,0.002,0.17,0.58,7.1,0.829,0.193,196,utide,196,False,False,True,False
