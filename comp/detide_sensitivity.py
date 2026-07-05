@@ -45,11 +45,11 @@ from .validate import download_storm
 def _utide_resid(wl: pd.Series, lat: float, method: str = "robust",
                  trend: bool = True) -> pd.Series:
     import utide
-    from matplotlib.dates import date2num
-    t = date2num(wl.index.to_pydatetime())
-    coef = utide.solve(t, wl.values, lat=lat, method=method, trend=trend,
+    # DatetimeIndex passed directly: date2num floats break utide 0.3.1's
+    # astronomical arguments (zero constituents selected) — see comp/coops.py
+    coef = utide.solve(wl.index, wl.values, lat=lat, method=method, trend=trend,
                        conf_int="none", verbose=False)
-    tide = utide.reconstruct(t, coef, verbose=False).h
+    tide = utide.reconstruct(wl.index, coef, verbose=False).h
     return pd.Series(wl.values - tide, index=wl.index)
 
 
@@ -112,11 +112,11 @@ BASELINE = "utide_robust_year"
 def _utide_tide(wl: pd.Series, lat: float) -> pd.Series:
     """Predicted astronomical tide (utide robust year fit) on the water-level index."""
     import utide
-    from matplotlib.dates import date2num
-    t = date2num(wl.index.to_pydatetime())
-    coef = utide.solve(t, wl.values, lat=lat, method="robust", trend=True,
+    # DatetimeIndex passed directly: date2num floats break utide 0.3.1's
+    # astronomical arguments (zero constituents selected) — see comp/coops.py
+    coef = utide.solve(wl.index, wl.values, lat=lat, method="robust", trend=True,
                        conf_int="none", verbose=False)
-    return pd.Series(utide.reconstruct(t, coef, verbose=False).h, index=wl.index)
+    return pd.Series(utide.reconstruct(wl.index, coef, verbose=False).h, index=wl.index)
 
 
 def _skew_surge_peak(wl: pd.Series, tide: pd.Series, win: Tuple) -> float:
