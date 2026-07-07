@@ -15,10 +15,13 @@ def bisection(f: Callable, left: float, right: float, tol: float) -> float:
         f (Callable): Function to find root of.
         left (float): Left boundary.
         right (float): Right boundary.
-        tol (float): Tolerance for convergence.
+        tol (float): Tolerance for convergence. NOTE: this is a tolerance on the
+            width of the bracketing interval |right - left|, in the UNITS OF x
+            (e.g. metres for a radius solve, dimensionless for the Wang y solve).
+            |f(x)| is never tested against it.
 
     Returns:
-        float: x such that |f(x)| < tol.
+        float: x such that the final bracket containing the root has width < tol.
 
     Example::
         >>> f = lambda x: x - 2

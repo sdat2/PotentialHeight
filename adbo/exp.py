@@ -754,7 +754,7 @@ def run_exists(exp_name: str, num_runs: int, root_exp_direc: str = EXP_PATH) -> 
 def run_bayesopt_exp(
     constraints: dict = DEFAULT_CONSTRAINTS,
     seed: int = 10,
-    profile_name: str = "2025_new_orleans_profile_r4i1p1f1",  # 2025.json, 2097.json
+    profile_name: str = "2015_new_orleans_profile_r4i1p1f1",  # shipped: {2015,2100}_{new_orleans,galverston,miami}_profile_r4i1p1f1.json (the old 2025_*/2097_* names never existed)
     resolution: str = "mid",
     exp_name: str = "bo_test",
     root_exp_direc: Optional[str] = None,
@@ -774,7 +774,7 @@ def run_bayesopt_exp(
     Args:
         constraints (dict, optional): Dictionary with the constraints for the optimization. Defaults to DEFAULT_CONSTRAINTS.
         seed (int, optional): Seed to initialize. Defaults to 10.
-        profile_name (str, optional): Name of the profile. Defaults to "2025_new_orleans_profile_r4i1p1f1".
+        profile_name (str, optional): Name of the profile. Defaults to "2015_new_orleans_profile_r4i1p1f1".
         exp_name (str, optional): Experiment name. Defaults to "bo_test".
         root_exp_direc (Optional[str], optional): Root directory for the
             experiments. Defaults to None, in which case the WORSTSURGE_EXP_DIR

@@ -11,8 +11,8 @@
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 
-p25=2025_new_orleans_profile_r4i1p1f1
-p97=2097_new_orleans_profile_r4i1p1f1
+p25=2015_new_orleans_profile_r4i1p1f1  # NOTE: renamed from nonexistent 2025_* (files shipped as 2015/2100)
+p97=2100_new_orleans_profile_r4i1p1f1  # NOTE: renamed from nonexistent 2097_*
 obs_lon=-90.0715
 obs_lat=29.9511
 init_steps=3

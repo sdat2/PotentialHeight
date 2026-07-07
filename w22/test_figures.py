@@ -306,8 +306,8 @@ def test_figure_4():
                 "vmax": vsg,  # m s-1
                 "msl": 1015,  # mbar
                 "rho_air": rho_air,  # kg m-3
-                "env_humidity": 0.9,
-                "cd_ck": 1,
+                "rh": 0.9,  # canonical humidity key (env_humidity also accepted as alias)
+                "ck_cd": 1,  # canonical key (cd_ck alias also accepted since 2026-07-07; before that, cd_ck was silently ignored -> default 0.9)
                 "cd": 0.0015,
             },
             coords={"lat": lat},
@@ -575,8 +575,8 @@ def test_wang_2022_canonical_point():
                 "vmax": vsg,  # m s-1
                 "msl": 1015,  # mbar
                 "rho_air": 1.225,  # kg m-3
-                "env_humidity": 0.9,
-                "cd_ck": 1,
+                "rh": 0.9,  # canonical humidity key (env_humidity also accepted as alias)
+                "ck_cd": 1,  # canonical key (cd_ck alias also accepted since 2026-07-07; before that, cd_ck was silently ignored -> default 0.9)
                 "cd": 0.0015,
             },
             coords={"lat": lat},
@@ -587,15 +587,26 @@ def test_wang_2022_canonical_point():
     rmax_km = float(soln_ds.rmax.values) / 1000
     pm_mbar = float(soln_ds.pm.values) / 100
     pc_mbar = float(soln_ds.pc.values) / 100
-    # (a) loose check against the values quoted in Wang (2022)
+    # (a) loose check against the values quoted in Wang (2022).
     assert np.isclose(r0_km, 2193, rtol=0.05), f"r0 {r0_km} km != W22 2193 km"
     assert np.isclose(rmax_km, 64, rtol=0.10), f"rmax {rmax_km} km != W22 64 km"
     assert np.isclose(pm_mbar, 944, atol=5), f"pm {pm_mbar} mbar != W22 944 mbar"
-    # (b) tight regression pins on our numba solution to catch numerical drift
-    assert np.isclose(r0_km, 2136.94, atol=2.0), f"r0 {r0_km} km drifted"
-    assert np.isclose(rmax_km, 59.14, atol=0.5), f"rmax {rmax_km} km drifted"
-    assert np.isclose(pm_mbar, 940.44, atol=0.5), f"pm {pm_mbar} mbar drifted"
-    assert np.isclose(pc_mbar, 880.84, atol=0.5), f"pc {pc_mbar} mbar drifted"
+    # (b) tight regression pins on our numba solution to catch numerical drift.
+    # Pins regenerated 2026-07-07 after fixing TWO silent input bugs:
+    # (i) the rh inconsistency in the Carnot back-conversion (the y -> p_m
+    #     numerator dropped the rh factor; w22_carnot.carnot_pm_from_y is now
+    #     the single implementation), and
+    # (ii) this test passed "cd_ck": 1, a key point_solution_ps silently
+    #     ignored, so the old pins were computed at CkCd = 0.9 (the default),
+    #     not the intended Wang canonical CkCd = 1.
+    # History: original pins (both bugs) r0 2136.94, rmax 59.14, pm 940.44,
+    # pc 880.84; fixing (i) alone at CkCd = 0.9 gives 2079.49 / 56.50 /
+    # 940.90 / 881.38; fixing both gives the pins below — 2.9% under Wang's
+    # 2193 km, back inside the original rtol = 0.05.
+    assert np.isclose(r0_km, 2128.81, atol=2.0), f"r0 {r0_km} km drifted"
+    assert np.isclose(rmax_km, 60.67, atol=0.5), f"rmax {rmax_km} km drifted"
+    assert np.isclose(pm_mbar, 942.04, atol=0.5), f"pm {pm_mbar} mbar drifted"
+    assert np.isclose(pc_mbar, 887.93, atol=0.5), f"pc {pc_mbar} mbar drifted"
 
 
 @pytest.mark.skipif(

@@ -25,7 +25,7 @@ from .constants import (
     SUPERGRADIENT_FACTOR,
     LOWER_RADIUS_BISECTION,
     UPPER_RADIUS_BISECTION,
-    PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
+    R0_BISECTION_TOLERANCE,
     LOWER_Y_WANG_BISECTION,
     UPPER_Y_WANG_BISECTION,
     W22_BISECTION_TOLERANCE,
@@ -33,7 +33,7 @@ from .constants import (
     CD_DEFAULT,
     ENVIRONMENTAL_HUMIDITY_DEFAULT,
 )
-from .w22_carnot import wang_diff, wang_consts
+from .w22_carnot import wang_diff, wang_consts, carnot_pm_from_y
 from cle15.cle15n import (
     run_cle15,
     SolverConfig,
@@ -129,6 +129,14 @@ def calculate_ps_ufunc(
             pressure_assumption=pressure_assumption,
             solver=_BISECT_SOLVER,
         )
+        # Ambient dry partial pressure at inflow [Pa]: total pressure (p_a [hPa]
+        # * 100 -> Pa) minus the ambient vapour pressure rh * e_sat(T_ns) [Pa].
+        # The SAME quantity must be used in the y-solve below and in the
+        # y -> p_m back-conversion (carnot_pm_from_y); before 2026-07-07 the
+        # back-conversion dropped the rh factor (silently reverting to rh = 1).
+        pressure_dry_at_inflow = (p_a * 100) - (
+            rh * buck_sat_vap_pressure(near_surface_air_temperature)
+        )  # [Pa]
         ys = bisection(
             wang_diff(
                 *wang_consts(
@@ -136,20 +144,20 @@ def calculate_ps_ufunc(
                     radius_of_inflow=r0,
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
-                    pressure_dry_at_inflow=(p_a * 100)
-                    - (rh * buck_sat_vap_pressure(near_surface_air_temperature)),
+                    pressure_dry_at_inflow=pressure_dry_at_inflow,
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=t0,
                 )
             ),
             LOWER_Y_WANG_BISECTION,
             UPPER_Y_WANG_BISECTION,
-            W22_BISECTION_TOLERANCE,
+            W22_BISECTION_TOLERANCE,  # [dimensionless] y-bracket width
         )
-        pm_car = (
-            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
-        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
-        return pm_cle - pm_car
+        # Total pressure at maximum winds [Pa] (eyewall assumed saturated).
+        pm_car = carnot_pm_from_y(
+            ys, pressure_dry_at_inflow, near_surface_air_temperature
+        )
+        return pm_cle - pm_car  # [Pa] - [Pa]
 
     # 3. Perform the main calculation (bisection to find r0)
     try:
@@ -159,7 +167,7 @@ def calculate_ps_ufunc(
         lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
         upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
         r0 = bisection(
-            try_for_r0, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+            try_for_r0, lower_r, upper_r, R0_BISECTION_TOLERANCE
         )
 
         # 4. Final calculation with the solved r0
@@ -283,6 +291,14 @@ def calculate_ps13_ufunc(
             pressure_assumption=pressure_assumption,
             solver=_BISECT_SOLVER,
         )
+        # Ambient dry partial pressure at inflow [Pa]: total pressure (p_a [hPa]
+        # * 100 -> Pa) minus the ambient vapour pressure rh * e_sat(T_ns) [Pa].
+        # The SAME quantity must be used in the y-solve below and in the
+        # y -> p_m back-conversion (carnot_pm_from_y); before 2026-07-07 the
+        # back-conversion dropped the rh factor (silently reverting to rh = 1).
+        pressure_dry_at_inflow = (p_a * 100) - (
+            rh * buck_sat_vap_pressure(near_surface_air_temperature)
+        )  # [Pa]
         ys = bisection(
             wang_diff(
                 *wang_consts(
@@ -290,20 +306,20 @@ def calculate_ps13_ufunc(
                     radius_of_inflow=r0,
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
-                    pressure_dry_at_inflow=(p_a * 100)
-                    - (rh * buck_sat_vap_pressure(near_surface_air_temperature)),
+                    pressure_dry_at_inflow=pressure_dry_at_inflow,
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=t0,
                 )
             ),
             LOWER_Y_WANG_BISECTION,
             UPPER_Y_WANG_BISECTION,
-            W22_BISECTION_TOLERANCE,
+            W22_BISECTION_TOLERANCE,  # [dimensionless] y-bracket width
         )
-        pm_car = (
-            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
-        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
-        return pm_cle - pm_car
+        # Total pressure at maximum winds [Pa] (eyewall assumed saturated).
+        pm_car = carnot_pm_from_y(
+            ys, pressure_dry_at_inflow, near_surface_air_temperature
+        )
+        return pm_cle - pm_car  # [Pa] - [Pa]
 
     try:
         # this is to restrict the search to a smaller space, but do this adaptively
@@ -316,7 +332,7 @@ def calculate_ps13_ufunc(
             return try_for_r0_v(r0, vmax_1)
 
         r0_1 = bisection(
-            try_for_r0_1, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+            try_for_r0_1, lower_r, upper_r, R0_BISECTION_TOLERANCE
         )
         # 4. Final calculation with the solved r0
         pm_1, rmax_1, pc_1 = run_cle15(
@@ -337,7 +353,7 @@ def calculate_ps13_ufunc(
             return try_for_r0_v(r0, vmax_3)
 
         r0_3 = bisection(
-            try_for_r0_3, lower_r, upper_r, PRESSURE_DIFFERENCE_BISECTION_TOLERANCE
+            try_for_r0_3, lower_r, upper_r, R0_BISECTION_TOLERANCE
         )
         pm_3, rmax_3, pc_3 = run_cle15(
             inputs={
@@ -625,7 +641,7 @@ def point_solution_ps(
 
     Example:
         >>> in_ds = xr.Dataset(data_vars={
-        ...     "msl": 1016.7, # mbar or hPa
+        ...     "msl": 1016.7, # hPa (mbar)
         ...     "vmax": 49.5, # m/s, potential intensity
         ...     "sst": 28, # degC
         ...     "t0": 200, # degK
@@ -655,16 +671,21 @@ def point_solution_ps(
     # read compuslory parameters
     p_a = float(ds["msl"].values)  # ambient surface pressure in mbars
     near_surface_air_temperature = (
-        ds["sst"].values + TEMP_0K - 1
+        ds["sst"].values + TEMP_0K - TEMP_DIFF
     )  # Celsius Kelvin, subtract 1K for parameterization for near surface
     outflow_temperature = float(ds["t0"].values)
     vmax = float(ds["vmax"].values)
     coriolis_parameter = abs(coriolis_parameter_from_lat(ds["lat"].values))
-    # optional parameters, set to default if they are not in the dataset
-    if "ck_cd" not in ds:
-        ck_cd = CK_CD_DEFAULT
-    else:
+    # optional parameters, set to default if they are not in the dataset.
+    # Canonical key is "ck_cd"; "cd_ck" is accepted as an alias — before
+    # 2026-07-07 a "cd_ck" input was silently IGNORED and CK_CD_DEFAULT (0.9)
+    # used instead (the same silent-drop failure mode as the env_humidity key).
+    if "ck_cd" in ds:
         ck_cd = float(ds["ck_cd"].values)
+    elif "cd_ck" in ds:
+        ck_cd = float(ds["cd_ck"].values)
+    else:
+        ck_cd = CK_CD_DEFAULT
     if "cd" not in ds:
         cd = CD_DEFAULT
     else:
@@ -677,10 +698,17 @@ def point_solution_ps(
         supergradient_factor = SUPERGRADIENT_FACTOR
     else:
         supergradient_factor = float(ds["supergradient_factor"].values)
-    if "rh" not in ds:
-        env_humidity = ENVIRONMENTAL_HUMIDITY_DEFAULT
-    else:
+    # Environmental relative humidity [fraction 0-1]. Canonical input key is
+    # "rh" (as used by the tcpips/ibtracs pipeline); "env_humidity" is accepted
+    # as an alias (used by test_figures) — before 2026-07-07 the alias was
+    # silently IGNORED and the default used instead (harmless by coincidence,
+    # since callers passed 0.9 == ENVIRONMENTAL_HUMIDITY_DEFAULT).
+    if "rh" in ds:
         env_humidity = float(ds["rh"].values)
+    elif "env_humidity" in ds:
+        env_humidity = float(ds["env_humidity"].values)
+    else:
+        env_humidity = ENVIRONMENTAL_HUMIDITY_DEFAULT
     if "rho_air" not in ds:
         water_vapour_pressure = env_humidity * buck_sat_vap_pressure(
             near_surface_air_temperature
@@ -706,6 +734,15 @@ def point_solution_ps(
             solver=_BISECT_SOLVER,
         )
 
+        # Ambient dry partial pressure at inflow [Pa]: total pressure (p_a [hPa]
+        # * 100 -> Pa) minus the ambient vapour pressure env_humidity * e_sat(T_ns)
+        # [Pa] (env_humidity == rh in the ufunc variants; initially assumed 1,
+        # now 0.9 by default). The SAME quantity must be used in the y-solve and
+        # in the y -> p_m back-conversion (carnot_pm_from_y); before 2026-07-07
+        # the back-conversion dropped the humidity factor (reverting to rh = 1).
+        pressure_dry_at_inflow = (p_a * 100) - (
+            env_humidity * buck_sat_vap_pressure(near_surface_air_temperature)
+        )  # [Pa]
         ys = bisection(
             wang_diff(
                 *wang_consts(
@@ -713,27 +750,23 @@ def point_solution_ps(
                     radius_of_inflow=r0,
                     maximum_wind_speed=vmax * supergradient_factor,
                     coriolis_parameter=coriolis_parameter,
-                    pressure_dry_at_inflow=p_a * 100  # 100 to convert from hPa to Pa
-                    - env_humidity
-                    * buck_sat_vap_pressure(
-                        near_surface_air_temperature
-                    ),  # env humidity intially assumed to be 1, now assumed to be 0.9 in default
+                    pressure_dry_at_inflow=pressure_dry_at_inflow,
                     near_surface_air_temperature=near_surface_air_temperature,
                     outflow_temperature=outflow_temperature,
                 )
             ),
             LOWER_Y_WANG_BISECTION,
             UPPER_Y_WANG_BISECTION,
-            W22_BISECTION_TOLERANCE,  # threshold
+            W22_BISECTION_TOLERANCE,  # [dimensionless] y-bracket width
         )
-        # convert solution to pressure
-        pm_car = (  # 100 to convert from hPa to Pa
-            p_a * 100 - buck_sat_vap_pressure(near_surface_air_temperature)
-        ) / ys + buck_sat_vap_pressure(near_surface_air_temperature)
+        # Total pressure at maximum winds [Pa] (eyewall assumed saturated).
+        pm_car = carnot_pm_from_y(
+            ys, pressure_dry_at_inflow, near_surface_air_temperature
+        )
         # if match_center:
         #    return pc_cle - pm_car
         # else:
-        return pm_cle - pm_car
+        return pm_cle - pm_car  # [Pa] - [Pa]
         # print("r0, rmax_cle, pm_cle, pm_car", r0, rmax_cle, pm_cle, pm_car)
 
     # let's vary the radius range by coriolis parameter.
@@ -753,8 +786,8 @@ def point_solution_ps(
         try_for_r0,
         lower_radius_bisection,
         upper_radius_bisection,
-        PRESSURE_DIFFERENCE_BISECTION_TOLERANCE,
-    )  # find potential size \(r_a\) between 200 and 5000 km with 1 Pa absolute tolerance
+        R0_BISECTION_TOLERANCE,
+    )  # find potential size r_a between 200 and 5000 km, stopping when the r0 bracket is 1 m wide (R0_BISECTION_TOLERANCE; see solve.bisection semantics)
 
     pm_cle, rmax_cle, pc = run_cle15(
         plot=False,
@@ -806,7 +839,7 @@ def point_solution_ps(
                 np.array(out["VV"]),  # [m/s]
                 p_a * 100,  # [Pa] 100 to convert from hPa to Pa
                 rho_air,  # [kg m-3]
-                coriolis_parameter,  # [rad s-1]
+                coriolis_parameter,  # [s-1]
                 assumption=pressure_assumption,
             )
             / 100,
@@ -839,16 +872,16 @@ def parallelized_ps(
     Example:
 
         >>> in_ds = xr.Dataset(data_vars={
-        ...     "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
+        ...     "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # hPa (mbar)
         ...     "vmax": (("y", "x"), [[50, 51], [49, 49.5]]),  # m/s, potential intensity
         ...     "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
         ...     "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
         ...     "rh": (("y", "x"), [[0.9, 0.9], [0.9, 0.9]]),  # [dimensionless], relative humidity
         ...     "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),  # [dimensionless], ck_cd
         ...     "cd": (("y", "x"), [[0.0015, 0.0015], [0.0015, 0.0015]]),  # [dimensionless], cd
-        ...     "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # mbar or hPa
-        ...     "supergradient_factor": (("y", "x"), [[1.2, 1.2], [1.2, 1.2]]),  # mbar or hPa
-        ...     "pressure_assumption": (("y", "x"), [["isothermal", "isothermal"], ["isothermal", "isothermal"]]),  # mbar or hPa
+        ...     "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # m/s
+        ...     "supergradient_factor": (("y", "x"), [[1.2, 1.2], [1.2, 1.2]]),  # dimensionless
+        ...     "pressure_assumption": (("y", "x"), [["isothermal", "isothermal"], ["isothermal", "isothermal"]]),  # str
         ...     },
         ...     coords={"lat": (("y", "x"), [[30, 30], [25, 25]])},  # degNorth
         ... )
@@ -1044,32 +1077,35 @@ def single_point_example() -> None:
     """
     in_ds = xr.Dataset(
         data_vars={
-            "msl": 1016.7,  # mbar or hPa
+            "msl": 1016.7,  # hPa (mbar)
             "rh": 0.9,  # [dimensionless], relative humidity
             "ck_cd": 0.95,  # [dimensionless], ck_cd
             "cd": 0.0015,  # [dimensionless], cd
-            "w_cool": 0.002,  # mbar or hPa
+            "w_cool": 0.002,  # m/s
             "vmax": 49.5,  # m/s, potential intensity
             "sst": 28,  # degC
             "t0": 200,  # degK
             "pressure_assumption": "isothermal",  # isothermal or isopycnal
-            "supergradient_factor": 1.2,  # mbar or hPa
+            "supergradient_factor": 1.2,  # dimensionless
         },
         coords={"lat": 25},  # degNorth
     )
+    # Pin regenerated 2026-07-07 after fixing the rh inconsistency in the
+    # Carnot back-conversion (old pin 2.005e6 m was the effectively-rh=1
+    # answer; the consistent rh = 0.9 solution is ~1.944e6 m).
     out_ds = point_solution_ps(in_ds)
     assert np.allclose(
         out_ds["r0"].values,
-        2.005e06,
+        1.9437e06,
         rtol=1e-2,
-    ), f"r0: {out_ds['r0'].values} != 2.005e+06"
+    ), f"r0: {out_ds['r0'].values} != 1.9437e+06"
 
     out_ds = parallelized_ps_dask(in_ds)
     assert np.allclose(
         out_ds["r0"].values,
-        2.005e06,
+        1.9437e06,
         rtol=1e-2,
-    ), f"r0: {out_ds['r0'].values} != 2.005e+06"
+    ), f"r0: {out_ds['r0'].values} != 1.9437e+06"
     # print("Single point example output:")
     # print(out_ds)
 
@@ -1080,7 +1116,7 @@ def multi_point_example_1d() -> None:
     """
     in_ds = xr.Dataset(
         data_vars={
-            "msl": ("y", [1016.7, 1016.7]),  # mbar or hPa
+            "msl": ("y", [1016.7, 1016.7]),  # hPa (mbar)
             "vmax": ("y", [49.5, 49.5]),  # m/s, potential intensity
             "sst": ("y", [28, 28]),  # degC
             "t0": ("y", [200, 200]),  # degK
@@ -1088,7 +1124,7 @@ def multi_point_example_1d() -> None:
             "ck_cd": ("y", [0.95, 0.95]),
             "cd": ("y", [0.0015, 0.0015]),  # [dimensionless], cd
             "w_cool": ("y", [0.002, 0.002]),
-            "supergradient_factor": ("y", [1.2, 1.2]),  # mbar or hPa
+            "supergradient_factor": ("y", [1.2, 1.2]),  # dimensionless
         },
         coords={"lat": ("y", [28, 29])},  # degNorth
     )
@@ -1110,7 +1146,7 @@ def multi_point_example_2d(autofail=True) -> None:
 
     in_ds = xr.Dataset(
         data_vars={
-            "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # mbar or hPa
+            "msl": (("y", "x"), [[1016.7, 1016.7], [1016.7, 1016.7]]),  # hPa (mbar)
             "vmax": (
                 ("y", "x"),
                 [[50, 51], [49, 49.5]],
@@ -1119,18 +1155,18 @@ def multi_point_example_2d(autofail=True) -> None:
             "sst": (("y", "x"), [[29, 30], [28, 28]]),  # degC
             "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),
             "t0": (("y", "x"), [[200, 200], [200, 200]]),  # degK
-            "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # mbar or hPa
-            "Cdvary": (("y", "x"), [[0, 0], [0, 0]]),  # mbar or hPa
-            "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),  # mbar or hPa
+            "w_cool": (("y", "x"), [[0.002, 0.002], [0.002, 0.002]]),  # m/s
+            "Cdvary": (("y", "x"), [[0, 0], [0, 0]]),  # flag (0/1)
+            "ck_cd": (("y", "x"), [[0.95, 0.95], [0.95, 0.95]]),  # dimensionless
             "supergradient_factor": (
                 ("y", "x"),
                 [[1.2, 1.2], [1.2, 1.2]],
-            ),  # mbar or hPa
+            ),  # dimensionless
             "pressure_assumption": (
                 ("y", "x"),
                 [["isothermal", "isothermal"], ["isothermal", "isothermal"]],
-            ),  # mbar or hPa
-            "cd": (("y", "x"), [[0.0015, 0.0015], [0.0015, 0.0015]]),  # mbar or hPa
+            ),  # str
+            "cd": (("y", "x"), [[0.0015, 0.0015], [0.0015, 0.0015]]),  # dimensionless
         },
         coords={"lat": (("y", "x"), [[30, 30], [25, 25]])},  # degNorth
     )

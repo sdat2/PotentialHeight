@@ -1,3 +1,26 @@
+v0.1.4 (unreleased):
+- FIXED (correctness): the Wang-2022 y -> p_m Carnot back-conversion in `w22/ps.py`
+  dropped the ambient relative-humidity factor from its numerator at all three
+  solver entry points, so solved potential sizes were effectively the rh = 1
+  answer regardless of the input humidity (canonical point: r0 -2.7%, rmax -4.5%
+  at rh = 0.9; expected -4-8% at typical CMIP6 Gulf humidities). Single shared
+  implementation now in `w22.w22_carnot.carnot_pm_from_y`; regression tests in
+  `tests/test_ps_units.py`; golden pins regenerated. See REPRODUCE.md for the
+  list of artifacts that predate the fix.
+- FIXED: `point_solution_ps` silently ignored the `env_humidity` and `cd_ck`
+  input keys (canonical keys `rh`/`ck_cd`; aliases now accepted). The canonical
+  Wang test had been running at CkCd = 0.9 instead of the intended 1.
+- FIXED: missing `return` in `adforce.profile.pressures_profile` (fallback path
+  always returned None); `read_profile` now rejects profiles whose far-field
+  pressure is not in hPa (guards against the legacy Pa-unit JSONs).
+- FIXED: `w22.plot.timeseries_plot` mutated the dataset in place (km conversion)
+  and the profile writer silently depended on it; `qair2rh` produced rh clipped
+  to 1.0 for plain-float pressure inputs in Pa.
+- Unit-annotation sweep of the potential-size path: bisection tolerance renamed
+  `R0_BISECTION_TOLERANCE` (it is 1 m of r0 bracket, not "1 mbar"/"1 Pa");
+  corrected unit comments (F_COR s-1, R_v J/kg/K, L_v provenance, Buck Pa);
+  cle15n run_cle15 (Pa) vs profile_from_stats ('p' in hPa) documented.
+
 v0.1.3:
 - Created ability to transform data to required dual graph format for SurgeNet training in `adforce/mesh.py`.
 - Created training datasets needed to create the SurgeNet model, by forcing the ADCIRC model with IBTrACS storms from 1980-2024 in `adforce/generate_training_data.py`.

@@ -1080,6 +1080,13 @@ def run_cle15(
 ) -> Tuple[float, float, float]:
     """Run the numba-accelerated CLE15 model — same API as cle15.run_cle15.
 
+    UNITS: inputs dict expects ``p0`` in hPa (asserted 900-1100 by
+    process_inputs; converted to Pa internally), ``r0`` in m, ``Vmax`` in m/s,
+    ``fcor`` in s-1. Returns ``(pm, rmax, pc)`` = (pressure at maximum winds
+    [Pa], radius of maximum winds [m], central pressure [Pa]). NOTE the
+    asymmetry with :func:`profile_from_stats`, whose returned profile carries
+    ``p`` in hPa (the profile-JSON convention).
+
     Parameters
     ----------
     solver : SolverConfig, optional
@@ -1141,6 +1148,12 @@ def profile_from_stats(
     solver: Optional[SolverConfig] = None,
 ) -> dict:
     """Same as cle15.profile_from_stats but uses the numba-accelerated kernel.
+
+    UNITS: takes ``vmax`` [m/s], ``fcor`` [s-1], ``r0`` [m], ``p0`` in hPa.
+    The returned dict follows the profile-JSON convention: ``rr`` [m],
+    ``VV`` [m/s], ``p`` in hPa (pressure_from_wind's Pa output is divided by
+    100 on the way out). NOTE the asymmetry with :func:`run_cle15`, which
+    returns pressures in Pa.
 
     Parameters
     ----------

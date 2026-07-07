@@ -185,9 +185,12 @@ def timeseries_plot(
     for i, var in enumerate(vars):
         for j, ds in enumerate(ds_l):
             x = np.array([time.year for time in ds.time.values])
-            y = ds[var].values
+            # .copy() so the km conversion below does NOT mutate the dataset
+            # in place (before 2026-07-07 it did, and the profile-writer block
+            # further down silently relied on r0 having been rescaled to km).
+            y = ds[var].values.copy()
             if var == "rmax" or var == "r0":
-                y /= 1000  # divide by 1000 to go to km
+                y /= 1000  # m -> km (copy only; dataset stays in m)
             axs[i].plot(x, y, color=colors[j], label=f"r{members[j]}i1p1f1")
             m = safe_grad(x, y)
             rho = safe_corr(x, y)
@@ -222,7 +225,10 @@ def timeseries_plot(
             tp = ds_l[j].isel(time=[t.year == year for t in ds_l[j].time.values])
             vmax = float(tp.vmax.values.ravel())
             fcor = float(coriolis_parameter_from_lat(tp.lat.values.ravel()))
-            r0 = float(tp.r0.values.ravel()) * 1000  # back to m
+            # r0 is in metres in the dataset (the plotting loop above now works
+            # on a copy, so no in-place km conversion has happened; the old
+            # `* 1000  # back to m` depended on that mutation).
+            r0 = float(tp.r0.values.ravel())  # [m]
             p0 = float(tp.msl.values.ravel())  # hPa
             if not np.isnan(vmax) and not np.isnan(r0):
                 profile = profile_from_stats(

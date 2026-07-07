@@ -95,10 +95,10 @@ def pressure_from_wind(
         >>> rr = np.array([0, 1, 2, 3, 4, 5])
         >>> vv = np.array([0] * 6)
         >>> p = pressure_from_wind(rr, vv, assumption="isopycnal")
-        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
+        >>> np.allclose(p, np.array([101600] * 6), rtol=1e-6, atol=1e-6) # zero velocity -> stays at default p0 = BACKGROUND_PRESSURE = 101,600 Pa.
         True
         >>> p = pressure_from_wind(rr, vv, assumption="isothermal")
-        >>> np.allclose(p, np.array([101500] * 6), rtol=1e-3, atol=1e-6) # zero velocity -> no change.
+        >>> np.allclose(p, np.array([101600] * 6), rtol=1e-6, atol=1e-6) # zero velocity -> stays at default p0 = BACKGROUND_PRESSURE = 101,600 Pa.
         True
         >>> r0 = 1_000_000
         >>> ds = 1/1_000 # decay scale [m-1]
@@ -125,7 +125,7 @@ def pressure_from_wind(
     assert isinstance(p0, Union[float, int])
     assert isinstance(fcor, Union[float, int])
     assert rho0 < 2 and rho0 > 0.5  # definitely between 0.5 and 2 kg m-3
-    assert p0 > 900_00 and p0 < 1100_00  # definitely between 900 hPa and 1100 hPa
+    assert p0 > 900_00 and p0 < 1100_00  # p0 in Pa: 90,000-110,000 Pa (= 900-1100 hPa)
     assert (
         fcor >= 0
     )  # assuming cyclonic winds, just take absolute value if you are in southern hemisphere
@@ -160,19 +160,30 @@ def buck_sat_vap_pressure(
     temp: float,
 ) -> float:  # temp in K -> saturation vapour pressure in Pa
     """
-    Arden buck_sat_vap_pressure equation.
+    Arden Buck equation for saturation vapour pressure over liquid water.
 
-    https://en.wikipedia.org/wiki/Arden_buck_sat_vap_pressure_equation
+    https://en.wikipedia.org/wiki/Arden_Buck_equation
+
+    UNIT LYNCHPIN of the potential-size path: input in KELVIN, output in
+    PASCALS (the Buck formula itself is written for T in degC yielding kPa;
+    this wrapper converts K -> degC on the way in and kPa -> Pa on the way
+    out via the * 1000). Contrast qair2rh in this module, whose internal
+    Bolton formula works in hPa. At T = 299 K this returns ~3333 Pa
+    (~33.3 hPa).
 
     Args:
         temp (float): temperature in Kelvin.
 
     Returns:
         float: saturation vapour pressure in Pa.
+
+    Example::
+        >>> 3200 < buck_sat_vap_pressure(299) < 3450  # ~3333 Pa at 25.85 degC
+        True
     """
-    assert temp > 150 and temp < 350
-    # https://en.wikipedia.org/wiki/Arden_buck_sat_vap_pressure_equation
+    assert temp > 150 and temp < 350  # K (a degC input would trip this)
     temp: float = temp - TEMP_0K  # convert from degK to degC
+    # 0.61121 kPa prefactor; * 1000 converts kPa -> Pa
     return 0.61121 * np.exp((18.678 - temp / 234.5) * (temp / (257.14 + temp))) * 1000
 
 
@@ -276,6 +287,14 @@ def qair2rh(
             press = press
         else:
             raise ValueError("press units not recognized")
+    else:
+        # Plain-float path: apply the same magnitude heuristic as above. This
+        # matters because the DEFAULT press is BACKGROUND_PRESSURE = 101,600 Pa,
+        # while the Bolton es below is in hPa — without this conversion the
+        # float path computed rh 100x too large and np.clip silently pinned
+        # it to 1.0 (fixed 2026-07-07).
+        if press > 10_000:  # magnitude says Pa
+            press = press / 100  # Pa -> hPa
     # saturation vapour pressure assuming temp in degC.
     # NOTE: this is the Bolton (1980) Magnus-type approximation, NOT the
     # Arden Buck equation implemented in buck_sat_vap_pressure() above;

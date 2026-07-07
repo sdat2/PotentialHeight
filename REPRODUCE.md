@@ -6,11 +6,53 @@ cyclone storm surges in a changing climate using Bayesian optimization"*
 Data Science) to the command that produces it, its key inputs, and its output
 path.
 
-Note on years: the paper's BO comparison (Fig. 7) is for **2025 vs 2097**
-(CESM2 SSP5-8.5 August monthly means), but the repository's experiment
-directories, figure filenames, and slurm variables use the legacy **2015/2100**
-naming (e.g. `2015-vs-2100-new-orleans.pdf`, `$p25`/`$p97` in
-`new-orleans.slurm`). They are the same experiments.
+Note on years (updated 2026-07-05): the revised paper's BO results are the
+**2015 vs 2100** experiments (CESM2 r4i1p1f1, SSP5-8.5 August monthly means)
+throughout — matching the repository's experiment directories, figure
+filenames, and slurm variables. The original submission's 2025/2097 runs
+(r10i1p1f1 single-site) are retired; the legacy `2025.json`/`2097.json`
+profiles in `w22/data` are kept for the record only (NOTE: they store `p`
+in Pa, unlike the hPa convention of the shipped city profiles —
+`adforce.profile.read_profile` now rejects them loudly).
+
+**Known issue — potential-size humidity fix (2026-07-07).** The Wang-2022
+y -> p_m back-conversion in `w22/ps.py` dropped the ambient relative-humidity
+factor from its numerator (all three solver entry points), so solved potential
+sizes were effectively the rh = 1 answer regardless of the input humidity
+(canonical point: r0 2136.9 -> 2079.5 km at rh = 0.9, i.e. -2.7%; rmax -4.5%).
+Fixed via the shared `w22.w22_carnot.carnot_pm_from_y` (see
+`tests/test_ps_units.py`; a second silently-ignored input key, `cd_ck` vs
+`ck_cd`, was fixed at the same time — golden pins now sit 2.9% under Wang
+2022's canonical r0). Artifacts computed BEFORE the fix and not yet
+regenerated:
+
+- the six `w22/data/*_profile_r4i1p1f1.json` city profiles and the PI/PS
+  input table (thesis `worstpp:tab:pips` r3/ra3 columns). At the CMIP6
+  surface relative humidities feeding these points (August Gulf/Florida,
+  typically ~0.75-0.85, vs the effectively-rh=1 answer the buggy solver
+  returned), the rh sweep implies the solved sizes shrink roughly **4-8%**
+  (canonical-point sweep: rh 0.8 -> -6.0%, 0.9 -> -2.9%, 0.95 -> -1.6%);
+- ALL gridded PS products: the ERA5 PS zarr (`tcpips/era5.py::era5_calculate_ps`),
+  the CMIP6 PS products (`tcpips/ps_driver.py`, `w22/ps_runs.py`) — and
+  therefore the paper's PS map/time-series panels (Fig. 2), the ~2.3 km/yr
+  potential-size trend and the SST-PS regression statistics;
+- the ERA5/IBTrACS along-track PS validation outputs (`tcpips/ibtracs.py`);
+- the tradeoff/4D BO pathway, contaminated DIRECTLY (w22/tradeoff.py calls
+  `calculate_ps_ufunc` live per sample, bypassing the profile JSONs) — any
+  pre-fix tradeoff/4D runs, and `data/adbo/gpr_data.csv`, whose surge values
+  come from ADCIRC runs forced by the pre-fix New Orleans profile (the GP
+  kernel RANKING is plausibly robust, the absolute skill numbers are pre-fix);
+- the thesis figure-4a/4b artifacts (`img/w22/figure_4a.pdf`, `figure_4b.pdf`
+  and the solver-output CSVs `4a-*-ours.csv`, `4b-*-ours.csv` in
+  `w22/data/w22/`) — still pre-fix builds; regenerate via
+  `python -m w22.test_figures` / `W22_SLOW_TESTS=1 pytest w22/test_figures.py`;
+- (downstream, via the profiles) the ADCIRC potential-height experiments.
+
+Regenerating the profiles requires the CMIP6 processed PI/PS point inputs
+(`data/cmip6/regrid/...` AND the potential-intensity products `data/cmip6/pi*`,
+ARCHER2 backup); regenerating potential heights requires ADCIRC re-runs on
+ARCHER2. SST and potential-intensity (Vp) values are NOT affected (solver
+inputs, computed by tcpyPI upstream of the PS solve).
 
 See the [README](README.md#getting-started) for environment setup
 (`env.yml` portable spec; `environment.lock.yml`/`requirements.lock.txt` exact

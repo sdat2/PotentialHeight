@@ -56,12 +56,12 @@ Possible new TC characteristics:
 ## Run an idealized storm surge
 
 ```bash
-python -m adforce.wrap --exp_name notide-ex-NEW_ORLEANS --profile_name 2025.json --stationid 3 --resolution mid-notide
+python -m adforce.wrap --exp_name notide-ex-NEW_ORLEANS --profile_name 2015_new_orleans_profile_r4i1p1f1 --stationid 3 --resolution mid-notide
 
-python -m adforce.wrap --exp_name notide-5sec --profile_name 2025.json  --resolution mid-notide
+python -m adforce.wrap --exp_name notide-5sec --profile_name 2015_new_orleans_profile_r4i1p1f1  --resolution mid-notide
 
 
-python -m adforce.wrap --exp_name notide-20sec --profile_name 2025.json  --resolution mid-notide
+python -m adforce.wrap --exp_name notide-20sec --profile_name 2015_new_orleans_profile_r4i1p1f1  --resolution mid-notide
 ```
 
 ## Animate a run:

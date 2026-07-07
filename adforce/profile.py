@@ -32,7 +32,10 @@ def pressures_profile(  # add pressure profile to wind profile
     Returns:
         np.ndarray: Pressures [hPa].
     """
-    pressure_from_wind(rr, vv, p0, rho0, fcor, assumption="isothermal") / 100
+    # pressure_from_wind takes and returns Pa; / 100 converts to hPa for the
+    # profile-JSON convention. (The missing `return` before 2026-07-07 meant
+    # this fallback always returned None and had never worked.)
+    return pressure_from_wind(rr, vv, p0, rho0, fcor, assumption="isothermal") / 100
 
 
 def read_profile(profile_path: str) -> xr.Dataset:
@@ -55,7 +58,7 @@ def read_profile(profile_path: str) -> xr.Dataset:
     Examples:
         >>> import os
         >>> from w22.constants import DATA_PATH
-        >>> profile_ds = read_profile(os.path.join(DATA_PATH, "2025.json"))
+        >>> profile_ds = read_profile(os.path.join(DATA_PATH, "2015_new_orleans_profile_r4i1p1f1.json"))
         >>> assert "windspeeds" in profile_ds.data_vars
         >>> assert "pressures" in profile_ds.data_vars
         >>> assert "radii" in profile_ds.coords
@@ -75,6 +78,18 @@ def read_profile(profile_path: str) -> xr.Dataset:
         pressures = pressures_profile(radii, windspeeds)
     else:
         pressures = np.array(chavas_profile["p"], dtype="float32")
+
+    # Unit gate: the profile-JSON contract stores 'p' in hPa (far-field
+    # ~1000 hPa), and downstream adforce/fort22.py pours these values verbatim
+    # into ADCIRC's PSFC field, which is declared in mb. Legacy files that
+    # stored 'p' in Pa (e.g. w22/data/2025.json, 2097.json, 2000.json) would
+    # otherwise flow through silently as a 100x error.
+    if not (500.0 < float(pressures[-1]) < 1100.0):
+        raise ValueError(
+            f"Profile '{profile_path}' far-field pressure is {pressures[-1]:.1f}"
+            " — expected hPa (~1000). If this is a legacy Pa-unit profile,"
+            " divide 'p' by 100 before use."
+        )
 
     return xr.Dataset(
         data_vars={

@@ -44,6 +44,6 @@ pip install ../sithom
 
 
 # Run the job
-python -m adforce.wrap --exp_name notide --profile_name 2025.json --stationid 3 --resolution mid-notide
+python -m adforce.wrap --exp_name notide --profile_name 2015_new_orleans_profile_r4i1p1f1  # legacy 2025.json stores p in Pa and is now rejected by read_profile --stationid 3 --resolution mid-notide
 
-python -m adforce.wrap --exp_name notide --profile_name 2097.json --stationid 3 --resolution mid-notide
+python -m adforce.wrap --exp_name notide --profile_name 2100_new_orleans_profile_r4i1p1f1  # legacy 2097.json stores p in Pa and is now rejected by read_profile --stationid 3 --resolution mid-notide

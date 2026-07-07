@@ -52,6 +52,58 @@ def wang_diff(
     return f
 
 
+def carnot_pm_from_y(
+    y: float,
+    pressure_dry_at_inflow: float,  # [Pa]
+    near_surface_air_temperature: float,  # [K]
+) -> float:  # [Pa]
+    """
+    Convert the Wang (2022) Carnot solution y back to the total surface pressure
+    at the radius of maximum winds.
+
+    The transcendental solved by :func:`wang_diff` is in terms of
+    y = p_da / p_dm, the ratio of the DRY partial pressure of air at the inflow
+    (point A) to that at the radius of maximum winds (point B). Therefore:
+
+        p_m = p_da / y + e_sat(T_ns)
+
+    where
+
+    - p_da = pressure_dry_at_inflow [Pa] is the ambient dry partial pressure,
+      p_a - rh * e_sat(T_ns), i.e. reduced by the ambient relative humidity rh.
+      It MUST be numerically identical to the ``pressure_dry_at_inflow``
+      supplied to :func:`wang_consts` for the same solve.
+    - e_sat(T_ns) [Pa] is the full saturation vapour pressure added back at B,
+      because the boundary-layer air at the radius of maximum winds is assumed
+      saturated (rh = 1 there); see the Gibbs step q_vB/q_va* = p_dA/p_dB
+      "from saturation at B" in the derivation (paper/ps_deriv.tex).
+
+    Unit table:
+        y ................................. dimensionless (p_da / p_dm)
+        pressure_dry_at_inflow ............ Pa
+        near_surface_air_temperature ...... K
+        returns p_m ....................... Pa (total = dry + vapour)
+
+    History: before 2026-07-07 the three inline copies of this conversion in
+    w22/ps.py used (p_a - e_sat)/y for the numerator, silently reverting the
+    ambient humidity to rh = 1 there while the solve itself used the
+    rh-corrected p_da --- an inconsistency that biased the solved potential size.
+    This helper is now the single implementation.
+
+    Example::
+        >>> e_sat = buck_sat_vap_pressure(299)  # [Pa]
+        >>> p_da = 1015e2 - 0.9 * e_sat  # rh = 0.9 ambient dry pressure [Pa]
+        >>> pm = carnot_pm_from_y(1.05, p_da, 299)
+        >>> bool(np.isclose(pm, p_da / 1.05 + e_sat, rtol=1e-12))
+        True
+        >>> 90_000 < pm < 101_500  # sensible central-region pressure [Pa]
+        True
+    """
+    return pressure_dry_at_inflow / y + buck_sat_vap_pressure(
+        near_surface_air_temperature
+    )
+
+
 def wang_consts(
     near_surface_air_temperature: float = NEAR_SURFACE_AIR_TEMPERATURE_DEFAULT,  # K
     outflow_temperature: float = OUTFLOW_TEMPERATURE_DEFAULT,  # K
