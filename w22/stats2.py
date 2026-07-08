@@ -215,7 +215,7 @@ def timeseries_relationships(
     ts = {var: ds_period[var].values for var in variables if var in ds_period}
     if not ts: return pd.DataFrame()
 
-    years = ds_period["time"]# .dt.year.values
+    years = np.asarray(ds_period["time"].values)  # numpy, not DataArray, so safe_grad returns a ufloat (was a DataArray -> '.n' AttributeError)
 
     # Correlations and gradients with time (years)
     for var in ts:
