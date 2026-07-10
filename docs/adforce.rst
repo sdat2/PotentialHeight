@@ -87,7 +87,42 @@ adforce.fort63 module
 adforce.generate\_training\_data module
 ---------------------------------------
 
+CLI shim; the implementation lives in the ``adforce.training`` package below.
+
 .. automodule:: adforce.generate_training_data
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+adforce.training package
+------------------------
+
+.. automodule:: adforce.training
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: adforce.training.storms
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: adforce.training.atcf
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: adforce.training.cfl
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: adforce.training.inputs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. automodule:: adforce.training.driver
    :members:
    :undoc-members:
    :show-inheritance:

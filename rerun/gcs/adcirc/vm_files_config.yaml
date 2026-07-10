@@ -1,0 +1,14 @@
+# OPTIONAL drop-in as adforce/config/files/vm.yaml, selectable with the Hydra override
+#   files=vm            (for `python -m adforce.wrap ...` runs only)
+# NOTE: the argparse BO drivers (adbo.exp_*, adbo.sweep_vmax) do NOT need this — they are
+# covered by the ADCIRC_EXE_PATH / ADCIRC_NP / WORSTSURGE_MODULES env vars read by
+# adforce.wrap.get_default_config() (implemented; pinned by tests/test_wrap_config_env.py).
+# Keep this file only as a manual alternative for Hydra-CLI runs.
+#
+# Mirror the KEY NAMES of the real adforce/config/files/n02_archer2_config.yaml (root,
+# exe_path, exp_path, run_folder, low_storage) — adjust if the schema differs.
+root: /work
+exe_path: /opt/adcirc/work        # where the image put adcprep + padcirc
+exp_path: /work/exp               # writable; BO/experiment run folders land here
+run_folder: /work/run
+low_storage: true                 # delete fort.22.nc etc. after each run (BO default)

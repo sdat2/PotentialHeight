@@ -55,7 +55,7 @@ Key files:
 - `fort61.py` / `fort63.py` — read tide gauge and SSH/wind output.
 - `mesh.py` — fast mesh reading/processing; converts ADCIRC output to dual-graph format for GNN training.
 - `dual_graph.py` — dual-graph construction for ML training datasets.
-- `generate_training_data.py` — forces ADCIRC with IBTrACS historical U.S. landfalling storms (1980–2024) to generate SurgeNet training data.
+- `generate_training_data.py` — CLI shim over the `adforce/training/` package: forces ADCIRC with IBTrACS historical U.S. landfalling storms (1980–2024) to generate SurgeNet training data.
 - `wrap.py` — orchestrates parallel ADCIRC runs on Archer2; the main file to edit when porting to a new machine.
 
 Supports `pyproj` and a fast `sphere` approximation for distance calculations (controlled by `geoid` in `adforce/config/grid/grid_fort22.yaml`; defaults to `sphere`).

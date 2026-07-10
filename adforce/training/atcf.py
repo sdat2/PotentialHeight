@@ -1,0 +1,496 @@
+"""IBTrACS-to-ATCF/ASWIP text conversion for the training-data generator.
+
+Split out of ``adforce/generate_training_data.py``. These functions turn a
+single-storm IBTrACS ``xarray.Dataset`` into the two text inputs each ADCIRC
+run needs:
+
+- ``convert_ibtracs_storm_to_aswip_input`` writes ``pre_aswip_fort.22``, the
+  fixed-width FORMAT(22) file that ASWIP converts to an NWS=20 (GAHM)
+  ``fort.22``.
+- ``convert_ibtracs_storm_to_atcf`` writes ``atcf.txt``, the comma-separated
+  ATCF best-track file that adcircpy's ``BestTrackForcing`` reads to build
+  the ``fort.15`` metadata.
+
+``_decode_char_array`` and ``clean_radii`` are the pure helpers they share.
+Only numpy/pandas/xarray are needed here (no adcircpy), so this module is
+cheap to import and its doctests run under ``pytest --doctest-modules``.
+"""
+
+import numpy as np
+import pandas as pd
+import xarray as xr
+
+
+def _decode_char_array(char_array_like) -> str:
+    """
+    PFunction to decode character arrays from xarray/numpy.
+
+    Args:
+        char_array_like: An object representing character data (e.g., numpy array of bytes/chars).
+
+    Returns:
+        The decoded string.
+
+    >>> _decode_char_array(np.array([b'A', b'L'], dtype='|S1'))
+    'AL'
+    >>> _decode_char_array(np.array([b'G', b'E', b'R', b'T', b' ', b' '], dtype='|S1'))
+    'GERT'
+    >>> _decode_char_array(np.array([b'T', b'S'], dtype='|S1'))
+    'TS'
+    """
+    try:
+        # Attempt common decoding strategy for byte arrays
+        if hasattr(char_array_like, "tobytes"):
+            decoded_bytes = char_array_like.tobytes()
+            # Try decoding as UTF-8, ignore errors, remove null bytes and strip whitespace
+            return (
+                decoded_bytes.decode("utf-8", errors="ignore")
+                .replace("\x00", "")
+                .strip()
+            )
+        # Handle cases where it might already be strings or needs different handling
+        elif isinstance(char_array_like, (str, bytes)):
+            if isinstance(char_array_like, bytes):
+                return (
+                    char_array_like.decode("utf-8", errors="ignore")
+                    .replace("\x00", "")
+                    .strip()
+                )
+            return str(char_array_like).replace("\x00", "").strip()
+        elif hasattr(char_array_like, "item"):  # Handle xarray DataArray extraction
+            item_val = char_array_like.item()
+            if isinstance(item_val, bytes):
+                return (
+                    item_val.decode("utf-8", errors="ignore")
+                    .replace("\x00", "")
+                    .strip()
+                )
+            return str(item_val).replace("\x00", "").strip()
+        else:
+            # Fallback for other array-like structures
+            # This might need refinement based on actual data types
+            joined_str = "".join(
+                [
+                    (
+                        c.decode("utf-8", errors="ignore")
+                        if isinstance(c, bytes)
+                        else str(c)
+                    )
+                    for c in char_array_like
+                ]
+            )
+            return joined_str.replace("\x00", "").strip()
+
+    except Exception:
+        # Fallback if decoding fails
+        return "UNKNOWN"
+
+
+def clean_radii(radii_nm: list) -> list:
+    """
+    Cleans a list of 4-quadrant radii [NE, SE, SW, NW]
+    to remove ambiguous zeros that crash ASWIP/ADCIRC.
+
+    Note: mixed (some-zero) input lists are modified in place and the same
+    list object may be returned.
+
+    Args:
+        radii_nm (list): A list of 4 radii [NE, SE, SW, NW].
+
+    Returns:
+        list: A corrected, unambiguous list of 4 radii.
+
+    Doctests:
+    >>> clean_radii([60.0, 60.0, 0.0, 0.0])  # Case 1: Simple mirroring
+    [60.0, 60.0, 60.0, 60.0]
+    >>> clean_radii([15.0, 0.0, 15.0, 0.0])  # Case 2: Un-mirrorable pair
+    [15.0, 15.0, 15.0, 15.0]
+    >>> clean_radii([15.0, 0.0, 0.0, 0.0])   # Case 3: Single value
+    [15.0, 15.0, 15.0, 15.0]
+    >>> clean_radii([0.0, 0.0, 0.0, 0.0])    # Case 4: All zeros (no storm)
+    [0.0, 0.0, 0.0, 0.0]
+    >>> clean_radii([60.0, 60.0, 15.0, 25.0]) # Case 5: Fully defined
+    [60.0, 60.0, 15.0, 25.0]
+    """
+    # [NE, SE, SW, NW]
+    #  0   1   2   3
+
+    # Check if the line is "mixed" (has both zeros and non-zeros)
+    has_zeros = any(r == 0 for r in radii_nm)
+    has_non_zeros = any(r > 0 for r in radii_nm)
+
+    if not (has_zeros and has_non_zeros):
+        # This line is fine. It's either all zeros or all non-zeros.
+        return radii_nm
+
+    # print(f"Fixing ambiguous radii: {radii_nm}")
+
+    # --- Pass 1: Try to mirror opposites ---
+
+    # Check NE <-> SW pair
+    if radii_nm[0] > 0 and radii_nm[2] == 0:
+        radii_nm[2] = radii_nm[0]
+    elif radii_nm[0] == 0 and radii_nm[2] > 0:
+        radii_nm[0] = radii_nm[2]
+
+    # Check SE <-> NW pair
+    if radii_nm[1] > 0 and radii_nm[3] == 0:
+        radii_nm[3] = radii_nm[1]
+    elif radii_nm[1] == 0 and radii_nm[3] > 0:
+        radii_nm[1] = radii_nm[3]
+
+    # --- Pass 2: Check for remaining zeros ---
+    # If we still have zeros, it means a pair was [0, 0]
+    # (e.g., [15, 0, 15, 0] or [15, 0, 0, 0])
+
+    if any(r == 0 for r in radii_nm):
+        # Data is fundamentally incomplete.
+        # Find the largest radius provided and make the storm symmetric.
+        # This is the most conservative (strongest) and safest assumption.
+        max_r = max(radii_nm)
+        # print(f"  Mirroring failed. Symmetrizing to max radius: {max_r}")
+        radii_nm = [max_r, max_r, max_r, max_r]
+
+    return radii_nm
+
+
+def convert_ibtracs_storm_to_aswip_input(ds: xr.Dataset, output_atcf_path: str):
+    """
+    Loads IBTrACS dataset for one tropical cyclone and creates a fixed-width
+    ASWIP input file (fort.22 format) based on FORMAT(22) from ASWIP source.
+
+    Includes asymmetry (wind radii) and size (RMW) information. Uses placeholders
+    for fields not directly available in standard IBTrACS best tracks.
+
+    Side effects: writes the fixed-width file to ``output_atcf_path`` and
+    prints progress; an ``IOError`` on write is caught and only printed.
+
+    Args:
+        ds (xr.Dataset): xarray.Dataset for a single storm from IBTrACS,
+                         containing variables like 'time', 'number', 'name',
+                         'usa_lat', 'usa_lon', 'usa_wind', 'usa_pres',
+                         'usa_status', 'usa_rmw', 'usa_r34', 'usa_r50', 'usa_r64'.
+        output_atcf_path (str): Path to save the new fixed-width file for ASWIP input.
+
+    Example:
+        >>> # Create a mock xarray Dataset for testing
+        >>> times = pd.to_datetime(['2005-08-28 12:00', '2005-08-28 18:00'])
+        >>> mock_ds = xr.Dataset(
+        ...     {
+        ...         "time": (("date_time",), times),
+        ...         "number": ((), 12), # Storm number 12
+        ...         "name": ((), b'KATRINA'),
+        ...         "basin": (("date_time", "max_basin_len"), np.array([[b'A', b'L'], [b'A', b'L']], dtype='|S1')),
+        ...         "usa_lat": (("date_time",), np.array([25.7, 26.5])),
+        ...         "usa_lon": (("date_time",), np.array([-84.7, -85.9])),
+        ...         "usa_wind": (("date_time",), np.array([100, 110])), # knots
+        ...         "usa_pres": (("date_time",), np.array([945, 940])), # mb
+        ...         "usa_status": (("date_time", "max_status_len"), np.array([[b'H', b'U'], [b'H', b'U']], dtype='|S1')),
+        ...         "usa_rmw": (("date_time",), np.array([20, 18])), # nm
+        ...         "usa_r34": (("date_time", "quadrant"), np.array([[100, 100, 75, 75], [120, 120, 80, 80]], dtype=np.float32)), # nm
+        ...         "usa_r50": (("date_time", "quadrant"), np.array([[50, 50, 35, 35], [60, 60, 40, 40]], dtype=np.float32)), # nm
+        ...         "usa_r64": (("date_time", "quadrant"), np.array([[30, 30, 20, 20], [35, 35, 25, 25]], dtype=np.float32)), # nm
+        ...         "usa_poci": (("date_time",), np.array([1010, 1008])), # Pressure of Outer Closed Isobar (placeholder)
+        ...         "usa_roci": (("date_time",), np.array([200, 220])), # Radius of Outer Closed Isobar (placeholder)
+        ...     },
+        ...     coords={
+        ...         "date_time": times,
+        ...         "quadrant": np.arange(4),
+        ...         "max_name_len": np.arange(10),
+        ...         "max_basin_len": np.arange(2),
+        ...         "max_status_len": np.arange(2)
+        ...     }
+        ... )
+        >>> import tempfile
+        >>> import os
+        >>> with tempfile.NamedTemporaryFile(delete=False, mode='w+') as tmpfile:
+        ...     output_path = tmpfile.name
+        >>> convert_ibtracs_storm_to_aswip_input(mock_ds, output_path) # doctest: +ELLIPSIS
+        Generating AWIP input for storm KATRINA (12)...
+        Processing 2 valid time steps...
+        ✅ Successfully created an ASWIP input file at ...
+        >>> with open(output_path, 'r') as f:
+        ...     lines = f.readlines()
+        >>> print(lines[0].strip()) # First line, 34kt radii
+           0  2005082812      BEST    0    257N   847W  100  945      34       100     100      75      75  1013        20                               0    0  KATRINA
+        >>> print(lines[1].strip()) # First line, 50kt radii
+           0  2005082812      BEST    0    257N   847W  100  945      50        50      50      35      35  1013        20                               0    0  KATRINA
+        >>> print(lines[2].strip()) # First line, 64kt radii
+           0  2005082812      BEST    0    257N   847W  100  945      64        30      30      20      20  1013        20                               0    0  KATRINA
+        >>> print(lines[3].strip()) # Second line, 34kt radii
+           0  2005082818      BEST    6  265N   859W  110   940       34        120   120    80    80  1013         18                             0    0  KATRINA
+        >>> os.remove(output_path) # Clean up the temp file
+    """
+    atcf_lines = []
+    fill_value_int = 0  # Default value for missing numeric fields
+
+    # Find all valid time steps by checking where the 'time' variable is not NaT
+    valid_time_indices = np.where(~np.isnat(ds["time"].values))[0]
+
+    # Get static storm information once
+    # Ensure storm number is treated safely, default if missing
+    try:
+        storm_number = int(ds["number"].item())
+    except (ValueError, KeyError, AttributeError):
+        storm_number = 0  # Default storm number if missing or invalid
+        print("Warning: Could not read storm number, defaulting to 0.")
+
+    try:
+        storm_name = _decode_char_array(ds["name"]).upper().strip()
+        if not storm_name or storm_name == "NOT_NAMED":
+            storm_name = "NONAME"
+    except (KeyError, AttributeError):
+        storm_name = "NONAME"  # Default storm name
+        print("Warning: Could not read storm name, defaulting to NONAME.")
+
+    print(f"Generating AWIP input for storm {storm_name} ({storm_number})...")
+    print(f"Processing {len(valid_time_indices)} valid time steps...")
+
+    start_time = pd.to_datetime(ds.isel(date_time=0)["time"].item())
+
+    # Loop through only the valid indices
+    for time_idx in valid_time_indices:
+        # Select a single time slice using .isel()
+        row = ds.isel(date_time=time_idx)
+
+        # Safely extract and format data, providing defaults where necessary
+        try:
+            dt_val = pd.to_datetime(row["time"].item())
+            year = dt_val.year
+            month = dt_val.month
+            day = dt_val.day
+            hour = dt_val.hour
+        except (AttributeError, ValueError):
+            print(
+                f"Error: Invalid time data at index {time_idx}. Skipping this time step."
+            )
+            continue  # Skip this time step if time is invalid
+
+        tech = "BEST"  # Technique
+        tau = int((dt_val - start_time).total_seconds() / 3600)
+
+        try:
+            lat = row["usa_lat"].item()
+            lat_val = int(abs(lat) * 10)
+            lat_hem = "N" if lat >= 0 else "S"
+        except (ValueError, KeyError, AttributeError):
+            lat_val, lat_hem = 0, "N"
+            print(f"Warning: Missing latitude at index {time_idx}, defaulting to 0N.")
+
+        try:
+            lon = row["usa_lon"].item()
+            lon_val = int(abs(lon) * 10)
+            # Correct hemisphere logic: West is negative
+            lon_hem = "W" if lon < 0 else "E"
+        except (ValueError, KeyError, AttributeError):
+            lon_val, lon_hem = 0, "E"
+            print(f"Warning: Missing longitude at index {time_idx}, defaulting to 0E.")
+
+        # Use np.nan_to_num to handle potential NaNs before converting to int
+        atcf_wind = int(
+            np.nan_to_num(
+                row.get("usa_wind", fill_value_int).item(), nan=fill_value_int
+            )
+        )
+        atcf_pres = int(
+            np.nan_to_num(row.get("usa_pres", 1013).item(), nan=1013)
+        )  # Default pressure 1013
+
+        # Background pressure (Pn) - typically 1013 mb
+        atcf_poci = 1013
+
+        atcf_rmw = int(
+            np.nan_to_num(row.get("usa_rmw", fill_value_int).item(), nan=fill_value_int)
+        )
+
+        # Placeholder for Direction and Speed (ASWIP recalculates)
+        storm_dir = 0
+        storm_speed = 0
+
+        # Define radii types and corresponding variable names
+        radii_vars = {
+            34: "usa_r34",
+            50: "usa_r50",
+            64: "usa_r64",
+            # Add 100kt if available in your dataset
+            # 100: "usa_r100",
+        }
+
+        for rad_kt, var_name in radii_vars.items():
+            radii_nm = [fill_value_int] * 4  # Initialize with default
+            if var_name in row:
+                try:
+                    # Extract radii, handle NaNs, convert to int
+                    radii_nm = [
+                        int(
+                            np.nan_to_num(
+                                row[var_name].isel(quadrant=q).item(),
+                                nan=fill_value_int,
+                            )
+                        )
+                        for q in range(4)
+                    ]
+                    # Check if any radius value is non-zero
+                    radii_nm = clean_radii(radii_nm)
+                except (ValueError, IndexError, KeyError, AttributeError) as e:
+                    print(
+                        f"Warning: Could not process radii for {rad_kt}kt at index {time_idx}. Error: {e}"
+                    )
+                    radii_nm = [fill_value_int] * 4  # Reset to default on error
+
+            # ASWIP documentation suggests it can handle multiple lines per time step,
+            # even if radii are zero, as it uses the presence of the isotach line.
+            # Let's write a line for each isotach type found, regardless of whether radii are zero,
+            # unless the variable itself was missing.
+            if var_name in row:
+                # FORMAT(22) breakdown and corresponding Python formatting
+                # 3x, i3, 2x, i4, 3i2, 6x, a4, 1x, i4, 2x, i3, a1, 1x, i5, a1, 2x, i3, 2x, i4, 6x, i3, 7x, 4(i4,2x), i4, 8x, i3, 27x, 2(i3,2x), a10
+                line = (
+                    f"   "  # 3x
+                    f"{0: >3d}"  # i3      (advr - placeholder 0)
+                    f"  "  # 2x
+                    f"{year: >4d}"  # i4      (iyear)
+                    f"{month:02d}"  # i2      (imth)
+                    f"{day:02d}"  # i2      (iday)
+                    f"{hour:02d}"  # i2      (ihr)
+                    f"      "  # 6x
+                    f"{tech: <4}"  # a4      (castType)
+                    f" "  # 1x
+                    f"{tau: >4d}"  # i4      (iFcstInc)
+                    f"  "  # 2x
+                    f"{lat_val: >3d}"  # i3      (ilat)
+                    f"{lat_hem: <1}"  # a1      (ns)
+                    f" "  # 1x
+                    f"{lon_val: >5d}"  # i5      (ilon)
+                    f"{lon_hem: <1}"  # a1      (ew)
+                    f"  "  # 2x
+                    f"{atcf_wind: >3d}"  # i3      (ispd)
+                    f"  "  # 2x
+                    f"{atcf_pres: >4d}"  # i4      (icpress)
+                    f"      "  # 6x
+                    f"{rad_kt: >3d}"  # i3      (ivr - Wind intensity for radii)
+                    f"       "  # 7x
+                    f"{radii_nm[0]: >4d}  "  # i4, 2x  (ir(1)) NE
+                    f"{radii_nm[1]: >4d}  "  # i4, 2x  (ir(2)) SE
+                    f"{radii_nm[2]: >4d}  "  # i4, 2x  (ir(3)) SW
+                    f"{radii_nm[3]: >4d}  "  # i4, 2x  (ir(4)) NW
+                    f"{atcf_poci: >4d}"  # i4      (ipn - Background pressure)
+                    f"        "  # 8x
+                    f"{atcf_rmw: >3d}"  # i3      (atcfRMW)
+                    f"                           "  # 27x
+                    f"{storm_dir: >3d}  "  # i3, 2x  (dir - placeholder 0)
+                    f"{storm_speed: >3d}  "  # i3, 2x  (speed - placeholder 0)
+                    f"{storm_name: <10}"  # a10     (stormname)
+                )
+                # Ensure the line length matches expected format length if needed, though Fortran often ignores trailing chars.
+                # Total length from format: 3+3+2+4+2+2+2+6+4+1+4+2+3+1+1+5+1+2+3+2+4+6+3+7+4*6+4+8+3+27+2*5+10 = 143
+                # Let's verify:
+                # print(len(line)) # Check length if necessary
+                atcf_lines.append(line)
+
+    # Write the formatted lines to the output file
+    try:
+        with open(output_atcf_path, "wt") as f:
+            f.write("\n".join(atcf_lines))
+        # Use repr() to handle potential special characters in the path for printing
+        print(f"✅ Successfully created an ASWIP input file at {output_atcf_path!r}")
+    except IOError as e:
+        print(
+            f"Error: Could not write to output file {output_atcf_path!r}. Reason: {e}"
+        )
+
+
+def convert_ibtracs_storm_to_atcf(ds: xr.Dataset, output_atcf_path: str):
+    """
+    Loads IBTrACS ds for one tropical cyclone and creates a complete ATCF file, including
+    asymmetry (wind radii) and size (RMW, POCI, ROCI) information.
+
+    Side effects: writes the comma-separated ATCF file to ``output_atcf_path``
+    (later read back by adcircpy's ``BestTrackForcing``) and prints progress.
+    Unlike the ASWIP twin, missing variables (e.g. 'usa_poci'/'usa_roci')
+    raise, and no ``clean_radii`` correction is applied.
+
+    Args:
+        ds (xr.Dataset): xarray.Dataset for a single storm from IBTrACS.
+        output_atcf_path (str): Path to save the new .txt ATCF file.
+    """
+    atcf_lines = []
+
+    # Find all valid time steps by checking where the 'time' variable is not a fill value
+    valid_time_indices = np.where(~np.isnat(ds["time"].values))[0]
+
+    # Get static storm information once
+    storm_number = int(ds["number"].values)
+    storm_name = _decode_char_array(ds["name"]).upper().strip(" ").strip("\x00")
+    print(f"Generating ATCF for storm {storm_name} ({storm_number})...")
+    # storm_name = "GERT"
+
+    print(f"Processing {len(valid_time_indices)} valid time steps...")
+
+    # Loop through only the valid indices
+    for time_idx in valid_time_indices:
+        # Select a single time slice using .isel()
+        row = ds.isel(date_time=time_idx)
+
+        # --- Part 1: Basic Identifiers ---
+        # Use the helper function to decode character arrays
+        atcf_basin = _decode_char_array(row["basin"])
+        atcf_cyclone_num = str(storm_number)
+        atcf_datetime = pd.to_datetime(row["time"].values).strftime("%Y%m%d%H")
+
+        # --- Part 2: Core Storm State ---
+        # .item() cleanly extracts the scalar value from a 0-dimensional array
+        lat = row["usa_lat"].item()
+        lon = row["usa_lon"].item()
+
+        lat_val = int(abs(lat) * 10)
+        lat_hem = "N" if lat >= 0 else "S"
+        atcf_lat = f"{lat_val}{lat_hem}"  # .rjust(5)
+
+        lon_val = int(abs(lon) * 10)
+        lon_hem = "W" if lon < 0 else "E"
+        atcf_lon = f"{lon_val}{lon_hem}"  # .rjust(6)
+
+        atcf_wind = str(int(np.nan_to_num(row["usa_wind"].item())))  # .rjust(4)
+        atcf_pres = str(int(np.nan_to_num(row["usa_pres"].item())))  # .rjust(5)
+        atcf_status = _decode_char_array(row["usa_status"])  # .ljust(3)
+
+        # --- Part 3: Enriched Data for Asymmetry and Size ---
+        # Select quadrant data using .isel() and get scalar with .item()
+        atcf_poci = str(int(np.nan_to_num(row["usa_poci"].item())))  # .rjust(5)
+        atcf_roci = str(int(np.nan_to_num(row["usa_roci"].item())))  # .rjust(4)
+        atcf_rmw = str(int(np.nan_to_num(row["usa_rmw"].item())))  # .rjust(4)
+        radii_data = {
+            "34": [
+                int(np.nan_to_num(row["usa_r34"].isel(quadrant=q).item()))
+                for q in range(4)
+            ],
+            "50": [
+                int(np.nan_to_num(row["usa_r50"].isel(quadrant=q).item()))
+                for q in range(4)
+            ],
+            "64": [
+                int(np.nan_to_num(row["usa_r64"].isel(quadrant=q).item()))
+                for q in range(4)
+            ],
+        }
+
+        for rad, rad_values in radii_data.items():
+            # Only write a line if there is actual radii data (sum > 0)
+            # if sum(rad_values) > 0:
+            if True:
+                # --- Part 3: Build the correctly formatted ATCF line ---
+                # This line now includes all required placeholder commas
+                line = (
+                    f"{atcf_basin},{atcf_cyclone_num},{atcf_datetime},{'00'},{'BEST'},{'0'},",
+                    f"{atcf_lat},{atcf_lon},{atcf_wind},{atcf_pres},{atcf_status},",
+                    f"{rad},{'NEQ'},{str(rad_values[0])},",
+                    f"{str(rad_values[1])},{str(rad_values[2])},{str(rad_values[3])},",
+                    f"{atcf_poci},{atcf_roci},{atcf_rmw},",
+                    f" , , , , , , ,{storm_name}",
+                )
+                atcf_lines.append("".join(line))
+
+    with open(output_atcf_path, "wt") as f:
+        f.write("\n".join(atcf_lines))
+    print(f"✅ Successfully created ENRICHED ATCF file at '{output_atcf_path}'")

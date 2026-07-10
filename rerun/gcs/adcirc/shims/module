@@ -1,0 +1,8 @@
+#!/bin/bash
+# DRAFT no-op `module` shim. adforce/subprocess.py does, via shell:
+#     module load <Cray modules>
+# and RAISES RuntimeError if it returns non-zero. There is no Cray module system in the
+# container, so this makes `module load ...` a harmless success.
+# CLEANER alternative (prefer this, then this shim is just belt-and-suspenders): pass the
+# Hydra override  slurm.modules=''  so subprocess.py skips the module block entirely.
+exit 0

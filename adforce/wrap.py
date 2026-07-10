@@ -138,6 +138,37 @@ def get_default_config() -> OmegaConf:
     ):
         # Compose the configuration as if you were running from the command line.
         cfg = compose(config_name="wrap_config")
+    # Machine-local overrides from the environment. The adbo drivers (exp.py,
+    # sweep_vmax.py) are argparse entry points that compose the config HERE
+    # rather than via the adforce.wrap Hydra CLI, so `files.*`/`slurm.*`
+    # dot-overrides cannot reach them; these variables are the supported way
+    # to point such runs at a non-ARCHER2 machine (e.g. a cloud VM/container).
+    # Each is applied only when set, so ARCHER2 behaviour is unchanged.
+    if os.environ.get("ADCIRC_EXE_PATH"):
+        # directory containing the adcprep/padcirc binaries
+        cfg.files.exe_path = os.environ["ADCIRC_EXE_PATH"]
+        print(f"env override: files.exe_path={cfg.files.exe_path} (ADCIRC_EXE_PATH)")
+    if os.environ.get("ADCIRC_NP"):  # empty string treated as unset
+        # MPI ranks: np = (tasks_per_node - reserved_cpus) * nodes, so with
+        # reserved_cpus=0 and nodes=1 (the mid resolution the observe loop
+        # asserts) this is the rank count.
+        try:
+            cfg.slurm.tasks_per_node = int(os.environ["ADCIRC_NP"])
+        except ValueError as e:
+            raise ValueError(
+                f"ADCIRC_NP must be an integer MPI rank count, "
+                f"got {os.environ['ADCIRC_NP']!r}"
+            ) from e
+        cfg.slurm.reserved_cpus = 0
+        print(
+            f"env override: slurm.tasks_per_node={cfg.slurm.tasks_per_node}, "
+            "slurm.reserved_cpus=0 (ADCIRC_NP)"
+        )
+    if "WORSTSURGE_MODULES" in os.environ:
+        # HPC modules to load before running ADCIRC; set to "" (empty) to
+        # disable the `module load` step entirely on machines without one.
+        cfg.slurm.modules = os.environ["WORSTSURGE_MODULES"]
+        print(f"env override: slurm.modules={cfg.slurm.modules!r} (WORSTSURGE_MODULES)")
     return cfg
 
 

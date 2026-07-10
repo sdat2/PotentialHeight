@@ -39,7 +39,7 @@ from sithom.misc import get_git_revision_hash
 from sithom.plot import plot_defaults
 from sithom.io import write_json
 import matplotlib.pyplot as plt
-from adforce.wrap import idealized_tc_observe, get_default_config
+from adforce.wrap import idealized_tc_observe
 from adforce.constants import NEW_ORLEANS
 from .wrap_utils import build_wrap_config
 from .ani import plot_gps

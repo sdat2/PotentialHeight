@@ -1,0 +1,51 @@
+# Build-TEST Dockerfile: ONLY the ADCIRC v55.02 compile — the risky part of the main
+# Dockerfile — with byte-identical toolchain + cmake commands. Used to de-risk the build
+# locally (small enough for a laptop: ~4 GB vs ~10 GB for the full image) before running
+# the full Dockerfile on GCP. If this builds, the main image's ADCIRC layer will too.
+#   docker build --platform=linux/amd64 -f Dockerfile.adcirc-only -t adcirc-buildtest .
+FROM mambaorg/micromamba:1.5.8
+
+# default mambauser can't write /opt/adcirc-src (inline comments are invalid in Dockerfiles)
+USER root
+
+# --- toolchain (IDENTICAL to main Dockerfile layer 1) ---
+# apt-free on purpose: plain-HTTP apt breaks on some networks (Fastly 500s) and
+# debian-slim ships no CA certs for HTTPS apt; conda-forge (own CA bundle) has
+# everything we need, git included — single package manager, more reproducible.
+RUN micromamba create -y -n ws -c conda-forge \
+      python=3.10 git \
+      fortran-compiler c-compiler cxx-compiler "cmake<4" make \
+      mpich "hdf5=*=mpi_mpich*" "netcdf-fortran=*=mpi_mpich*" \
+    && micromamba clean -a -y
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+SHELL ["micromamba", "run", "-n", "ws", "/bin/bash", "-o", "pipefail", "-c"]
+
+# --- ADCIRC build (IDENTICAL to main Dockerfile layer 2) ---
+ARG ADCIRC_REPO=https://github.com/sdat2/adcirc-v55.02.git
+# Flags mirror the fork's compile.sh EXACTLY: the line-length flags go via the dedicated
+# Fortran_LINELENGTH_FLAG / ADDITIONAL_FLAGS_* vars, NOT CMAKE_Fortran_FLAGS — the fork's
+# cmake/macros.cmake passes them unquoted, and if they're unset the expansion vanishes and
+# set_target_properties errors with "incorrect number of arguments".
+RUN git clone --depth 1 "$ADCIRC_REPO" /opt/adcirc-src && \
+    LL="-ffixed-line-length-132 -ffree-line-length-132" && \
+    cmake -S /opt/adcirc-src/adcirc -B /opt/adcirc-build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_ADCPREP=ON -DBUILD_PADCIRC=ON \
+      -DENABLE_OUTPUT_NETCDF=ON -DENABLE_DATETIME=ON \
+      -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_Fortran_COMPILER=mpif90 \
+      -DCMAKE_Fortran_FLAGS="-DREAL8 -DCSCA -DLINUX -g -fbacktrace -w -fallow-argument-mismatch -O2" \
+      -DFortran_LINELENGTH_FLAG="$LL" \
+      -DADDITIONAL_FLAGS_ADCPREP="$LL" \
+      -DNETCDFHOME="$CONDA_PREFIX" \
+      -DNETCDF_LIBRARY="$CONDA_PREFIX/lib/libnetcdf.so" \
+      -DNETCDF_INCLUDE_DIR="$CONDA_PREFIX/include" \
+      -DNETCDF_F90_LIBRARY="$CONDA_PREFIX/lib/libnetcdff.so" && \
+    cmake --build /opt/adcirc-build -j "$(nproc)" && \
+    mkdir -p /opt/adcirc/work && \
+    find /opt/adcirc-build \( -name adcprep -o -name padcirc \) -type f -exec cp {} /opt/adcirc/work/ \; && \
+    test -x /opt/adcirc/work/adcprep && test -x /opt/adcirc/work/padcirc && \
+    ls -l /opt/adcirc/work
+
+# quick link sanity (full smoke test needs the Python stack from the main image)
+RUN ldd /opt/adcirc/work/padcirc | grep -iE "mpi|netcdf" && echo "BUILD TEST OK"
+CMD ["bash"]

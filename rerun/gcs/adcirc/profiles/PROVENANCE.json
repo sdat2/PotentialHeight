@@ -1,0 +1,43 @@
+{
+  "point_nc": "/Volumes/s/tcpips/new_orleans_august_ssp585_r4i1p1f1_isothermal_pi4new.nc",
+  "lat": 29.25,
+  "solver": {
+    "ck_cd": 0.9,
+    "cd": 0.0015,
+    "w_cool": 0.002,
+    "supergradient_factor": 1.2,
+    "pressure_assumption": "isothermal"
+  },
+  "years": {
+    "2015": {
+      "vmax_ms": 105.01183390185271,
+      "msl_hPa": 1019.5537109375,
+      "sst_C": 31.260822296142578,
+      "t0_K": 204.89627071184762,
+      "rh": 0.7465781765410258,
+      "r0_stored_m": 1665130.6441149367,
+      "r0_fixed_m": 1526993.7610393302,
+      "rmax_stored_m": 28561.417566293945,
+      "rmax_fixed_m": 25032.684607202133,
+      "pm_fixed_Pa": 87999.03863956434,
+      "pc_fixed_Pa": 76496.25,
+      "profile_old": "profile_old_2015.json",
+      "profile_fixed": "profile_fixed_2015.json"
+    },
+    "2100": {
+      "vmax_ms": 111.43032007296077,
+      "msl_hPa": 1021.4007568359375,
+      "sst_C": 34.79368209838867,
+      "t0_K": 207.0630268255425,
+      "rh": 0.7421529499677376,
+      "r0_stored_m": 1925725.2120521404,
+      "r0_fixed_m": 1778184.8518226622,
+      "rmax_stored_m": 33082.377805396674,
+      "rmax_fixed_m": 29289.81801717447,
+      "pm_fixed_Pa": 86557.05454604402,
+      "pc_fixed_Pa": 74069.1875,
+      "profile_old": "profile_old_2100.json",
+      "profile_fixed": "profile_fixed_2100.json"
+    }
+  }
+}

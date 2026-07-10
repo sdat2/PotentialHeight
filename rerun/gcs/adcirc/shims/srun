@@ -1,0 +1,22 @@
+#!/bin/bash
+# DRAFT srun -> mpirun shim (so the unmodified adforce/subprocess.py runs in a plain container).
+# adforce/subprocess.py launches ADCIRC with, verbatim:
+#     srun --distribution=block:block --hint=nomultithread --ntasks=<N> <exe> [args...]
+# There is no SLURM in the container, so translate to:  mpirun -np <N> <exe> [args...]
+# MPICH's mpirun has no root guard, so nothing extra is needed. If you rebuild the image
+# with OpenMPI instead, add --allow-run-as-root (and --oversubscribe if N > physical cores).
+set -euo pipefail
+NP=1
+POS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ntasks=*)            NP="${1#*=}" ;;
+    --ntasks)              NP="$2"; shift ;;
+    --distribution=*|--hint=*) ;;          # drop SLURM-only flags (=value form)
+    --distribution|--hint) shift ;;        # drop SLURM-only flags (space form)
+    --*)                   ;;               # ignore any other srun flag
+    *)                     POS+=("$1") ;;   # positional = the executable + its args
+  esac
+  shift
+done
+exec mpirun -np "$NP" "${POS[@]}"

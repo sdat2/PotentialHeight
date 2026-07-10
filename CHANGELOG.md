@@ -1,4 +1,14 @@
 v0.1.4 (unreleased):
+- REFACTORED: `adforce/generate_training_data.py` (1088-line hurried single file)
+  split into the documented `adforce/training/` package (`storms`, `atcf`, `cfl`,
+  `inputs`, `driver`); the old module remains as a behavior-identical CLI shim
+  (`python -m adforce.generate_training_data` unchanged, --help byte-identical).
+  Function bodies moved unchanged (AST-verified); 29 characterization tests added
+  (`tests/test_training_data.py`), captured against the original module first.
+  BEHAVIOR CHANGE (intentional): the driver now composes its config via
+  `adforce.wrap.get_default_config()`, so the `ADCIRC_EXE_PATH`/`ADCIRC_NP`/
+  `WORSTSURGE_MODULES` machine-local env overrides apply to training-data
+  generation too (previously bypassed via a bare `hydra.compose`).
 - FIXED (correctness): the Wang-2022 y -> p_m Carnot back-conversion in `w22/ps.py`
   dropped the ambient relative-humidity factor from its numerator at all three
   solver entry points, so solved potential sizes were effectively the rh = 1

@@ -66,7 +66,7 @@ intersphinx_mapping = {
 #   cdsapi                            - tcpips.era5
 #   dask_mpi                          - tcpips.era5_ps_calc
 #   dask_jobqueue                     - tcpips.run_dask_calculation
-#   adcircpy                          - adforce.generate_training_data
+#   adcircpy                          - adforce.training.inputs (via .driver; shim adforce.generate_training_data is lazy)
 #       (not in install_requires at all)
 #   numba                             - cle15.cle15n
 #       (not in install_requires; remove from this list if added there)

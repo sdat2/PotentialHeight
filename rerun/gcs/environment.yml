@@ -1,0 +1,42 @@
+# DRAFT — minimal compute env for the ERA5 potential-size re-solve on a Linux VM.
+# This is the COMPUTE SUBSET of the local `t1` env (which is a huge research env);
+# it covers the import chain of tcpips/era5.py + w22/ps.py + cle15 (matplotlib,
+# statsmodels, uncertainties, metpy, gsw, dask, netcdf4, numba, joblib, tcpyPI, sithom).
+#
+# Before the real run, VALIDATE on the VM:
+#     micromamba run -n worstsurge-era5 python -c "import tcpips.era5, w22.ps, cle15.cle15n"
+# If an import fails, add the missing package here. For hard reproducibility, freeze
+# this into a conda-lock file or a Docker image once it imports clean (see README).
+name: worstsurge-era5
+channels:
+  - conda-forge
+  - numba
+dependencies:
+  - python=3.10
+  # pins mirror repo-root env.yml — without them the conda solve lands on numpy 2.x and pip
+  # then force-downgrades xarray for sithom (<2024.3), a combination no proven run ever used
+  - numpy<2
+  - scipy
+  - xarray<2024.3
+  - dask
+  - distributed
+  - netcdf4
+  - h5netcdf
+  - cftime
+  - bottleneck
+  - joblib
+  - numba
+  - llvmlite
+  - tqdm
+  - matplotlib-base      # tcpips/era5.py imports pyplot at module level
+  - statsmodels          # ditto (statsmodels.api)
+  - uncertainties        # ditto
+  - cartopy              # sithom.plot map helpers; import-guarded in tcpips but cheap to keep
+  - pooch
+  - cdsapi               # only needed if re-downloading ERA5 from Copernicus on the VM
+  - pytest               # w22/ps.py imports pytest at module level (yes, really)
+  - pip
+  - pip:
+      - tcpyPI==1.4
+      - sithom            # the author's utility lib (sithom.time/xr/plot/io/misc); on PyPI
+      # cle15, w22, tcpips resolve from the cloned repo via PYTHONPATH — not installed here

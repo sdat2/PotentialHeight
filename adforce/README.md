@@ -30,6 +30,10 @@ Then there are some general utility files
 And the main logic to run the ADCIRC model is given in:
 
 - wrap - run the ADCIRC model in parallel for nodes on archer2 supercomputer.
+- training/ - SurgeNet training-data generation package (IBTrACS storms -> ATCF
+  conversion (`atcf`), CFL timestep (`cfl`), simulation windows (`storms`),
+  adcircpy input decks (`inputs`), ensemble driver + CLI (`driver`));
+  `generate_training_data` is the back-compat CLI shim over it.
 
 When changing to new machines, it is likely that `wrap` is the main file that needs to be edited.
 
