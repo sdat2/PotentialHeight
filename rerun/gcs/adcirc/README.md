@@ -67,6 +67,8 @@ the fork README calls out). Strip either and the build fails.
 **Failure signatures → fix (top rows hit for real during local build-testing, 2026-07-10):**
 | error | cause / fix |
 |---|---|
+| MPI ranks segfault (signal 11) at launch inside the container | Docker's default **64 MB `/dev/shm`** — MPICH's shared-memory transport exhausts it → `docker run --shm-size=8g` |
+| `process_vm_readv failed (errno 1)` from MPICH | Docker's seccomp blocks CMA cross-process reads → `docker run --cap-add=SYS_PTRACE`. **Every MPI `docker run` needs BOTH flags** (all invocations in these scripts carry them) |
 | `set_target_properties called with incorrect number of arguments` (macros.cmake, at configure) | the fork's macros expand `Fortran_LINELENGTH_FLAG`/`ADDITIONAL_FLAGS_*` **unquoted**; unset ⇒ the arg vanishes. Pass `-DFortran_LINELENGTH_FLAG="-ffixed-line-length-132 -ffree-line-length-132"` (+ `-DADDITIONAL_FLAGS_ADCPREP`) exactly like `compile.sh` — do NOT fold line-length into `CMAKE_Fortran_FLAGS` |
 | CMake configure rejects `cmake_minimum_required(2.8.12)` | conda `cmake` resolved to v4 → pin `"cmake<4"` |
 | `could not create work tree dir … Permission denied` (git clone) | mambaorg image default user can't write `/opt` → `USER root` |

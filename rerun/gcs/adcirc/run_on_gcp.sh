@@ -47,7 +47,7 @@ cat <<'REMOTE'
 #   gcloud compute scp rerun/gcs/adcirc/profiles/profile_*.json adcirc-worker:~/work/profiles/ --zone=$ZONE
   mkdir -p ~/work/exp ~/work/profiles
   for variant in old fixed; do
-    docker run --rm -v ~/work:/work adcirc-ws micromamba run -n ws \
+    docker run --rm --shm-size=8g --cap-add=SYS_PTRACE -v ~/work:/work adcirc-ws micromamba run -n ws \
       python -m adforce.wrap name=materiality_${variant}_2015 \
         tc.profile_name.value=/work/profiles/profile_${variant}_2015.json \
         files.exe_path=/opt/adcirc/work files.exp_path=/work/exp \
@@ -72,12 +72,12 @@ cat <<EOF
   # settings from env vars read by adforce.wrap.get_default_config() (implemented + tested:
   # tests/test_wrap_config_env.py). The image bakes ADCIRC_EXE_PATH and WORSTSURGE_MODULES="";
   # you only pass the rank count for the VM: -e ADCIRC_NP=<vCPUs>. No yaml editing needed.
-  #   docker run --rm -v ~/work:/work -e ADCIRC_NP=16 adcirc-ws micromamba run -n ws \\
+  #   docker run --rm --shm-size=8g --cap-add=SYS_PTRACE -v ~/work:/work -e ADCIRC_NP=16 adcirc-ws micromamba run -n ws \\
   #     python -m adbo.exp_3d --exp_name=new-orleans-2015-fixed \\
   #       --profile_name=2015_new_orleans_profile_r4i1p1f1 \\
   #       --obs_lat=29.9511 --obs_lon=-90.0715
   # Or the 1D size-intensity tradeoff sweep (curves in w22/data/curves/, plumbing-tested):
-  #   docker run --rm -v ~/work:/work -e ADCIRC_NP=16 adcirc-ws micromamba run -n ws \\
+  #   docker run --rm --shm-size=8g --cap-add=SYS_PTRACE -v ~/work:/work -e ADCIRC_NP=16 adcirc-ws micromamba run -n ws \\
   #     python -m adbo.sweep_vmax --curve_nc w22/data/curves/2015_new_orleans_r4i1p1f1.nc \\
   #       --exp_name no-sweep-2015 --num 15
   # ~50 ADCIRC runs/BO experiment (15/sweep), sequential. Size the VM accordingly (see README).
