@@ -45,7 +45,9 @@ python -m adforce.wrap name=smoke use_slurm=false \
     files.exe_path="$EXE" files.exp_path=/work/exp files.low_storage=false \
     slurm.modules='' slurm.tasks_per_node="$NP" slurm.reserved_cpus=0 2>&1 | tail -25
 check "maxele.63.nc produced" "test -f $RUN/maxele.63.nc"
-ZETA=$(python -c "import xarray as xr,numpy as np; d=xr.open_dataset('$RUN/maxele.63.nc'); v=float(np.nanmax(d['zeta_max'].values)); print(v if np.isfinite(v) and abs(v)<100 else 'BAD')" 2>/dev/null || echo "BAD")
+# NB: plain xr.open_dataset cannot parse ADCIRC output (neta exists as both dim and
+# variable) — must use the repo's loader, like adforce's own observe_max_point does.
+ZETA=$(python -c "import numpy as np; from adforce.mesh import xr_loader; d=xr_loader('$RUN/maxele.63.nc'); v=float(np.nanmax(np.asarray(d['zeta_max'].values,dtype='float64'))); print(v if np.isfinite(v) and abs(v)<100 else 'BAD')" 2>/dev/null | tail -1 || echo "BAD")
 if [ "$ZETA" != "BAD" ] && [ -n "$ZETA" ]; then echo "  PASS  finite max water level (max zeta = ${ZETA} m)"; else echo "  FAIL  finite max water level (got: ${ZETA:-nothing})"; fail=1; fi
 
 echo
