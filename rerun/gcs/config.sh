@@ -5,7 +5,7 @@
 # Env-first (VAR="${VAR:-default}"): the VM sources the COMMITTED copy of this file from the
 # git clone, so laptop-only edits don't propagate. Either commit your real values (bucket
 # names aren't secrets) or override per-invocation: `BUCKET=my-bucket ./run_decade_gcs.sh ...`.
-export PROJECT="${PROJECT:-<your-gcp-project-id>}"
+export PROJECT="${PROJECT:-potential-height}"
 export REGION="${REGION:-europe-west2}"   # London (low latency from the UK); pair the zone to it
 export ZONE="${ZONE:-europe-west2-c}"
 export BUCKET="${BUCKET:-worstsurge-era5}" # gs://$BUCKET — created by provision.sh; globally-unique name
