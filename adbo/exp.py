@@ -221,15 +221,19 @@ def objective_f(
                 try:
                     real_result = idealized_tc_observe(wrap_cfg)
                 except ValueError as e:
-                    # fail loudly rather than feeding NaN/fill values to the GP
+                    # A NaN/fill max water level usually means the observation
+                    # node stayed DRY for this query (e.g. slow oblique storms
+                    # in the wider 4D space) — the honest objective there is
+                    # zero surge, which is informative to the GP, unlike a
+                    # crashed loop. Log loudly, score the point at 0.0, and
+                    # keep optimizing. (Previously this re-raised, which
+                    # killed multi-day 4D campaigns one dry query at a time.)
                     print(
-                        f"Rejected run: call_number={call_number}, "
-                        f"run_folder={tmp_dir}, query={inputs}, error={e}"
+                        f"Dry/invalid run scored as 0.0 m: "
+                        f"call_number={call_number}, run_folder={tmp_dir}, "
+                        f"query={inputs}, error={e}"
                     )
-                    raise ValueError(
-                        f"BayesOpt objective failed at query point {inputs} "
-                        f"(call_number={call_number}, run_folder={tmp_dir})"
-                    ) from e
+                    real_result = 0.0
                 # out_path=tmp_dir,
                 # profile_name=profile_name,
                 # resolution=resolution,
