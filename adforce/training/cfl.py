@@ -140,5 +140,5 @@ def calculate_cfl_timestep(
             f"Calculated timestep ({recommended_dt:.4f}s) is not positive. Check inputs."
         )
 
-    print(f"✅ Recommended timestep (dt): {recommended_dt:.4f} seconds")
+    print(f"Recommended timestep (dt): {recommended_dt:.4f} seconds")
     return recommended_dt
