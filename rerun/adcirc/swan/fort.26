@@ -5,6 +5,9 @@ $ coupled case (adcirc-swan/adcirc_swan_apes_irene-parallel/fort.26);
 $ only the time window (matches adforce fort.15: cold start 2005-08-25,
 $ RNDAY=7 -> 2005-09-01) and the project name differ.
 $ Coupling interval 1200 s == RSTIMINC appended to fort.15 WTIMINC line.
+$ NB: the ADCFRIC friction coupling is DELIBERATELY OMITTED (unlike the Irene
+$ test): this mesh's fort.13 carries no Manning field, and manning2madsen
+$ (couple2swan.F:501) segfaults without one. FRICTION JONSWAP instead.
 $
 PROJ 'wsurge' 'W01'
 $
@@ -30,13 +33,11 @@ $
 INPGRID WIND UNSTRUCTURED EXCEPTION 0.   NONSTAT 20050825.000000 1200 SEC 20050901.000000
 READINP ADCWIND
 $
-INPGRID FRIC UNSTRUCTURED EXCEPTION 0.05 NONSTAT 20050825.000000 1200 SEC 20050901.000000
-READINP ADCFRIC
 $
 GEN3 KOMEN AGROW
 WCAP KOMEN 2.36E-5 3.02E-3 2.0 1.0 1.0
 BREAKING
-FRICTION MADSEN KN=0.05
+FRICTION JONSWAP
 PROP BSBT
 NUM STOPC DABS=0.005 DREL=0.01 CURVAT=0.005 NPNTS=95 NONSTAT MXITNS=20
 $
