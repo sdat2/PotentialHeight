@@ -41,10 +41,10 @@ run 'mkdir -p ~/era5_data/era5 && { [ -L ~/worstsurge/data/era5 ] || rm -rf ~/wo
 # 4. build the compute env from the checked-in environment.yml
 run 'export PATH=~/.local/bin:$PATH MAMBA_ROOT_PREFIX=~/micromamba; \
      micromamba env list | grep -q worstsurge-era5 || \
-     micromamba create -y -n worstsurge-era5 -f ~/worstsurge/rerun/gcs/environment.yml'
+     micromamba create -y -n worstsurge-era5 -f ~/worstsurge/rerun/era5/environment.yml'
 
 # 5. validate the import chain (fail loudly if a dep is missing from environment.yml)
 run 'export PATH=~/.local/bin:$PATH MAMBA_ROOT_PREFIX=~/micromamba PYTHONPATH=~/worstsurge; \
      micromamba run -n worstsurge-era5 python -c "import tcpips.era5, w22.ps, cle15.cle15n; print(\"import chain OK\")"'
 
-echo "bootstrap done. SSH in and run:  cd ~/worstsurge/rerun/gcs && ./run_decade_gcs.sh <start> <end>"
+echo "bootstrap done. SSH in and run:  cd ~/worstsurge/rerun/era5 && ./run_decade_gcs.sh <start> <end>"

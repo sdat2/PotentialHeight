@@ -2,13 +2,13 @@
 # DRAFT — provision a GCP VM, build the ADCIRC image, run the MATERIALITY CHECK, sync to GCS.
 # UNTESTED. Read each step; run them by hand the first time. Reuses ../config.sh for
 # PROJECT/ZONE/BUCKET; ADCIRC wants a bigger box than the ERA5 worker.
-# PREREQUISITE: rerun/gcs/ AND the env-hook change (adforce/wrap.py +
+# PREREQUISITE: rerun/era5/ AND the env-hook change (adforce/wrap.py +
 # tests/test_wrap_config_env.py) must be COMMITTED AND PUSHED — both step 2's fresh clone
 # on the VM and the image's internal `git clone` can only contain what's on origin.
-# (`git status` must be clean for those paths; `git ls-tree origin/main rerun/gcs/` non-empty.)
+# (`git status` must be clean for those paths; `git ls-tree origin/main rerun/era5/` non-empty.)
 set -euo pipefail
 cd "$(dirname "$0")"
-source ../config.sh
+source ../era5/config.sh
 
 VM_ADCIRC="adcirc-worker"
 MACHINE_ADCIRC="c2d-standard-16"     # 16 vCPU. Bump to -32/-56 to speed the full BO (below).
@@ -28,7 +28,7 @@ cat <<'REMOTE'
   sudo apt-get update && sudo apt-get install -y docker.io git
   sudo usermod -aG docker "$USER"   # re-login after this
   git clone https://github.com/sdat2/worstsurge.git ~/worstsurge
-  cd ~/worstsurge/rerun/gcs/adcirc
+  cd ~/worstsurge/rerun/adcirc
   docker build -t adcirc-ws .       # builds ADCIRC v55.02 + BO env (~15-40 min first time)
   # (optional: push to Artifact Registry so you never rebuild:
   #   docker tag adcirc-ws $REGION-docker.pkg.dev/$PROJECT/ws/adcirc-ws && docker push ... )
@@ -38,13 +38,13 @@ cat <<'REMOTE'
 # re-running the whole BO? Run the SAME idealized TC once with the OLD (pre-fix) CLE15
 # profile and once with the FIXED profile, compare max surge at New Orleans.
 #
-# PROFILES — already generated + verified on the laptop (rerun/gcs/adcirc/profiles/:
+# PROFILES — already generated + verified on the laptop (rerun/adcirc/profiles/:
 # profile_{old,fixed}_{2015,2100}.json, PROVENANCE.json; produced by generate_profiles.py,
 # wiring verified end-to-end by verify_wiring.py). Do NOT pass bare profile names inside
 # the image: both eras share ONE canonical filename in w22/data, so names would silently
 # run old-vs-old. fort22.py treats a profile_name ending in .json as a LITERAL PATH —
 # these commands use that (same branch the adbo tradeoff sweep uses). Upload first:
-#   gcloud compute scp rerun/gcs/adcirc/profiles/profile_*.json adcirc-worker:~/work/profiles/ --zone=$ZONE
+#   gcloud compute scp rerun/adcirc/profiles/profile_*.json adcirc-worker:~/work/profiles/ --zone=$ZONE
   mkdir -p ~/work/exp ~/work/profiles
   for variant in old fixed; do
     docker run --rm --shm-size=8g --cap-add=SYS_PTRACE -v ~/work:/work adcirc-ws micromamba run -n ws \

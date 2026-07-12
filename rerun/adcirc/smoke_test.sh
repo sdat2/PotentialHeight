@@ -2,7 +2,7 @@
 # DRAFT — "did the ADCIRC build actually work?" one-command check. The image bakes this
 # script onto PATH as `adcirc-smoke-test`, so the canonical invocation is:
 #   docker run --rm --shm-size=8g --cap-add=SYS_PTRACE -v ~/work:/work adcirc-ws adcirc-smoke-test [NP]
-# (equivalently: bash /opt/worstsurge/rerun/gcs/adcirc/smoke_test.sh from the cloned repo)
+# (equivalently: bash /opt/worstsurge/rerun/adcirc/smoke_test.sh from the cloned repo)
 # Graduated: toolchain -> binaries -> MPI launch -> a real end-to-end adforce.wrap run that
 # must produce a finite max water level in maxele.63.nc. Exits non-zero on the first class of
 # failure so you know which layer broke. A binary that compiles but segfaults on the mesh is

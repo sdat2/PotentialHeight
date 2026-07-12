@@ -6,7 +6,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -y && apt-get install -y docker.io git || { echo "SWAN-CLONE-FAIL(apt)"; exit 1; }
 git clone --depth 1 https://github.com/sdat2/worstsurge.git /root/worstsurge \
     && echo "SWAN-CLONE-OK" || { echo "SWAN-CLONE-FAIL"; exit 1; }
-cd /root/worstsurge/rerun/gcs/adcirc
+cd /root/worstsurge/rerun/adcirc
 if docker build -t adcirc-ws . > /root/build.log 2>&1; then echo "SWAN-BASE-OK"; else
     echo "SWAN-BASE-FAIL"; tail -15 /root/build.log; exit 1; fi
 # extend: build padcswan in the existing source/build tree (flags mirror the base build;

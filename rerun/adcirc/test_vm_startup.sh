@@ -12,7 +12,7 @@ apt-get update -y && apt-get install -y docker.io git || { echo "ADCIRC-CLONE-FA
 git clone --depth 1 https://github.com/sdat2/worstsurge.git /root/worstsurge \
     && echo "ADCIRC-CLONE-OK" || { echo "ADCIRC-CLONE-FAIL"; exit 1; }
 
-cd /root/worstsurge/rerun/gcs/adcirc
+cd /root/worstsurge/rerun/adcirc
 if docker build -t adcirc-ws . > /root/build.log 2>&1; then
     echo "ADCIRC-BUILD-OK"
 else

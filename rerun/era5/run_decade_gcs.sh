@@ -41,7 +41,7 @@ trap 'kill $SYNC_PID 2>/dev/null || true; gcloud storage rsync -r "$OUT" "gs://$
 
 echo "### solve $START-$END (n_jobs=$N_JOBS, cap ${CAP_MB}MB) ###"
 micromamba run -n "$ENV_NAME" python "$REPO_DIR/rerun/mem_guard.py" \
-    "$REPO_DIR/rerun/era5_ps_local.py" "$CAP_MB" "$TIMEOUT_S" \
+    "$REPO_DIR/rerun/era5/era5_ps_local.py" "$CAP_MB" "$TIMEOUT_S" \
     -- --start-year "$START" --end-year "$END" --out-dir "$OUT" --n-jobs "$N_JOBS"
 
 echo "### final sync to bucket ###"

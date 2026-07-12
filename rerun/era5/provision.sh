@@ -2,8 +2,8 @@
 # DRAFT — provision the GCS bucket + upload inputs + create the spot VM. UNTESTED.
 # Prereqs: `gcloud` CLI installed & authed (`gcloud auth login`; `gcloud config set project <id>`),
 # a GCP project with billing enabled, and the local ERA5 decade files present (on the SSD).
-# PREREQUISITE: rerun/gcs/ must be COMMITTED AND PUSHED — startup.sh builds the env from the
-# fresh clone's rerun/gcs/environment.yml, which only exists on the VM if it's on origin.
+# PREREQUISITE: rerun/era5/ must be COMMITTED AND PUSHED — startup.sh builds the env from the
+# fresh clone's rerun/era5/environment.yml, which only exists on the VM if it's on origin.
 # Run steps individually the first time rather than blind — read each command.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -52,7 +52,7 @@ cat <<EOF
   # SSH in (startup.sh will have cloned the repo + built the env, or is still running):
   gcloud compute ssh $VM --zone=$ZONE
   # then on the VM, run a decade (see run_decade_gcs.sh), e.g.:
-  #   cd ~/worstsurge/rerun/gcs && ./run_decade_gcs.sh 2000 2009
+  #   cd ~/worstsurge/rerun/era5 && ./run_decade_gcs.sh 2000 2009
   #
   # When ALL decades are done, TEAR DOWN so you stop paying:
   gcloud compute instances delete $VM --zone=$ZONE

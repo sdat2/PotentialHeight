@@ -16,8 +16,10 @@ discipline and the ERA5 job in detail.
 | path | what it does |
 |------|--------------|
 | `mem_guard.py` | Runs any script under a hard RSS cap + wall-clock timeout (its own process group, killed if it exceeds either). The external safety net — dask's own memory controls are not trustworthy here. |
-| `era5_ps_local.py` | ERA5 gridded PS re-solve, one year at a time, checkpointed. Parameterised by `--start-year/--end-year`, so the same script does every decade. |
-| `RESUME_era5_1980s.sh` | One-liner to (re)start the first decade; skips finished years. |
+| `era5/era5_ps_local.py` | ERA5 gridded PS re-solve, one year at a time, checkpointed. Parameterised by `--start-year/--end-year`, so the same script does every decade. |
+| `era5/` | The rest of the ERA5 job: RESUME scripts, plus the GCP scaffolding (config, provision, VM startup, per-decade cloud runner). |
+| `adcirc/` | ADCIRC + BO on GCP: Docker build (proven), srun/module shims, smoke test, materiality profiles, SWAN coupling kit (`swan/`). |
+| `results/` | Archived experiment outputs: BO/sweep ledgers, materiality maxele tarballs. |
 | `ibtracs/` | IBTrACS observational validation: exact exceedance re-solve, rmax patching, and the survival/histogram/track/v-tradeoff figures. |
 | `cmip6/` | CMIP6+ERA5 point timeseries at 28.75°N, the trend multipanels, and the trend `.tex` tables. |
 | `thesis_figs/` | Thesis figure 4 (CLE15 comparison) + its validation. |
@@ -33,7 +35,7 @@ Always go through the guard, and `caffeinate` so the machine won't sleep:
 ```bash
 export HDF5_USE_FILE_LOCKING=FALSE
 caffeinate -i -s python rerun/mem_guard.py \
-    rerun/era5_ps_local.py 7168 259200 -- --start-year 1980 --end-year 1989
+    rerun/era5/era5_ps_local.py 7168 259200 -- --start-year 1980 --end-year 1989
 ```
 
 - `7168` = 7 GB RSS cap, `259200` = 3-day timeout. Steady-state RSS is ~1 GB at

@@ -17,13 +17,26 @@ export HDF5_USE_FILE_LOCKING=FALSE
 caffeinate -i -s python rerun/mem_guard.py <script.py> <cap_mb> <timeout_s> [-- args]
 ```
 
-## ERA5 gridded PS (top level)
+## ERA5 gridded PS (`era5/`; shared `mem_guard.py` at top level)
 
 | script | produces | inputs | outputs | runtime |
 |--------|----------|--------|---------|---------|
-| `era5_ps_local.py` | ERA5 gridded fixed-PS product (feeds ERA5 snapshot maps + global trends) | `data/era5` (→ SSD) | `/Volumes/s/tcpips/data/era5/ps_fixed/era5_ps_fixed_{year}.nc` | ~27 h/decade |
+| `era5/era5_ps_local.py` | ERA5 gridded fixed-PS product (feeds ERA5 snapshot maps + global trends) | `data/era5` (→ SSD) | `/Volumes/s/tcpips/data/era5/ps_fixed/era5_ps_fixed_{year}.nc` | ~27 h/decade |
 | `mem_guard.py` | RSS-cap + timeout watchdog (wraps every job) | — | — | — |
-| `RESUME_era5_1980s.sh` | resume the 1980–1989 decade (skips finished years) | — | — | — |
+| `era5/RESUME_era5_decade.sh <start> <end>` | resume any decade (skips finished years) | — | — | — |
+| `era5/{config,provision,startup,run_decade_gcs}.sh` | GCP path: bucket + spot-VM per-decade runner (proven: 2000-2024 ran on it) | bucket inputs | `gs://worstsurge-era5/ps_fixed/` | ~20 h/decade @16 vCPU |
+
+## ADCIRC + BO on GCP (`adcirc/`)
+
+See `adcirc/README.md` (build playbook + failure table). Proven: image builds from
+clean clone, 7-day mid-mesh run = ~8 min @16 ranks, smoke + materiality + 3-site 4D
+campaign all executed. `adcirc/swan/` = SWAN coupling kit (fort.26 from the official
+testsuite, swaninit naming it, NWS+300 / RSTIMINC conventions).
+
+## Archived results (`results/`)
+
+BO/sweep ledgers (`*-4d-2015_ledger.json`, `no-sweep-{2015,2100}_ledger.json`) and
+materiality maxele tarballs — the numbers behind the tradeoff/materiality conclusions.
 
 ## IBTrACS observational validation (`ibtracs/`)
 
@@ -82,5 +95,6 @@ Top-6 supersize (r2, AF): Ellen 3.59→3.86, Man-Yi 2.86→3.11.
   **deterministically regenerable** by `resolve_exceedance.py` (fixed n_jobs,
   seeded). The *published numbers and figures already exist* in `fixed_ibtracs/*.nc`
   and `fixed_figures/`, so the npz are only needed to re-run patch/figure stages.
-- `/Volumes/s/tcpips/data/era5/ps_fixed/` is being filled now (1980–1989 running);
-  ERA5 snapshot maps / global trend figures are not yet regenerated.
+- ERA5 ps_fixed is COMPLETE for 1980–2024 (1980–99 on the SSD + internal backup;
+  2000–24 in `gs://worstsurge-era5/ps_fixed/`); snapshot maps / global trend figures
+  are now regenerable but not yet regenerated.

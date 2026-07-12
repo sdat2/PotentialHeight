@@ -2,7 +2,7 @@
 
 Answers "will `tc.profile_name.value=/path/to/profile.json` wire in okay?" by
 composing the REAL adforce Hydra config with the EXACT override strings that
-rerun/gcs/adcirc/run_on_gcp.sh passes, then calling the real
+rerun/adcirc/run_on_gcp.sh passes, then calling the real
 ``adforce.fort22.create_fort22`` and asserting on the resulting fort.22.nc:
 
   1. bare-name branch  (tc.profile_name.value=2015_new_orleans_profile_r4i1p1f1,
@@ -13,7 +13,7 @@ rerun/gcs/adcirc/run_on_gcp.sh passes, then calling the real
      wind field), and each file's surface winds/pressures are consistent with
      its source profile (v_reduc * max(VV); min pressure ~ profile min p).
 
-Run:  PYTHONPATH=<repo> python rerun/gcs/adcirc/profiles/verify_wiring.py [workdir]
+Run:  PYTHONPATH=<repo> python rerun/adcirc/profiles/verify_wiring.py [workdir]
 (workdir defaults to a scratch tmpdir; ~1-2 GB RAM transient while gridding.)
 """
 
@@ -26,7 +26,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 _REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                     "..", "..", "..", ".."))
+                                     "..", "..", ".."))
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 

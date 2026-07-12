@@ -22,7 +22,7 @@ Solver parameters are the production point-timeseries values (ck_cd=0.9, cd=0.00
 w_cool=0.002, supergradient=1.2, isothermal) — the same family that produced the stored
 point file, NOT the CkCd=1 canonical-test values.
 
-Run from the repo root (SSD mounted): python rerun/gcs/adcirc/profiles/generate_profiles.py
+Run from the repo root (SSD mounted): python rerun/adcirc/profiles/generate_profiles.py
 Then use via fort22.py's literal-.json branch:
   tc.profile_name.value=/work/profiles/profile_fixed_2015.json
 """
@@ -38,7 +38,7 @@ warnings.filterwarnings("ignore")
 
 # make cle15/w22 importable when run as a plain script from anywhere
 _REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                     "..", "..", "..", ".."))
+                                     "..", "..", ".."))
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
@@ -50,7 +50,7 @@ from w22.ps import calculate_ps_ufunc
 from w22.utils import coriolis_parameter_from_lat
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
+REPO = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 POINT_NC = "/Volumes/s/tcpips/new_orleans_august_ssp585_r4i1p1f1_isothermal_pi4new.nc"
 # production solver parameters (match the stored point file's family)
 CK_CD, CD, W_COOL, SUPERGRADIENT = 0.9, 0.0015, 0.002, 1.2

@@ -1,4 +1,4 @@
-# rerun/gcs/adcirc/ — ADCIRC + BO on Google Cloud (Part B, DRAFT)
+# rerun/adcirc/ — ADCIRC + BO on Google Cloud (Part B, DRAFT)
 
 **Status: untested draft scaffolding.** This is the harder half — ADCIRC is Fortran/MPI and
 must be *compiled*. The plan: bake ADCIRC v55.02 + the BO driver into one Docker image, run

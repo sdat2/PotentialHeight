@@ -1,4 +1,4 @@
-# rerun/gcs/ — ERA5 potential-size re-solve on Google Cloud (DRAFT)
+# rerun/era5/ — ERA5 potential-size re-solve on Google Cloud (DRAFT)
 
 **Status: untested draft scaffolding** (reviewed: a 27-finding adversarial pass has been
 applied). Fill in `config.sh`, read each script before running, and refine. This moves the
@@ -40,12 +40,12 @@ ARCHER2/SSD replacement); the VM is disposable.
 
 ## Steps
 ```bash
-cd rerun/gcs
+cd rerun/era5
 $EDITOR config.sh                 # fill in PROJECT / BUCKET / ZONE
 ./provision.sh                    # bucket + upload 2000s inputs + create VM (read it first!)
 gcloud compute ssh era5-worker --zone=europe-west2-c
 #   on the VM:
-cd ~/worstsurge/rerun/gcs && ./run_decade_gcs.sh 2000 2009
+cd ~/worstsurge/rerun/era5 && ./run_decade_gcs.sh 2000 2009
 #   repeat for 2010 2019, then 2020 2024 (upload each decade's inputs first)
 gcloud compute instances delete era5-worker --zone=europe-west2-c   # tear down when done
 ```
