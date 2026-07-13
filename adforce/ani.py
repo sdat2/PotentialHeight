@@ -833,9 +833,7 @@ if __name__ == "__main__":
         y_pos=-0.05,
     )
     single_wind_and_height_step(
-        path_in=os.path.join(
-            DATA_ROOT, "tcpips", "exp", "galverston-2015", "exp_0049"
-        ),
+        path_in=os.path.join(DATA_ROOT, "tcpips", "exp", "galverston-2015", "exp_0049"),
         bbox=GALVERSTON.bbox(),
         time_i=360,
         coarsen=3,

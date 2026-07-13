@@ -4,12 +4,15 @@ Processes a single, completed ADCIRC run directory into SWE-GNN format.
 This script is intended to be called by a Slurm job array, where each
 task processes one directory.
 """
+
 import os
 import argparse
 from .mesh import swegnn_netcdf_creation
 
 
-def check_and_process_run(run_path: str, save_path: str, use_dask: bool) -> bool: # NEW: use_dask parameter
+def check_and_process_run(
+    run_path: str, save_path: str, use_dask: bool
+) -> bool:  # NEW: use_dask parameter
     """
     Checks a single run for success and processes it if valid.
 
@@ -43,17 +46,20 @@ def check_and_process_run(run_path: str, save_path: str, use_dask: bool) -> bool
             swegnn_netcdf_creation(
                 path_in=run_path,
                 path_out=save_path,
-                use_dask=use_dask  # NEW: Use the parameter
+                use_dask=use_dask,  # NEW: Use the parameter
             )
             print(f"Run {run_name}: Processing complete. Saved to {save_path}")
             return True
         else:
-            print(f"Run {run_name}: FAILED (Did not find 'Job completed successfully.')")
+            print(
+                f"Run {run_name}: FAILED (Did not find 'Job completed successfully.')"
+            )
             return False
 
     except Exception as e:
         print(f"Run {run_name}: ERROR during check or processing: {e}")
         return False
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -63,21 +69,21 @@ if __name__ == "__main__":
         "--run-path",
         type=str,
         required=True,
-        help="Path to the single run directory (e.g., .../run_5sec/exp_0001)."
+        help="Path to the single run directory (e.g., .../run_5sec/exp_0001).",
     )
     parser.add_argument(
         "--save-path",
         type=str,
         required=True,
-        help="Full path for the output .nc file (e.g., .../swegnn_5sec/exp_0001.nc)."
+        help="Full path for the output .nc file (e.g., .../swegnn_5sec/exp_0001.nc).",
     )
     # NEW: Add the --use-dask flag
     # action='store_true' means it defaults to False,
     # and becomes True if the flag '--use-dask' is present.
     parser.add_argument(
         "--use-dask",
-        action='store_true',
-        help="Enable Dask for loading (use_dask=True). If flag is absent, defaults to False."
+        action="store_true",
+        help="Enable Dask for loading (use_dask=True). If flag is absent, defaults to False.",
     )
     args = parser.parse_args()
 

@@ -47,8 +47,9 @@ def gulf_gauges(box: dict = GAUGE_BOX) -> List[Gauge]:
     ]
 
 
-def _coops(station: str, begin: str, end: str, product: str,
-           datum: str = "MSL") -> pd.Series:
+def _coops(
+    station: str, begin: str, end: str, product: str, datum: str = "MSL"
+) -> pd.Series:
     """Fetch one hourly CO-OPS series (GMT, metric), cached on disk by request."""
     key = f"{station}_{product}_{begin}_{end}_{datum}.csv"
     fp = os.path.join(COOPS_CACHE, key)
@@ -56,9 +57,16 @@ def _coops(station: str, begin: str, end: str, product: str,
         text = open(fp).read()
     else:
         params = dict(
-            begin_date=begin, end_date=end, station=station, product=product,
-            datum=datum, units="metric", time_zone="gmt", interval="h",
-            application="worstsurge_comp", format="csv",
+            begin_date=begin,
+            end_date=end,
+            station=station,
+            product=product,
+            datum=datum,
+            units="metric",
+            time_zone="gmt",
+            interval="h",
+            application="worstsurge_comp",
+            format="csv",
         )
         try:
             r = requests.get(COOPS_API, params=params, timeout=90)
@@ -67,7 +75,12 @@ def _coops(station: str, begin: str, end: str, product: str,
         except Exception:
             text = ""
         open(fp, "w").write(text)
-    if not text or "Error" in text or "No " in text or len(text.strip().splitlines()) < 2:
+    if (
+        not text
+        or "Error" in text
+        or "No " in text
+        or len(text.strip().splitlines()) < 2
+    ):
         return pd.Series(dtype=float)
     df = pd.read_csv(io.StringIO(text))
     df.columns = [c.strip() for c in df.columns]
@@ -86,8 +99,9 @@ def fetch_year(station: str, year: int) -> pd.Series:
     return wl
 
 
-def observed_residual(station: str, lat: float, year: int,
-                      start, end) -> Tuple[pd.Series, str]:
+def observed_residual(
+    station: str, lat: float, year: int, start, end
+) -> Tuple[pd.Series, str]:
     """De-tided surge residual over ``[start, end]``.
 
     Returns ``(residual_series, method)`` where method is ``"utide"``,
@@ -105,8 +119,15 @@ def observed_residual(station: str, lat: float, year: int,
             # Verified on Grand Isle 2020: date2num path -> empty constituent
             # list, tide std 0.03 m; DatetimeIndex -> SA/K1/O1 amplitudes
             # 0.16/0.12/0.12 m, tide std 0.17 m. Same fix as comp.annual_max.
-            coef = utide.solve(wl.index, wl.values, lat=lat, method="robust",
-                               trend=True, conf_int="none", verbose=False)
+            coef = utide.solve(
+                wl.index,
+                wl.values,
+                lat=lat,
+                method="robust",
+                trend=True,
+                conf_int="none",
+                verbose=False,
+            )
             tide = utide.reconstruct(wl.index, coef, verbose=False).h
             resid = pd.Series(wl.values - tide, index=wl.index)
             return resid.loc[start:end], "utide"

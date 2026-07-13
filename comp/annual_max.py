@@ -62,9 +62,7 @@ def _hours_in_year(year: int) -> int:
         >>> _hours_in_year(2020)
         8784
     """
-    return int(
-        (pd.Timestamp(year + 1, 1, 1) - pd.Timestamp(year, 1, 1)).days * 24
-    )
+    return int((pd.Timestamp(year + 1, 1, 1) - pd.Timestamp(year, 1, 1)).days * 24)
 
 
 def station_meta(station: str) -> Optional[dict]:
@@ -91,8 +89,9 @@ def station_meta(station: str) -> Optional[dict]:
         json.dump(stations, open(cache, "w"))
     for s in stations:
         if s["id"] == station:
-            return dict(id=s["id"], name=s["name"], lat=float(s["lat"]),
-                        lon=float(s["lng"]))
+            return dict(
+                id=s["id"], name=s["name"], lat=float(s["lat"]), lon=float(s["lng"])
+            )
     return None
 
 
@@ -120,8 +119,12 @@ def _clear_failed_cache(station: str, year: int) -> bool:
     return cleared
 
 
-def fetch_year_wl(station: str, year: int, retries: int = C.COOPS_RETRIES,
-                  sleep_s: float = C.COOPS_SLEEP_S) -> pd.Series:
+def fetch_year_wl(
+    station: str,
+    year: int,
+    retries: int = C.COOPS_RETRIES,
+    sleep_s: float = C.COOPS_SLEEP_S,
+) -> pd.Series:
     """Hourly water level (MSL, GMT) for one calendar year, cached + polite.
 
     Delegates to :func:`comp.coops.fetch_year` (verified ``hourly_height``,
@@ -138,9 +141,11 @@ def fetch_year_wl(station: str, year: int, retries: int = C.COOPS_RETRIES,
     Returns:
         pd.Series: Hourly water level indexed by GMT timestamp (may be empty).
     """
-    live = not os.path.exists(os.path.join(
-        C.COOPS_CACHE, f"{station}_hourly_height_{year}0101_{year}1231_MSL.csv"
-    ))
+    live = not os.path.exists(
+        os.path.join(
+            C.COOPS_CACHE, f"{station}_hourly_height_{year}0101_{year}1231_MSL.csv"
+        )
+    )
     wl = coops.fetch_year(station, year)
     attempt = 0
     while wl.empty and attempt < retries and _clear_failed_cache(station, year):
@@ -179,14 +184,22 @@ def detide_year(wl: pd.Series, lat: float, method: str = "robust") -> pd.Series:
     """
     import utide
 
-    coef = utide.solve(wl.index, wl.values, lat=lat, method=method, trend=True,
-                       conf_int="none", verbose=False)
+    coef = utide.solve(
+        wl.index,
+        wl.values,
+        lat=lat,
+        method=method,
+        trend=True,
+        conf_int="none",
+        verbose=False,
+    )
     tide = utide.reconstruct(wl.index, coef, verbose=False).h
     return pd.Series(wl.values - tide, index=wl.index)
 
 
-def max_at_gap_edge(series: pd.Series, gap_hr: float = 3.0,
-                    window_hr: float = 6.0) -> bool:
+def max_at_gap_edge(
+    series: pd.Series, gap_hr: float = 3.0, window_hr: float = 6.0
+) -> bool:
     """Flag whether the series maximum sits next to a data gap (or record edge).
 
     If the gauge failed as the surge peaked (a common failure mode in major
@@ -216,21 +229,22 @@ def max_at_gap_edge(series: pd.Series, gap_hr: float = 3.0,
 
 def _table_tag(method: str) -> str:
     """Cache version tag; bump the leading v1 if the algorithm changes."""
-    return (f"v1|cov{C.MIN_YEAR_COVERAGE}|ut{C.UTIDE_MIN_SAMPLES}|{method}")
+    return f"v1|cov{C.MIN_YEAR_COVERAGE}|ut{C.UTIDE_MIN_SAMPLES}|{method}"
 
 
 def _resid_path(station: str, year: int, method: str) -> str:
-    return os.path.join(C.ANNUAL_MAX_CACHE,
-                        f"resid_{station}_{year}_{method}.parquet")
+    return os.path.join(C.ANNUAL_MAX_CACHE, f"resid_{station}_{year}_{method}.parquet")
 
 
 def _table_path(station: str, start: int, end: int, method: str) -> str:
-    return os.path.join(C.ANNUAL_MAX_CACHE,
-                        f"annmax_{station}_{start}_{end}_{method}.parquet")
+    return os.path.join(
+        C.ANNUAL_MAX_CACHE, f"annmax_{station}_{start}_{end}_{method}.parquet"
+    )
 
 
-def year_residual(station: str, year: int, lat: float, method: str = "robust",
-                  refresh: bool = False) -> Optional[pd.Series]:
+def year_residual(
+    station: str, year: int, lat: float, method: str = "robust", refresh: bool = False
+) -> Optional[pd.Series]:
     """De-tided hourly residual for one station-year (Parquet write-through).
 
     Applies the missing-data policy documented in the module docstring and
@@ -258,16 +272,21 @@ def year_residual(station: str, year: int, lat: float, method: str = "robust",
         return None
     resid = detide_year(wl, lat, method=method)
     try:
-        pd.DataFrame({"time": resid.index, "resid": resid.values,
-                      "tag": _table_tag(method)}).to_parquet(fp, index=False)
+        pd.DataFrame(
+            {"time": resid.index, "resid": resid.values, "tag": _table_tag(method)}
+        ).to_parquet(fp, index=False)
     except Exception as e:  # pragma: no cover - caching must never break the run
         print(f"  (warning: could not cache {station} {year} residual: {e})")
     return resid
 
 
-def annual_maxima(station: str, start: int = C.AM_START_YEAR,
-                  end: int = C.AM_END_YEAR, method: str = "robust",
-                  refresh: bool = False) -> pd.DataFrame:
+def annual_maxima(
+    station: str,
+    start: int = C.AM_START_YEAR,
+    end: int = C.AM_END_YEAR,
+    method: str = "robust",
+    refresh: bool = False,
+) -> pd.DataFrame:
     """Annual maxima of the de-tided surge residual for ``start..end``.
 
     The completed table is cached as Parquet under ``ANNUAL_MAX_CACHE`` so
@@ -294,25 +313,35 @@ def annual_maxima(station: str, start: int = C.AM_START_YEAR,
     meta = station_meta(station)
     if meta is None:
         raise ValueError(f"unknown CO-OPS station id {station!r}")
-    print(f"annual maxima for {station} ({meta['name']}), {start}-{end}, "
-          f"method={method}")
+    print(
+        f"annual maxima for {station} ({meta['name']}), {start}-{end}, "
+        f"method={method}"
+    )
     rows = []
     for year in range(start, end + 1):
-        resid = year_residual(station, year, meta["lat"], method=method,
-                              refresh=refresh)
+        resid = year_residual(
+            station, year, meta["lat"], method=method, refresh=refresh
+        )
         if resid is None or resid.empty:
             continue
-        rows.append(dict(
-            station=station, name=meta["name"], year=year,
-            ann_max_m=float(resid.max()), t_max=resid.idxmax(),
-            n_obs=int(resid.size),
-            coverage=round(resid.size / _hours_in_year(year), 3),
-            max_at_gap_edge=max_at_gap_edge(resid),
-        ))
-        print(f"  {year}: max={rows[-1]['ann_max_m']:+.3f} m at "
-              f"{rows[-1]['t_max']:%Y-%m-%d %H:%M} "
-              f"(coverage={rows[-1]['coverage']:.2f}"
-              f"{', NEAR GAP' if rows[-1]['max_at_gap_edge'] else ''})")
+        rows.append(
+            dict(
+                station=station,
+                name=meta["name"],
+                year=year,
+                ann_max_m=float(resid.max()),
+                t_max=resid.idxmax(),
+                n_obs=int(resid.size),
+                coverage=round(resid.size / _hours_in_year(year), 3),
+                max_at_gap_edge=max_at_gap_edge(resid),
+            )
+        )
+        print(
+            f"  {year}: max={rows[-1]['ann_max_m']:+.3f} m at "
+            f"{rows[-1]['t_max']:%Y-%m-%d %H:%M} "
+            f"(coverage={rows[-1]['coverage']:.2f}"
+            f"{', NEAR GAP' if rows[-1]['max_at_gap_edge'] else ''})"
+        )
     df = pd.DataFrame(rows)
     try:
         df.assign(tag=_table_tag(method)).to_parquet(tp, index=False)
@@ -324,24 +353,33 @@ def annual_maxima(station: str, start: int = C.AM_START_YEAR,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--station", default="8761724",
-                    help="CO-OPS station id (default 8761724, Grand Isle LA)")
+    ap.add_argument(
+        "--station",
+        default="8761724",
+        help="CO-OPS station id (default 8761724, Grand Isle LA)",
+    )
     ap.add_argument("--start", type=int, default=C.AM_START_YEAR)
     ap.add_argument("--end", type=int, default=C.AM_END_YEAR)
-    ap.add_argument("--method", default="robust", choices=["robust", "ols"],
-                    help="utide.solve method (default robust)")
-    ap.add_argument("--refresh", action="store_true",
-                    help="recompute instead of reading the caches")
+    ap.add_argument(
+        "--method",
+        default="robust",
+        choices=["robust", "ols"],
+        help="utide.solve method (default robust)",
+    )
+    ap.add_argument(
+        "--refresh", action="store_true", help="recompute instead of reading the caches"
+    )
     a = ap.parse_args()
-    df = annual_maxima(a.station, a.start, a.end, method=a.method,
-                       refresh=a.refresh)
+    df = annual_maxima(a.station, a.start, a.end, method=a.method, refresh=a.refresh)
     if df.empty:
         print("no usable years")
         return
-    print(f"\n{len(df)} usable years of {a.end - a.start + 1}; "
-          f"max residual {df.ann_max_m.max():.2f} m in "
-          f"{int(df.loc[df.ann_max_m.idxmax(), 'year'])}; "
-          f"{int(df.max_at_gap_edge.sum())} year(s) flagged max-near-gap")
+    print(
+        f"\n{len(df)} usable years of {a.end - a.start + 1}; "
+        f"max residual {df.ann_max_m.max():.2f} m in "
+        f"{int(df.loc[df.ann_max_m.idxmax(), 'year'])}; "
+        f"{int(df.max_at_gap_edge.sum())} year(s) flagged max-near-gap"
+    )
 
 
 if __name__ == "__main__":

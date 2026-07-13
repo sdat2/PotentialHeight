@@ -127,7 +127,9 @@ def main(cfg: DictConfig) -> float:
     Returns:
         float: float.
     """
-    cfg["name"] = str(cfg["name"])  # ensure name is a string (hydra may parse it as int)
+    cfg["name"] = str(
+        cfg["name"]
+    )  # ensure name is a string (hydra may parse it as int)
     cfg.files["run_folder"] = os.path.join(str(cfg.files.exp_path), str(cfg.name))
     return idealized_tc_observe(cfg)
 

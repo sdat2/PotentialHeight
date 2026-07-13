@@ -138,7 +138,13 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
     ns = int(config.ns)
     fit = config.fit
 
-    ng, nsig, nb, nr, nq = len(gammas), len(sigmas), len(biases), len(seeds), len(quantiles)
+    ng, nsig, nb, nr, nq = (
+        len(gammas),
+        len(sigmas),
+        len(biases),
+        len(seeds),
+        len(quantiles),
+    )
 
     rv_ubk = np.full((ng, nsig, nb, nr, nq), np.nan)
     rv_ubu = np.full((ng, nr, nq), np.nan)
@@ -242,7 +248,10 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
             "rv_ubk": (
                 ("gamma", "sigma", "bias", "seed", "rp"),
                 rv_ubk,
-                {"units": "m", "long_name": "Return value, method I (bounded at assumed bound)"},
+                {
+                    "units": "m",
+                    "long_name": "Return value, method I (bounded at assumed bound)",
+                },
             ),
             "rv_ubu": (
                 ("gamma", "seed", "rp"),
@@ -429,7 +438,9 @@ def plot_rv_bias(config: DictConfig, ds: xr.Dataset) -> str:
             for k, sigma in enumerate(sigmas):
                 ax.plot(
                     biases,
-                    err_i.sel(gamma=gamma, sigma=sigma, rp=rp).mean("seed", skipna=True),
+                    err_i.sel(gamma=gamma, sigma=sigma, rp=rp).mean(
+                        "seed", skipna=True
+                    ),
                     color=colors[k],
                     linewidth=1.2,
                     label=rf"I: $\sigma_{{\hat{{z}}^*}}={sigma:.1f}$ m, mean error",
@@ -544,7 +555,10 @@ def plot_param_compensation(config: DictConfig, ds: xr.Dataset) -> str:
             float(gamma), color=config.color.true_gev, linestyle="--", linewidth=0.9
         )
         axs[1, jg].axhline(
-            float(config.beta), color=config.color.true_gev, linestyle="--", linewidth=0.9
+            float(config.beta),
+            color=config.color.true_gev,
+            linestyle="--",
+            linewidth=0.9,
         )
         axs[0, jg].set_title(rf"$\gamma={gamma:+.1f}$")
         axs[1, jg].set_xlabel(r"Upper-bound bias, $b$ [m]")
@@ -639,7 +653,9 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
     plot_rmse(config, ds)
 
 
-def report_crossings(config: DictConfig, ds: xr.Dataset) -> Dict[Tuple[float, float, int], dict]:
+def report_crossings(
+    config: DictConfig, ds: xr.Dataset
+) -> Dict[Tuple[float, float, int], dict]:
     """Report b*: where method I's error crosses method II's, per (gamma, sigma, rp).
 
     Two error metrics are used. RMSE is the headline, but method II's RMSE is
@@ -672,7 +688,9 @@ def report_crossings(config: DictConfig, ds: xr.Dataset) -> Dict[Tuple[float, fl
     frac = ds["clip_engaged"].mean("seed")
     out: Dict[Tuple[float, float, int], dict] = {}
     for metric, (m_i, m_ii) in metrics.items():
-        print(f"\n=== b* summary ({metric}): where {metric}(I) crosses {metric}(II) ===")
+        print(
+            f"\n=== b* summary ({metric}): where {metric}(I) crosses {metric}(II) ==="
+        )
         for gamma in ds.gamma.values.tolist():
             for rp in ds.rp.values.tolist():
                 r2 = float(m_ii.sel(gamma=gamma, rp=rp))

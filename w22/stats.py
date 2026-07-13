@@ -13,6 +13,7 @@ TODO: Add in ability to process new variables and for it to be more extensible.
         - vmax_3  (should be labeled \(V_{p})\)
 
 """
+
 import os
 from typing import Tuple
 import numpy as np
@@ -67,7 +68,9 @@ def safe_corr(xt: np.ndarray, yt: np.ndarray) -> float:
     return corr[0, 1]
 
 
-def calculate_detrended_cv(timeseries_data: np.ndarray) -> Tuple[np.ndarray, float, float]:
+def calculate_detrended_cv(
+    timeseries_data: np.ndarray,
+) -> Tuple[np.ndarray, float, float]:
     """Calculates the detrended standard deviation and coefficient of variation.
 
     This function performs a linear regression on the input time series to
@@ -182,10 +185,10 @@ def analyze_bias(ground_truth: np.ndarray, model: np.ndarray) -> dict:
     p_value_trend = lin_reg_result.pvalue
 
     return {
-        'mean_bias': np.mean(bias),
-        'mean_bias_p_value': p_value_mean,
-        'bias_trend': slope,
-        'bias_trend_p_value': p_value_trend,
+        "mean_bias": np.mean(bias),
+        "mean_bias_p_value": p_value_mean,
+        "bias_trend": slope,
+        "bias_trend_p_value": p_value_trend,
     }
 
 
@@ -211,7 +214,10 @@ def timeseries_relationships(
     """
     vars = ("sst", "vmax_3", "r0_3", "rmax_3")
 
-    var_timeseries = {var: timeseries_ds[var].sel(time=slice(year_min, year_max)).values for var in vars}
+    var_timeseries = {
+        var: timeseries_ds[var].sel(time=slice(year_min, year_max)).values
+        for var in vars
+    }
     print(var_timeseries)
 
     ssts = timeseries_ds["sst"].sel(time=slice(year_min, year_max)).values
@@ -232,7 +238,6 @@ def timeseries_relationships(
     rho_sst_vmax = safe_corr(ssts, vmaxs)
     rho_sst_r0 = safe_corr(ssts, r0s_3)
     rho_sst_rmax = safe_corr(ssts, rmaxs)
-
 
     # work out gradient with error bars for same period
     fit_vmax = safe_grad(years, vmaxs)
@@ -263,8 +268,8 @@ def timeseries_relationships(
             "fit_vmax_err": [fit_vmax.s],
             "fit_r0": [fit_r0.n],
             "fit_r0_err": [fit_r0.s],
-            "fit_rmax" : [fit_rmax.n],
-            "fit_rmax_err" : [fit_rmax.s],
+            "fit_rmax": [fit_rmax.n],
+            "fit_rmax_err": [fit_rmax.s],
             "fit_r0_sst": [fit_r0_sst.n],
             "fit_r0_sst_err": [fit_r0_sst.s],
             "fit_rmax_sst": [fit_rmax_sst.n],
@@ -286,8 +291,7 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     df_l = []
     for member in [4, 10, 11]:
         timeseries_ds = get_timeseries(
-            model="CESM2",
-            place=place, member=member, pi_version=pi_version
+            model="CESM2", place=place, member=member, pi_version=pi_version
         )
         df_l.append(
             timeseries_relationships(
@@ -328,8 +332,8 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
     )
     df = pd.concat(df_l, ignore_index=True)
     file_name = os.path.join(
-            DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}new.csv"
-        )
+        DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}new.csv"
+    )
 
     df.to_csv(
         file_name,
@@ -343,7 +347,9 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
         df[[col for col in df.columns if not col.startswith("fit_")]]
     )
     print(df_str)
-    file_name = os.path.join(DATA_PATH, f"{place}_temporal_correlation_CESM2_pi{pi_version}.tex")
+    file_name = os.path.join(
+        DATA_PATH, f"{place}_temporal_correlation_CESM2_pi{pi_version}.tex"
+    )
     with open(
         file_name,
         "w",
@@ -355,10 +361,10 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
         df[[col for col in df.columns if not col.startswith("rho_")]]
     )
     print(df_str)
-    file_name = os.path.join(DATA_PATH, f"{place}_temporal_fit_CESM2_pi{pi_version}.tex")
-    with open(
-        file_name, "w"
-    ) as f:
+    file_name = os.path.join(
+        DATA_PATH, f"{place}_temporal_fit_CESM2_pi{pi_version}.tex"
+    )
+    with open(file_name, "w") as f:
         f.write(df_str)
     print("Saved temporal relationships data to LaTeX table.")
     return None
@@ -385,7 +391,9 @@ def format_single_latex_sci(value: float, sig_figs: int = 2) -> str:
         >>> print(format_single_latex_sci(float('inf')))
         \(\infty\)
     """
-    assert isinstance(sig_figs, int) and sig_figs >= 1, "sig_figs must be a positive integer"
+    assert (
+        isinstance(sig_figs, int) and sig_figs >= 1
+    ), "sig_figs must be a positive integer"
     assert isinstance(value, (int, float)), "value must be a number"
     if value == 0:
         return f"\\({0.0:.{sig_figs-1}f}\\)"
@@ -437,17 +445,16 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
         return format_single_latex_sci(nominal)
     elif not math.isfinite(error):
         return "--"
-        #return format_single_latex_sci(nominal) + "\\( \\pm \\infty \\)"
+        # return format_single_latex_sci(nominal) + "\\( \\pm \\infty \\)"
     elif not math.isfinite(nominal):
         return "--"
 
-
     # Determine the common exponent from the nominal value
     exponent = (
-            math.floor(math.log10(abs(nominal)))
-            if nominal != 0
-            else math.floor(math.log10(abs(error)))
-        )
+        math.floor(math.log10(abs(nominal)))
+        if nominal != 0
+        else math.floor(math.log10(abs(error)))
+    )
 
     # Rescale numbers to the common exponent
     nominal_rescaled = nominal / (10**exponent)
@@ -473,7 +480,9 @@ def format_error_latex_sci(nominal: float, error: float) -> str:
     if exponent == 0:
         return f"\\({nominal_str} \\pm {error_str}\\)"
 
-    return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
+    return (
+        f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
+    )
 
 
 def dataframe_to_latex_table(df: pd.DataFrame) -> str:
@@ -605,6 +614,7 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
 
     return latex_str
 
+
 if __name__ == "__main__":
     # python -m w22.stats
-    temporal_relationship_data(place = "new_orleans")
+    temporal_relationship_data(place="new_orleans")

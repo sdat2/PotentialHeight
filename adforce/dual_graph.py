@@ -19,6 +19,7 @@ from .mesh import (
     xr_loader,
     swegnn_dg_from_mesh_ds_from_path,  # <-- Add this one
 )
+
 FIGURE_PATH = os.path.join(FIGURE_PATH, "dual_graph")
 os.makedirs(FIGURE_PATH, exist_ok=True)
 
@@ -481,9 +482,7 @@ def plot_swegnn_ghost_cells(path_in: str, output_path: str) -> None:
     try:
         # --- 1. Calculate SWE-GNN Dataset On-the-Fly ---
         # Use use_dask=False to compute immediately for plotting
-        swegnn_ds = swegnn_dg_from_mesh_ds_from_path(
-            path=path_in, use_dask=True
-        )
+        swegnn_ds = swegnn_dg_from_mesh_ds_from_path(path=path_in, use_dask=True)
         print("SWE-GNN dataset calculated.", swegnn_ds)
         print("SWE-GNN dataset variables:", [var for var in swegnn_ds])
 
@@ -533,9 +532,7 @@ def plot_swegnn_ghost_cells(path_in: str, output_path: str) -> None:
             label="Dual Graph Edges",
         )
         # Plot all dual nodes (face centers)
-        ax.scatter(
-            face_x, face_y, color="blue", s=0.5, alpha=0.2, label="Face Centers"
-        )
+        ax.scatter(face_x, face_y, color="blue", s=0.5, alpha=0.2, label="Face Centers")
 
         # --- 6. Plot Original Boundary Edges (Green) ---
         edge_index_BC = swegnn_ds["edge_index_BC"].values

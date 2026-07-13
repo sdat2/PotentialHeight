@@ -67,7 +67,9 @@ ERA5_PI_OG_PATH: str = os.path.join(ERA5_PATH, "pi_og")  # pi no bias correction
 os.makedirs(ERA5_PI_OG_PATH, exist_ok=True)  # potential intensity on original grid
 ERA5_PI_PATH: str = os.path.join(ERA5_PATH, "pi")  # pi on new grid
 os.makedirs(ERA5_PI_PATH, exist_ok=True)  # potential intensity on new grid
-ERA5_PS_OG_PATH: str = os.path.join(ERA5_PATH, "ps_og")  # potential size on original grid
+ERA5_PS_OG_PATH: str = os.path.join(
+    ERA5_PATH, "ps_og"
+)  # potential size on original grid
 os.makedirs(ERA5_PS_OG_PATH, exist_ok=True)  # potential size on
 ERA5_PS_PATH = os.path.join(ERA5_PATH, "ps")  # potential size
 os.makedirs(ERA5_PS_PATH, exist_ok=True)  # potential size on new grid

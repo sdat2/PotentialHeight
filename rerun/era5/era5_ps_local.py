@@ -64,8 +64,18 @@ def _solve_one(v1, v3, msl, sst, t0, lat, rh):
     import w22.ps as p
 
     return p.calculate_ps13_ufunc(
-        float(v1), float(v3), float(msl), float(sst), float(t0),
-        float(lat), float(rh), 0.9, 0.0015, 0.002, 1.2, "isothermal",
+        float(v1),
+        float(v3),
+        float(msl),
+        float(sst),
+        float(t0),
+        float(lat),
+        float(rh),
+        0.9,
+        0.0015,
+        0.002,
+        1.2,
+        "isothermal",
     )
 
 
@@ -103,17 +113,28 @@ def solve_year(ds: xr.Dataset, i: int, year: int, out_dir: str, n_jobs: int) -> 
     flat_lat = lat2d.ravel()
 
     valid = np.where(
-        np.isfinite(flat["vmax_3"]) & (flat["vmax_3"] > 0.01)
+        np.isfinite(flat["vmax_3"])
+        & (flat["vmax_3"] > 0.01)
         & np.isfinite(flat["sst"])
-        & np.isfinite(flat["rh"]) & (flat["rh"] >= 0) & (flat["rh"] <= 1)
-        & np.isfinite(flat["msl"]) & np.isfinite(flat["t0"])
+        & np.isfinite(flat["rh"])
+        & (flat["rh"] >= 0)
+        & (flat["rh"] <= 1)
+        & np.isfinite(flat["msl"])
+        & np.isfinite(flat["t0"])
     )[0]
-    print(f"[{year}] solving {len(valid)} ocean cells (n_jobs={n_jobs}) ...", flush=True)
+    print(
+        f"[{year}] solving {len(valid)} ocean cells (n_jobs={n_jobs}) ...", flush=True
+    )
 
     res = Parallel(n_jobs=n_jobs, backend="loky")(
         delayed(_solve_one)(
-            flat["vmax_1"][j], flat["vmax_3"][j], flat["msl"][j], flat["sst"][j],
-            flat["t0"][j], flat_lat[j], flat["rh"][j],
+            flat["vmax_1"][j],
+            flat["vmax_3"][j],
+            flat["msl"][j],
+            flat["sst"][j],
+            flat["t0"][j],
+            flat_lat[j],
+            flat["rh"][j],
         )
         for j in valid
     )
@@ -131,10 +152,34 @@ def solve_year(ds: xr.Dataset, i: int, year: int, out_dir: str, n_jobs: int) -> 
         data_vars,
         coords={"lat": ds["lat"].values, "lon": ds["lon"].values, "year": year},
     )
+    # units for downstream figure code (colorbars/panel titles); mirrors the
+    # canonical attrs of the original ARCHER2 product
+    units = {
+        "r0_1": "m",
+        "r0_3": "m",
+        "rmax_1": "m",
+        "rmax_3": "m",
+        "pm_1": "Pa",
+        "pm_3": "Pa",
+        "pc_1": "Pa",
+        "pc_3": "Pa",
+        "vmax_1": "m/s",
+        "vmax_3": "m/s",
+        "sst": "Celsius",
+        "msl": "hPa",
+        "rh": "fraction",
+        "t0": "K",
+    }
+    for v, u in units.items():
+        if v in dso:
+            dso[v].attrs["units"] = u
     tmp = out + ".tmp"
     dso.to_netcdf(tmp)
     os.replace(tmp, out)  # atomic: a killed write never leaves a half file
-    print(f"[{year}] DONE {len(valid)} cells in {(time.time() - t) / 3600:.2f} h -> {out}", flush=True)
+    print(
+        f"[{year}] DONE {len(valid)} cells in {(time.time() - t) / 3600:.2f} h -> {out}",
+        flush=True,
+    )
 
 
 def main() -> None:

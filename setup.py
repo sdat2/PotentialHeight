@@ -111,7 +111,16 @@ setup(
         "Operating System :: Unix",
         "Operating System :: MacOS",
     ],
-    packages=["tcpips", "w22", "adforce", "adforce.training", "adbo", "worst", "cle15", "comp"],
+    packages=[
+        "tcpips",
+        "w22",
+        "adforce",
+        "adforce.training",
+        "adbo",
+        "worst",
+        "cle15",
+        "comp",
+    ],
     package_dir={
         "tcpips": "tcpips",  # Calculate potential intensity and prerequisites for potential size
         "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab (octave), calculate potential size

@@ -25,8 +25,9 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                     "..", "..", ".."))
+_REPO = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
@@ -52,8 +53,7 @@ def make_fort22(workdir: str, run_name: str, profile_value: str) -> str:
     with initialize_config_dir(config_dir=CONFIG_DIR, version_base=None):
         cfg = compose(
             config_name="wrap_config",
-            overrides=[f"name={run_name}",
-                       f"tc.profile_name.value={profile_value}"],
+            overrides=[f"name={run_name}", f"tc.profile_name.value={profile_value}"],
         )
     create_fort22(run_folder, cfg.grid, cfg.tc)
     out = os.path.join(run_folder, "fort.22.nc")
@@ -63,6 +63,7 @@ def make_fort22(workdir: str, run_name: str, profile_value: str) -> str:
 
 def summarize(nc_file: str) -> dict:
     import netCDF4 as nc
+
     ds = nc.Dataset(nc_file)
     tc1 = ds.groups["TC1"]
     spd = np.sqrt(np.asarray(tc1["U10"][:]) ** 2 + np.asarray(tc1["V10"][:]) ** 2)
@@ -87,31 +88,49 @@ def main() -> None:
     s_name = summarize(f_name)
     check("groups", s_name["groups"] == ["Main", "TC1"], f"{s_name['groups']}")
     vexp = v_reduc * float(np.max(prof_old["VV"]))
-    check("surface wind ~ v_reduc*max(VV)", abs(s_name["max_wind"] - vexp) < 0.15 * vexp,
-          f"{s_name['max_wind']:.1f} vs expected ~{vexp:.1f} m/s")
+    check(
+        "surface wind ~ v_reduc*max(VV)",
+        abs(s_name["max_wind"] - vexp) < 0.15 * vexp,
+        f"{s_name['max_wind']:.1f} vs expected ~{vexp:.1f} m/s",
+    )
 
     print("[2] literal-path branch (materiality check / tradeoff sweep):")
-    f_fixed = make_fort22(workdir, "wiring_fixed",
-                          os.path.join(HERE, "profile_fixed_2015.json"))
+    f_fixed = make_fort22(
+        workdir, "wiring_fixed", os.path.join(HERE, "profile_fixed_2015.json")
+    )
     s_fixed = summarize(f_fixed)
     vexp_f = v_reduc * float(np.max(prof_fixed["VV"]))
-    check("surface wind ~ v_reduc*max(VV)", abs(s_fixed["max_wind"] - vexp_f) < 0.15 * vexp_f,
-          f"{s_fixed['max_wind']:.1f} vs expected ~{vexp_f:.1f} m/s")
-    check("min psfc ~ profile min p", abs(s_fixed["min_psfc"] - min(prof_fixed["p"])) < 5.0,
-          f"{s_fixed['min_psfc']:.1f} vs profile {min(prof_fixed['p']):.1f} hPa")
+    check(
+        "surface wind ~ v_reduc*max(VV)",
+        abs(s_fixed["max_wind"] - vexp_f) < 0.15 * vexp_f,
+        f"{s_fixed['max_wind']:.1f} vs expected ~{vexp_f:.1f} m/s",
+    )
+    check(
+        "min psfc ~ profile min p",
+        abs(s_fixed["min_psfc"] - min(prof_fixed["p"])) < 5.0,
+        f"{s_fixed['min_psfc']:.1f} vs profile {min(prof_fixed['p']):.1f} hPa",
+    )
 
     print("[3] old vs fixed forcing differs (the fix reaches the wind field):")
-    f_old = make_fort22(workdir, "wiring_old",
-                        os.path.join(HERE, "profile_old_2015.json"))
+    f_old = make_fort22(
+        workdir, "wiring_old", os.path.join(HERE, "profile_old_2015.json")
+    )
     s_old = summarize(f_old)
     import netCDF4 as nc
-    a = nc.Dataset(f_old); b = nc.Dataset(f_fixed)
-    u_old = np.asarray(a.groups["TC1"]["U10"][:]); u_fix = np.asarray(b.groups["TC1"]["U10"][:])
+
+    a = nc.Dataset(f_old)
+    b = nc.Dataset(f_fixed)
+    u_old = np.asarray(a.groups["TC1"]["U10"][:])
+    u_fix = np.asarray(b.groups["TC1"]["U10"][:])
     rel = float(np.nanmax(np.abs(u_fix - u_old)) / np.nanmax(np.abs(u_old)))
-    a.close(); b.close()
+    a.close()
+    b.close()
     check("fields differ", rel > 0.005, f"max relative U10 difference {100*rel:.1f}%")
-    check("same intensity both eras", abs(s_old["max_wind"] - s_fixed["max_wind"]) < 1.0,
-          f"{s_old['max_wind']:.1f} vs {s_fixed['max_wind']:.1f} m/s (fix changes size, not Vp)")
+    check(
+        "same intensity both eras",
+        abs(s_old["max_wind"] - s_fixed["max_wind"]) < 1.0,
+        f"{s_old['max_wind']:.1f} vs {s_fixed['max_wind']:.1f} m/s (fix changes size, not Vp)",
+    )
 
     print()
     if FAILURES:

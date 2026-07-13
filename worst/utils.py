@@ -144,8 +144,15 @@ def legend_below(fig, ax, ncol: int = 2, fontsize: int = 8, y: float = -0.02) ->
     and ``fig.savefig(out, bbox_inches="tight")`` (so the legend is not clipped).
     """
     handles, labels = ax.get_legend_handles_labels()
-    fig.legend(handles, labels, ncol=ncol, fontsize=fontsize, loc="lower center",
-               bbox_to_anchor=(0.5, y), frameon=False)
+    fig.legend(
+        handles,
+        labels,
+        ncol=ncol,
+        fontsize=fontsize,
+        loc="lower center",
+        bbox_to_anchor=(0.5, y),
+        frameon=False,
+    )
 
 
 def retry_wrapper(max_retries: int = 10) -> callable:

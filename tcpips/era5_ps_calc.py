@@ -3,6 +3,7 @@ Calculating the potential size is very computationally intensive,
 so we use dask to parallelize the work,
 ideally across many nodes on the Archer2 cluster.
 """
+
 import time
 import argparse
 import xarray as xr
@@ -10,12 +11,11 @@ import numpy as np
 import dask
 import dask.array as da
 from dask.distributed import Client
+
 try:
     from dask_mpi import initialize
 except ImportError:
-    print(
-        "dask-mpi is not installed. Please install it with `pip install dask-mpi`."
-    )
+    print("dask-mpi is not installed. Please install it with `pip install dask-mpi`.")
 from tcpips.era5 import calculate_potential_sizes
 
 
@@ -78,7 +78,9 @@ if __name__ == "__main__":
         help="End year for the calculation (default: 2009)",
     )
     args = parser.parse_args()
-    print(f"Running potential size calculation from {args.start_year} to {args.end_year}")
+    print(
+        f"Running potential size calculation from {args.start_year} to {args.end_year}"
+    )
     # --- Dask Memory Configuration ---
     # This is the key to preventing memory issues with Lustre.
     # We tell Dask to leave a 30-40% buffer for the OS file cache.

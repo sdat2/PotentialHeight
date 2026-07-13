@@ -1,5 +1,5 @@
-"""Generate tables of results.
-"""
+"""Generate tables of results."""
+
 import os
 from typing import Tuple, List, Dict
 import math
@@ -27,9 +27,7 @@ MODELS_TO_PROCESS = {
     "CESM2": ["r4i1p1f1", "r10i1p1f1", "r11i1p1f1"],
 }
 
-VARIABLES_TO_PROCESS = [# "sst", ""
-"vmax_3", "r0_3", "rmax_3", # "r0_1",
-"rmax_1"]
+VARIABLES_TO_PROCESS = ["vmax_3", "r0_3", "rmax_3", "rmax_1"]  # "sst", ""  # "r0_1",
 
 
 def safe_grad(xt: np.ndarray, yt: np.ndarray) -> ufloat:
@@ -78,7 +76,9 @@ def safe_corr(xt: np.ndarray, yt: np.ndarray) -> float:
     return corr[0, 1]
 
 
-def calculate_detrended_cv(timeseries_data: np.ndarray) -> Tuple[np.ndarray, float, float]:
+def calculate_detrended_cv(
+    timeseries_data: np.ndarray,
+) -> Tuple[np.ndarray, float, float]:
     """Calculates the detrended standard deviation and coefficient of variation.
 
     This function performs a linear regression on the input time series to
@@ -172,15 +172,15 @@ def analyze_bias(ground_truth: np.ndarray, model: np.ndarray) -> dict:
         raise ValueError("Input arrays must have the same shape.")
 
     bias = model - ground_truth
-    t_stat_mean, p_value_mean = ss.ttest_1samp(bias, 0.0, nan_policy='omit')
+    t_stat_mean, p_value_mean = ss.ttest_1samp(bias, 0.0, nan_policy="omit")
     time_axis = np.arange(len(bias))
     lin_reg_result = ss.linregress(time_axis, bias)
 
     return {
-        'mean_bias': np.nanmean(bias),
-        'mean_bias_p_value': p_value_mean,
-        'bias_trend': lin_reg_result.slope,
-        'bias_trend_p_value': lin_reg_result.pvalue,
+        "mean_bias": np.nanmean(bias),
+        "mean_bias_p_value": p_value_mean,
+        "bias_trend": lin_reg_result.slope,
+        "bias_trend_p_value": lin_reg_result.pvalue,
     }
 
 
@@ -208,20 +208,25 @@ def timeseries_relationships(
         pd.DataFrame: A single-row DataFrame with calculated statistics.
     """
     results = {
-        "place": place, "member": member,
-        "year_min": year_min, "year_max": year_max,
+        "place": place,
+        "member": member,
+        "year_min": year_min,
+        "year_max": year_max,
     }
     ds_period = timeseries_ds.sel(time=slice(str(year_min), str(year_max)))
     ts = {var: ds_period[var].values for var in variables if var in ds_period}
-    if not ts: return pd.DataFrame()
+    if not ts:
+        return pd.DataFrame()
 
-    years = np.asarray(ds_period["time"].values)  # numpy, not DataArray, so safe_grad returns a ufloat (was a DataArray -> '.n' AttributeError)
+    years = np.asarray(
+        ds_period["time"].values
+    )  # numpy, not DataArray, so safe_grad returns a ufloat (was a DataArray -> '.n' AttributeError)
 
     # Correlations and gradients with time (years)
     for var in ts:
         results[f"rho_{var}"] = safe_corr(ts[var], years)
-        if var != 'sst': # SST gradient with time not in original analysis
-            scale = 1000 if 'r0' in var or 'rmax' in var else 1
+        if var != "sst":  # SST gradient with time not in original analysis
+            scale = 1000 if "r0" in var or "rmax" in var else 1
             fit_val = safe_grad(years, ts[var] / scale)
             results[f"fit_{var}"] = fit_val.n
             results[f"fit_{var}_err"] = fit_val.s
@@ -231,7 +236,7 @@ def timeseries_relationships(
         for var in ts:
             if var != "sst":
                 results[f"rho_{var}_sst"] = safe_corr(ts[var], ts["sst"])
-                scale = 1000 if 'r0' in var or 'rmax' in var else 1
+                scale = 1000 if "r0" in var or "rmax" in var else 1
                 fit_val_sst = safe_grad(ts["sst"], ts[var] / scale)
                 results[f"fit_{var}_sst"] = fit_val_sst.n
                 results[f"fit_{var}_sst_err"] = fit_val_sst.s
@@ -258,20 +263,46 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
                     model=model, place=place, member=member_str, pi_version=pi_version
                 )
                 # Future period
-                df_l.append(timeseries_relationships(
-                    timeseries_ds, place, member_str, 2014, 2100, VARIABLES_TO_PROCESS))
+                df_l.append(
+                    timeseries_relationships(
+                        timeseries_ds,
+                        place,
+                        member_str,
+                        2014,
+                        2100,
+                        VARIABLES_TO_PROCESS,
+                    )
+                )
                 # Historical period
-                df_l.append(timeseries_relationships(
-                    timeseries_ds, place, member_str, 1980, 2014, VARIABLES_TO_PROCESS))
+                df_l.append(
+                    timeseries_relationships(
+                        timeseries_ds,
+                        place,
+                        member_str,
+                        1980,
+                        2014,
+                        VARIABLES_TO_PROCESS,
+                    )
+                )
             except Exception as e:
                 print(f"Could not process {model}/{member_str}. Skipping. Error: {e}")
 
     # Process ERA5
     try:
-        timeseries_ds_era5 = get_timeseries(place=place, model="ERA5", pi_version=pi_version)
+        timeseries_ds_era5 = get_timeseries(
+            place=place, model="ERA5", pi_version=pi_version
+        )
         for start_year in [1980, 1940]:
-            df_l.append(timeseries_relationships(
-                timeseries_ds_era5, place, "ERA5", start_year, 2024, VARIABLES_TO_PROCESS))
+            df_l.append(
+                timeseries_relationships(
+                    timeseries_ds_era5,
+                    place,
+                    "ERA5",
+                    start_year,
+                    2024,
+                    VARIABLES_TO_PROCESS,
+                )
+            )
     except Exception as e:
         print(f"Could not process ERA5. Skipping. Error: {e}")
 
@@ -280,22 +311,33 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
         return
 
     df = pd.concat(df_l, ignore_index=True)
-    df.to_csv(os.path.join(DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}.csv"), index=False)
+    df.to_csv(
+        os.path.join(DATA_PATH, f"{place}_temporal_relationships_pi{pi_version}.csv"),
+        index=False,
+    )
     print("Saved temporal relationships data to CSV.")
 
     df.drop(columns=["place"], inplace=True)
-    corr_cols = ['member', 'year_min', 'year_max'] + [c for c in df.columns if c.startswith('rho_')]
-    fit_cols = ['member', 'year_min', 'year_max'] + [c for c in df.columns if c.startswith('fit_')]
+    corr_cols = ["member", "year_min", "year_max"] + [
+        c for c in df.columns if c.startswith("rho_")
+    ]
+    fit_cols = ["member", "year_min", "year_max"] + [
+        c for c in df.columns if c.startswith("fit_")
+    ]
 
     # Save correlation table
     df_str_corr = dataframe_to_latex_table(df[corr_cols])
-    with open(os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}.tex"), "w") as f:
+    with open(
+        os.path.join(DATA_PATH, f"{place}_temporal_correlation_pi{pi_version}.tex"), "w"
+    ) as f:
         f.write(df_str_corr)
     print("Saved temporal correlation data to LaTeX table.")
 
     # Save fit/gradient table
     df_str_fit = dataframe_to_latex_table(df[fit_cols])
-    with open(os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}.tex"), "w") as f:
+    with open(
+        os.path.join(DATA_PATH, f"{place}_temporal_fit_pi{pi_version}.tex"), "w"
+    ) as f:
         f.write(df_str_fit)
     print("Saved temporal gradient data to LaTeX table.")
 
@@ -304,7 +346,7 @@ def temporal_relationship_data(place: str = "new_orleans", pi_version: int = 4) 
 def generate_assessment_tables(
     place: str = "new_orleans",
     pi_version: int = 4,
-    comparison_period: Tuple[int, int] = (1980, 2014)
+    comparison_period: Tuple[int, int] = (1980, 2014),
 ) -> None:
     """
     Generates tables to assess biases and variability for models compared to ERA5.
@@ -328,38 +370,51 @@ def generate_assessment_tables(
     for model, members in MODELS_TO_PROCESS.items():
         for member_str in members:
             try:
-                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_ds = get_timeseries(
+                    model=model, place=place, member=member_str, pi_version=pi_version
+                )
                 model_ds_period = model_ds.sel(time=slice(start_yr, end_yr))
 
                 common_time = np.intersect1d(era5_ds_period.time, model_ds_period.time)
                 if len(common_time) < 5:
-                    print(f"Not enough overlapping data for {model}/{member_str}. Skipping.")
+                    print(
+                        f"Not enough overlapping data for {model}/{member_str}. Skipping."
+                    )
                     continue
 
                 era5_aligned = era5_ds_period.sel(time=common_time)
                 model_aligned = model_ds_period.sel(time=common_time)
 
                 for var in VARIABLES_TO_PROCESS:
-                    if var not in model_aligned or var not in era5_aligned: continue
+                    if var not in model_aligned or var not in era5_aligned:
+                        continue
 
                     era5_data = era5_aligned[var].values
                     model_data = model_aligned[var].values
 
                     valid_mask = ~np.isnan(era5_data) & ~np.isnan(model_data)
-                    if np.sum(valid_mask) < 5: continue
+                    if np.sum(valid_mask) < 5:
+                        continue
 
-                    bias_res = analyze_bias(era5_data[valid_mask], model_data[valid_mask])
+                    bias_res = analyze_bias(
+                        era5_data[valid_mask], model_data[valid_mask]
+                    )
                     _, _, model_cv = calculate_detrended_cv(model_data[valid_mask])
                     _, _, era5_cv = calculate_detrended_cv(era5_data[valid_mask])
 
-                    results.append({
-                        "model": model, "member": member_str, "variable": var,
-                        "mean_bias": bias_res['mean_bias'],
-                        "mean_bias_p": bias_res['mean_bias_p_value'],
-                        "bias_trend": bias_res['bias_trend'],
-                        "bias_trend_p": bias_res['bias_trend_p_value'],
-                        "model_cv": model_cv, "era5_cv": era5_cv,
-                    })
+                    results.append(
+                        {
+                            "model": model,
+                            "member": member_str,
+                            "variable": var,
+                            "mean_bias": bias_res["mean_bias"],
+                            "mean_bias_p": bias_res["mean_bias_p_value"],
+                            "bias_trend": bias_res["bias_trend"],
+                            "bias_trend_p": bias_res["bias_trend_p_value"],
+                            "model_cv": model_cv,
+                            "era5_cv": era5_cv,
+                        }
+                    )
             except Exception as e:
                 print(f"Could not assess {model}/{member_str}. Skipping. Error: {e}")
 
@@ -368,32 +423,44 @@ def generate_assessment_tables(
         return
 
     df = pd.DataFrame(results)
-    df.to_csv(os.path.join(DATA_PATH, f"{place}_assessment_pi{pi_version}.csv"), index=False)
+    df.to_csv(
+        os.path.join(DATA_PATH, f"{place}_assessment_pi{pi_version}.csv"), index=False
+    )
     print("Saved assessment data to CSV.")
 
     # Format for LaTeX table
     def p_to_star(p):
-        return '***' if p < 0.001 else '**' if p < 0.01 else '*' if p < 0.05 else ''
+        return "***" if p < 0.001 else "**" if p < 0.01 else "*" if p < 0.05 else ""
+
     def p_to_str(p):
         out = f"{p:.1e}" if p < 0.01 else f"{p:.2f}"
         return " (p=" + out + ")"
-    df['mean_bias'] = df.apply(lambda r: f"{r.mean_bias:.2f}{p_to_str(r.mean_bias_p)}", axis=1)
-    df['bias_trend'] = df.apply(lambda r: f"{r.bias_trend:.3f}{p_to_str(r.bias_trend_p)}", axis=1)
 
-    era5_cv_df = df[['variable', 'era5_cv']].drop_duplicates().reset_index(drop=True)
+    df["mean_bias"] = df.apply(
+        lambda r: f"{r.mean_bias:.2f}{p_to_str(r.mean_bias_p)}", axis=1
+    )
+    df["bias_trend"] = df.apply(
+        lambda r: f"{r.bias_trend:.3f}{p_to_str(r.bias_trend_p)}", axis=1
+    )
+
+    era5_cv_df = df[["variable", "era5_cv"]].drop_duplicates().reset_index(drop=True)
     print("\nERA5 Detrended Coefficient of Variation (1980-2014):")
     print(era5_cv_df)
 
-    df_tex = df[['model', 'member', 'variable', 'mean_bias', 'bias_trend', 'model_cv']]
+    df_tex = df[["model", "member", "variable", "mean_bias", "bias_trend", "model_cv"]]
     df_str_tex = dataframe_to_latex_table(df_tex)
-    with open(os.path.join(DATA_PATH, f"{place}_assessment_pi{pi_version}.tex"), "w") as f:
+    with open(
+        os.path.join(DATA_PATH, f"{place}_assessment_pi{pi_version}.tex"), "w"
+    ) as f:
         f.write(df_str_tex)
     print("Saved assessment data to LaTeX table.")
 
 
 def format_single_latex_sci(value: float, sig_figs: int = 2) -> str:
     # ... (function unchanged)
-    assert isinstance(sig_figs, int) and sig_figs >= 1, "sig_figs must be a positive integer"
+    assert (
+        isinstance(sig_figs, int) and sig_figs >= 1
+    ), "sig_figs must be a positive integer"
     assert isinstance(value, (int, float)), "value must be a number"
     if value == 0:
         return f"\\({0.0:.{sig_figs-1}f}\\)"
@@ -410,24 +477,38 @@ def format_single_latex_sci(value: float, sig_figs: int = 2) -> str:
         return f"\\({mantissa_str}\\)"
     return f"\\({mantissa_str} \\times 10^{{{exponent}}}\\)"
 
+
 def format_error_latex_sci(nominal: float, error: float) -> str:
     # ... (function unchanged)
     assert isinstance(nominal, (int, float)), "nominal must be a number"
     assert isinstance(error, (int, float)), "error must be a number"
-    if error == 0: return format_single_latex_sci(nominal)
-    if not math.isfinite(error) or not math.isfinite(nominal): return "--"
-    exponent = math.floor(math.log10(abs(nominal))) if nominal != 0 else math.floor(math.log10(abs(error)))
+    if error == 0:
+        return format_single_latex_sci(nominal)
+    if not math.isfinite(error) or not math.isfinite(nominal):
+        return "--"
+    exponent = (
+        math.floor(math.log10(abs(nominal)))
+        if nominal != 0
+        else math.floor(math.log10(abs(error)))
+    )
     nominal_rescaled = nominal / (10**exponent)
     error_rescaled = error / (10**exponent)
-    rounding_decimals = -math.floor(math.log10(abs(error_rescaled))) if error_rescaled != 0 else 1
-    if rounding_decimals < 0: rounding_decimals = 1
+    rounding_decimals = (
+        -math.floor(math.log10(abs(error_rescaled))) if error_rescaled != 0 else 1
+    )
+    if rounding_decimals < 0:
+        rounding_decimals = 1
     nominal_rounded = round(nominal_rescaled, rounding_decimals)
     error_rounded = round(error_rescaled, rounding_decimals)
     fmt_str = f"{{:.{rounding_decimals}f}}"
-    nominal_str, error_str = fmt_str.format(nominal_rounded), fmt_str.format(error_rounded)
+    nominal_str, error_str = fmt_str.format(nominal_rounded), fmt_str.format(
+        error_rounded
+    )
     if exponent == 0:
         return f"\\({nominal_str} \\pm {error_str}\\)"
-    return f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
+    return (
+        f"\\(\\left({nominal_str} \\pm {error_str}\\right)\\times 10^{{{exponent}}}\\)"
+    )
 
 
 def dataframe_to_latex_table(df: pd.DataFrame) -> str:
@@ -438,38 +519,67 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
 
     def _generate_header_map(columns: list[str]) -> Dict[str, str]:
         symbol_map = {
-            "vmax_3": "V_p", "rmax_3": "r_3", "rmax_1": "r_1", "r0_1": "r_{a1}",
-            "r0_3": "r_{a3}", "sst": "T_s", "years": "t",
+            "vmax_3": "V_p",
+            "rmax_3": "r_3",
+            "rmax_1": "r_1",
+            "r0_1": "r_{a1}",
+            "r0_3": "r_{a3}",
+            "sst": "T_s",
+            "years": "t",
         }
         unit_map = {
-            "vmax_3": r"\text{m s}^{-1}", "r0_3": r"\text{km}", "r0_1": r"\text{km}",
-            "rmax_3": r"\text{km}", "rmax_1": r"\text{km}", "sst": r"^{\circ}\text{C}",
+            "vmax_3": r"\text{m s}^{-1}",
+            "r0_3": r"\text{km}",
+            "r0_1": r"\text{km}",
+            "rmax_3": r"\text{km}",
+            "rmax_1": r"\text{km}",
+            "sst": r"^{\circ}\text{C}",
             "years": r"\text{yr}",
         }
         header_map = {}
         for col in columns:
             if col.startswith("rho_"):
-                parts = col.split('_')[1:]
-                dep, indep = (parts[0], parts[1]) if len(parts) > 1 else (parts[0], 'years')
-                header_map[col] = f"\\(\\rho({symbol_map.get(dep, dep)}, {symbol_map.get(indep, indep)})\\)"
+                parts = col.split("_")[1:]
+                dep, indep = (
+                    (parts[0], parts[1]) if len(parts) > 1 else (parts[0], "years")
+                )
+                header_map[col] = (
+                    f"\\(\\rho({symbol_map.get(dep, dep)}, {symbol_map.get(indep, indep)})\\)"
+                )
             elif col.startswith("fit_"):
-                parts = col.split('_')[1:]
-                dep, indep = (parts[0], parts[1]) if len(parts) > 1 else (parts[0], 'years')
-                dep_sym, ind_sym = symbol_map.get(dep, dep), symbol_map.get(indep, indep)
+                parts = col.split("_")[1:]
+                dep, indep = (
+                    (parts[0], parts[1]) if len(parts) > 1 else (parts[0], "years")
+                )
+                dep_sym, ind_sym = symbol_map.get(dep, dep), symbol_map.get(
+                    indep, indep
+                )
                 dep_unit, ind_unit = unit_map.get(dep), unit_map.get(indep)
-                unit_str = f" [\\({dep_unit}\\;{ind_unit}^{{-1}}\\)]" if dep_unit and ind_unit else ""
+                unit_str = (
+                    f" [\\({dep_unit}\\;{ind_unit}^{{-1}}\\)]"
+                    if dep_unit and ind_unit
+                    else ""
+                )
                 header_map[col] = f"\\(m({ind_sym}, {dep_sym})\\){unit_str}"
 
         # Static headers
-        header_map.update({
-            "member": "Member", "place": "Place", "year_min": "Start", "year_max": "End",
-            "model": "Model", "variable": "Variable", "mean_bias": "Mean Bias",
-            "bias_trend": "Bias Trend", "model_cv": "Model CV",
-        })
+        header_map.update(
+            {
+                "member": "Member",
+                "place": "Place",
+                "year_min": "Start",
+                "year_max": "End",
+                "model": "Model",
+                "variable": "Variable",
+                "mean_bias": "Mean Bias",
+                "bias_trend": "Bias Trend",
+                "model_cv": "Model CV",
+            }
+        )
         return header_map
 
     # TODO: we need to get the calculate the bias over the three model members for each model,
-    # we need to have the columns as the variables and the rows as the models with proper latex names e.g. \(V_p\)
+    # we need to have the columns as the variables and the rows as the models with proper latex names e.g. \(V_p\)
     # and we need to seperate different properties into different tables
 
     header_map = _generate_header_map(list(df_proc.columns))
@@ -479,11 +589,18 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
         err_col = f"{col}_err"
         if err_col in df_proc.columns:
             df_proc[col] = df_proc.apply(
-                lambda r: format_error_latex_sci(r[col], r[err_col]) if pd.notnull(r[col]) and pd.notnull(r[err_col]) else "", axis=1)
+                lambda r: (
+                    format_error_latex_sci(r[col], r[err_col])
+                    if pd.notnull(r[col]) and pd.notnull(r[err_col])
+                    else ""
+                ),
+                axis=1,
+            )
             err_cols_to_drop.append(err_col)
         elif pd.api.types.is_numeric_dtype(df_proc[col]):
-             df_proc[col] = df_proc[col].apply(
-                lambda x: f"{x:.2f}" if pd.notnull(x) else "")
+            df_proc[col] = df_proc[col].apply(
+                lambda x: f"{x:.2f}" if pd.notnull(x) else ""
+            )
 
     df_proc.drop(columns=err_cols_to_drop, inplace=True)
     final_order = [col for col in df.columns if not col.endswith("_err")]
@@ -491,7 +608,9 @@ def dataframe_to_latex_table(df: pd.DataFrame) -> str:
     df_proc = df_proc[[header_map.get(c, c) for c in final_order]]
 
     col_format = "l" * len(df_proc.columns)
-    return df_proc.to_latex(index=False, escape=False, header=True, column_format=col_format, caption=" ")
+    return df_proc.to_latex(
+        index=False, escape=False, header=True, column_format=col_format, caption=" "
+    )
 
 
 def wide_dataframe_to_latex(
@@ -511,11 +630,16 @@ def wide_dataframe_to_latex(
     """
     # Symbol and name mapping for variables and metrics
     symbol_map = {
-        "vmax_3": "$V_p$", "rmax_3": "$r_3$", "rmax_1": "$r_1$",
-        "r0_1": "$r_{a1}$", "r0_3": "$r_{a3}$", "sst": "$T_s$",
+        "vmax_3": "$V_p$",
+        "rmax_3": "$r_3$",
+        "rmax_1": "$r_1$",
+        "r0_1": "$r_{a1}$",
+        "r0_3": "$r_{a3}$",
+        "sst": "$T_s$",
     }
     metric_map = {
-        "mean_bias": "Mean Bias", "rmse": "RMSE",
+        "mean_bias": "Mean Bias",
+        "rmse": "RMSE",
         "variability_ratio": "Variability Ratio",
         "corr_variability": "Variability Corr. ($\\rho$)",
     }
@@ -529,7 +653,7 @@ def wide_dataframe_to_latex(
     for metric, var in current_cols:
         metric_name = metric_map.get(metric, metric)
         var_symbol = symbol_map.get(var, var)
-        new_cols.append((var_symbol, metric_name)) # Group by variable symbol first
+        new_cols.append((var_symbol, metric_name))  # Group by variable symbol first
     df_latex.columns = pd.MultiIndex.from_tuples(new_cols)
 
     # Convert to LaTeX string
@@ -539,7 +663,7 @@ def wide_dataframe_to_latex(
         multicolumn_format="c",
         caption=caption,
         label=label,
-        position="!htbp"
+        position="!htbp",
     )
 
     # Save to file
@@ -551,7 +675,7 @@ def wide_dataframe_to_latex(
 def generate_wide_assessment_tables(
     place: str = "new_orleans",
     pi_version: int = 4,
-    comparison_period: Tuple[int, int] = (1980, 2024)
+    comparison_period: Tuple[int, int] = (1980, 2024),
 ) -> None:
     """
     Generates wide-format assessment tables with aggregated model statistics.
@@ -580,7 +704,9 @@ def generate_wide_assessment_tables(
     for model, members in MODELS_TO_PROCESS.items():
         for member_str in members:
             try:
-                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_ds = get_timeseries(
+                    model=model, place=place, member=member_str, pi_version=pi_version
+                )
                 model_ds_period = model_ds.sel(time=slice(start_yr, end_yr))
 
                 # Align timestamps
@@ -591,7 +717,8 @@ def generate_wide_assessment_tables(
                 model_aligned = model_ds_period.sel(time=common_time)
 
                 for var in VARIABLES_TO_PROCESS:
-                    if var not in model_aligned or var not in era5_aligned: continue
+                    if var not in model_aligned or var not in era5_aligned:
+                        continue
 
                     era5_data = era5_aligned[var].values
                     model_data = model_aligned[var].values
@@ -599,22 +726,33 @@ def generate_wide_assessment_tables(
                         era5_data = era5_data / 1000.0  # Convert from m to km
                         model_data = model_data / 1000.0
                     valid_mask = ~np.isnan(era5_data) & ~np.isnan(model_data)
-                    if np.sum(valid_mask) < 5: continue
+                    if np.sum(valid_mask) < 5:
+                        continue
 
-                    era5_valid, model_valid = era5_data[valid_mask], model_data[valid_mask]
+                    era5_valid, model_valid = (
+                        era5_data[valid_mask],
+                        model_data[valid_mask],
+                    )
                     bias_res = analyze_bias(era5_valid, model_valid)
                     model_residuals, _, model_cv = calculate_detrended_cv(model_valid)
                     era5_residuals, _, era5_cv = calculate_detrended_cv(era5_valid)
-                    rmse = np.sqrt(np.mean((model_valid - era5_valid)**2))
+                    rmse = np.sqrt(np.mean((model_valid - era5_valid) ** 2))
                     corr_variability = safe_corr(model_residuals, era5_residuals)
 
-                    results.append({
-                        "model": model, "member": member_str, "variable": var,
-                        "mean_bias": bias_res['mean_bias'], "rmse": rmse,
-                        "variability_ratio": model_cv / era5_cv if era5_cv != 0 else np.nan,
-                        "model_cv": model_cv,
-                        "corr_variability": corr_variability,
-                    })
+                    results.append(
+                        {
+                            "model": model,
+                            "member": member_str,
+                            "variable": var,
+                            "mean_bias": bias_res["mean_bias"],
+                            "rmse": rmse,
+                            "variability_ratio": (
+                                model_cv / era5_cv if era5_cv != 0 else np.nan
+                            ),
+                            "model_cv": model_cv,
+                            "corr_variability": corr_variability,
+                        }
+                    )
             except Exception as e:
                 print(f"Could not assess {model}/{member_str}. Skipping. Error: {e}")
 
@@ -624,47 +762,65 @@ def generate_wide_assessment_tables(
 
     df_long = pd.DataFrame(results)
     agg_funcs = {
-        'mean_bias': ['mean', 'std'], 'rmse': ['mean', 'std'],
-        'variability_ratio': ['mean', 'std'], 'corr_variability': ['mean', 'std'],
-        'model_cv': ['mean', 'std'],
+        "mean_bias": ["mean", "std"],
+        "rmse": ["mean", "std"],
+        "variability_ratio": ["mean", "std"],
+        "corr_variability": ["mean", "std"],
+        "model_cv": ["mean", "std"],
     }
-    df_agg = df_long.groupby(['model', 'variable']).agg(agg_funcs).reset_index()
-    df_agg.columns = ['_'.join(col).strip('_') for col in df_agg.columns.values]
+    df_agg = df_long.groupby(["model", "variable"]).agg(agg_funcs).reset_index()
+    df_agg.columns = ["_".join(col).strip("_") for col in df_agg.columns.values]
 
     for metric in agg_funcs.keys():
-        mean_col, std_col = f'{metric}_mean', f'{metric}_std'
+        mean_col, std_col = f"{metric}_mean", f"{metric}_std"
         df_agg[metric] = df_agg.apply(
-            lambda r: f"${r[mean_col]:.2f} \\pm {r[std_col]:.2f}$"
-            if pd.notnull(r[mean_col]) else "NaN", axis=1
+            lambda r: (
+                f"${r[mean_col]:.2f} \\pm {r[std_col]:.2f}$"
+                if pd.notnull(r[mean_col])
+                else "NaN"
+            ),
+            axis=1,
         )
         df_agg.drop(columns=[mean_col, std_col], inplace=True)
 
     # --- Create and Save Bias/RMSE Table ---
-    df_bias_rmse = df_agg.pivot(index='model', columns='variable', values=['mean_bias']) # 'rmse'
+    df_bias_rmse = df_agg.pivot(
+        index="model", columns="variable", values=["mean_bias"]
+    )  # 'rmse'
     df_bias_rmse.index.name = "Model"
-    csv_path_br = os.path.join(DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.csv")
-    tex_path_br = os.path.join(DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.tex")
+    csv_path_br = os.path.join(
+        DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.csv"
+    )
+    tex_path_br = os.path.join(
+        DATA_PATH, f"{place}_assessment_bias_rmse_pi{pi_version}.tex"
+    )
     df_bias_rmse.to_csv(csv_path_br)
     print(f"\nSaved Bias and RMSE data to {csv_path_br}")
     wide_dataframe_to_latex(
         df=df_bias_rmse,
         caption=f"Model Mean State Assessment for {place.replace('_', ' ').title()} (1980-2014)",
         label=f"tab:{place}_bias_rmse",
-        filename=tex_path_br
+        filename=tex_path_br,
     )
 
     # --- Create and Save Variability Table ---
-    df_variability = df_agg.pivot(index='model', columns='variable', values=['model_cv']) # 'variability_ratio', 'corr_variability'
+    df_variability = df_agg.pivot(
+        index="model", columns="variable", values=["model_cv"]
+    )  # 'variability_ratio', 'corr_variability'
     df_variability.index.name = "Model"
-    csv_path_var = os.path.join(DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.csv")
-    tex_path_var = os.path.join(DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.tex")
+    csv_path_var = os.path.join(
+        DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.csv"
+    )
+    tex_path_var = os.path.join(
+        DATA_PATH, f"{place}_assessment_variability_pi{pi_version}.tex"
+    )
     df_variability.to_csv(csv_path_var)
     print(f"\nSaved Variability data to {csv_path_var}")
     wide_dataframe_to_latex(
         df=df_variability,
         caption=f"Model Variability Assessment for {place.replace('_', ' ').title()} (1980-2014)",
         label=f"tab:{place}_variability",
-        filename=tex_path_var
+        filename=tex_path_var,
     )
 
 
@@ -693,19 +849,21 @@ def analyze_bias_newey_west_ensemble(
     ensemble_mean_bias = bias_ds.mean(dim="member").values
 
     # Analyze this single time series for its trend
-    bias_trend, bias_intercept, bias_trend_p = trend_with_neweywest_full(ensemble_mean_bias)
+    bias_trend, bias_intercept, bias_trend_p = trend_with_neweywest_full(
+        ensemble_mean_bias
+    )
 
     return {
-        'mean_bias': np.nanmean(ensemble_mean_bias),
-        'bias_trend': bias_trend,
-        'bias_trend_p_value': bias_trend_p,
+        "mean_bias": np.nanmean(ensemble_mean_bias),
+        "bias_trend": bias_trend,
+        "bias_trend_p_value": bias_trend_p,
     }
 
 
 def generate_newey_west_assessment_tables(
     place: str = "new_orleans",
     pi_version: int = 4,
-    comparison_period: Tuple[int, int] = (1980, 2024)
+    comparison_period: Tuple[int, int] = (1980, 2024),
 ) -> None:
     """
     Generates assessment tables using an ensemble-mean Newey-West approach.
@@ -725,60 +883,76 @@ def generate_newey_west_assessment_tables(
         model_data_all_members = []
         for member_str in members:
             try:
-                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_ds = get_timeseries(
+                    model=model, place=place, member=member_str, pi_version=pi_version
+                )
                 model_data_all_members.append(model_ds)
             except Exception as e:
                 print(f"Could not load data for {model}/{member_str}. Skipping member.")
 
-        if not model_data_all_members: continue
+        if not model_data_all_members:
+            continue
 
-        full_model_ds = xr.concat(model_data_all_members, dim=pd.Index(members, name="member"))
+        full_model_ds = xr.concat(
+            model_data_all_members, dim=pd.Index(members, name="member")
+        )
         full_model_ds_period = full_model_ds.sel(time=slice(start_yr, end_yr))
 
         common_time = np.intersect1d(era5_ds_period.time, full_model_ds_period.time)
-        if len(common_time) < 5: continue
+        if len(common_time) < 5:
+            continue
         era5_aligned = era5_ds_period.sel(time=common_time)
         model_aligned = full_model_ds_period.sel(time=common_time)
 
         for var in VARIABLES_TO_PROCESS:
-            if var not in model_aligned or var not in era5_aligned: continue
+            if var not in model_aligned or var not in era5_aligned:
+                continue
             if "r" in var:
                 era5_aligned[var] = era5_aligned[var] / 1000.0  # Convert from m to km
                 model_aligned[var] = model_aligned[var] / 1000.0
 
             # --- Analyze with the Newey-West ensemble function ---
-            analysis_res = analyze_bias_newey_west_ensemble(model_aligned, era5_aligned, var)
+            analysis_res = analyze_bias_newey_west_ensemble(
+                model_aligned, era5_aligned, var
+            )
 
             # (CV and RMSE would still be calculated per-member then averaged/ranged)
 
             # Helper for significance stars
-            #def p_to_star(p):
+            # def p_to_star(p):
             #    return '***' if p < 0.001 else '**' if p < 0.01 else '*' # if p < 0.05 else ''
             def p_to_str(p):
                 out = f"{p:.1e}" if p < 0.01 else f"{p:.2f}"
                 return " (p=" + out + ")"
 
-            results.append({
-                "model": model, "variable": var,
-                "mean_bias": f"${analysis_res['mean_bias']:.2f}$",
-                "bias_trend": f"${analysis_res['bias_trend']:.3f}${p_to_str(analysis_res['bias_trend_p_value'])}",
-            })
+            results.append(
+                {
+                    "model": model,
+                    "variable": var,
+                    "mean_bias": f"${analysis_res['mean_bias']:.2f}$",
+                    "bias_trend": f"${analysis_res['bias_trend']:.3f}${p_to_str(analysis_res['bias_trend_p_value'])}",
+                }
+            )
 
     if not results:
         print("No assessment results generated.")
         return
 
     df = pd.DataFrame(results)
-    df_pivot = df.pivot(index='model', columns='variable', values=['mean_bias', 'bias_trend'])
+    df_pivot = df.pivot(
+        index="model", columns="variable", values=["mean_bias", "bias_trend"]
+    )
     df_pivot.index.name = "Model"
 
-    tex_path = os.path.join(DATA_PATH, f"{place}_assessment_neweywest_pi{pi_version}.tex")
+    tex_path = os.path.join(
+        DATA_PATH, f"{place}_assessment_neweywest_pi{pi_version}.tex"
+    )
 
     wide_dataframe_to_latex(
         df=df_pivot,
         caption=f"Model Bias Assessment for {place.replace('_', ' ').title()} (1980-2024). Trends computed on the ensemble mean with Newey-West standard errors.",
         label=f"tab:{place}_bias_neweywest",
-        filename=tex_path
+        filename=tex_path,
     )
 
 
@@ -798,35 +972,35 @@ def analyze_bias_mixed_model(model_df: pd.DataFrame) -> dict:
         p-values, and the variance of the inter-member variability.
     """
     # Ensure time is a numerical predictor (e.g., years from start)
-    model_df['time_idx'] = model_df['time']  - model_df['time'].min()
+    model_df["time_idx"] = model_df["time"] - model_df["time"].min()
 
     # Fit the mixed-effects model.
     # Fixed effects: Intercept (mean bias) + time_idx (bias trend)
     # Random effect: A random intercept for each member
     md = smf.mixedlm("bias ~ 1 + time_idx", model_df, groups=model_df["member"])
-    mdf = md.fit(reml=False) # Use ML for better p-values
+    mdf = md.fit(reml=False)  # Use ML for better p-values
 
     # Extract results
     fixed_effects = mdf.params
     p_values = mdf.pvalues
     std_errs = mdf.bse
-    random_effects_var = mdf.cov_re.iloc[0, 0] # Variance of the random intercept
+    random_effects_var = mdf.cov_re.iloc[0, 0]  # Variance of the random intercept
 
     return {
-        'mean_bias': fixed_effects['Intercept'],
-        'mean_bias_se': std_errs['Intercept'],
-        'mean_bias_p': p_values['Intercept'],
-        'bias_trend': fixed_effects['time_idx'],
-        'bias_trend_se': std_errs['time_idx'],
-        'bias_trend_p': p_values['time_idx'],
-        'inter_member_variance': random_effects_var,
+        "mean_bias": fixed_effects["Intercept"],
+        "mean_bias_se": std_errs["Intercept"],
+        "mean_bias_p": p_values["Intercept"],
+        "bias_trend": fixed_effects["time_idx"],
+        "bias_trend_se": std_errs["time_idx"],
+        "bias_trend_p": p_values["time_idx"],
+        "inter_member_variance": random_effects_var,
     }
 
 
 def generate_mixed_model_assessment_tables(
     place: str = "new_orleans",
     pi_version: int = 4,
-    comparison_period: Tuple[int, int] = (1980, 2024)
+    comparison_period: Tuple[int, int] = (1980, 2024),
 ) -> None:
     """
     Generates assessment tables using a robust mixed-effects model approach.
@@ -847,45 +1021,59 @@ def generate_mixed_model_assessment_tables(
         model_data_all_members = []
         for member_str in members:
             try:
-                model_ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                model_ds = get_timeseries(
+                    model=model, place=place, member=member_str, pi_version=pi_version
+                )
                 model_data_all_members.append(model_ds)
             except Exception as e:
                 print(f"Could not load data for {model}/{member_str}. Skipping member.")
 
-        if not model_data_all_members: continue
+        if not model_data_all_members:
+            continue
 
         # Concatenate datasets from all members
-        full_model_ds = xr.concat(model_data_all_members, dim=pd.Index(members, name="member"))
+        full_model_ds = xr.concat(
+            model_data_all_members, dim=pd.Index(members, name="member")
+        )
         full_model_ds_period = full_model_ds.sel(time=slice(start_yr, end_yr))
 
         # Align with ERA5
         common_time = np.intersect1d(era5_ds_period.time, full_model_ds_period.time)
-        if len(common_time) < 5: continue
+        if len(common_time) < 5:
+            continue
         era5_aligned = era5_ds_period.sel(time=common_time)
         model_aligned = full_model_ds_period.sel(time=common_time)
 
         for var in VARIABLES_TO_PROCESS:
-            if var not in model_aligned or var not in era5_aligned: continue
-
+            if var not in model_aligned or var not in era5_aligned:
+                continue
 
             # Create a DataFrame suitable for the mixed model
-            bias_df = (model_aligned[var] - era5_aligned[var]).to_dataframe(name='bias').reset_index()
+            bias_df = (
+                (model_aligned[var] - era5_aligned[var])
+                .to_dataframe(name="bias")
+                .reset_index()
+            )
             if "r" in var:
-                bias_df['bias'] = bias_df['bias'] / 1000.0  # Convert from m to km
+                bias_df["bias"] = bias_df["bias"] / 1000.0  # Convert from m to km
             bias_df.dropna(inplace=True)
-            if bias_df.shape[0] < 10: continue
+            if bias_df.shape[0] < 10:
+                continue
 
             # --- Analyze with the new function ---
             bias_res = analyze_bias_mixed_model(bias_df)
 
             # (Note: CV calculation would still be done per-member then averaged, as it's a property of each timeseries)
 
-            results.append({
-                "model": model, "variable": var,
-                "mean_bias": f"${bias_res['mean_bias']:.2f} \\pm {bias_res['mean_bias_se']:.2f}$",
-                "bias_trend": f"${bias_res['bias_trend']:.3f} \\pm {bias_res['bias_trend_se']:.3f}$",
-                # You could also add p-value stars if desired
-            })
+            results.append(
+                {
+                    "model": model,
+                    "variable": var,
+                    "mean_bias": f"${bias_res['mean_bias']:.2f} \\pm {bias_res['mean_bias_se']:.2f}$",
+                    "bias_trend": f"${bias_res['bias_trend']:.3f} \\pm {bias_res['bias_trend_se']:.3f}$",
+                    # You could also add p-value stars if desired
+                }
+            )
 
     if not results:
         print("No assessment results generated.")
@@ -894,18 +1082,23 @@ def generate_mixed_model_assessment_tables(
     df = pd.DataFrame(results)
 
     # --- Pivot and Save Table ---
-    df_pivot = df.pivot(index='model', columns='variable', values=['mean_bias', 'bias_trend'])
+    df_pivot = df.pivot(
+        index="model", columns="variable", values=["mean_bias", "bias_trend"]
+    )
     df_pivot.index.name = "Model"
 
-    tex_path = os.path.join(DATA_PATH, f"{place}_assessment_mixed_model_pi{pi_version}.tex")
+    tex_path = os.path.join(
+        DATA_PATH, f"{place}_assessment_mixed_model_pi{pi_version}.tex"
+    )
 
     # A simplified wide_dataframe_to_latex call
     wide_dataframe_to_latex(
         df=df_pivot,
         caption=f"Model Bias Assessment for {place.replace('_', ' ').title()} (1980-2024). Values are fixed effects $\\pm$ standard error from a mixed-effects model.",
         label=f"tab:{place}_bias_mixed_model",
-        filename=tex_path
+        filename=tex_path,
     )
+
 
 def p_to_str(p_val: float) -> str:
     """
@@ -959,7 +1152,7 @@ def trend_with_neweywest_full(y: np.ndarray) -> tuple[float, float, float]:
 def generate_future_trend_table(
     place: str = "new_orleans",
     pi_version: int = 4,
-    future_period: Tuple[int, int] = (2014, 2100)
+    future_period: Tuple[int, int] = (2014, 2100),
 ) -> None:
     """
     Generates a table of future trends for CMIP6 models.
@@ -982,7 +1175,9 @@ def generate_future_trend_table(
         member_datasets = []
         for member_str in members:
             try:
-                ds = get_timeseries(model=model, place=place, member=member_str, pi_version=pi_version)
+                ds = get_timeseries(
+                    model=model, place=place, member=member_str, pi_version=pi_version
+                )
                 member_datasets.append(ds.sel(time=slice(start_yr, end_yr)))
             except Exception as e:
                 print(f"Could not load data for {model}/{member_str}. Skipping member.")
@@ -1000,7 +1195,9 @@ def generate_future_trend_table(
 
             # 1. Calculate trend on the ENSEMBLE MEAN series
             ensemble_mean_series = full_model_ds[var].mean(dim="member").values
-            mean_trend, _, mean_p_value = trend_with_neweywest_full(ensemble_mean_series)
+            mean_trend, _, mean_p_value = trend_with_neweywest_full(
+                ensemble_mean_series
+            )
 
             # 2. Calculate trend for EACH MEMBER to get the spread
             member_trends = []
@@ -1012,14 +1209,16 @@ def generate_future_trend_table(
             trend_range_min = np.nanmin(member_trends)
             trend_range_max = np.nanmax(member_trends)
 
-            results.append({
-                "model": model,
-                "variable": var,
-                "mean_trend": mean_trend,
-                "p_value": mean_p_value,
-                "trend_min": trend_range_min,
-                "trend_max": trend_range_max
-            })
+            results.append(
+                {
+                    "model": model,
+                    "variable": var,
+                    "mean_trend": mean_trend,
+                    "p_value": mean_p_value,
+                    "trend_min": trend_range_min,
+                    "trend_max": trend_range_max,
+                }
+            )
 
     if not results:
         print("No trend results generated.")
@@ -1031,18 +1230,19 @@ def generate_future_trend_table(
     # This makes the numbers in the table easier to read.
     scaling_factor = 10
 
-    df['Trend (per decade)'] = df.apply(
+    df["Trend (per decade)"] = df.apply(
         lambda r: f"${r.mean_trend * scaling_factor:.3f}${p_to_str(r.p_value)}", axis=1
     )
-    df['Ensemble Range (per decade)'] = df.apply(
-        lambda r: f"$[{r.trend_min * scaling_factor:.3f}, {r.trend_max * scaling_factor:.3f}]$", axis=1
+    df["Ensemble Range (per decade)"] = df.apply(
+        lambda r: f"$[{r.trend_min * scaling_factor:.3f}, {r.trend_max * scaling_factor:.3f}]$",
+        axis=1,
     )
 
     # Pivot the table into a wide format for the final output
     df_pivot = df.pivot(
-        index='model',
-        columns='variable',
-        values=['Trend (per decade)', 'Ensemble Range (per decade)']
+        index="model",
+        columns="variable",
+        values=["Trend (per decade)", "Ensemble Range (per decade)"],
     )
 
     # Clean up column names for the LaTeX table
@@ -1061,12 +1261,12 @@ def generate_future_trend_table(
 if __name__ == "__main__":
     # python -m w22.stats2
     # Example usage for one location
-    #LOCATION = "new_orleans"
+    # LOCATION = "new_orleans"
     LOCATION = "hong_kong"
     PI_VERSION = 4
 
     # Generate tables for temporal trends and correlations
-    #temporal_relationship_data(place=LOCATION, pi_version=PI_VERSION)
+    # temporal_relationship_data(place=LOCATION, pi_version=PI_VERSION)
 
     # Generate tables for bias and variability assessment
     # generate_assessment_tables(place=LOCATION, pi_version=PI_VERSION)
@@ -1074,9 +1274,7 @@ if __name__ == "__main__":
     # generate_wide_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
     # generate_mixed_model_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
     # generate_mixed_model_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
-    #generate_newey_west_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
+    # generate_newey_west_assessment_tables(place="hong_kong", pi_version=PI_VERSION)
     # generate_newey_west_assessment_tables(place="new_orleans", pi_version=PI_VERSION)
     generate_future_trend_table(place="hong_kong", pi_version=PI_VERSION)
     generate_future_trend_table(place="new_orleans", pi_version=PI_VERSION)
-
-

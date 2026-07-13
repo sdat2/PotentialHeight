@@ -151,7 +151,7 @@ def plot_var_on_map(
                     f"{ones/(ones + zeros) * 100:.2f}% of the area for {label} is masked out."
                 )
 
-            _ = hatch_mask.astype(int).plot.contourf(
+            _cs = hatch_mask.astype(int).plot.contourf(
                 ax=ax,
                 transform=ccrs.PlateCarree(),
                 x="longitude",
@@ -161,6 +161,13 @@ def plot_var_on_map(
                 colors="none",  # Makes the area transparent
                 add_colorbar=False,
             )
+            # rasterize the hatch paths: dense vector hatching over a global
+            # grid is what makes these multi-panel PDFs ~10 MB and slow to open
+            try:
+                _cs.set_rasterized(True)
+            except AttributeError:  # older matplotlib: ContourSet of collections
+                for _c in _cs.collections:
+                    _c.set_rasterized(True)
     if second_hatch_mask is not None:
         if not isinstance(second_hatch_mask, xr.DataArray):
             raise ValueError("second_hatch_mask must be an xarray DataArray.")
@@ -176,7 +183,7 @@ def plot_var_on_map(
                 print(
                     f"{ones/(ones + zeros) * 100:.2f}% of the area for {label} is masked out."
                 )
-            _ = second_hatch_mask.astype(int).plot.contourf(
+            _cs2 = second_hatch_mask.astype(int).plot.contourf(
                 ax=ax,
                 transform=ccrs.PlateCarree(),
                 x="longitude",
@@ -186,6 +193,11 @@ def plot_var_on_map(
                 colors="none",  # Makes the area transparent
                 add_colorbar=False,
             )
+            try:
+                _cs2.set_rasterized(True)
+            except AttributeError:
+                for _c in _cs2.collections:
+                    _c.set_rasterized(True)
 
     ax.set_title(label)
     plot_defaults()
@@ -498,6 +510,7 @@ def era5_pi_decade(single_level_path: str, pressure_level_path: str) -> None:
 
 import os
 import netCDF4 as nc
+
 
 def assign_coordinate_attributes(file_path: str):
     """Assigns CF-compliant 'coordinates' attributes to data variables.
@@ -1035,7 +1048,10 @@ def era5_ps_trends(
         if os.path.exists(out_path):
             shutil.rmtree(out_path)
 
-        os.rename(temp_path, out_path)
+        # shutil.move, not os.rename: out_path may sit on a different
+        # filesystem (data/ symlinked to the external SSD), where a bare
+        # rename fails with OSError 18 (cross-device link)
+        shutil.move(temp_path, out_path)
         print(f"Successfully saved to {out_path}")
 
     except Exception as e:
@@ -1152,7 +1168,10 @@ def era5_pi_trends(
         if os.path.exists(out_path):
             shutil.rmtree(out_path)
 
-        os.rename(temp_path, out_path)
+        # shutil.move, not os.rename: out_path may sit on a different
+        # filesystem (data/ symlinked to the external SSD), where a bare
+        # rename fails with OSError 18 (cross-device link)
+        shutil.move(temp_path, out_path)
         print(f"Successfully saved to {out_path}")
 
     except Exception as e:
@@ -1495,6 +1514,10 @@ def plot_trend_lineplots(
         >>> format_p_latex(0.051)
         '$p=5.1 \\\\times 10^{-2}$'
         """
+        if not np.isfinite(value):
+            # NaN/inf p-values (e.g. masked or degenerate pixels) format as
+            # "nan" with no exponent, which would crash the split below
+            return "$p=$n/a"
         precision = sig_figs - 1
         sci_notation_str = f"{value:.{precision}e}"
         mantissa, exponent_str = sci_notation_str.split("e")

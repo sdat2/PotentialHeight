@@ -693,7 +693,10 @@ def rebuild_initial_data(
     )
     mins = np.array([float(constraints[name]["min"]) for name in order])
     diffs = np.array(
-        [float(constraints[name]["max"]) - float(constraints[name]["min"]) for name in order]
+        [
+            float(constraints[name]["max"]) - float(constraints[name]["min"])
+            for name in order
+        ]
     )
     queries = (real_queries - mins) / diffs  # rescale to [0, 1] (see adbo.rescale)
     tol = 1e-6

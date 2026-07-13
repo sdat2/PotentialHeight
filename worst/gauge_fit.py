@@ -58,24 +58,24 @@ from .utils import z_star_from_alpha_beta_gamma
 # experiment outputs (exp/ or data/bo_exp/) before quoting in the thesis.
 # --------------------------------------------------------------------------- #
 POTENTIAL_HEIGHT_M: Dict[str, float] = {
-    "8729840": 4.191,   # Pensacola, FL
-    "8735180": 3.567,   # Dauphin Island, AL
-    "8760922": 1.879,   # Pilots Station East, S.W. Pass, LA
-    "8761724": 5.886,   # Grand Isle, LA
-    "8762075": 4.903,   # Port Fourchon, Belle Pass, LA
+    "8729840": 4.191,  # Pensacola, FL
+    "8735180": 3.567,  # Dauphin Island, AL
+    "8760922": 1.879,  # Pilots Station East, S.W. Pass, LA
+    "8761724": 5.886,  # Grand Isle, LA
+    "8762075": 4.903,  # Port Fourchon, Belle Pass, LA
     "8762482": 11.694,  # West Bank 1, Bayou Gauche, LA
-    "8764044": 9.911,   # Berwick, Atchafalaya River, LA
+    "8764044": 9.911,  # Berwick, Atchafalaya River, LA
 }
 
 # 2097-climate ("max2") counterparts from the same commented block, kept for
 # reference/plots only: 8729840: 4.772, 8735180: 3.946, 8760922: 2.420,
 # 8761724: 7.141, 8762075: 5.274, 8762482: 12.714, 8764044: 11.102.
 
-RETURN_PERIODS_KEY = (100.0, 500.0)   # RVs reported in the results json
-N_BOOT = 200                          # parametric-bootstrap resamples
-RP_GRID = np.unique(np.concatenate(
-    [np.logspace(np.log10(1.05), 3.0, 120), list(RETURN_PERIODS_KEY)]
-))
+RETURN_PERIODS_KEY = (100.0, 500.0)  # RVs reported in the results json
+N_BOOT = 200  # parametric-bootstrap resamples
+RP_GRID = np.unique(
+    np.concatenate([np.logspace(np.log10(1.05), 3.0, 120), list(RETURN_PERIODS_KEY)])
+)
 
 
 def gringorten_rp(n: int) -> np.ndarray:
@@ -99,8 +99,7 @@ def gringorten_rp(n: int) -> np.ndarray:
     return 1.0 / (1.0 - p)
 
 
-def return_level(alpha: float, beta: float, gamma: float,
-                 rp: np.ndarray) -> np.ndarray:
+def return_level(alpha: float, beta: float, gamma: float, rp: np.ndarray) -> np.ndarray:
     """GEV return level(s) for return period(s) ``rp`` (annual maxima).
 
     Args:
@@ -116,12 +115,12 @@ def return_level(alpha: float, beta: float, gamma: float,
         >>> round(float(return_level(0.0, 1.0, -1.0, 100.0)), 3)
         0.99
     """
-    return genextreme.isf(1.0 / np.asarray(rp, dtype=float),
-                          c=-gamma, loc=alpha, scale=beta)
+    return genextreme.isf(
+        1.0 / np.asarray(rp, dtype=float), c=-gamma, loc=alpha, scale=beta
+    )
 
 
-def fit_cases(data: np.ndarray, z_star: float
-              ) -> Dict[str, Tuple[float, float, float]]:
+def fit_cases(data: np.ndarray, z_star: float) -> Dict[str, Tuple[float, float, float]]:
     """Fit case I (bound known at ``z_star``) and case II (unbounded).
 
     Uses the ``worst.tens`` L-BFGS fitters (imported lazily -- ``worst.tens``
@@ -141,17 +140,27 @@ def fit_cases(data: np.ndarray, z_star: float
     data = np.asarray(data, dtype=float)
     beta_guess = float(np.std(data)) or 1.0
     fit_i = fit_gev_upper_bound_known(
-        data, z_star, beta_guess=beta_guess, gamma_guess=-0.1, method="lbfgs")
+        data, z_star, beta_guess=beta_guess, gamma_guess=-0.1, method="lbfgs"
+    )
     fit_ii = fit_gev_upper_bound_not_known(
-        data, alpha_guess=float(np.mean(data)), beta_guess=beta_guess,
-        gamma_guess=-0.1, method="lbfgs")
+        data,
+        alpha_guess=float(np.mean(data)),
+        beta_guess=beta_guess,
+        gamma_guess=-0.1,
+        method="lbfgs",
+    )
     return {"I": tuple(map(float, fit_i)), "II": tuple(map(float, fit_ii))}
 
 
-def bootstrap_bands(params: Tuple[float, float, float], case: str, n: int,
-                    z_star: Optional[float] = None, n_boot: int = N_BOOT,
-                    rps: np.ndarray = RP_GRID, seed: int = 0
-                    ) -> Dict[str, np.ndarray]:
+def bootstrap_bands(
+    params: Tuple[float, float, float],
+    case: str,
+    n: int,
+    z_star: Optional[float] = None,
+    n_boot: int = N_BOOT,
+    rps: np.ndarray = RP_GRID,
+    seed: int = 0,
+) -> Dict[str, np.ndarray]:
     """5-95% parametric-bootstrap envelope of the return-level curve.
 
     Resamples ``n`` annual maxima from the fitted GEV, refits with the same
@@ -177,20 +186,32 @@ def bootstrap_bands(params: Tuple[float, float, float], case: str, n: int,
     rng = np.random.default_rng(seed)
     curves = np.full((n_boot, rps.size), np.nan)
     for k in range(n_boot):
-        sample = genextreme.rvs(c=-gamma, loc=alpha, scale=beta, size=n,
-                                random_state=rng)
+        sample = genextreme.rvs(
+            c=-gamma, loc=alpha, scale=beta, size=n, random_state=rng
+        )
         if case == "I":
             a, b, g = fit_gev_upper_bound_known(
-                sample, z_star, beta_guess=beta, gamma_guess=min(gamma, -1e-3),
-                method="lbfgs")
+                sample,
+                z_star,
+                beta_guess=beta,
+                gamma_guess=min(gamma, -1e-3),
+                method="lbfgs",
+            )
         else:
             a, b, g = fit_gev_upper_bound_not_known(
-                sample, alpha_guess=alpha, beta_guess=beta, gamma_guess=gamma,
-                method="lbfgs")
+                sample,
+                alpha_guess=alpha,
+                beta_guess=beta,
+                gamma_guess=gamma,
+                method="lbfgs",
+            )
         if np.isfinite([a, b, g]).all():
             curves[k] = return_level(a, b, g, rps)
-    return {"rp": rps, "lo": np.nanpercentile(curves, 5, axis=0),
-            "hi": np.nanpercentile(curves, 95, axis=0)}
+    return {
+        "rp": rps,
+        "lo": np.nanpercentile(curves, 5, axis=0),
+        "hi": np.nanpercentile(curves, 95, axis=0),
+    }
 
 
 def _setup_plt():
@@ -206,9 +227,16 @@ def _setup_plt():
     return plt
 
 
-def plot_gauge_fit(station: str, name: str, data: np.ndarray,
-                   gap_flags: np.ndarray, fits: dict, bands: dict,
-                   z_star: float, out_pdf: str) -> None:
+def plot_gauge_fit(
+    station: str,
+    name: str,
+    data: np.ndarray,
+    gap_flags: np.ndarray,
+    fits: dict,
+    bands: dict,
+    z_star: float,
+    out_pdf: str,
+) -> None:
     """Return-period figure: empirical points, case I/II curves + envelopes.
 
     Args:
@@ -229,27 +257,58 @@ def plot_gauge_fit(station: str, name: str, data: np.ndarray,
     order = np.argsort(data)
     rp_emp = gringorten_rp(len(data))
     z_sorted, gap_sorted = data[order], np.asarray(gap_flags, bool)[order]
-    ax.scatter(rp_emp[~gap_sorted], z_sorted[~gap_sorted], s=14, color="black",
-               zorder=5, label="Observed annual maxima")
+    ax.scatter(
+        rp_emp[~gap_sorted],
+        z_sorted[~gap_sorted],
+        s=14,
+        color="black",
+        zorder=5,
+        label="Observed annual maxima",
+    )
     if gap_sorted.any():
-        ax.scatter(rp_emp[gap_sorted], z_sorted[gap_sorted], s=16,
-                   facecolors="none", edgecolors="black", zorder=5,
-                   label="Maximum near data gap")
+        ax.scatter(
+            rp_emp[gap_sorted],
+            z_sorted[gap_sorted],
+            s=16,
+            facecolors="none",
+            edgecolors="black",
+            zorder=5,
+            label="Maximum near data gap",
+        )
     for case, color in (("I", "green"), ("II", "orange")):
         alpha, beta, gamma = fits[case]
         if not np.isfinite([alpha, beta, gamma]).all():
             continue
-        lab = (rf"I: bounded at $z^*$ ($\beta$={beta:.2f}, $\gamma$={gamma:.2f})"
-               if case == "I" else
-               rf"II: unbounded ($\beta$={beta:.2f}, $\gamma$={gamma:.2f})")
-        ax.semilogx(RP_GRID, return_level(alpha, beta, gamma, RP_GRID),
-                    color=color, lw=1.4, label=lab)
+        lab = (
+            rf"I: bounded at $z^*$ ($\beta$={beta:.2f}, $\gamma$={gamma:.2f})"
+            if case == "I"
+            else rf"II: unbounded ($\beta$={beta:.2f}, $\gamma$={gamma:.2f})"
+        )
+        ax.semilogx(
+            RP_GRID,
+            return_level(alpha, beta, gamma, RP_GRID),
+            color=color,
+            lw=1.4,
+            label=lab,
+        )
         b = bands.get(case)
         if b is not None:
-            ax.fill_between(b["rp"], b["lo"], b["hi"], color=color, alpha=0.18,
-                            lw=0, label=f"{case}: 5-95% bootstrap")
-    ax.axhline(z_star, color="purple", ls="--", lw=1.0,
-               label=rf"Potential height $z^*$ = {z_star:.2f} m")
+            ax.fill_between(
+                b["rp"],
+                b["lo"],
+                b["hi"],
+                color=color,
+                alpha=0.18,
+                lw=0,
+                label=f"{case}: 5-95% bootstrap",
+            )
+    ax.axhline(
+        z_star,
+        color="purple",
+        ls="--",
+        lw=1.0,
+        label=rf"Potential height $z^*$ = {z_star:.2f} m",
+    )
     ax.set_xscale("log")
     ax.set_xlim(1, RP_GRID[-1])
     ax.set_ylim(0, max(z_star * 1.15, float(np.max(data)) * 1.3))
@@ -264,9 +323,15 @@ def plot_gauge_fit(station: str, name: str, data: np.ndarray,
     plt.close(fig)
 
 
-def analyze_station(station: str, start: int = 1980, end: int = 2025,
-                    n_boot: int = N_BOOT, method: str = "robust",
-                    refresh: bool = False, make_figure: bool = True) -> dict:
+def analyze_station(
+    station: str,
+    start: int = 1980,
+    end: int = 2025,
+    n_boot: int = N_BOOT,
+    method: str = "robust",
+    refresh: bool = False,
+    make_figure: bool = True,
+) -> dict:
     """Full case-I/case-II analysis of one gauge's annual maxima.
 
     Loads (or computes) the annual maxima via :mod:`comp.annual_max`, fits
@@ -287,56 +352,89 @@ def analyze_station(station: str, start: int = 1980, end: int = 2025,
     from comp.annual_max import annual_maxima
 
     if station not in POTENTIAL_HEIGHT_M:
-        raise ValueError(f"no potential height recorded for station {station}; "
-                         f"known: {sorted(POTENTIAL_HEIGHT_M)}")
+        raise ValueError(
+            f"no potential height recorded for station {station}; "
+            f"known: {sorted(POTENTIAL_HEIGHT_M)}"
+        )
     z_star = POTENTIAL_HEIGHT_M[station]
     df = annual_maxima(station, start, end, method=method, refresh=refresh)
     if df.empty:
         raise RuntimeError(f"no usable years for station {station}")
     data = df.ann_max_m.to_numpy(dtype=float)
     name = str(df["name"].iloc[0])
-    print(f"\n{name} ({station}): n={len(data)} annual maxima, "
-          f"sample max={data.max():.2f} m, z*={z_star:.3f} m")
+    print(
+        f"\n{name} ({station}): n={len(data)} annual maxima, "
+        f"sample max={data.max():.2f} m, z*={z_star:.3f} m"
+    )
     if data.max() >= z_star:
-        print("WARNING: sample maximum exceeds the potential height -- the "
-              "bounded fit will be degenerate (NaN).")
+        print(
+            "WARNING: sample maximum exceeds the potential height -- the "
+            "bounded fit will be degenerate (NaN)."
+        )
     fits = fit_cases(data, z_star)
-    bands = {case: bootstrap_bands(fits[case], case, len(data),
-                                   z_star=z_star, n_boot=n_boot, seed=0)
-             for case in ("I", "II") if np.isfinite(fits[case]).all()}
+    bands = {
+        case: bootstrap_bands(
+            fits[case], case, len(data), z_star=z_star, n_boot=n_boot, seed=0
+        )
+        for case in ("I", "II")
+        if np.isfinite(fits[case]).all()
+    }
     results = dict(
-        station=station, name=name, start=start, end=end, n_years=int(len(data)),
-        years=[int(y) for y in df.year], detide_method=method,
-        sample_max_m=float(data.max()), z_star_m=float(z_star),
-        z_star_provenance=("BO potential height, Aug-2025 climate, CLE15/"
-                           "CESM2-r4i1p1f1 SSP5-8.5; worst_new.tex commented "
-                           "results block (TODO(verify): regenerate from BO "
-                           "outputs)"),
+        station=station,
+        name=name,
+        start=start,
+        end=end,
+        n_years=int(len(data)),
+        years=[int(y) for y in df.year],
+        detide_method=method,
+        sample_max_m=float(data.max()),
+        z_star_m=float(z_star),
+        z_star_provenance=(
+            "BO potential height, Aug-2025 climate, CLE15/"
+            "CESM2-r4i1p1f1 SSP5-8.5; worst_new.tex commented "
+            "results block (TODO(verify): regenerate from BO "
+            "outputs)"
+        ),
         n_boot=int(n_boot),
     )
     for case in ("I", "II"):
         alpha, beta, gamma = fits[case]
         entry = dict(alpha=alpha, beta=beta, gamma=gamma)
         if np.isfinite([alpha, beta, gamma]).all():
-            entry["upper_bound_m"] = float(
-                z_star_from_alpha_beta_gamma(alpha, beta, gamma)
-            ) if gamma < 0 else None
+            entry["upper_bound_m"] = (
+                float(z_star_from_alpha_beta_gamma(alpha, beta, gamma))
+                if gamma < 0
+                else None
+            )
             for rp in RETURN_PERIODS_KEY:
                 rv = float(return_level(alpha, beta, gamma, rp))
                 entry[f"rv{int(rp)}_m"] = rv
                 if case in bands:
                     j = int(np.argmin(np.abs(bands[case]["rp"] - rp)))
                     entry[f"rv{int(rp)}_ci90_m"] = [
-                        float(bands[case]["lo"][j]), float(bands[case]["hi"][j])]
+                        float(bands[case]["lo"][j]),
+                        float(bands[case]["hi"][j]),
+                    ]
         results[f"case_{case}"] = entry
-        print(f"  case {case}: alpha={alpha:.3f} beta={beta:.3f} "
-              f"gamma={gamma:.3f} "
-              + " ".join(f"RV{int(rp)}={entry.get(f'rv{int(rp)}_m', float('nan')):.2f}m"
-                         for rp in RETURN_PERIODS_KEY))
+        print(
+            f"  case {case}: alpha={alpha:.3f} beta={beta:.3f} "
+            f"gamma={gamma:.3f} "
+            + " ".join(
+                f"RV{int(rp)}={entry.get(f'rv{int(rp)}_m', float('nan')):.2f}m"
+                for rp in RETURN_PERIODS_KEY
+            )
+        )
     if make_figure:
-        plot_gauge_fit(station, name, data, df.max_at_gap_edge.to_numpy(),
-                       fits, bands, z_star,
-                       os.path.join(FIGURE_PATH, f"gauge_fit_{station}.pdf"))
+        plot_gauge_fit(
+            station,
+            name,
+            data,
+            df.max_at_gap_edge.to_numpy(),
+            fits,
+            bands,
+            z_star,
+            os.path.join(FIGURE_PATH, f"gauge_fit_{station}.pdf"),
+        )
     out_json = os.path.join(DATA_PATH, f"gauge_fit_{station}.json")
     with open(out_json, "w") as fh:
         json.dump(results, fh, indent=2, default=float)
@@ -346,16 +444,20 @@ def analyze_station(station: str, start: int = 1980, end: int = 2025,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--station", default="8761724",
-                    help="CO-OPS station id (default 8761724, Grand Isle LA)")
+    ap.add_argument(
+        "--station",
+        default="8761724",
+        help="CO-OPS station id (default 8761724, Grand Isle LA)",
+    )
     ap.add_argument("--start", type=int, default=1980)
     ap.add_argument("--end", type=int, default=2025)
     ap.add_argument("--n-boot", type=int, default=N_BOOT)
     ap.add_argument("--method", default="robust", choices=["robust", "ols"])
     ap.add_argument("--refresh", action="store_true")
     a = ap.parse_args()
-    analyze_station(a.station, a.start, a.end, n_boot=a.n_boot,
-                    method=a.method, refresh=a.refresh)
+    analyze_station(
+        a.station, a.start, a.end, n_boot=a.n_boot, method=a.method, refresh=a.refresh
+    )
 
 
 if __name__ == "__main__":

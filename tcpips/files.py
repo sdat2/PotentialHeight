@@ -2,6 +2,7 @@
 
 Keep the file pipeline clean and organized with these functions.
 """
+
 from typing import Dict
 import os
 import collections
@@ -245,9 +246,10 @@ def get_task_dict(
     return tasks
 
 
-def find_atmos_ocean_pairs(path: str = REGRIDDED_PATH,
-                           new_path: str = PI_PATH,
-                           ) -> Dict[str, Dict[str, any]]:
+def find_atmos_ocean_pairs(
+    path: str = REGRIDDED_PATH,
+    new_path: str = PI_PATH,
+) -> Dict[str, Dict[str, any]]:
     """
     Find the atmospheric and oceanic data pairs that can be combined to calculate potential intensity.
 
@@ -260,11 +262,7 @@ def find_atmos_ocean_pairs(path: str = REGRIDDED_PATH,
     """
 
     pairs = {}
-    for exp in [
-        x
-        for x in os.listdir(path)
-        if os.path.isdir(os.path.join(path, x))
-    ]:
+    for exp in [x for x in os.listdir(path) if os.path.isdir(os.path.join(path, x))]:
         for model in os.listdir(os.path.join(path, exp, "ocean")):
             for member in [
                 x.strip(".nc")

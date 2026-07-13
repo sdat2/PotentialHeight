@@ -1,4 +1,5 @@
 """Script to explore the boundaries of the ADCIRC mesh."""
+
 from typing import Optional
 import os
 import numpy as np
@@ -150,8 +151,7 @@ def find_boundaries_in_fort63(path: str = FORT63_EXAMPLE, typ="medium"):
 
 
 def extract_elevation_boundary_edges(
-    netcdf_path: str,
-    boundary_type: Optional[int] = 0
+    netcdf_path: str, boundary_type: Optional[int] = 0
 ) -> np.ndarray:
     """
     Extracts the edges corresponding to elevation specified boundaries
@@ -207,9 +207,9 @@ def extract_elevation_boundary_edges(
     if not os.path.exists(netcdf_path):
         raise FileNotFoundError(f"NetCDF file not found at: {netcdf_path}")
 
-    with nc.Dataset(netcdf_path, 'r') as ds:
+    with nc.Dataset(netcdf_path, "r") as ds:
         # Check for required variables
-        required_vars = ['nbdv', 'nvdll', 'ibtypee']
+        required_vars = ["nbdv", "nvdll", "ibtypee"]
         for var in required_vars:
             if var not in ds.variables:
                 raise KeyError(f"Required variable '{var}' not found in {netcdf_path}")
@@ -219,15 +219,13 @@ def extract_elevation_boundary_edges(
     return be_np
 
 
-
-
-
 # --- Example Usage (within if __name__ == '__main__': block) ---
 if __name__ == "__main__":
     # Example using the path from your script output
     # Make sure DATA_PATH is correctly defined or replace with the full path
     try:
-        from .constants import DATA_PATH # Adjust import if needed
+        from .constants import DATA_PATH  # Adjust import if needed
+
         file_path = os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc")
 
         print(f"Extracting elevation boundary edges (type 0) from: {file_path}")
@@ -241,7 +239,9 @@ if __name__ == "__main__":
             print("No elevation boundary edges of the specified type found.")
 
     except ImportError:
-        print("Could not import DATA_PATH. Please ensure constants.py is accessible or provide the full path.")
+        print(
+            "Could not import DATA_PATH. Please ensure constants.py is accessible or provide the full path."
+        )
     except FileNotFoundError as e:
         print(e)
     except KeyError as e:
@@ -251,5 +251,5 @@ if __name__ == "__main__":
     # find_boundaries_in_fort63()
     # find_boundaries_in_fort63(os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc"), typ="medium")
 
-    #find_boundaries_in_fort63(os.path.join(DATA_PATH, "tiny.maxele.63.nc"), typ="small")
+    # find_boundaries_in_fort63(os.path.join(DATA_PATH, "tiny.maxele.63.nc"), typ="small")
     # find_boundaries_in_fort63(os.path.join(DATA_PATH, "big.maxele.63.nc"), typ="big")

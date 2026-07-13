@@ -92,9 +92,7 @@ def plot_vmax_sweep(exp_dir: str, curve_nc: Optional[str] = None) -> str:
 
     if curve is not None:
         ax.axvline(curve.v_max, color="green", linestyle="--", alpha=0.7)
-        ax.annotate(
-            "$V_p$", (curve.v_max, ax.get_ylim()[0]), color="green", ha="right"
-        )
+        ax.annotate("$V_p$", (curve.v_max, ax.get_ylim()[0]), color="green", ha="right")
         ax2 = axs[1][0]
         vv = np.linspace(curve.v_min, curve.v_max, 200)
         ax2.plot(vv, [curve.rmax(x) / 1000 for x in vv], color="tab:purple")
@@ -164,9 +162,7 @@ def plot_4d_samples(
         ax.plot(v[i_best], z[i_best], "*", color="tab:orange", markersize=15)
     if curve is not None:
         ax.axvline(curve.v_max, color="green", linestyle="--", alpha=0.7)
-        ax.annotate(
-            "$V_p$", (curve.v_max, ax.get_ylim()[0]), color="green", ha="right"
-        )
+        ax.annotate("$V_p$", (curve.v_max, ax.get_ylim()[0]), color="green", ha="right")
     ax.set_xlabel("Maximum gradient wind speed $V$ [m s$^{-1}$]")
     ax.set_ylabel("Max SSH at observation point [m]")
     ax.legend()

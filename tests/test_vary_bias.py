@@ -130,7 +130,9 @@ def test_clip_fraction_rises_at_strongly_negative_bias(experiment) -> None:
     frac_neg = float(frac.sel(bias=-3.0))
     frac_zero = float(frac.sel(bias=0.0))
     frac_pos = float(frac.sel(bias=3.0))
-    print(f"clip fraction: b=-3: {frac_neg:.2f}, b=0: {frac_zero:.2f}, b=+3: {frac_pos:.2f}")
+    print(
+        f"clip fraction: b=-3: {frac_neg:.2f}, b=0: {frac_zero:.2f}, b=+3: {frac_pos:.2f}"
+    )
     assert frac_neg > 0.8  # rises toward 1 when the bound sits below typical maxima
     assert frac_neg > frac_zero
     assert frac_neg > frac_pos

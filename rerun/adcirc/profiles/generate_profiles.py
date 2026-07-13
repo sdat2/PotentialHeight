@@ -37,8 +37,9 @@ os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 warnings.filterwarnings("ignore")
 
 # make cle15/w22 importable when run as a plain script from anywhere
-_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                     "..", "..", ".."))
+_REPO = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..")
+)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
@@ -61,19 +62,26 @@ def main() -> None:
     ds = xr.open_dataset(POINT_NC)
     lat = float(ds["lat"].values)
     fcor = abs(float(coriolis_parameter_from_lat(lat)))
-    meta = {"point_nc": POINT_NC, "lat": lat,
-            "solver": {"ck_cd": CK_CD, "cd": CD, "w_cool": W_COOL,
-                       "supergradient_factor": SUPERGRADIENT,
-                       "pressure_assumption": ASSUMPTION},
-            "years": {}}
+    meta = {
+        "point_nc": POINT_NC,
+        "lat": lat,
+        "solver": {
+            "ck_cd": CK_CD,
+            "cd": CD,
+            "w_cool": W_COOL,
+            "supergradient_factor": SUPERGRADIENT,
+            "pressure_assumption": ASSUMPTION,
+        },
+        "years": {},
+    }
 
     for year in (2015, 2100):
         sel = ds.sel(time=ds.time.dt.year == year)
-        vmax = float(sel["vmax"].values.ravel()[0])   # Vp, gradient level [m/s]
-        msl = float(sel["msl"].values.ravel()[0])     # [hPa]
-        sst = float(sel["sst"].values.ravel()[0])     # [C]
-        t0 = float(sel["t0"].values.ravel()[0])       # [K]
-        rh = float(sel["rh"].values.ravel()[0])       # [frac]
+        vmax = float(sel["vmax"].values.ravel()[0])  # Vp, gradient level [m/s]
+        msl = float(sel["msl"].values.ravel()[0])  # [hPa]
+        sst = float(sel["sst"].values.ravel()[0])  # [C]
+        t0 = float(sel["t0"].values.ravel()[0])  # [K]
+        rh = float(sel["rh"].values.ravel()[0])  # [frac]
         r0_stored = float(sel["r0"].values.ravel()[0])
         rmax_stored = float(sel["rmax"].values.ravel()[0])
 
@@ -81,35 +89,57 @@ def main() -> None:
         r0_f, pm_f, pc_f, rmax_f = calculate_ps_ufunc(
             vmax, msl, sst, t0, lat, rh, CK_CD, CD, W_COOL, SUPERGRADIENT, ASSUMPTION
         )
-        print(f"[{year}] Vp={vmax:.3f} m/s  msl={msl:.2f} hPa  sst={sst:.2f} C  rh={rh:.4f}")
-        print(f"        r0:   stored {r0_stored/1000:8.1f} km -> fixed {r0_f/1000:8.1f} km "
-              f"({100*(r0_f-r0_stored)/r0_stored:+.1f}%)")
-        print(f"        rmax: stored {rmax_stored/1000:8.2f} km -> fixed {rmax_f/1000:8.2f} km "
-              f"({100*(rmax_f-rmax_stored)/rmax_stored:+.1f}%)")
+        print(
+            f"[{year}] Vp={vmax:.3f} m/s  msl={msl:.2f} hPa  sst={sst:.2f} C  rh={rh:.4f}"
+        )
+        print(
+            f"        r0:   stored {r0_stored/1000:8.1f} km -> fixed {r0_f/1000:8.1f} km "
+            f"({100*(r0_f-r0_stored)/r0_stored:+.1f}%)"
+        )
+        print(
+            f"        rmax: stored {rmax_stored/1000:8.2f} km -> fixed {rmax_f/1000:8.2f} km "
+            f"({100*(rmax_f-rmax_stored)/rmax_stored:+.1f}%)"
+        )
 
         # old = the shipped artifact, byte-copied
-        shipped = os.path.join(REPO, "w22", "data",
-                               f"{year}_new_orleans_profile_r4i1p1f1.json")
+        shipped = os.path.join(
+            REPO, "w22", "data", f"{year}_new_orleans_profile_r4i1p1f1.json"
+        )
         old_out = os.path.join(HERE, f"profile_old_{year}.json")
         shutil.copyfile(shipped, old_out)
 
         # fixed = same profile call the shipped ones used, with the fixed r0
-        prof = profile_from_stats(vmax, fcor, float(r0_f), msl,
-                                  pressure_assumption=ASSUMPTION)
+        prof = profile_from_stats(
+            vmax, fcor, float(r0_f), msl, pressure_assumption=ASSUMPTION
+        )
         fixed_out = os.path.join(HERE, f"profile_fixed_{year}.json")
         with open(fixed_out, "w") as f:
-            json.dump({k: (list(np.asarray(v).astype(float)) if np.ndim(v) else float(v))
-                       for k, v in prof.items()}, f)
+            json.dump(
+                {
+                    k: (list(np.asarray(v).astype(float)) if np.ndim(v) else float(v))
+                    for k, v in prof.items()
+                },
+                f,
+            )
 
         old = json.load(open(old_out))
-        print(f"        profile rmax: old {old['rmax']/1000:6.2f} km -> fixed "
-              f"{prof['rmax']/1000:6.2f} km;  r0: old {old['rr'][-1]/1000:7.1f} -> "
-              f"fixed {prof['rr'][-1]/1000:7.1f} km")
+        print(
+            f"        profile rmax: old {old['rmax']/1000:6.2f} km -> fixed "
+            f"{prof['rmax']/1000:6.2f} km;  r0: old {old['rr'][-1]/1000:7.1f} -> "
+            f"fixed {prof['rr'][-1]/1000:7.1f} km"
+        )
         meta["years"][year] = {
-            "vmax_ms": vmax, "msl_hPa": msl, "sst_C": sst, "t0_K": t0, "rh": rh,
-            "r0_stored_m": r0_stored, "r0_fixed_m": float(r0_f),
-            "rmax_stored_m": rmax_stored, "rmax_fixed_m": float(rmax_f),
-            "pm_fixed_Pa": float(pm_f), "pc_fixed_Pa": float(pc_f),
+            "vmax_ms": vmax,
+            "msl_hPa": msl,
+            "sst_C": sst,
+            "t0_K": t0,
+            "rh": rh,
+            "r0_stored_m": r0_stored,
+            "r0_fixed_m": float(r0_f),
+            "rmax_stored_m": rmax_stored,
+            "rmax_fixed_m": float(rmax_f),
+            "pm_fixed_Pa": float(pm_f),
+            "pc_fixed_Pa": float(pc_f),
             "profile_old": os.path.basename(old_out),
             "profile_fixed": os.path.basename(fixed_out),
         }

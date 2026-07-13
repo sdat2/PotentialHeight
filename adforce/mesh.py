@@ -32,6 +32,7 @@ fort.73 format: ditto but "pressure" instead of "zeta"
 fort.74 format: ditto but "u-vel" and "v-vel" instead of "zeta"
 
 """
+
 from typing import Union, Tuple, List, Literal, Optional, Dict
 import os
 import numpy as np
@@ -406,7 +407,10 @@ def dual_graph_ds_base_from_triangles(
             "area": (
                 ["nele"],
                 areas,
-                {"description": "Area of the original triangles.", "units": "degrees^2"},
+                {
+                    "description": "Area of the original triangles.",
+                    "units": "degrees^2",
+                },
             ),
             "start": ("edge", starts, {"description": "Start indices of the edges."}),
             "end": ("edge", ends, {"description": "End indices of the edges."}),
@@ -481,9 +485,9 @@ def _test_xr_dataset() -> xr.Dataset:
     )
 
 
-def dual_graph_ds_from_mesh_ds(ds: xr.Dataset,
-                               take_grad: Literal["none", "dynamic", "static", "all"] = "static"
-                               ) -> xr.Dataset:
+def dual_graph_ds_from_mesh_ds(
+    ds: xr.Dataset, take_grad: Literal["none", "dynamic", "static", "all"] = "static"
+) -> xr.Dataset:
     """
     Create a dual graph dataset from an ADCIRC output dataset.
 
@@ -533,7 +537,9 @@ def dual_graph_ds_from_mesh_ds(ds: xr.Dataset,
                 ),
             )
 
-    variable_names = [x for x in ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"] if x in ds]
+    variable_names = [
+        x for x in ["zeta", "u-vel", "v-vel", "windx", "windy", "pressure"] if x in ds
+    ]
     # calculate the gradient of the zeta in x and y
     # ds["time"] = ("time", ds["time"].values)
     # assign time coordinate
@@ -633,7 +639,7 @@ def swegnn_dg_from_mesh_ds_from_path(
     dg = dual_graph_ds_from_mesh_ds_from_path(
         path=path,
         use_dask=use_dask,
-        take_grad="static" # Only calculate static depth gradient
+        take_grad="static",  # Only calculate static depth gradient
     )
     # Downsample time dimension, getting every nth timestep
     if time_downsampling > 1:
@@ -652,110 +658,168 @@ def swegnn_dg_from_mesh_ds_from_path(
     # Assuming 'depth' in dg is positive downwards bathymetry.
     # mSWE-GNN might expect positive elevation, so DEM = -depth.
     # Check mSWE-GNN's convention if unsure. For now, let's assume -depth.
-    if 'depth' in dg:
-        swegnn_ds['DEM'] = -dg['depth']
-        swegnn_ds['DEM'].attrs = {'description': 'Bathymetry/DEM at face centers (m, positive up)', 'units': 'm'}
+    if "depth" in dg:
+        swegnn_ds["DEM"] = -dg["depth"]
+        swegnn_ds["DEM"].attrs = {
+            "description": "Bathymetry/DEM at face centers (m, positive up)",
+            "units": "m",
+        }
     else:
-         # Add handling if depth is missing - maybe raise error or set to zero
-         raise ValueError("Input dataset 'dg' is missing the 'depth' variable.")
-
+        # Add handling if depth is missing - maybe raise error or set to zero
+        raise ValueError("Input dataset 'dg' is missing the 'depth' variable.")
 
     # WD (Water Depth)
     # WD = zeta - DEM = zeta - (-depth) = zeta + depth
-    if 'zeta' in dg and 'depth' in dg:
-        swegnn_ds['WD'] = dg['zeta'] + dg['depth']
-        swegnn_ds['WD'].attrs = {'description': 'Water depth at face centers (time series)', 'units': 'm'}
+    if "zeta" in dg and "depth" in dg:
+        swegnn_ds["WD"] = dg["zeta"] + dg["depth"]
+        swegnn_ds["WD"].attrs = {
+            "description": "Water depth at face centers (time series)",
+            "units": "m",
+        }
         # Ensure non-negative water depth
-        swegnn_ds['WD'] = swegnn_ds['WD'].where(swegnn_ds['WD'] > 0, 0)
+        swegnn_ds["WD"] = swegnn_ds["WD"].where(swegnn_ds["WD"] > 0, 0)
     else:
         # Handle missing zeta or depth for WD calculation
-        if 'zeta' not in dg:
-             print("Warning: 'zeta' variable not found. Cannot calculate 'WD'.")
-        if 'depth' not in dg:
-             print("Warning: 'depth' variable not found. Cannot calculate 'WD'.")
-
+        if "zeta" not in dg:
+            print("Warning: 'zeta' variable not found. Cannot calculate 'WD'.")
+        if "depth" not in dg:
+            print("Warning: 'depth' variable not found. Cannot calculate 'WD'.")
 
     # VX, VY (Velocities) - Rename u-vel, v-vel
-    if 'u-vel' in dg:
-        swegnn_ds['VX'] = dg['u-vel']
-        swegnn_ds['VX'].attrs = {'description': 'X-velocity at face centers (time series)', 'units': 'm/s'}
-    if 'v-vel' in dg:
-        swegnn_ds['VY'] = dg['v-vel']
-        swegnn_ds['VY'].attrs = {'description': 'Y-velocity at face centers (time series)', 'units': 'm/s'}
+    if "u-vel" in dg:
+        swegnn_ds["VX"] = dg["u-vel"]
+        swegnn_ds["VX"].attrs = {
+            "description": "X-velocity at face centers (time series)",
+            "units": "m/s",
+        }
+    if "v-vel" in dg:
+        swegnn_ds["VY"] = dg["v-vel"]
+        swegnn_ds["VY"].attrs = {
+            "description": "Y-velocity at face centers (time series)",
+            "units": "m/s",
+        }
 
-    if 'windx' in dg:
-        swegnn_ds['WX'] = dg['windx']
-        swegnn_ds['WX'].attrs = {'description': 'X-component of wind at face centers (time series)', 'units': 'm/s'}
+    if "windx" in dg:
+        swegnn_ds["WX"] = dg["windx"]
+        swegnn_ds["WX"].attrs = {
+            "description": "X-component of wind at face centers (time series)",
+            "units": "m/s",
+        }
 
-    if 'windy' in dg:
-        swegnn_ds['WY'] = dg['windy']
-        swegnn_ds['WY'].attrs = {'description': 'Y-component of wind at face centers (time series)', 'units': 'm/s'}
+    if "windy" in dg:
+        swegnn_ds["WY"] = dg["windy"]
+        swegnn_ds["WY"].attrs = {
+            "description": "Y-component of wind at face centers (time series)",
+            "units": "m/s",
+        }
 
-    if 'pressure' in dg:
-        swegnn_ds['P'] = dg['pressure']
-        swegnn_ds['P'].attrs = {'description': 'Atmospheric pressure at face centers (time series)', 'units': 'm'}
+    if "pressure" in dg:
+        swegnn_ds["P"] = dg["pressure"]
+        swegnn_ds["P"].attrs = {
+            "description": "Atmospheric pressure at face centers (time series)",
+            "units": "m",
+        }
 
     # Slopes (from depth_grad)
-    if 'depth_grad' in dg:
+    if "depth_grad" in dg:
         # Assuming dg['depth_grad'] has shape [direction(2), nele]
-        swegnn_ds['slopex'] = dg['depth_grad'].isel(direction=0)
+        swegnn_ds["slopex"] = dg["depth_grad"].isel(direction=0)
         # Apply negative sign if DEM = -depth (gradient of DEM = -gradient of depth)
-        swegnn_ds['slopex'] = -swegnn_ds['slopex']
-        swegnn_ds['slopex'].attrs = {'description': 'Topographic slope in x-direction at face centers', 'units': 'm/degree_east'} # Check units
+        swegnn_ds["slopex"] = -swegnn_ds["slopex"]
+        swegnn_ds["slopex"].attrs = {
+            "description": "Topographic slope in x-direction at face centers",
+            "units": "m/degree_east",
+        }  # Check units
 
-        swegnn_ds['slopey'] = dg['depth_grad'].isel(direction=1)
+        swegnn_ds["slopey"] = dg["depth_grad"].isel(direction=1)
         # Apply negative sign
-        swegnn_ds['slopey'] = -swegnn_ds['slopey']
-        swegnn_ds['slopey'].attrs = {'description': 'Topographic slope in y-direction at face centers', 'units': 'm/degree_north'} # Check units
+        swegnn_ds["slopey"] = -swegnn_ds["slopey"]
+        swegnn_ds["slopey"].attrs = {
+            "description": "Topographic slope in y-direction at face centers",
+            "units": "m/degree_north",
+        }  # Check units
     else:
         # Handle missing depth_grad if needed (e.g., set slopes to zero)
-        print("Warning: 'depth_grad' not found. Slopes ('slopex', 'slopey') will not be included.")
-
+        print(
+            "Warning: 'depth_grad' not found. Slopes ('slopex', 'slopey') will not be included."
+        )
 
     # Area
-    swegnn_ds['area'] = dg["area"]
-    swegnn_ds['area'].attrs = {'description': 'Area of each mesh face (triangle)', 'units': 'm^2'}
+    swegnn_ds["area"] = dg["area"]
+    swegnn_ds["area"].attrs = {
+        "description": "Area of each mesh face (triangle)",
+        "units": "m^2",
+    }
 
     # --- Step 4: Rename/Calculate Edge (Dual Edge) Features ---
     # Edge Index (Connectivity of faces)
     # Using 'start' and 'end' from dg. These represent connections between 'nele' indices.
     # mSWE-GNN expects shape [2, num_dual_edges]. Ensure dg.start/end are combined correctly.
     # Note: mSWE-GNN's graph_creation makes edges undirected later.
-    edge_index = np.stack([dg['start'].values, dg['end'].values])
-    swegnn_ds['edge_index'] = (['two', 'edge'], edge_index)
-    swegnn_ds['edge_index'].attrs = {'description': 'Dual graph connectivity (face indices)', 'units': 'index'}
+    edge_index = np.stack([dg["start"].values, dg["end"].values])
+    swegnn_ds["edge_index"] = (["two", "edge"], edge_index)
+    swegnn_ds["edge_index"].attrs = {
+        "description": "Dual graph connectivity (face indices)",
+        "units": "index",
+    }
 
     # Face Distance (Distance between face centers)
     # Calculate from dg.x, dg.y using edge_index
-    x_coords = dg['x'].values
-    y_coords = dg['y'].values
+    x_coords = dg["x"].values
+    y_coords = dg["y"].values
     dx = x_coords[edge_index[1, :]] - x_coords[edge_index[0, :]]
     dy = y_coords[edge_index[1, :]] - y_coords[edge_index[0, :]]
     face_distance = np.sqrt(dx**2 + dy**2)
-    swegnn_ds['face_distance'] = (['edge'], face_distance)
-    swegnn_ds['face_distance'].attrs = {'description': 'Distance between centers of connected faces', 'units': 'degrees'} # Check units
+    swegnn_ds["face_distance"] = (["edge"], face_distance)
+    swegnn_ds["face_distance"].attrs = {
+        "description": "Distance between centers of connected faces",
+        "units": "degrees",
+    }  # Check units
 
     # Relative Face Distance (Vector between face centers)
-    face_relative_distance = np.stack([dx, dy], axis=-1) # Shape [num_edges, 2]
+    face_relative_distance = np.stack([dx, dy], axis=-1)  # Shape [num_edges, 2]
     # mSWE-GNN might expect [num_edges, 2]. Let's store it like that.
-    swegnn_ds['face_relative_distance'] = (['edge', 'xy'], face_relative_distance)
-    swegnn_ds['face_relative_distance'].attrs = {'description': 'Vector (dx, dy) between centers of connected faces', 'units': 'degrees'} # Check units
+    swegnn_ds["face_relative_distance"] = (["edge", "xy"], face_relative_distance)
+    swegnn_ds["face_relative_distance"].attrs = {
+        "description": "Vector (dx, dy) between centers of connected faces",
+        "units": "degrees",
+    }  # Check units
 
     # Edge Slope (Slope between connected faces based on DEM)
-    dem_values = swegnn_ds['DEM'].values
+    dem_values = swegnn_ds["DEM"].values
     dem_diff = dem_values[edge_index[1, :]] - dem_values[edge_index[0, :]]
     # Avoid division by zero if face_distance is zero (shouldn't happen for distinct faces)
-    edge_slope = np.divide(dem_diff, face_distance, out=np.zeros_like(dem_diff), where=face_distance!=0)
-    swegnn_ds['edge_slope'] = (['edge'], edge_slope)
-    swegnn_ds['edge_slope'].attrs = {'description': 'Slope between connected faces based on DEM', 'units': 'm/degree'} # Check units
+    edge_slope = np.divide(
+        dem_diff, face_distance, out=np.zeros_like(dem_diff), where=face_distance != 0
+    )
+    swegnn_ds["edge_slope"] = (["edge"], edge_slope)
+    swegnn_ds["edge_slope"].attrs = {
+        "description": "Slope between connected faces based on DEM",
+        "units": "m/degree",
+    }  # Check units
 
     # --- Step 5: Add Coordinates and other relevant info ---
-    swegnn_ds = swegnn_ds.assign_coords(dg.coords) # Copy coordinates (time, nele, edge, nvertex, direction)
-    swegnn_ds = swegnn_ds.drop_vars(['start', 'end', 'direction', 'depth_grad', 'length', 'unit_normal_x', 'unit_normal_y'], errors='ignore') # Drop original/intermediate vars
-    swegnn_ds = swegnn_ds.rename({'nele': 'num_nodes'}) # Rename nele dimension to num_nodes (for clarity in PyG context)
+    swegnn_ds = swegnn_ds.assign_coords(
+        dg.coords
+    )  # Copy coordinates (time, nele, edge, nvertex, direction)
+    swegnn_ds = swegnn_ds.drop_vars(
+        [
+            "start",
+            "end",
+            "direction",
+            "depth_grad",
+            "length",
+            "unit_normal_x",
+            "unit_normal_y",
+        ],
+        errors="ignore",
+    )  # Drop original/intermediate vars
+    swegnn_ds = swegnn_ds.rename(
+        {"nele": "num_nodes"}
+    )  # Rename nele dimension to num_nodes (for clarity in PyG context)
 
     # Add original mesh info if needed for area calc or BCs later
-    swegnn_ds['element'] = dg['element'] # Example
+    swegnn_ds["element"] = dg["element"]  # Example
 
     # --- Step 6: Placeholder for Boundary Conditions ---
 
@@ -763,18 +827,19 @@ def swegnn_dg_from_mesh_ds_from_path(
     for var in ghost_ds.data_vars:
         swegnn_ds[var] = ghost_ds[var]
 
-    swegnn_ds.attrs['description'] = 'Dual graph formatted for mSWE-GNN input pipeline'
+    swegnn_ds.attrs["description"] = "Dual graph formatted for mSWE-GNN input pipeline"
 
-    print("SWE_GNN dataset created with variables:", [var for var in swegnn_ds.data_vars])
+    print(
+        "SWE_GNN dataset created with variables:", [var for var in swegnn_ds.data_vars]
+    )
 
     return swegnn_ds
 
 
 @timeit
-def swegnn_netcdf_creation(path_in: str,
-                           path_out: str,
-                           time_downsampling: int = 36,
-                           use_dask: bool = True) -> None:
+def swegnn_netcdf_creation(
+    path_in: str, path_out: str, time_downsampling: int = 36, use_dask: bool = True
+) -> None:
     """
     Create a netCDF file formatted for mSWE-GNN from ADCIRC fort.*.nc files.
 
@@ -786,67 +851,80 @@ def swegnn_netcdf_creation(path_in: str,
     """
     # Define encoding settings
 
-    swegnn_ds = swegnn_dg_from_mesh_ds_from_path(path=path_in,
-                                                 time_downsampling=time_downsampling,
-                                                 use_dask=use_dask)
-
+    swegnn_ds = swegnn_dg_from_mesh_ds_from_path(
+        path=path_in, time_downsampling=time_downsampling, use_dask=use_dask
+    )
 
     encoding_dict = {}
     float_vars = [
-        'DEM', 'WD', 'VX', 'VY', 'slopex', 'slopey', 'area',
-        'face_distance', 'face_relative_distance', 'edge_slope',
-        'ghost_face_x', 'ghost_face_y', 'ghost_node_x', 'ghost_node_y',
-        'edge_BC_length',
+        "DEM",
+        "WD",
+        "VX",
+        "VY",
+        "slopex",
+        "slopey",
+        "area",
+        "face_distance",
+        "face_relative_distance",
+        "edge_slope",
+        "ghost_face_x",
+        "ghost_face_y",
+        "ghost_node_x",
+        "ghost_node_y",
+        "edge_BC_length",
     ]
     int_vars = [
-        'edge_index', 'element', 'edge_index_BC', 'face_BC',
-        'original_ghost_node_indices', 'ghost_node_indices', 'node_BC'
+        "edge_index",
+        "element",
+        "edge_index_BC",
+        "face_BC",
+        "original_ghost_node_indices",
+        "ghost_node_indices",
+        "node_BC",
     ]
 
-    compression_level = 5 # Example compression level (adjust as needed)
+    compression_level = 5  # Example compression level (adjust as needed)
 
     for var in float_vars:
-        if var in swegnn_ds: # Check if variable exists
+        if var in swegnn_ds:  # Check if variable exists
             encoding_dict[var] = {
-                'dtype': 'float32',
-                'zlib': True,
-                'complevel': compression_level
+                "dtype": "float32",
+                "zlib": True,
+                "complevel": compression_level,
             }
             # For variables with _FillValue (like potentially WD, VX, VY if masked)
-            if '_FillValue' in swegnn_ds[var].attrs:
-                encoding_dict[var]['_FillValue'] = swegnn_ds[var].attrs['_FillValue']
+            if "_FillValue" in swegnn_ds[var].attrs:
+                encoding_dict[var]["_FillValue"] = swegnn_ds[var].attrs["_FillValue"]
 
     for var in int_vars:
         if var in swegnn_ds:
             # Check max index value to see if int32 is sufficient
-            max_val = swegnn_ds[var].max().item() # Get max value as scalar
-            min_val = swegnn_ds[var].min().item() # Get min value as scalar
+            max_val = swegnn_ds[var].max().item()  # Get max value as scalar
+            min_val = swegnn_ds[var].min().item()  # Get min value as scalar
             # Check range for int32
-            if max_val < 2**31 and min_val >= -2**31:
-                dtype_choice = 'int32'
+            if max_val < 2**31 and min_val >= -(2**31):
+                dtype_choice = "int32"
             else:
-                dtype_choice = 'int64' # Fallback if indices are too large
+                dtype_choice = "int64"  # Fallback if indices are too large
 
             encoding_dict[var] = {
-                'dtype': dtype_choice,
-                'zlib': True,
-                'complevel': compression_level
+                "dtype": dtype_choice,
+                "zlib": True,
+                "complevel": compression_level,
             }
-            if '_FillValue' in swegnn_ds[var].attrs:
-                encoding_dict[var]['_FillValue'] = swegnn_ds[var].attrs['_FillValue']
+            if "_FillValue" in swegnn_ds[var].attrs:
+                encoding_dict[var]["_FillValue"] = swegnn_ds[var].attrs["_FillValue"]
 
     # Save the dataset
     try:
         print(f"Saving dataset to {path_out} with encoding...")
-        swegnn_ds.to_netcdf(path_out, encoding=encoding_dict, engine='netcdf4')
+        swegnn_ds.to_netcdf(path_out, encoding=encoding_dict, engine="netcdf4")
         print("Save complete.")
     except Exception as e:
         print(f"Error saving NetCDF: {e}")
 
 
-def calc_ghost_cells_for_swegnn(
-        path: str
-        ) -> xr.Dataset:
+def calc_ghost_cells_for_swegnn(path: str) -> xr.Dataset:
     """
     Calculate ghost cells for elevation boundary conditions from ADCIRC fort.63.nc file.
 
@@ -858,9 +936,9 @@ def calc_ghost_cells_for_swegnn(
     """
     with nc.Dataset(os.path.join(path, "fort.63.nc"), "r") as ds:
         edge_index_BC = get_elevation_boundary_edges(ds, boundary_type=0)
-        triangles = ds.variables['element'][:] - 1
-        x = ds.variables['x'][:]
-        y = ds.variables['y'][:]
+        triangles = ds.variables["element"][:] - 1
+        x = ds.variables["x"][:]
+        y = ds.variables["y"][:]
         original_node_xy = np.stack([x, y], axis=-1)
 
     dg_x, dg_y = mean_for_triangle(x, triangles), mean_for_triangle(y, triangles)
@@ -872,106 +950,133 @@ def calc_ghost_cells_for_swegnn(
     num_real_faces = dg_xy.shape[0]
 
     if edge_index_BC.shape[0] == 0:
-        print("Warning: No elevation boundary edges found. Ghost cells cannot be calculated.")
-        ghost_ds['face_BC'] = (['num_BC_edges'], np.array([], dtype=int))
-        ghost_ds['edge_index_BC'] = (['num_BC_edges', 'two'], np.empty((0, 2), dtype=int))
-        ghost_ds['node_BC'] = (['num_BC_edges'], np.array([], dtype=int))
-        ghost_ds['ghost_face_x'] = (['num_BC_edges'], np.array([]))
-        ghost_ds['ghost_face_y'] = (['num_BC_edges'], np.array([]))
-        ghost_ds['ghost_node_x'] = (['num_ghost_nodes'], np.array([])) # Dim needs defining
-        ghost_ds['ghost_node_y'] = (['num_ghost_nodes'], np.array([])) # Dim needs defining
-        ghost_ds['original_ghost_node_indices'] = (['num_ghost_nodes'], np.array([], dtype=int)) # Dim needs defining
+        print(
+            "Warning: No elevation boundary edges found. Ghost cells cannot be calculated."
+        )
+        ghost_ds["face_BC"] = (["num_BC_edges"], np.array([], dtype=int))
+        ghost_ds["edge_index_BC"] = (
+            ["num_BC_edges", "two"],
+            np.empty((0, 2), dtype=int),
+        )
+        ghost_ds["node_BC"] = (["num_BC_edges"], np.array([], dtype=int))
+        ghost_ds["ghost_face_x"] = (["num_BC_edges"], np.array([]))
+        ghost_ds["ghost_face_y"] = (["num_BC_edges"], np.array([]))
+        ghost_ds["ghost_node_x"] = (
+            ["num_ghost_nodes"],
+            np.array([]),
+        )  # Dim needs defining
+        ghost_ds["ghost_node_y"] = (
+            ["num_ghost_nodes"],
+            np.array([]),
+        )  # Dim needs defining
+        ghost_ds["original_ghost_node_indices"] = (
+            ["num_ghost_nodes"],
+            np.array([], dtype=int),
+        )  # Dim needs defining
         # Cannot define dimensions easily here, might be better to return empty DS or None
         # Returning DS with empty data arrays for now
-        ghost_ds = ghost_ds.assign_coords(num_BC_edges=0, num_ghost_nodes=0) # Add empty dims
+        ghost_ds = ghost_ds.assign_coords(
+            num_BC_edges=0, num_ghost_nodes=0
+        )  # Add empty dims
         return ghost_ds
 
     print(f"Found {edge_index_BC.shape[0]} elevation boundary edges.")
-    ghost_ds['edge_index_BC'] = (['num_BC_edges', 'two'], edge_index_BC)
+    ghost_ds["edge_index_BC"] = (["num_BC_edges", "two"], edge_index_BC)
 
     # Find Boundary Faces
-    face_BC = find_boundary_faces(triangles, edge_index_BC) # Use NumPy version
+    face_BC = find_boundary_faces(triangles, edge_index_BC)  # Use NumPy version
     print(f"Found {face_BC.shape[0]} corresponding boundary faces.")
     if face_BC.shape[0] != edge_index_BC.shape[0]:
-        print(f"Warning: Number of boundary faces ({face_BC.shape[0]}) does not match boundary edges ({edge_index_BC.shape[0]}). Check assumptions.")
+        print(
+            f"Warning: Number of boundary faces ({face_BC.shape[0]}) does not match boundary edges ({edge_index_BC.shape[0]}). Check assumptions."
+        )
         # Decide how to proceed: error, padding, or careful indexing? Assuming ok for now.
-    ghost_ds['face_BC'] = (['num_BC_edges'], face_BC)
+    ghost_ds["face_BC"] = (["num_BC_edges"], face_BC)
 
     # Calculate Midpoints and Normals
     edge_midpoints = get_boundary_edge_midpoints(original_node_xy, edge_index_BC)
     outward_normals = calculate_outward_normals(
         original_node_xy,
-        dg_xy, # Use dual graph node coords (face centers)
+        dg_xy,  # Use dual graph node coords (face centers)
         edge_index_BC,
         face_BC,
-        edge_midpoints
+        edge_midpoints,
     )
 
     # Calculate Ghost Face Coordinates
     ghost_face_xy = calculate_ghost_face_coords(
-        dg_xy, # Use dual graph node coords (face centers)
+        dg_xy,  # Use dual graph node coords (face centers)
         face_BC,
         edge_midpoints,
-        outward_normals
+        outward_normals,
     )
-    ghost_ds['ghost_face_x'] = (['num_BC_edges'], ghost_face_xy[:, 0])
-    ghost_ds['ghost_face_y'] = (['num_BC_edges'], ghost_face_xy[:, 1])
+    ghost_ds["ghost_face_x"] = (["num_BC_edges"], ghost_face_xy[:, 0])
+    ghost_ds["ghost_face_y"] = (["num_BC_edges"], ghost_face_xy[:, 1])
 
     # Calculate Ghost Node Coordinates (assuming triangles)
     try:
-        ghost_node_xy, original_node_indices, face_to_ghost_node_map = calculate_ghost_node_coords(
-            original_node_xy,
-            triangles,
-            face_BC,
-            edge_index_BC,
-            edge_midpoints,
-            outward_normals
+        ghost_node_xy, original_node_indices, face_to_ghost_node_map = (
+            calculate_ghost_node_coords(
+                original_node_xy,
+                triangles,
+                face_BC,
+                edge_index_BC,
+                edge_midpoints,
+                outward_normals,
+            )
         )
         num_ghost_nodes = ghost_node_xy.shape[0]
-        ghost_ds['ghost_node_x'] = (['num_ghost_nodes'], ghost_node_xy[:, 0])
-        ghost_ds['ghost_node_y'] = (['num_ghost_nodes'], ghost_node_xy[:, 1])
+        ghost_ds["ghost_node_x"] = (["num_ghost_nodes"], ghost_node_xy[:, 0])
+        ghost_ds["ghost_node_y"] = (["num_ghost_nodes"], ghost_node_xy[:, 1])
         # Store original node indices for reference/debugging
-        ghost_ds['original_ghost_node_indices'] = (['num_ghost_nodes'], original_node_indices)
+        ghost_ds["original_ghost_node_indices"] = (
+            ["num_ghost_nodes"],
+            original_node_indices,
+        )
         # We might need the face_to_ghost_node_map later for connectivity,
         # but storing dicts in xarray isn't straightforward. We'll recalculate if needed,
         # or store constituent parts. Let's store the new indices.
-        new_ghost_node_indices = np.arange(num_real_nodes, num_real_nodes + num_ghost_nodes)
-        ghost_ds['ghost_node_indices'] = (['num_ghost_nodes'], new_ghost_node_indices)
-
+        new_ghost_node_indices = np.arange(
+            num_real_nodes, num_real_nodes + num_ghost_nodes
+        )
+        ghost_ds["ghost_node_indices"] = (["num_ghost_nodes"], new_ghost_node_indices)
 
     except ValueError as e:
         print(f"Error calculating ghost node coordinates: {e}")
         print("Adding empty placeholders for ghost node data.")
-        num_ghost_nodes = 0 # Set to zero if calculation fails
-        ghost_ds['ghost_node_x'] = (['num_ghost_nodes'], np.array([]))
-        ghost_ds['ghost_node_y'] = (['num_ghost_nodes'], np.array([]))
-        ghost_ds['original_ghost_node_indices'] = (['num_ghost_nodes'], np.array([], dtype=int))
-        ghost_ds['ghost_node_indices'] = (['num_ghost_nodes'], np.array([], dtype=int))
-
+        num_ghost_nodes = 0  # Set to zero if calculation fails
+        ghost_ds["ghost_node_x"] = (["num_ghost_nodes"], np.array([]))
+        ghost_ds["ghost_node_y"] = (["num_ghost_nodes"], np.array([]))
+        ghost_ds["original_ghost_node_indices"] = (
+            ["num_ghost_nodes"],
+            np.array([], dtype=int),
+        )
+        ghost_ds["ghost_node_indices"] = (["num_ghost_nodes"], np.array([], dtype=int))
 
     # Calculate Ghost Cell (Face) Indices (node_BC for PyG)
     ghost_cell_indices = np.arange(num_real_faces, num_real_faces + face_BC.shape[0])
-    ghost_ds['node_BC'] = (['num_BC_edges'], ghost_cell_indices)
-    ghost_ds['node_BC'].attrs = {'description': 'Indices assigned to ghost cells (faces) appended after real faces'}
+    ghost_ds["node_BC"] = (["num_BC_edges"], ghost_cell_indices)
+    ghost_ds["node_BC"].attrs = {
+        "description": "Indices assigned to ghost cells (faces) appended after real faces"
+    }
 
-    ghost_ds['edge_BC_length'] = (['num_BC_edges'], calculate_boundary_edge_lengths(
-        original_node_xy, edge_index_BC
-    ))
+    ghost_ds["edge_BC_length"] = (
+        ["num_BC_edges"],
+        calculate_boundary_edge_lengths(original_node_xy, edge_index_BC),
+    )
 
     # Assign coordinates/dimensions
     ghost_ds = ghost_ds.assign_coords(
         num_BC_edges=np.arange(face_BC.shape[0]),
         num_ghost_nodes=np.arange(num_ghost_nodes),
-        two=['x', 'y'] # Assuming 'two' dim is for coordinates
+        two=["x", "y"],  # Assuming 'two' dim is for coordinates
     )
 
     return ghost_ds
 
 
 def find_non_boundary_nodes_for_faces(
-    triangles: np.ndarray,
-    face_BC: np.ndarray,
-    edge_index_BC: np.ndarray
+    triangles: np.ndarray, face_BC: np.ndarray, edge_index_BC: np.ndarray
 ) -> Dict[int, List[int]]:
     """
     Identifies the node(s) within each boundary face that are not part
@@ -1018,8 +1123,10 @@ def find_non_boundary_nodes_for_faces(
         {}
     """
     if face_BC.shape[0] != edge_index_BC.shape[0]:
-        raise ValueError(f"Number of boundary faces ({face_BC.shape[0]}) must match "
-                         f"number of boundary edges ({edge_index_BC.shape[0]})")
+        raise ValueError(
+            f"Number of boundary faces ({face_BC.shape[0]}) must match "
+            f"number of boundary edges ({edge_index_BC.shape[0]})"
+        )
     if face_BC.shape[0] == 0:
         return {}
 
@@ -1030,7 +1137,9 @@ def find_non_boundary_nodes_for_faces(
 
     for i, face_idx in enumerate(face_BC):
         if face_idx >= triangles.shape[0] or face_idx < 0:
-             raise ValueError(f"Boundary face index {face_idx} is out of bounds for triangles array.")
+            raise ValueError(
+                f"Boundary face index {face_idx} is out of bounds for triangles array."
+            )
 
         face_nodes = triangles[face_idx]
         bc_edge_nodes = bc_edge_node_sets[i]
@@ -1045,11 +1154,11 @@ def find_non_boundary_nodes_for_faces(
 
 def calculate_ghost_node_coords(
     node_xy: np.ndarray,
-    triangles: np.ndarray, # Needed by helper
+    triangles: np.ndarray,  # Needed by helper
     face_BC: np.ndarray,
     edge_index_BC: np.ndarray,
     edge_midpoints: np.ndarray,
-    outward_normals: np.ndarray
+    outward_normals: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[int, List[int]]]:
     """
     Calculates coordinates for ghost nodes by mirroring non-boundary nodes
@@ -1120,16 +1229,18 @@ def calculate_ghost_node_coords(
 
     # Check if map contains all faces and assume one node per face (triangle)
     if len(non_boundary_nodes_map) != face_BC.shape[0]:
-         raise ValueError("Could not find non-boundary nodes for all boundary faces.")
+        raise ValueError("Could not find non-boundary nodes for all boundary faces.")
 
     original_node_indices_list = []
-    corresponding_face_indices = [] # Keep track of which face this node belongs to
+    corresponding_face_indices = []  # Keep track of which face this node belongs to
     for face_idx in face_BC:
         other_nodes = non_boundary_nodes_map.get(face_idx)
         if other_nodes is None or len(other_nodes) != 1:
-             raise ValueError(f"Expected exactly one non-boundary node for face {face_idx} (triangle assumption), found {other_nodes}")
+            raise ValueError(
+                f"Expected exactly one non-boundary node for face {face_idx} (triangle assumption), found {other_nodes}"
+            )
         original_node_indices_list.append(other_nodes[0])
-        corresponding_face_indices.append(face_idx) # Store face index
+        corresponding_face_indices.append(face_idx)  # Store face index
 
     original_node_indices = np.array(original_node_indices_list, dtype=int)
     node_BC_xy = node_xy[original_node_indices]
@@ -1137,7 +1248,7 @@ def calculate_ghost_node_coords(
     # --- Mirroring Calculation (Similar to ghost faces but uses node coords) ---
     # For triangles, the symmetry point for the node mirror is often the edge midpoint.
     # mSWE-GNN uses edge nodes for quads, edge midpoint for triangles. Stick with midpoint here.
-    node_symmetry_point = edge_midpoints # Using edge midpoints as symmetry points
+    node_symmetry_point = edge_midpoints  # Using edge midpoints as symmetry points
 
     # Distance from the non-boundary node to the symmetry point
     distance_node_edge_BC = np.linalg.norm(
@@ -1153,20 +1264,25 @@ def calculate_ghost_node_coords(
     # --- Create mapping from face index to new ghost node index ---
     num_orig_nodes = node_xy.shape[0]
     # Assign new indices sequentially after original nodes
-    new_ghost_node_indices = np.arange(num_orig_nodes, num_orig_nodes + ghost_node_xy.shape[0])
+    new_ghost_node_indices = np.arange(
+        num_orig_nodes, num_orig_nodes + ghost_node_xy.shape[0]
+    )
 
     # Map the original face index to the new ghost node index
-    face_to_ghost_node_map = {face_idx: [new_idx] for face_idx, new_idx in zip(face_BC, new_ghost_node_indices)}
+    face_to_ghost_node_map = {
+        face_idx: [new_idx]
+        for face_idx, new_idx in zip(face_BC, new_ghost_node_indices)
+    }
 
     return ghost_node_xy, original_node_indices, face_to_ghost_node_map
 
 
 # not yet implemented: some of this may be reversible? perhaps with the mesh we should be able to recover all (or almost all) of the original properties.
 
+
 def get_elevation_boundary_edges(
-        ds: nc.Dataset,
-        boundary_type: Optional[int] = 0
-        )  -> np.ndarray:
+    ds: nc.Dataset, boundary_type: Optional[int] = 0
+) -> np.ndarray:
     """
     Helper function to extract elevation boundary edges from an open
     netCDF4 Dataset object.
@@ -1183,9 +1299,9 @@ def get_elevation_boundary_edges(
                     empty array if no relevant boundaries are found.
     """
 
-    nbdv = ds.variables['nbdv'][:] - 1  # Get 0-based node indices
-    nvdll = ds.variables['nvdll'][:]    # Nodes per segment
-    ibtypee = ds.variables['ibtypee'][:] # Type per segment
+    nbdv = ds.variables["nbdv"][:] - 1  # Get 0-based node indices
+    nvdll = ds.variables["nvdll"][:]  # Nodes per segment
+    ibtypee = ds.variables["ibtypee"][:]  # Type per segment
     return elevation_boundary_edges(nbdv, nvdll, ibtypee, boundary_type)
 
 
@@ -1380,8 +1496,7 @@ def grad_for_triangle_static(
 
 
 def calculate_boundary_edge_lengths(
-    node_xy: np.ndarray,
-    edge_index_BC: np.ndarray
+    node_xy: np.ndarray, edge_index_BC: np.ndarray
 ) -> np.ndarray:
     """
     Calculates the physical length of each boundary edge.
@@ -1412,14 +1527,14 @@ def calculate_boundary_edge_lengths(
         return np.array([], dtype=float)
 
     # Get coordinates for the start and end node of each boundary edge
-    start_nodes_xy = node_xy[edge_index_BC[:, 0]] # Shape: (num_BC_edges, 2)
-    end_nodes_xy   = node_xy[edge_index_BC[:, 1]] # Shape: (num_BC_edges, 2)
+    start_nodes_xy = node_xy[edge_index_BC[:, 0]]  # Shape: (num_BC_edges, 2)
+    end_nodes_xy = node_xy[edge_index_BC[:, 1]]  # Shape: (num_BC_edges, 2)
 
     # Calculate the difference in coordinates (dx, dy)
-    delta_xy = end_nodes_xy - start_nodes_xy # Shape: (num_BC_edges, 2)
+    delta_xy = end_nodes_xy - start_nodes_xy  # Shape: (num_BC_edges, 2)
 
     # Calculate Euclidean distance (length) = sqrt(dx^2 + dy^2)
-    edge_lengths = np.linalg.norm(delta_xy, axis=1) # Calculate norm along axis 1
+    edge_lengths = np.linalg.norm(delta_xy, axis=1)  # Calculate norm along axis 1
 
     return edge_lengths
 
@@ -1502,9 +1617,9 @@ def grad_for_triangle_timeseries(
 
 # --- ghost cell functions ---
 
+
 def get_boundary_edge_midpoints(
-    node_xy: np.ndarray,
-    edge_index_BC: np.ndarray
+    node_xy: np.ndarray, edge_index_BC: np.ndarray
 ) -> np.ndarray:
     """Calculates the midpoint of each boundary edge.
 
@@ -1540,7 +1655,7 @@ def calculate_outward_normals(
     face_xy: np.ndarray,
     edge_index_BC: np.ndarray,
     face_BC: np.ndarray,
-    edge_midpoints: np.ndarray
+    edge_midpoints: np.ndarray,
 ) -> np.ndarray:
     """Calculates outward-pointing unit normal vectors for boundary edges.
 
@@ -1604,7 +1719,7 @@ def calculate_ghost_face_coords(
     face_xy: np.ndarray,
     face_BC: np.ndarray,
     edge_midpoints: np.ndarray,
-    outward_normals: np.ndarray
+    outward_normals: np.ndarray,
 ) -> np.ndarray:
     """Calculates coordinates for ghost faces by mirroring across boundary edges.
 
@@ -1651,10 +1766,7 @@ def calculate_ghost_face_coords(
     return ghost_face_xy
 
 
-def find_boundary_faces(
-    triangles: np.ndarray,
-    edge_index_BC: np.ndarray
-) -> np.ndarray:
+def find_boundary_faces(triangles: np.ndarray, edge_index_BC: np.ndarray) -> np.ndarray:
     """
     Finds the indices of faces (triangles) that contain boundary edges using NumPy.
 
@@ -1703,7 +1815,7 @@ def find_boundary_faces(
     if edge_index_BC.shape[0] == 0:
         return np.array([], dtype=np.int64)
     if triangles.shape[0] == 0:
-         return np.array([], dtype=np.int64)
+        return np.array([], dtype=np.int64)
 
     num_faces = triangles.shape[0]
 
@@ -1716,11 +1828,14 @@ def find_boundary_faces(
     # Edge 2: node 1 -> node 2
     # Edge 3: node 2 -> node 0
     # Shape: (num_faces, 3, 2) -> (num_faces * 3, 2)
-    all_triangle_edges = np.stack([
-        np.stack([triangles[:, 0], triangles[:, 1]], axis=-1),
-        np.stack([triangles[:, 1], triangles[:, 2]], axis=-1),
-        np.stack([triangles[:, 2], triangles[:, 0]], axis=-1)
-    ], axis=1).reshape(-1, 2)
+    all_triangle_edges = np.stack(
+        [
+            np.stack([triangles[:, 0], triangles[:, 1]], axis=-1),
+            np.stack([triangles[:, 1], triangles[:, 2]], axis=-1),
+            np.stack([triangles[:, 2], triangles[:, 0]], axis=-1),
+        ],
+        axis=1,
+    ).reshape(-1, 2)
 
     # 3. Sort node indices within each triangle edge
     # Shape: (num_faces * 3, 2)
@@ -1748,10 +1863,12 @@ def find_boundary_faces(
     return boundary_face_indices.astype(np.int64)
 
 
-def elevation_boundary_edges(nbdv: np.ndarray,
-                             nvdll: np.ndarray,
-                             ibtypee: np.ndarray,
-                             boundary_type: Optional[int] = 0) -> np.ndarray:
+def elevation_boundary_edges(
+    nbdv: np.ndarray,
+    nvdll: np.ndarray,
+    ibtypee: np.ndarray,
+    boundary_type: Optional[int] = 0,
+) -> np.ndarray:
     """
     Extract elevation boundary edges from ADCIRC mesh data.
 
@@ -1789,24 +1906,22 @@ def elevation_boundary_edges(nbdv: np.ndarray,
             current_node_index += num_nodes_in_segment
             continue
         # Extract node indices for the current segment
-        segment_nodes = nbdv[current_node_index : current_node_index + num_nodes_in_segment]
+        segment_nodes = nbdv[
+            current_node_index : current_node_index + num_nodes_in_segment
+        ]
 
         # Create edges by pairing consecutive nodes within the segment
         # An open boundary typically doesn't loop back, so we stop at len-1
-        segment_edges = np.stack(
-           [segment_nodes[:-1], segment_nodes[1:]],
-           axis=-1
-        )
+        segment_edges = np.stack([segment_nodes[:-1], segment_nodes[1:]], axis=-1)
         all_boundary_edges.append(segment_edges)
 
         # Move the index pointer for the flat nbdv array
         current_node_index += num_nodes_in_segment
 
     if not all_boundary_edges:
-        return np.empty((0, 2), dtype=np.int64) # Use int64 for consistency
+        return np.empty((0, 2), dtype=np.int64)  # Use int64 for consistency
 
     return np.vstack(all_boundary_edges)
-
 
 
 # -- coast functions ---
@@ -2052,30 +2167,33 @@ if __name__ == "__main__":
     #     # use_dask=False # Using use_dask=False might be simpler initially for debugging
     # )
     # python -m adforce.mesh
-    swegnn_netcdf_creation(os.path.join(DATA_PATH, "exp_0049"),
-                           os.path.join(DATA_PATH, "exp_0049", "swegnn.nc"),
-                           use_dask=False
-                           )
+    swegnn_netcdf_creation(
+        os.path.join(DATA_PATH, "exp_0049"),
+        os.path.join(DATA_PATH, "exp_0049", "swegnn.nc"),
+        use_dask=False,
+    )
     # print("\n--- SWE-GNN Formatted Dataset ---")
     # print(swegnn_formatted_ds)
     # print("\nVariables:", list(swegnn_formatted_ds.data_vars))
 
     try:
-        from .constants import DATA_PATH # Adjust import if needed
+        from .constants import DATA_PATH  # Adjust import if needed
         from .boundaries import extract_elevation_boundary_edges
 
         file_path = os.path.join(DATA_PATH, "exp_0049", "maxele.63.nc")
 
-        with nc.Dataset(file_path, 'r') as ds:
+        with nc.Dataset(file_path, "r") as ds:
             # Load 0-based triangle node indices
-            triangles_from_file = ds.variables['element'][:] - 1
+            triangles_from_file = ds.variables["element"][:] - 1
 
         # 2. Get the boundary edges using the previously defined function
         ocean_edges = extract_elevation_boundary_edges(file_path, boundary_type=0)
 
         # 3. Find the boundary faces using the NumPy version
         if triangles_from_file is not None and ocean_edges.shape[0] > 0:
-            print(f"Finding boundary faces for {ocean_edges.shape[0]} boundary edges (NumPy)...")
+            print(
+                f"Finding boundary faces for {ocean_edges.shape[0]} boundary edges (NumPy)..."
+            )
             face_BC_np = find_boundary_faces(triangles_from_file, ocean_edges)
 
             if face_BC_np.shape[0] > 0:
@@ -2086,14 +2204,17 @@ if __name__ == "__main__":
                 if face_BC_np.shape[0] == ocean_edges.shape[0]:
                     print("Number of boundary faces matches number of boundary edges.")
                 else:
-                     print(f"Warning: Number of faces ({face_BC_np.shape[0]}) doesn't match edges ({ocean_edges.shape[0]}).")
+                    print(
+                        f"Warning: Number of faces ({face_BC_np.shape[0]}) doesn't match edges ({ocean_edges.shape[0]})."
+                    )
 
             else:
                 print("No boundary faces found corresponding to the boundary edges.")
         else:
-             if triangles_from_file is None: print("Could not load triangle data.")
-             if ocean_edges.shape[0] == 0: print("No boundary edges were provided.")
-
+            if triangles_from_file is None:
+                print("Could not load triangle data.")
+            if ocean_edges.shape[0] == 0:
+                print("No boundary edges were provided.")
 
     except ImportError:
         print("Could not import DATA_PATH or other functions.")

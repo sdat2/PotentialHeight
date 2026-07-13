@@ -30,9 +30,7 @@ def test_carnot_pm_from_y_matches_hand_formula():
         p_da = 1015e2 - rh * e_sat  # [Pa] ambient dry partial pressure
         for y in (1.01, 1.05, 1.2):
             expected = p_da / y + e_sat
-            assert carnot_pm_from_y(y, p_da, t_ns) == pytest.approx(
-                expected, rel=1e-12
-            )
+            assert carnot_pm_from_y(y, p_da, t_ns) == pytest.approx(expected, rel=1e-12)
 
 
 def test_carnot_pm_from_y_uses_supplied_dry_pressure():

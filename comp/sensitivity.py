@@ -49,14 +49,32 @@ def filter_sweep() -> pd.DataFrame:
     for thr in (0.2, 0.3, 0.4, 0.5, 0.6, 0.8):
         d = base[(base.obs_peak >= thr) & (base.peak_dt_hr.abs() <= C.MAX_TIMING_HR)]
         b, e, r = metrics(d)
-        rows.append(dict(knob="MIN_OBS_PEAK_M", value=thr, n=len(d),
-                         bias=b, rmse=e, r=r, within_r=within_storm_r(d)))
+        rows.append(
+            dict(
+                knob="MIN_OBS_PEAK_M",
+                value=thr,
+                n=len(d),
+                bias=b,
+                rmse=e,
+                r=r,
+                within_r=within_storm_r(d),
+            )
+        )
     # vary the simultaneous-peak window (default MAX_TIMING_HR)
     for thr in (3, 4, 6, 9, 12, 24):
         d = base[(base.obs_peak >= C.MIN_OBS_PEAK_M) & (base.peak_dt_hr.abs() <= thr)]
         b, e, r = metrics(d)
-        rows.append(dict(knob="MAX_TIMING_HR", value=thr, n=len(d),
-                         bias=b, rmse=e, r=r, within_r=within_storm_r(d)))
+        rows.append(
+            dict(
+                knob="MAX_TIMING_HR",
+                value=thr,
+                n=len(d),
+                bias=b,
+                rmse=e,
+                r=r,
+                within_r=within_storm_r(d),
+            )
+        )
     return pd.DataFrame(rows)
 
 
@@ -73,16 +91,24 @@ def _nearest_wet_param(tree, WD, lon, lat, wet_min, max_deg, knn):
     return None
 
 
-def node_sweep(combos: Optional[List[Tuple[float, float, int]]] = None,
-               storms: Optional[List[str]] = None) -> pd.DataFrame:
+def node_sweep(
+    combos: Optional[List[Tuple[float, float, int]]] = None,
+    storms: Optional[List[str]] = None,
+) -> pd.DataFrame:
     """Re-run peak extraction for several (WET_MIN_M, MAX_NODE_DEG, KNN) combos.
 
     Loads each storm netCDF once; re-uses the cached observed residuals. Reports the
     clean-pair skill for each combo so it can be compared with the default
     (0.30, 0.12, 60)."""
     if combos is None:
-        combos = [(0.10, 0.12, 60), (0.30, 0.12, 60), (0.50, 0.12, 60),
-                  (0.30, 0.06, 60), (0.30, 0.20, 60), (0.30, 0.12, 30)]
+        combos = [
+            (0.10, 0.12, 60),
+            (0.30, 0.12, 60),
+            (0.50, 0.12, 60),
+            (0.30, 0.06, 60),
+            (0.30, 0.20, 60),
+            (0.30, 0.12, 30),
+        ]
     items = {k: C.STORMS[k] for k in (storms or C.STORMS)}
     gauges = gulf_gauges()
     # accumulate per-combo lists of (sim_peak, obs_peak, storm, timing) over clean-ish pairs
@@ -103,11 +129,12 @@ def node_sweep(combos: Optional[List[Tuple[float, float, int]]] = None,
             obs, _ = observed_residual(sid, lat, year, s0, s1)
             if obs.empty or obs.size < 12 or (sid, name) in []:
                 continue
-            if obs.max() < C.MIN_OBS_PEAK_M:          # only meaningful-surge gauges
+            if obs.max() < C.MIN_OBS_PEAK_M:  # only meaningful-surge gauges
                 continue
             if (storm, sid) in C.KNOWN_FAILED:
                 continue
-            obs_peak = float(obs.max()); obs_tmax = obs.idxmax()
+            obs_peak = float(obs.max())
+            obs_tmax = obs.idxmax()
             for cmb in combos:
                 idx = _nearest_wet_param(tree, WD, lon, lat, *cmb)
                 if idx is None:
@@ -120,11 +147,21 @@ def node_sweep(combos: Optional[List[Tuple[float, float, int]]] = None,
     rows = []
     for cmb, recs in acc.items():
         d = pd.DataFrame(recs, columns=["sim_peak", "obs_peak", "storm", "timing"])
-        d = d[d.timing.abs() <= C.MAX_TIMING_HR]      # apply the default timing gate
+        d = d[d.timing.abs() <= C.MAX_TIMING_HR]  # apply the default timing gate
         b, e, r = metrics(d)
-        rows.append(dict(wet_min=cmb[0], max_deg=cmb[1], knn=cmb[2], n=len(d),
-                         bias=b, rmse=e, r=r, within_r=within_storm_r(d),
-                         default=(cmb == (C.WET_MIN_M, C.MAX_NODE_DEG, C.KNN))))
+        rows.append(
+            dict(
+                wet_min=cmb[0],
+                max_deg=cmb[1],
+                knn=cmb[2],
+                n=len(d),
+                bias=b,
+                rmse=e,
+                r=r,
+                within_r=within_storm_r(d),
+                default=(cmb == (C.WET_MIN_M, C.MAX_NODE_DEG, C.KNN)),
+            )
+        )
     return pd.DataFrame(rows)
 
 

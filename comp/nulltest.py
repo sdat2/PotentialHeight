@@ -64,9 +64,15 @@ def perm_global(c: pd.DataFrame, n: int = 5000, seed: int = RNG_SEED) -> Dict:
     obs, sim = c.obs_peak.values, c.sim_peak.values
     obs_r = _r(obs, sim)
     null = np.array([_r(obs, rng.permutation(sim)) for _ in range(n)])
-    return dict(observed=obs_r, null_mean=float(null.mean()), null_sd=float(null.std()),
-                null_p95=float(np.percentile(null, 95)), null_max=float(null.max()),
-                p=float((null >= obs_r).mean()), null=null)
+    return dict(
+        observed=obs_r,
+        null_mean=float(null.mean()),
+        null_sd=float(null.std()),
+        null_p95=float(np.percentile(null, 95)),
+        null_max=float(null.max()),
+        p=float((null >= obs_r).mean()),
+        null=null,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -75,7 +81,7 @@ def perm_global(c: pd.DataFrame, n: int = 5000, seed: int = RNG_SEED) -> Dict:
 def perm_within_storm(c: pd.DataFrame, n: int = 5000, seed: int = RNG_SEED) -> Dict:
     rng = np.random.default_rng(seed)
     obs, sim = c.obs_peak.values, c.sim_peak.values
-    obs_r = _r(obs, sim)                       # pooled, compared to within-shuffled null
+    obs_r = _r(obs, sim)  # pooled, compared to within-shuffled null
     codes = c.storm.astype("category").cat.codes.values
     groups = [np.where(codes == g)[0] for g in np.unique(codes)]
     null = np.empty(n)
@@ -84,10 +90,16 @@ def perm_within_storm(c: pd.DataFrame, n: int = 5000, seed: int = RNG_SEED) -> D
         for idx in groups:
             sp[idx] = rng.permutation(sp[idx])
         null[i] = _r(obs, sp)
-    return dict(observed_pooled=obs_r, observed_spatial=within_storm_r(c),
-                null_mean=float(null.mean()), null_sd=float(null.std()),
-                null_p95=float(np.percentile(null, 95)), null_max=float(null.max()),
-                p=float((null >= obs_r).mean()), null=null)
+    return dict(
+        observed_pooled=obs_r,
+        observed_spatial=within_storm_r(c),
+        null_mean=float(null.mean()),
+        null_sd=float(null.std()),
+        null_p95=float(np.percentile(null, 95)),
+        null_max=float(null.max()),
+        p=float((null >= obs_r).mean()),
+        null=null,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -117,9 +129,10 @@ def _clean_keys(c: pd.DataFrame) -> Dict[str, List[str]]:
     return out
 
 
-def lag_curve(storms: Optional[List[str]] = None,
-              lags_days: Tuple[float, ...] = (-3, -2, -1, -0.5, 0, 0.5, 1, 2, 3),
-              ) -> pd.DataFrame:
+def lag_curve(
+    storms: Optional[List[str]] = None,
+    lags_days: Tuple[float, ...] = (-3, -2, -1, -0.5, 0, 0.5, 1, 2, 3),
+) -> pd.DataFrame:
     """Median time-series correlation over clean pairs as the simulated hydrograph
     is shifted by each lag (days). Real surge skill peaks sharply at lag 0."""
     c = load_clean()
@@ -145,9 +158,15 @@ def lag_curve(storms: Optional[List[str]] = None,
                 if np.isfinite(r):
                     per_lag[L].append(r)
         print(f"  {storm:14s}: {n_used} clean gauges")
-    rows = [dict(lag_days=L, median_ts_r=float(np.nanmedian(per_lag[L])),
-                 mean_ts_r=float(np.nanmean(per_lag[L])), n=len(per_lag[L]))
-            for L in lags_days]
+    rows = [
+        dict(
+            lag_days=L,
+            median_ts_r=float(np.nanmedian(per_lag[L])),
+            mean_ts_r=float(np.nanmean(per_lag[L])),
+            n=len(per_lag[L]),
+        )
+        for L in lags_days
+    ]
     return pd.DataFrame(rows).sort_values("lag_days").reset_index(drop=True)
 
 
@@ -156,8 +175,10 @@ def lag_curve(storms: Optional[List[str]] = None,
 # --------------------------------------------------------------------------- #
 def plot(g: Dict, w: Dict, lag: Optional[pd.DataFrame], paths: List[str]) -> None:
     import matplotlib
+
     matplotlib.use("Agg")
     from sithom.plot import plot_defaults, get_dim, BRICK_RED, OX_BLUE
+
     plot_defaults()
     import matplotlib.pyplot as plt
 
@@ -165,14 +186,19 @@ def plot(g: Dict, w: Dict, lag: Optional[pd.DataFrame], paths: List[str]) -> Non
     # ratio 0.42 (not 0.33) gives the two-line titles vertical room; panel ids sit in the
     # left-aligned titles so they cannot clash with an outside label.
     fig, ax = plt.subplots(1, ncol, figsize=get_dim(ratio=0.42))
-    for i, (a, res, title) in enumerate([(ax[0], g, "Global permutation"),
-                                         (ax[1], w, "Within-storm permutation")]):
+    for i, (a, res, title) in enumerate(
+        [(ax[0], g, "Global permutation"), (ax[1], w, "Within-storm permutation")]
+    ):
         a.hist(res["null"], bins=40, color="0.75", edgecolor="none")
         obs = res.get("observed", res.get("observed_pooled"))
         a.axvline(obs, color=BRICK_RED, lw=1.8, label=f"Observed $r={obs:.2f}$")
-        a.set_title(f"({chr(97 + i)}) {title}\n(null max ${res['null_max']:.2f}$, $p<10^{{-3}}$)",
-                    fontsize=7, loc="left")
-        a.set_xlabel("Correlation $r$"); a.legend(fontsize=6)
+        a.set_title(
+            f"({chr(97 + i)}) {title}\n(null max ${res['null_max']:.2f}$, $p<10^{{-3}}$)",
+            fontsize=7,
+            loc="left",
+        )
+        a.set_xlabel("Correlation $r$")
+        a.legend(fontsize=6)
     ax[0].set_ylabel("Count")
     if lag is not None:
         a = ax[2]
@@ -180,7 +206,8 @@ def plot(g: Dict, w: Dict, lag: Optional[pd.DataFrame], paths: List[str]) -> Non
         a.axvline(0, color="0.5", ls=":")
         a.set_title("(c) Temporal-lag null", fontsize=7, loc="left")
         # short label: the long form overhangs the narrow panel and clips the "]"
-        a.set_xlabel("Lag [days]"); a.set_ylabel("Median time-series $r$")
+        a.set_xlabel("Lag [days]")
+        a.set_ylabel("Median time-series $r$")
         a.grid(alpha=0.3)
     for p in paths:
         fig.savefig(p, bbox_inches="tight")
@@ -191,27 +218,42 @@ def run(do_lag: bool = True) -> None:
     c = load_clean()
     print(f"clean pairs: n={len(c)}\n")
     g = perm_global(c)
-    print(f"[1] GLOBAL permutation     : observed r={g['observed']:.3f}  "
-          f"null mean={g['null_mean']:+.3f} sd={g['null_sd']:.3f} max={g['null_max']:.3f}  "
-          f"p={g['p']:.2e}")
+    print(
+        f"[1] GLOBAL permutation     : observed r={g['observed']:.3f}  "
+        f"null mean={g['null_mean']:+.3f} sd={g['null_sd']:.3f} max={g['null_max']:.3f}  "
+        f"p={g['p']:.2e}"
+    )
     w = perm_within_storm(c)
-    print(f"[2] WITHIN-STORM permutation: pooled r={w['observed_pooled']:.3f} "
-          f"spatial r={w['observed_spatial']:.3f}  null max={w['null_max']:.3f}  p={w['p']:.2e}")
+    print(
+        f"[2] WITHIN-STORM permutation: pooled r={w['observed_pooled']:.3f} "
+        f"spatial r={w['observed_spatial']:.3f}  null max={w['null_max']:.3f}  p={w['p']:.2e}"
+    )
     x = cross_storm(c)
-    print(f"[3] CROSS-STORM same-gauge  : r={x['r']:+.3f}  (true {x['observed']:.3f}, n={x['n']})")
+    print(
+        f"[3] CROSS-STORM same-gauge  : r={x['r']:+.3f}  (true {x['observed']:.3f}, n={x['n']})"
+    )
     lag = None
     if do_lag:
         print("[4] TEMPORAL-LAG curve (loading storm netCDFs)...")
         lag = lag_curve()
         print(lag.to_string(index=False))
         lag.to_csv(os.path.join(C.OUT_PATH, "nulltest_lag.csv"), index=False)
-    plot(g, w, lag, [os.path.join(C.FIGURE_PATH, "val_nulltests.png"),
-                     os.path.join(C.PAPER_IMG_PATH, "comp_val_nulltests.pdf")])
+    plot(
+        g,
+        w,
+        lag,
+        [
+            os.path.join(C.FIGURE_PATH, "val_nulltests.png"),
+            os.path.join(C.PAPER_IMG_PATH, "comp_val_nulltests.pdf"),
+        ],
+    )
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--no-lag", action="store_true", help="skip the netCDF-heavy lag test")
+    ap.add_argument(
+        "--no-lag", action="store_true", help="skip the netCDF-heavy lag test"
+    )
     run(do_lag=not ap.parse_args().no_lag)
 
 

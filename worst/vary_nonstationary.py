@@ -111,17 +111,23 @@ def _fit_method(fit: DictConfig) -> str:
 
 def _ns_lbfgs_unbounded(data, time_axis, fit, force_weibull):
     """L-BFGS MLE of (alpha0, alpha1, beta, gamma); loc(t)=alpha0+alpha1 t."""
+
     def nll(p):
         a0, a1, beta = p[0], p[1], np.exp(p[2])
         gamma = -np.exp(p[3]) if force_weibull else p[3]
         lp = genextreme.logpdf(data, c=-gamma, loc=a0 + a1 * time_axis, scale=beta)
         return 1e12 if not np.all(np.isfinite(lp)) else -float(np.sum(lp))
+
     a0 = _fit_value(fit, "alpha_guess", float(np.mean(data)))
     a1 = float(np.polyfit(time_axis, data, 1)[0]) if len(data) > 1 else 0.0
     bg = _fit_value(fit, "beta_guess", 1.0)
     gg = _fit_value(fit, "gamma_guess", -0.1)
-    x0 = [a0, a1, float(np.log(max(bg, 1e-3))),
-          float(np.log(max(-gg, 1e-3)) if force_weibull else gg)]
+    x0 = [
+        a0,
+        a1,
+        float(np.log(max(bg, 1e-3))),
+        float(np.log(max(-gg, 1e-3)) if force_weibull else gg),
+    ]
     r = minimize(nll, x0, method="L-BFGS-B")
     gamma = float(-np.exp(r.x[3]) if force_weibull else r.x[3])
     return float(r.x[0]), float(r.x[1]), float(np.exp(r.x[2])), gamma
@@ -129,14 +135,21 @@ def _ns_lbfgs_unbounded(data, time_axis, fit, force_weibull):
 
 def _ns_lbfgs_bounded(data, z_star_assumed_t, fit):
     """L-BFGS MLE of (beta, gamma) with known time-varying bound; loc(t)=z*(t)+beta/gamma."""
+
     def nll(p):
         beta, gamma = np.exp(p[0]), -np.exp(p[1])
-        lp = genextreme.logpdf(data, c=-gamma, loc=z_star_assumed_t + beta / gamma, scale=beta)
+        lp = genextreme.logpdf(
+            data, c=-gamma, loc=z_star_assumed_t + beta / gamma, scale=beta
+        )
         return 1e12 if not np.all(np.isfinite(lp)) else -float(np.sum(lp))
+
     bg = _fit_value(fit, "beta_guess", 1.0)
     gg = _fit_value(fit, "gamma_guess", -0.1)
-    r = minimize(nll, [float(np.log(max(bg, 1e-3))), float(np.log(max(-gg, 1e-3)))],
-                 method="L-BFGS-B")
+    r = minimize(
+        nll,
+        [float(np.log(max(bg, 1e-3))), float(np.log(max(-gg, 1e-3)))],
+        method="L-BFGS-B",
+    )
     return float(np.exp(r.x[0])), float(-np.exp(r.x[1]))
 
 
@@ -163,11 +176,15 @@ def fit_nonstationary_unbounded(
 
     alpha0 = tf.Variable(alpha0_guess, dtype=tf.float32)
     alpha1 = tf.Variable(slope_guess, dtype=tf.float32)
-    beta = tf.Variable(beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg())
+    beta = tf.Variable(
+        beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+    )
 
     force_weibull = bool(fit.force_weibull) if "force_weibull" in fit else False
     if force_weibull:
-        neg_gamma = tf.Variable(-gamma_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg())
+        neg_gamma = tf.Variable(
+            -gamma_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+        )
     else:
         neg_gamma = tf.Variable(-gamma_guess, dtype=tf.float32)
 
@@ -227,8 +244,12 @@ def fit_nonstationary_bounded(
 
     beta_guess = _fit_value(fit, "beta_guess", 1.0)
     gamma_guess = _fit_value(fit, "gamma_guess", -0.1)
-    beta = tf.Variable(beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg())
-    neg_gamma = tf.Variable(-gamma_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg())
+    beta = tf.Variable(
+        beta_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+    )
+    neg_gamma = tf.Variable(
+        -gamma_guess, dtype=tf.float32, constraint=tf.keras.constraints.NonNeg()
+    )
 
     optimizer = _adam_optimizer(learning_rate=_fit_value(fit, "lr", 0.01))
 
@@ -330,7 +351,11 @@ def run_single_experiment(
     # parameter uncertainty (model choice, supergradient factor, surge-model bias),
     # which -- unlike independent year-to-year noise -- cannot be averaged away.
     sigma = float(config.z_star_assumed_sigma)
-    mode = str(config.bound_uncertainty_mode) if "bound_uncertainty_mode" in config else "systematic"
+    mode = (
+        str(config.bound_uncertainty_mode)
+        if "bound_uncertainty_mode" in config
+        else "systematic"
+    )
     if mode == "per_year":
         bound_noise = rng.normal(0.0, sigma, size=n_years)
     else:  # "systematic"
@@ -389,7 +414,9 @@ def run_single_experiment(
     loc_su = alpha_su
     loc_sb = alpha_sb
     loc_nu = a0_nu + a1_nu * time_axis[-1]
-    loc_nb = float(alpha_from_z_star_beta_gamma(z_star_assumed_t[-1], beta_nb, gamma_nb))
+    loc_nb = float(
+        alpha_from_z_star_beta_gamma(z_star_assumed_t[-1], beta_nb, gamma_nb)
+    )
 
     rv_est = np.array(
         [
@@ -480,7 +507,9 @@ def get_fit_ds(config: DictConfig) -> xr.Dataset:
     return ds
 
 
-def _seed_summary(da: xr.DataArray, lp: float, up: float) -> Tuple[xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]:
+def _seed_summary(
+    da: xr.DataArray, lp: float, up: float
+) -> Tuple[xr.DataArray, xr.DataArray, xr.DataArray, xr.DataArray]:
     """Summarize over seed axis using mean and 5-95 envelope statistics."""
     mn = da.mean(dim="seed", skipna=True)
     lower = da.quantile(lp, dim="seed", skipna=True).drop_vars("quantile")
@@ -675,7 +704,9 @@ def plot_fit_ds(config: DictConfig, ds: xr.Dataset) -> None:
         ax.set_xlim(trend_min, trend_max)
         ax.margins(x=0)
 
-    axs[0].legend(handles=top_handles, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=2)
+    axs[0].legend(
+        handles=top_handles, loc="lower center", bbox_to_anchor=(0.5, 1.02), ncol=2
+    )
     axs[2].legend(loc="upper left")
     axs[3].legend(loc="upper right", ncol=2)
     label_subplots(axs, override="outside")
@@ -714,7 +745,7 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
     plot_defaults()
 
     est, tru = ds["rv_est"], ds["rv_true"]
-    bias = (est.mean("seed", skipna=True) - tru.mean("seed", skipna=True))
+    bias = est.mean("seed", skipna=True) - tru.mean("seed", skipna=True)
     est_mn = est.mean("seed", skipna=True)
     true_mn = tru.mean("seed", skipna=True)
     elo = est.quantile(0.05, "seed", skipna=True).drop_vars("quantile")
@@ -727,51 +758,84 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
     name = _name_base(config)
 
     # --- Figure 1: return value + 5-95% envelope vs trend --------------------
-    fig, axs = plt.subplots(1, len(rps), figsize=get_dim(ratio=0.42), sharex=True,
-                            squeeze=False)
+    fig, axs = plt.subplots(
+        1, len(rps), figsize=get_dim(ratio=0.42), sharex=True, squeeze=False
+    )
     for j, rp in enumerate(rps):
         ax = axs[0, j]
         ax.plot(trends, true_mn.sel(rp=rp), color="black", lw=1.8, label="True")
-        ax.fill_between(trends, tlo.sel(rp=rp), thi.sel(rp=rp), color="black", alpha=0.10)
+        ax.fill_between(
+            trends, tlo.sel(rp=rp), thi.sel(rp=rp), color="black", alpha=0.10
+        )
         for fit in ("nonstationary_unbounded", "nonstationary_bounded"):
-            ax.plot(trends, est_mn.sel(fit=fit, rp=rp), color=_NS_COLORS[fit], lw=1.4,
-                    label=FIT_LABELS[fit])
-            ax.fill_between(trends, elo.sel(fit=fit, rp=rp), ehi.sel(fit=fit, rp=rp),
-                            color=_NS_COLORS[fit], alpha=0.18)
+            ax.plot(
+                trends,
+                est_mn.sel(fit=fit, rp=rp),
+                color=_NS_COLORS[fit],
+                lw=1.4,
+                label=FIT_LABELS[fit],
+            )
+            ax.fill_between(
+                trends,
+                elo.sel(fit=fit, rp=rp),
+                ehi.sel(fit=fit, rp=rp),
+                color=_NS_COLORS[fit],
+                alpha=0.18,
+            )
         for fit in ("stationary_unbounded", "stationary_bounded"):
-            ax.plot(trends, est_mn.sel(fit=fit, rp=rp), color=_NS_COLORS[fit],
-                    lw=1.0, ls=":", label=FIT_LABELS[fit])
+            ax.plot(
+                trends,
+                est_mn.sel(fit=fit, rp=rp),
+                color=_NS_COLORS[fit],
+                lw=1.0,
+                ls=":",
+                label=FIT_LABELS[fit],
+            )
         ax.set_title(f"RV{int(rp)}")
         ax.set_xlabel(r"Upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
-        ax.set_xlim(float(trends.min()), float(trends.max())); ax.margins(x=0)
+        ax.set_xlim(float(trends.min()), float(trends.max()))
+        ax.margins(x=0)
     axs[0, 0].set_ylabel("Return value [m]")
     axs[0, 0].legend(fontsize=7, loc="upper left")
     label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout()
     f1 = os.path.join(FIGURE_PATH, f"vary_nonstationary_rv_{name}.pdf")
-    plt.savefig(f1); plt.close(); print("wrote", f1)
+    plt.savefig(f1)
+    plt.close()
+    print("wrote", f1)
 
     # --- Figure 2: bias (top) and 5-95% range (bottom) vs trend --------------
-    fig, axs = plt.subplots(2, len(rps), figsize=get_dim(ratio=0.85), sharex=True,
-                            squeeze=False)
+    fig, axs = plt.subplots(
+        2, len(rps), figsize=get_dim(ratio=0.85), sharex=True, squeeze=False
+    )
     for j, rp in enumerate(rps):
         for fit in FIT_NAMES:
-            kw = dict(color=_NS_COLORS[fit], linestyle=_NS_LINESTYLE[fit], lw=1.6,
-                      marker=("o" if "nonstationary" in fit else None), markersize=3)
-            axs[0, j].plot(trends, bias.sel(fit=fit, rp=rp), label=FIT_LABELS[fit], **kw)
+            kw = dict(
+                color=_NS_COLORS[fit],
+                linestyle=_NS_LINESTYLE[fit],
+                lw=1.6,
+                marker=("o" if "nonstationary" in fit else None),
+                markersize=3,
+            )
+            axs[0, j].plot(
+                trends, bias.sel(fit=fit, rp=rp), label=FIT_LABELS[fit], **kw
+            )
             axs[1, j].plot(trends, width.sel(fit=fit, rp=rp), **kw)
         axs[0, j].axhline(0.0, color="grey", ls="--", lw=0.8)
         axs[0, j].set_title(f"RV{int(rp)}")
         axs[1, j].set_xlabel(r"Upper-bound trend, $dz^*/dt$ [m year$^{-1}$]")
         for ax in (axs[0, j], axs[1, j]):
-            ax.set_xlim(float(trends.min()), float(trends.max())); ax.margins(x=0)
+            ax.set_xlim(float(trends.min()), float(trends.max()))
+            ax.margins(x=0)
     axs[0, 0].set_ylabel("Bias [m]")
     axs[1, 0].set_ylabel("5--95% range [m]")
-    legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
+    legend_below(fig, axs[0, 0], ncol=2)  # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout(rect=[0, 0.08, 1, 1])
     f2 = os.path.join(FIGURE_PATH, f"vary_nonstationary_bias_range_{name}.pdf")
-    plt.savefig(f2, bbox_inches="tight"); plt.close(); print("wrote", f2)
+    plt.savefig(f2, bbox_inches="tight")
+    plt.close()
+    print("wrote", f2)
 
     # --- console summary (bias, 5-95% range, range ratio II-ns/I-ns) ---------
     it = int(np.argmin(np.abs(trends - 0.01)))
@@ -779,15 +843,21 @@ def plot_ns_skill(config: DictConfig, ds: xr.Dataset) -> None:
     for rp in rps:
         print(f"  RV{int(rp)}:   bias    5-95%range")
         for fit in FIT_NAMES:
-            print(f"    {FIT_LABELS[fit]:34s} "
-                  f"{float(bias.sel(fit=fit, rp=rp)[it]):+5.2f}   "
-                  f"{float(width.sel(fit=fit, rp=rp)[it]):5.2f}")
-        ratio = float(width.sel(fit="nonstationary_unbounded", rp=rp)[it]
-                      / width.sel(fit="nonstationary_bounded", rp=rp)[it])
+            print(
+                f"    {FIT_LABELS[fit]:34s} "
+                f"{float(bias.sel(fit=fit, rp=rp)[it]):+5.2f}   "
+                f"{float(width.sel(fit=fit, rp=rp)[it]):5.2f}"
+            )
+        ratio = float(
+            width.sel(fit="nonstationary_unbounded", rp=rp)[it]
+            / width.sel(fit="nonstationary_bounded", rp=rp)[it]
+        )
         print(f"    -> 5-95% range ratio II-ns / I-ns = {ratio:.2f}")
 
 
-@hydra.main(version_base=None, config_path=CONFIG_PATH, config_name="vary_nonstationary")
+@hydra.main(
+    version_base=None, config_path=CONFIG_PATH, config_name="vary_nonstationary"
+)
 def run_vary_nonstationary(config: DictConfig) -> None:
     """Hydra entrypoint for non-stationary synthetic EVT experiment."""
     print(config)

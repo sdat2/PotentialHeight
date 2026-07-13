@@ -68,10 +68,12 @@ os.makedirs(FIGURE_PATH, exist_ok=True)
 
 LOWER_VP_DEFAULT: float = 33  # m/s
 LOWER_WIND_OBS_DEFAULT: float = 33  # m/s
-NORM_VAR = ["normalized_intensity",
-            "normalized_size_pips",
-            "normalized_size_cps",
-            "normalized_size_cat1"]
+NORM_VAR = [
+    "normalized_intensity",
+    "normalized_size_pips",
+    "normalized_size_cps",
+    "normalized_size_cat1",
+]
 
 
 def download_ibtracs_data() -> None:
@@ -2815,18 +2817,32 @@ def plot_normalized_quad_dual(
     """
     plot_defaults()
     bf_ds = get_normalized_data(
-            lower_wind_vp=lower_wind_vp,
-            lower_wind_obs=lower_wind_obs
-            )
+        lower_wind_vp=lower_wind_vp, lower_wind_obs=lower_wind_obs
+    )
     af_ds = get_normalized_data(
-            lower_wind_vp=lower_wind_vp,
-            lower_wind_obs=lower_wind_obs,
-            min_sst_c=26.5,
-            max_abs_lat=30,
+        lower_wind_vp=lower_wind_vp,
+        lower_wind_obs=lower_wind_obs,
+        min_sst_c=26.5,
+        max_abs_lat=30,
+    )
+
+    def _plot_norm_var_panel(
+        ax, var: str, bins, ds1: xr.Dataset, ds2: xr.Dataset
+    ) -> None:
+        ax.hist(
+            ds1[var].values.ravel(),
+            bins=bins,
+            alpha=0.5,
+            color="blue",
+            label=f"SF: {_perc_gt_1(ds1[var].values):.1f}%",
         )
-    def _plot_norm_var_panel(ax, var: str, bins, ds1: xr.Dataset, ds2: xr.Dataset) -> None:
-        ax.hist(ds1[var].values.ravel(), bins=bins, alpha=0.5, color="blue", label=f"SF: {_perc_gt_1(ds1[var].values):.1f}%")
-        ax.hist(ds2[var].values.ravel(), bins=bins, alpha=0.5, color="green", label=f"AF: {_perc_gt_1(ds2[var].values):.1f}%")
+        ax.hist(
+            ds2[var].values.ravel(),
+            bins=bins,
+            alpha=0.5,
+            color="green",
+            label=f"AF: {_perc_gt_1(ds2[var].values):.1f}%",
+        )
         ax.legend()
 
     fig, axs = plt.subplots(
@@ -2853,8 +2869,9 @@ def plot_normalized_quad_dual(
     )
     plt.clf()
     plt.close()
+
     def max_norm_ds_f(ds: xr.Dataset) -> xr.Dataset:
-        out_d  = {}
+        out_d = {}
         for norm_var in NORM_VAR:
             out_d[norm_var] = ds[norm_var].max(dim="date_time")
         return xr.Dataset(out_d)
@@ -2862,7 +2879,9 @@ def plot_normalized_quad_dual(
     max_bf_ds = max_norm_ds_f(bf_ds)
     max_af_ds = max_norm_ds_f(af_ds)
 
-    def _plot_max_norm_var_panel(ax, var: str, ds1: xr.Dataset, ds2: xr.Dataset) -> None:
+    def _plot_max_norm_var_panel(
+        ax, var: str, ds1: xr.Dataset, ds2: xr.Dataset
+    ) -> None:
         ax.plot(
             np.sort(_processed_array(ds1[var].values)),
             _proc_to_sf(ds1[var].values),
@@ -2878,6 +2897,7 @@ def plot_normalized_quad_dual(
             label=f"AF: {_find_survival_value_at_thresh(ds2[var].values, 1.0)*100:.1f}%",
         )
         ax.legend()
+
     fig, axs = plt.subplots(
         1,
         4,

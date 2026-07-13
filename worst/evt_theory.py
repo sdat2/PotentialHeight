@@ -48,6 +48,7 @@ from scipy.optimize import minimize
 from scipy.stats import genextreme
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
@@ -62,14 +63,14 @@ np.seterr(all="ignore")
 
 # --- reference GEV (Weibull domain) ----------------------------------------
 MU, SIG, XI = 2.0, 1.0, -0.2
-ZSTAR = MU - SIG / XI                       # = 7.0, the true upper endpoint (potential height)
-RPS = {100: 0.01, 500: 0.002}              # return period -> exceedance prob p
-W = {k: -np.log(-np.log(1 - p)) for k, p in RPS.items()}   # Gumbel reduced variate w_p
+ZSTAR = MU - SIG / XI  # = 7.0, the true upper endpoint (potential height)
+RPS = {100: 0.01, 500: 0.002}  # return period -> exceedance prob p
+W = {k: -np.log(-np.log(1 - p)) for k, p in RPS.items()}  # Gumbel reduced variate w_p
 # Gumbel-limit plateau and Fisher slope at the reference GEV (RV500), cached for the closed
 # form / window; recomputed and checked against this in :func:`gumbel_plateau`.
 B_INF_REF = {100: 1.369, 500: 2.390}
 C_P_REF = {100: 0.177, 500: 0.292}
-E_GN_50 = 2.1                               # E[G_n] safeguard gap at n=50 (Lemma: gap law)
+E_GN_50 = 2.1  # E[G_n] safeguard gap at n=50 (Lemma: gap law)
 
 # simulation caches (NetCDF, like worst.sigma_robustness) -- the slow Monte-Carlo is cached so
 # re-plotting / restyling is instant; pass refresh=True (or `--refresh`) to recompute.
@@ -86,7 +87,9 @@ def _paper_img_path() -> str:
     """
     env = os.environ.get("WORSTSURGE_PAPER_ROOT")
     candidates = ([Path(env)] if env else []) + [
-        Path.home() / "thesis", PROJ_PATH.parent, PROJ_PATH,
+        Path.home() / "thesis",
+        PROJ_PATH.parent,
+        PROJ_PATH,
     ]
     for c in candidates:
         if (c / "paper" / "evt_theory.tex").is_file():
@@ -117,13 +120,15 @@ ZP_TRUE = {k: return_level(MU, SIG, XI, p) for k, p in RPS.items()}
 #  Population (pseudo-true) quantities: the saturating bias and its Gumbel plateau
 # ======================================================================================
 def _population_sample(size: int, seed: int = 0) -> np.ndarray:
-    return genextreme.rvs(c=-XI, loc=MU, scale=SIG, size=size, random_state=np.random.default_rng(seed))
+    return genextreme.rvs(
+        c=-XI, loc=MU, scale=SIG, size=size, random_state=np.random.default_rng(seed)
+    )
 
 
 def _neg_loglik_gev_constrained(par, x, psi):
     """-E_hat[log f] for the bounded GEV with endpoint fixed at ``psi`` (params log-sig, log(-xi))."""
     sig, xi = np.exp(par[0]), -np.exp(par[1])
-    t = xi * (x - psi) / sig                      # = 1 + xi (x-mu)/sig with mu = psi + sig/xi
+    t = xi * (x - psi) / sig  # = 1 + xi (x-mu)/sig with mu = psi + sig/xi
     if np.any(t <= 0):
         return 1e9
     return -np.mean(-np.log(sig) - (1 + 1 / xi) * np.log(t) - t ** (-1 / xi))
@@ -146,8 +151,13 @@ def gumbel_plateau(size: int = 3_000_000, seed: int = 0):
     Returns ``(b_inf: dict, (mu_G, sig_G))``.
     """
     x = _population_sample(size, seed)
-    r = minimize(_neg_loglik_gumbel, [2.0, 0.0], args=(x,), method="Nelder-Mead",
-                 options=dict(xatol=1e-9, fatol=1e-11, maxiter=20000))
+    r = minimize(
+        _neg_loglik_gumbel,
+        [2.0, 0.0],
+        args=(x,),
+        method="Nelder-Mead",
+        options=dict(xatol=1e-9, fatol=1e-11, maxiter=20000),
+    )
     mu_g, sig_g = r.x[0], np.exp(r.x[1])
     b_inf = {k: (mu_g + sig_g * W[k]) - ZP_TRUE[k] for k in RPS}
     return b_inf, (mu_g, sig_g)
@@ -163,14 +173,19 @@ def saturating_bias_curve(us, size: int = 3_000_000, seed: int = 0):
     par = [0.0, np.log(0.2)]
     bias = {k: [] for k in RPS}
     for u in us:
-        r = minimize(_neg_loglik_gev_constrained, par, args=(x, ZSTAR + u), method="Nelder-Mead",
-                     options=dict(xatol=1e-9, fatol=1e-10, maxiter=8000))
-        par = r.x                                 # warm-start the next u
+        r = minimize(
+            _neg_loglik_gev_constrained,
+            par,
+            args=(x, ZSTAR + u),
+            method="Nelder-Mead",
+            options=dict(xatol=1e-9, fatol=1e-10, maxiter=8000),
+        )
+        par = r.x  # warm-start the next u
         s, xi = np.exp(r.x[0]), -np.exp(r.x[1])
         for k, p in RPS.items():
             bias[k].append(_rl_from_endpoint(ZSTAR + u, s, xi, p) - ZP_TRUE[k])
     bias = {k: np.array(v) for k, v in bias.items()}
-    cp = {k: bias[k][0] / us[0] for k in RPS}     # slope from the first (small-u) point
+    cp = {k: bias[k][0] / us[0] for k in RPS}  # slope from the first (small-u) point
     return bias, cp
 
 
@@ -185,23 +200,36 @@ def fisher_information(size: int = 2_000_000, seed: int = 1) -> np.ndarray:
     def logf(th):
         mu, sig, xi = th
         t = 1 + xi * (x - mu) / sig
-        return np.where(t > 0, -np.log(sig) - (1 + 1 / xi) * np.log(np.maximum(t, 1e-300))
-                        - t ** (-1 / xi), -1e6)
+        return np.where(
+            t > 0,
+            -np.log(sig)
+            - (1 + 1 / xi) * np.log(np.maximum(t, 1e-300))
+            - t ** (-1 / xi),
+            -1e6,
+        )
 
     th0, e, H = [MU, SIG, XI], 1e-4, np.zeros((3, 3))
     for i in range(3):
         for j in range(3):
             tpp, tpm, tmp, tmm = (th0.copy() for _ in range(4))
-            tpp[i] += e; tpp[j] += e; tpm[i] += e; tpm[j] -= e
-            tmp[i] -= e; tmp[j] += e; tmm[i] -= e; tmm[j] -= e
-            H[i, j] = np.mean((logf(tpp) - logf(tpm) - logf(tmp) + logf(tmm)) / (4 * e * e))
+            tpp[i] += e
+            tpp[j] += e
+            tpm[i] += e
+            tpm[j] -= e
+            tmp[i] -= e
+            tmp[j] += e
+            tmm[i] -= e
+            tmm[j] -= e
+            H[i, j] = np.mean(
+                (logf(tpp) - logf(tpm) - logf(tmp) + logf(tmm)) / (4 * e * e)
+            )
     return -H
 
 
 def asymptotic_se_zstar(I3: np.ndarray, n: int) -> float:
     """Leading-order ``SE(z*hat) = sqrt((I^-1)_{psi psi}/n)``; grad of ``z*=mu-sig/xi`` is
     ``(1, -1/xi, sig/xi^2)``.  Exactly return-period independent."""
-    gz = np.array([1.0, -1 / XI, SIG / XI ** 2])
+    gz = np.array([1.0, -1 / XI, SIG / XI**2])
     return float(np.sqrt(gz @ np.linalg.inv(I3) @ gz / n))
 
 
@@ -216,23 +244,39 @@ def cornish_fisher_RII(I3: np.ndarray, n: int, p: float = 0.002) -> float:
     th, e = [MU, SIG, XI], 1e-5
     g, Hn = np.zeros(3), np.zeros((3, 3))
     for i in range(3):
-        tp, tm = th.copy(), th.copy(); tp[i] += e; tm[i] -= e
+        tp, tm = th.copy(), th.copy()
+        tp[i] += e
+        tm[i] -= e
         g[i] = (zfull(*tp) - zfull(*tm)) / (2 * e)
     for i in range(3):
         for j in range(3):
             tpp, tpm, tmp, tmm = (th.copy() for _ in range(4))
-            tpp[i] += e; tpp[j] += e; tpm[i] += e; tpm[j] -= e
-            tmp[i] -= e; tmp[j] += e; tmm[i] -= e; tmm[j] -= e
-            Hn[i, j] = (zfull(*tpp) - zfull(*tpm) - zfull(*tmp) + zfull(*tmm)) / (4 * e * e)
+            tpp[i] += e
+            tpp[j] += e
+            tpm[i] += e
+            tpm[j] -= e
+            tmp[i] -= e
+            tmp[j] += e
+            tmm[i] -= e
+            tmm[j] -= e
+            Hn[i, j] = (zfull(*tpp) - zfull(*tpm) - zfull(*tmp) + zfull(*tmm)) / (
+                4 * e * e
+            )
     S = np.linalg.inv(I3) / n
     k2 = g @ S @ g + 0.5 * np.trace(S @ Hn @ S @ Hn)
     k3 = 3 * g @ S @ Hn @ S @ g + np.trace(S @ Hn @ S @ Hn @ S @ Hn)
-    k4 = 12 * g @ S @ Hn @ S @ Hn @ S @ g + 3 * np.trace(S @ Hn @ S @ Hn @ S @ Hn @ S @ Hn)
-    g1, g2 = k3 / k2 ** 1.5, k4 / k2 ** 2
+    k4 = 12 * g @ S @ Hn @ S @ Hn @ S @ g + 3 * np.trace(
+        S @ Hn @ S @ Hn @ S @ Hn @ S @ Hn
+    )
+    g1, g2 = k3 / k2**1.5, k4 / k2**2
 
     def cf(za):
-        return (za + g1 / 6 * (za ** 2 - 1) + g2 / 24 * (za ** 3 - 3 * za)
-                - g1 ** 2 / 36 * (2 * za ** 3 - 5 * za))
+        return (
+            za
+            + g1 / 6 * (za**2 - 1)
+            + g2 / 24 * (za**3 - 3 * za)
+            - g1**2 / 36 * (2 * za**3 - 5 * za)
+        )
 
     return float(np.sqrt(k2) * (cf(1.645) - cf(-1.645)))
 
@@ -241,7 +285,8 @@ def cornish_fisher_RII(I3: np.ndarray, n: int, p: float = 0.002) -> float:
 #  Direct GEV-fit simulation: ground-truth R_II, SE, and the clipped crossover sigma*(n)
 # ======================================================================================
 def _nll_unb(par, d):
-    mu, ls, lx = par; s, x = np.exp(ls), -np.exp(lx)
+    mu, ls, lx = par
+    s, x = np.exp(ls), -np.exp(lx)
     t = 1 + x * (d - mu) / s
     if np.any(t <= 0):
         return 1e12
@@ -249,7 +294,8 @@ def _nll_unb(par, d):
 
 
 def _nll_bnd(par, d, zst):
-    ls, lx = par; s, x = np.exp(ls), -np.exp(lx)
+    ls, lx = par
+    s, x = np.exp(ls), -np.exp(lx)
     mu = zst + s / x
     t = 1 + x * (d - mu) / s
     if np.any(t <= 0):
@@ -258,20 +304,36 @@ def _nll_bnd(par, d, zst):
 
 
 def _fit_unb(d, p):
-    r = minimize(_nll_unb, [np.median(d), 0.0, np.log(0.2)], args=(d,), method="Nelder-Mead",
-                 options=dict(xatol=1e-7, fatol=1e-7, maxiter=6000))
+    r = minimize(
+        _nll_unb,
+        [np.median(d), 0.0, np.log(0.2)],
+        args=(d,),
+        method="Nelder-Mead",
+        options=dict(xatol=1e-7, fatol=1e-7, maxiter=6000),
+    )
     return return_level(r.x[0], np.exp(r.x[1]), -np.exp(r.x[2]), p)
 
 
 def _fit_bnd(d, zst, p):
-    zst = max(zst, d.max() + 1e-6)            # empirical-max clip: the bound cannot lie below the data
-    r = minimize(_nll_bnd, [0.0, np.log(0.2)], args=(d, zst), method="Nelder-Mead",
-                 options=dict(xatol=1e-7, fatol=1e-7, maxiter=6000))
+    zst = max(
+        zst, d.max() + 1e-6
+    )  # empirical-max clip: the bound cannot lie below the data
+    r = minimize(
+        _nll_bnd,
+        [0.0, np.log(0.2)],
+        args=(d, zst),
+        method="Nelder-Mead",
+        options=dict(xatol=1e-7, fatol=1e-7, maxiter=6000),
+    )
     return _rl_from_endpoint(zst, np.exp(r.x[0]), -np.exp(r.x[1]), p)
 
 
-def simulate_crossover(n: int, n_rep: int = 700, p: float = 0.002,
-                       sigmas=(0.25, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12)):
+def simulate_crossover(
+    n: int,
+    n_rep: int = 700,
+    p: float = 0.002,
+    sigmas=(0.25, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12),
+):
     """Direct simulation at record length ``n``: unbounded range ``R_II``, robust endpoint SE,
     and the bound-uncertainty ``sigma_z*`` at which the clipped-bounded 5--95% range first
     overtakes ``R_II`` (the crossover).  Returns ``(R_II, se_robust, crossover, sigmas, ranges_I)``.
@@ -280,11 +342,24 @@ def simulate_crossover(n: int, n_rep: int = 700, p: float = 0.002,
     D = genextreme.rvs(c=-XI, loc=MU, scale=SIG, size=(n_rep, n), random_state=g)
     zII = np.array([_fit_unb(d, p) for d in D])
     rII = np.nanquantile(zII, 0.95) - np.nanquantile(zII, 0.05)
-    pu = np.array([minimize(_nll_unb, [np.median(d), 0.0, np.log(0.2)], args=(d,),
-                            method="Nelder-Mead", options=dict(xatol=1e-7, fatol=1e-7, maxiter=6000)).x
-                   for d in D])
-    zstar = pu[:, 0] - np.exp(pu[:, 1]) / (-np.exp(pu[:, 2]))      # mu - sig/xi (heavy-tailed: use robust scale)
-    se_robust = (np.nanquantile(zstar, 0.95) - np.nanquantile(zstar, 0.05)) / (2 * 1.645)
+    pu = np.array(
+        [
+            minimize(
+                _nll_unb,
+                [np.median(d), 0.0, np.log(0.2)],
+                args=(d,),
+                method="Nelder-Mead",
+                options=dict(xatol=1e-7, fatol=1e-7, maxiter=6000),
+            ).x
+            for d in D
+        ]
+    )
+    zstar = pu[:, 0] - np.exp(pu[:, 1]) / (
+        -np.exp(pu[:, 2])
+    )  # mu - sig/xi (heavy-tailed: use robust scale)
+    se_robust = (np.nanquantile(zstar, 0.95) - np.nanquantile(zstar, 0.05)) / (
+        2 * 1.645
+    )
     sigmas = np.asarray(sigmas, dtype=float)
     ranges_I = []
     for sz in sigmas:
@@ -294,19 +369,27 @@ def simulate_crossover(n: int, n_rep: int = 700, p: float = 0.002,
     ranges_I = np.array(ranges_I)
     above = ranges_I >= rII
     if not above.any():
-        cx = np.nan                                  # bounded always tighter -> crossover beyond grid
+        cx = np.nan  # bounded always tighter -> crossover beyond grid
     elif above[0]:
         cx = sigmas[0]
     else:
         i = int(np.argmax(above))
-        cx = float(np.interp(0, [ranges_I[i - 1] - rII, ranges_I[i] - rII], [sigmas[i - 1], sigmas[i]]))
+        cx = float(
+            np.interp(
+                0,
+                [ranges_I[i - 1] - rII, ranges_I[i] - rII],
+                [sigmas[i - 1], sigmas[i]],
+            )
+        )
     return rII, se_robust, cx, sigmas, ranges_I
 
 
 # ======================================================================================
 #  Closed-form crossover and the existence window (from the saturating bias)
 # ======================================================================================
-def closed_form_crossover(R_II: float, n: int, b_inf: float, c_p: float, e_gn_50: float = E_GN_50):
+def closed_form_crossover(
+    R_II: float, n: int, b_inf: float, c_p: float, e_gn_50: float = E_GN_50
+):
     """Saturating closed-form crossover, valid inside the window; ``nan`` otherwise:
 
     ``sigma* = (b_inf / 1.645 c_p) log[ b_inf / (b_inf - (R_II - c_p Gbar)) ]``.
@@ -333,9 +416,11 @@ def get_saturation_ds(size: int = 3_000_000, refresh: bool = False) -> xr.Datase
     bias, cp = saturating_bias_curve(us, size)
     rp = list(RPS)
     ds = xr.Dataset(
-        {"bias": (("rp", "u"), np.array([bias[k] for k in rp])),
-         "b_inf": (("rp",), np.array([b_inf[k] for k in rp])),
-         "c_p": (("rp",), np.array([cp[k] for k in rp]))},
+        {
+            "bias": (("rp", "u"), np.array([bias[k] for k in rp])),
+            "b_inf": (("rp",), np.array([b_inf[k] for k in rp])),
+            "c_p": (("rp",), np.array([cp[k] for k in rp])),
+        },
         coords={"rp": rp, "u": us},
         attrs={"mu_g": float(mu_g), "sig_g": float(sig_g), "size": int(size)},
     )
@@ -356,7 +441,8 @@ def get_crossover_ds(n_rep: int = 700, refresh: bool = False) -> xr.Dataset:
         print(f"  n={int(n):4d}  R_II={rII_s[i]:.2f}  crossover={cx_s[i]:.2f} m")
     ds = xr.Dataset(
         {"R_II": (("n",), rII_s), "crossover": (("n",), cx_s)},
-        coords={"n": ns}, attrs={"n_rep": int(n_rep)},
+        coords={"n": ns},
+        attrs={"n_rep": int(n_rep)},
     )
     ds.to_netcdf(CROSS_CACHE)
     print(f"  cached -> {CROSS_CACHE}")
@@ -366,45 +452,91 @@ def get_crossover_ds(n_rep: int = 700, refresh: bool = False) -> xr.Dataset:
 # ======================================================================================
 #  Figures (plot from the cached datasets -- restyling is instant, no resimulation)
 # ======================================================================================
-def make_saturation_fig(ds: xr.Dataset | None = None, out_dir: str | None = None,
-                        size: int = 3_000_000, refresh: bool = False) -> xr.Dataset:
+def make_saturation_fig(
+    ds: xr.Dataset | None = None,
+    out_dir: str | None = None,
+    size: int = 3_000_000,
+    refresh: bool = False,
+) -> xr.Dataset:
     """Generate ``evt_saturation.pdf`` from the cached saturation dataset."""
     out_dir = out_dir or _paper_img_path()
     ds = ds if ds is not None else get_saturation_ds(size=size, refresh=refresh)
     plot_defaults()
     us = ds.u.values
 
-    def _logfit(b):                               # the (wrong) local log fit, for the overlay
-        return min(((np.sum((b - (A := np.sum(b * np.log(1 + us / U)) / np.sum(np.log(1 + us / U) ** 2))
-                             * np.log(1 + us / U)) ** 2), A, U)
-                    for U in np.linspace(0.2, 30, 400)), key=lambda t: t[0])
+    def _logfit(b):  # the (wrong) local log fit, for the overlay
+        return min(
+            (
+                (
+                    np.sum(
+                        (
+                            b
+                            - (
+                                A := np.sum(b * np.log(1 + us / U))
+                                / np.sum(np.log(1 + us / U) ** 2)
+                            )
+                            * np.log(1 + us / U)
+                        )
+                        ** 2
+                    ),
+                    A,
+                    U,
+                )
+                for U in np.linspace(0.2, 30, 400)
+            ),
+            key=lambda t: t[0],
+        )
 
     fig, axs = plt.subplots(1, 2, figsize=get_dim(ratio=0.5))
     uplot = np.linspace(0, 60, 400)
     for ax, k in zip(axs, (100, 500)):
         b = ds.bias.sel(rp=k).values
-        b_inf = float(ds.b_inf.sel(rp=k)); cp = float(ds.c_p.sel(rp=k))
+        b_inf = float(ds.b_inf.sel(rp=k))
+        cp = float(ds.c_p.sel(rp=k))
         _, A, U = _logfit(b)
-        ax.plot(us, b, "o", ms=3.0, color="#1f77b4", label=r"Pseudo-true $b_p(u)$", zorder=5)
-        ax.axhline(b_inf, ls="--", color="#2ca02c", lw=1.4,
-                   label=fr"Plateau $b_\infty={b_inf:.2f}$")
-        ax.plot(uplot, A * np.log(1 + uplot / U), ":", color="#d62728", lw=1.5,
-                label="Local log fit")
-        ax.plot([0, 6], [0, 6 * cp], "-", color="grey", lw=1.0, label=r"Fisher slope $c_p$")
-        ax.set_xlim(0, 60); ax.set_ylim(0, max(b_inf * 1.25, A * np.log(1 + 60 / U)))
-        ax.set_xlabel(r"Bound margin $u=\hat z^*-z^*$ [m]"); ax.set_title(f"1-in-{k} yr")
+        ax.plot(
+            us, b, "o", ms=3.0, color="#1f77b4", label=r"Pseudo-true $b_p(u)$", zorder=5
+        )
+        ax.axhline(
+            b_inf,
+            ls="--",
+            color="#2ca02c",
+            lw=1.4,
+            label=rf"Plateau $b_\infty={b_inf:.2f}$",
+        )
+        ax.plot(
+            uplot,
+            A * np.log(1 + uplot / U),
+            ":",
+            color="#d62728",
+            lw=1.5,
+            label="Local log fit",
+        )
+        ax.plot(
+            [0, 6], [0, 6 * cp], "-", color="grey", lw=1.0, label=r"Fisher slope $c_p$"
+        )
+        ax.set_xlim(0, 60)
+        ax.set_ylim(0, max(b_inf * 1.25, A * np.log(1 + 60 / U)))
+        ax.set_xlabel(r"Bound margin $u=\hat z^*-z^*$ [m]")
+        ax.set_title(f"1-in-{k} yr")
         ax.grid(alpha=0.3)
     axs[0].set_ylabel(r"Pseudo-true bias $b_p$ [m]")
-    legend_below(fig, axs[0], ncol=4)                # shared legend below -> no data overlap
+    legend_below(fig, axs[0], ncol=4)  # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")
     out = os.path.join(out_dir, "evt_saturation.pdf")
-    fig.tight_layout(rect=[0, 0.08, 1, 1]); fig.savefig(out, bbox_inches="tight"); plt.close(fig)
+    fig.tight_layout(rect=[0, 0.08, 1, 1])
+    fig.savefig(out, bbox_inches="tight")
+    plt.close(fig)
     print("  wrote", out)
     return ds
 
 
-def make_closedform_fig(ds: xr.Dataset | None = None, out_dir: str | None = None,
-                       n_rep: int = 700, refresh: bool = False) -> None:
+def make_closedform_fig(
+    ds: xr.Dataset | None = None,
+    out_dir: str | None = None,
+    n_rep: int = 700,
+    refresh: bool = False,
+) -> None:
     """Generate ``evt_closedform.pdf`` (RV500) from the cached crossover dataset: simulated
     crossover, saturating closed form, and the existence window."""
     out_dir = out_dir or _paper_img_path()
@@ -424,43 +556,86 @@ def make_closedform_fig(ds: xr.Dataset | None = None, out_dir: str | None = None
         return E_GN_50 * (50.0 / np.asarray(n, float)) ** 0.2
 
     def se_asymp(n):
-        return 1.8 * np.sqrt(50.0 / np.asarray(n, float))     # leading-order, p-independent
+        return 1.8 * np.sqrt(
+            50.0 / np.asarray(n, float)
+        )  # leading-order, p-independent
 
     ng = np.logspace(np.log10(20), np.log10(500), 200)
-    cl = np.array([closed_form_crossover(float(RII(n)), float(n), b_inf, c_p) for n in ng])
+    cl = np.array(
+        [closed_form_crossover(float(RII(n)), float(n), b_inf, c_p) for n in ng]
+    )
     nn = np.logspace(np.log10(15), np.log10(9000), 500)
     rii_n, saf, up = RII(nn), c_p * gbar(nn), b_inf + c_p * gbar(nn)
     n_lo = nn[np.argmin(np.abs(rii_n - saf))]
     n_hi = nn[np.argmin(np.abs(rii_n - up))]
-    print(f"  R_II ~ {A:.2f} n^-1/2 ;  window n_hi ~ {n_hi:.0f} yr ,  n_lo ~ {n_lo:.0f} yr")
+    print(
+        f"  R_II ~ {A:.2f} n^-1/2 ;  window n_hi ~ {n_hi:.0f} yr ,  n_lo ~ {n_lo:.0f} yr"
+    )
 
     fig, (axL, axR) = plt.subplots(1, 2, figsize=get_dim(ratio=0.5))
     axL.plot(ng, cl, "-", color="#d62728", lw=1.6, label="Saturating closed form")
     axL.plot(ns, cx_s, "k*", ms=8, label="Full GEV-fit simulation")
-    axL.plot(ng, se_asymp(ng), ":", color="grey", lw=1.2, label=r"Asymptotic $\mathrm{SE}(\hat z^*)$")
-    axL.set_xscale("log"); axL.set_yscale("log")
-    axL.set_xlabel(r"Record length $n$ [years]"); axL.set_ylabel(r"Crossover $\sigma^*$ [m]")
+    axL.plot(
+        ng,
+        se_asymp(ng),
+        ":",
+        color="grey",
+        lw=1.2,
+        label=r"Asymptotic $\mathrm{SE}(\hat z^*)$",
+    )
+    axL.set_xscale("log")
+    axL.set_yscale("log")
+    axL.set_xlabel(r"Record length $n$ [years]")
+    axL.set_ylabel(r"Crossover $\sigma^*$ [m]")
     axL.set_title("Crossover, 1-in-500 yr")
-    axL.legend(fontsize=7, loc="lower left", framealpha=0.95); axL.grid(alpha=0.3, which="both")
-    axL.annotate(r"Closed form $\approx1.6\times$ sim",
-                 (70, closed_form_crossover(float(RII(70)), 70, b_inf, c_p)), (90, 8.5),
-                 fontsize=7, color="#d62728", arrowprops=dict(arrowstyle="->", color="#d62728", lw=0.8))
+    axL.legend(fontsize=7, loc="lower left", framealpha=0.95)
+    axL.grid(alpha=0.3, which="both")
+    axL.annotate(
+        r"Closed form $\approx1.6\times$ sim",
+        (70, closed_form_crossover(float(RII(70)), 70, b_inf, c_p)),
+        (90, 8.5),
+        fontsize=7,
+        color="#d62728",
+        arrowprops=dict(arrowstyle="->", color="#d62728", lw=0.8),
+    )
 
-    axR.fill_between(nn, 0.05, 12, where=(rii_n > saf) & (rii_n < up), color="green", alpha=0.07)
-    axR.plot(nn, rii_n, color="#1f77b4", lw=1.6, label=r"Data range $R_{II}\sim n^{-1/2}$")
-    axR.plot(nn, saf, color="#ff7f0e", lw=1.6, label=r"Lower edge $c_p\bar G\sim n^{-|\xi|}$")
+    axR.fill_between(
+        nn, 0.05, 12, where=(rii_n > saf) & (rii_n < up), color="green", alpha=0.07
+    )
+    axR.plot(
+        nn, rii_n, color="#1f77b4", lw=1.6, label=r"Data range $R_{II}\sim n^{-1/2}$"
+    )
+    axR.plot(
+        nn, saf, color="#ff7f0e", lw=1.6, label=r"Lower edge $c_p\bar G\sim n^{-|\xi|}$"
+    )
     axR.plot(nn, up, color="#9467bd", lw=1.6, label=r"Upper edge $b_\infty+c_p\bar G$")
-    for nt, lab, dy in ((n_lo, fr"$n_{{\rm lo}}\approx{n_lo:.0f}$ yr", 0.12),
-                        (n_hi, fr"$n_{{\rm hi}}\approx{n_hi:.0f}$ yr", 5.0)):
-        axR.axvline(nt, ls="--", color="k", lw=0.9); axR.text(nt * 1.04, dy, lab, fontsize=7)
-    axR.text(np.sqrt(n_hi * n_lo), 0.5, "Bound helps\n(window)", ha="center", fontsize=7, color="green")
-    axR.set_xscale("log"); axR.set_yscale("log"); axR.set_ylim(0.08, 12)
-    axR.set_xlabel(r"Record length $n$ [years]"); axR.set_ylabel("[m]")
-    axR.set_title("Existence window"); axR.legend(fontsize=7, loc="upper right", framealpha=0.95)
+    for nt, lab, dy in (
+        (n_lo, rf"$n_{{\rm lo}}\approx{n_lo:.0f}$ yr", 0.12),
+        (n_hi, rf"$n_{{\rm hi}}\approx{n_hi:.0f}$ yr", 5.0),
+    ):
+        axR.axvline(nt, ls="--", color="k", lw=0.9)
+        axR.text(nt * 1.04, dy, lab, fontsize=7)
+    axR.text(
+        np.sqrt(n_hi * n_lo),
+        0.5,
+        "Bound helps\n(window)",
+        ha="center",
+        fontsize=7,
+        color="green",
+    )
+    axR.set_xscale("log")
+    axR.set_yscale("log")
+    axR.set_ylim(0.08, 12)
+    axR.set_xlabel(r"Record length $n$ [years]")
+    axR.set_ylabel("[m]")
+    axR.set_title("Existence window")
+    axR.legend(fontsize=7, loc="upper right", framealpha=0.95)
     axR.grid(alpha=0.3, which="both")
     label_subplots([axL, axR], override="outside")
     out = os.path.join(out_dir, "evt_closedform.pdf")
-    fig.tight_layout(); fig.savefig(out); plt.close(fig)
+    fig.tight_layout()
+    fig.savefig(out)
+    plt.close(fig)
     print("  wrote", out)
 
 
@@ -468,19 +643,35 @@ def diagnostics(n_rep: int = 800) -> None:
     """Print the ground-truth calibration table (R_II, both SE definitions, crossover)."""
     I3 = fisher_information()
     print("Ground-truth diagnostics (RV500):")
-    print(f"{'n':>5} {'R_II_sim':>9} {'R_II_CF':>8} {'SE_asymp':>9} {'SE_robust':>10} {'crossover':>10}")
-    for n in (50, 100, 200, 400):   # n<~26 is the degenerate upper window edge (endpoint SE diverges)
+    print(
+        f"{'n':>5} {'R_II_sim':>9} {'R_II_CF':>8} {'SE_asymp':>9} {'SE_robust':>10} {'crossover':>10}"
+    )
+    for n in (
+        50,
+        100,
+        200,
+        400,
+    ):  # n<~26 is the degenerate upper window edge (endpoint SE diverges)
         rII, se_rob, cx, _, _ = simulate_crossover(n, n_rep=n_rep)
-        print(f"{n:>5} {rII:>9.2f} {cornish_fisher_RII(I3, n):>8.2f} "
-              f"{asymptotic_se_zstar(I3, n):>9.2f} {se_rob:>10.2f} {cx:>10.2f}")
+        print(
+            f"{n:>5} {rII:>9.2f} {cornish_fisher_RII(I3, n):>8.2f} "
+            f"{asymptotic_se_zstar(I3, n):>9.2f} {se_rob:>10.2f} {cx:>10.2f}"
+        )
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--quick", action="store_true", help="fewer samples/seeds (faster, rougher)")
-    ap.add_argument("--refresh", action="store_true",
-                    help="recompute and overwrite the cached simulation datasets")
-    ap.add_argument("--diagnostics-only", action="store_true", help="print the table, skip figures")
+    ap.add_argument(
+        "--quick", action="store_true", help="fewer samples/seeds (faster, rougher)"
+    )
+    ap.add_argument(
+        "--refresh",
+        action="store_true",
+        help="recompute and overwrite the cached simulation datasets",
+    )
+    ap.add_argument(
+        "--diagnostics-only", action="store_true", help="print the table, skip figures"
+    )
     a = ap.parse_args()
     size = 500_000 if a.quick else 3_000_000
     n_rep = 200 if a.quick else 700

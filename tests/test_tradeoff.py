@@ -62,9 +62,9 @@ def test_curve_values_physical(curve_dataset) -> None:
 def test_tradeoff_is_monotonic(curve_dataset) -> None:
     """The size-intensity tradeoff: more intense storms have smaller cores."""
     rmax = curve_dataset["rmax"].values
-    assert np.all(np.diff(rmax) < 0), (
-        f"rmax(V) should be strictly decreasing, got {rmax}"
-    )
+    assert np.all(
+        np.diff(rmax) < 0
+    ), f"rmax(V) should be strictly decreasing, got {rmax}"
     # central pressure drops as intensity rises
     pc = curve_dataset["pc"].values
     assert np.all(np.diff(pc) < 0), f"pc(V) should decrease, got {pc}"
@@ -97,9 +97,9 @@ def test_profile_on_curve(curve, tmp_path) -> None:
     vv = np.asarray(profile["VV"], dtype=float)
     rr = np.asarray(profile["rr"], dtype=float)
     pp = np.asarray(profile["p"], dtype=float)
-    assert abs(float(np.nanmax(vv)) - v_mid) < 1.5, (
-        f"profile max wind {np.nanmax(vv):.2f} != sampled vmax {v_mid:.2f}"
-    )
+    assert (
+        abs(float(np.nanmax(vv)) - v_mid) < 1.5
+    ), f"profile max wind {np.nanmax(vv):.2f} != sampled vmax {v_mid:.2f}"
     assert rr[0] >= 0 and np.all(np.diff(rr) > 0), "rr must be increasing"
     # pressure profile: minimum at centre, rising outward to ~ambient [hPa]
     assert pp[0] == np.min(pp)
@@ -202,9 +202,7 @@ def test_4d_bo_wrap_test_smoke(curve_dataset, tmp_path) -> None:
 
     curve_nc = os.path.join(tmp_path, "curve.nc")
     curve_dataset.to_netcdf(curve_nc)
-    constraints = yaml.safe_load(
-        open(os.path.join(CONFIG_PATH, "4d_constraints.yaml"))
-    )
+    constraints = yaml.safe_load(open(os.path.join(CONFIG_PATH, "4d_constraints.yaml")))
     exp_name = "tradeoff_smoke"
     run_bayesopt_exp(
         constraints=constraints,

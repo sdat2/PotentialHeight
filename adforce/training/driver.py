@@ -133,7 +133,9 @@ def drive_all_adcirc(
     # 2. Loop and generate inputs for each storm
     for i, storm in target_storms[:]:
         storm_name_safe = storm.name.upper().replace(" ", "_")
-        run_directory = os.path.join(runs_parent_dir, f"{i}_{storm_name_safe}_{storm.year}")
+        run_directory = os.path.join(
+            runs_parent_dir, f"{i}_{storm_name_safe}_{storm.year}"
+        )
 
         # --- Check for existing successful run (implements TODO #1) ---
         slurm_path = os.path.join(run_directory, "slurm.out")
@@ -146,14 +148,18 @@ def drive_all_adcirc(
                             is_successful = True
                             break
             except (IOError, FileNotFoundError) as e:
-                print(f"Warning: Could not read {slurm_path}. Will attempt to rerun. Error: {e}")
+                print(
+                    f"Warning: Could not read {slurm_path}. Will attempt to rerun. Error: {e}"
+                )
                 is_successful = False
 
         if is_successful:
             print(f"Run {run_directory} already completed successfully. Skipping.")
             continue  # Skip to the next storm
         elif os.path.exists(run_directory):
-            print(f"Directory {run_directory} exists but is incomplete or failed. Rerunning...")
+            print(
+                f"Directory {run_directory} exists but is incomplete or failed. Rerunning..."
+            )
         # --- End check ---
 
         try:
@@ -163,7 +169,12 @@ def drive_all_adcirc(
 
             # 1. Generate ADCIRC input files (fort.15, pre_aswip_fort.22, fort.13)
             print(f"Generating inputs in: {run_directory}")
-            generate_adcirc_inputs(storm, target_storms_ds.isel(storm=i), run_directory, recommended_dt=recommended_dt)
+            generate_adcirc_inputs(
+                storm,
+                target_storms_ds.isel(storm=i),
+                run_directory,
+                recommended_dt=recommended_dt,
+            )
 
             # 2. Create a storm-specific config to pass to subprocess
             # Start with the default config

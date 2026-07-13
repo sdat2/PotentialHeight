@@ -130,13 +130,15 @@ import time
 
 print(
     "recent .tex:",
-    [
-        os.path.basename(f)
-        for f in glob.glob(os.path.join(st.DATA_PATH, "*.tex"))
-        if os.path.getmtime(f) > time.time() - 120
-    ]
-    if hasattr(st, "DATA_PATH")
-    else "?",
+    (
+        [
+            os.path.basename(f)
+            for f in glob.glob(os.path.join(st.DATA_PATH, "*.tex"))
+            if os.path.getmtime(f) > time.time() - 120
+        ]
+        if hasattr(st, "DATA_PATH")
+        else "?"
+    ),
 )
 from w22.constants import DATA_PATH
 

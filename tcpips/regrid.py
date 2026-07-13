@@ -47,7 +47,7 @@ def run_regridding_sequentially(
         parallel (bool, optional): Run in parallel. Defaults to False.
 
     """
-    tasks = get_task_dict(original_root=RAW_PATH,new_root=REGRIDDED_PATH)
+    tasks = get_task_dict(original_root=RAW_PATH, new_root=REGRIDDED_PATH)
     write_json(tasks, os.path.join(DATA_PATH, "regridding_tasks.json"))
     print("tasks", tasks)
 

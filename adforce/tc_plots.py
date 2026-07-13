@@ -7,6 +7,7 @@ on the ADCIRC mesh, colored by intensity.
 Usage:
     python -m adforce.plotting [--test-single] [--output-name "track_summary.pdf"]
 """
+
 from typing import List
 import os
 import numpy as np
@@ -28,11 +29,12 @@ try:
 except ImportError:
     print("Warning: Running as standalone. Assuming relative paths.")
     # Define fallback paths if run directly from project root
-    PROJ_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    SETUP_PATH = os.path.join(PROJ_PATH, 'setup')
-    FIGURE_PATH = os.path.join(PROJ_PATH, 'figures')
+    PROJ_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    SETUP_PATH = os.path.join(PROJ_PATH, "setup")
+    FIGURE_PATH = os.path.join(PROJ_PATH, "figures")
     # This is complex, assumes tcpips is a sibling directory
     import sys
+
     sys.path.append(PROJ_PATH)
     from tcpips.ibtracs import na_landing_tcs
 
@@ -44,36 +46,37 @@ plot_defaults()
 KNOTS_TO_MS = 0.514444
 
 # Original wind speed bins in knots
-#SS_BINS_KNOTS = [0, 34, 64, 83, 96, 113, 137, 500]  # Bin edges
+# SS_BINS_KNOTS = [0, 34, 64, 83, 96, 113, 137, 500]  # Bin edges
 # Convert bins to m s$^{-1}$ and round to one decimal
 SS_BINS = [0, 17.5, 33, 43, 50, 58, 70, 86, 500]  # in m s$^{-1}$
 # Result: [0.0, 17.5, 32.9, 42.7, 49.4, 58.1, 70.5, 257.2]
 
-SS_COLORS = ['cyan', 'green', 'yellow', 'orange', 'red', 'darkred', 'magenta', 'black']
+SS_COLORS = ["cyan", "green", "yellow", "orange", "red", "darkred", "magenta", "black"]
 
 # Labels updated to reflect m s$^{-1}$
 SS_LABELS: List[str] = [
-    'TD (<17.5 m s$^{-1}$)',
-    'TS (17.5-33 m s$^{-1}$)',
-    'Cat 1 (33-43 m s$^{-1}$)',
-    'Cat 2 (43-50 m s$^{-1}$)',
-    'Cat 3 (50-58 m s$^{-1}$)',
-    'Cat 4 (58-70 m s$^{-1}$)',
-    'Cat 5 (70-86 m s$^{-1}$)',
-    'Cat 6 (86.0+ m s$^{-1}$)'
+    "TD (<17.5 m s$^{-1}$)",
+    "TS (17.5-33 m s$^{-1}$)",
+    "Cat 1 (33-43 m s$^{-1}$)",
+    "Cat 2 (43-50 m s$^{-1}$)",
+    "Cat 3 (50-58 m s$^{-1}$)",
+    "Cat 4 (58-70 m s$^{-1}$)",
+    "Cat 5 (70-86 m s$^{-1}$)",
+    "Cat 6 (86.0+ m s$^{-1}$)",
 ]
 
 SS_CMAP = ListedColormap(SS_COLORS)
-SS_NORM = BoundaryNorm(SS_BINS, SS_CMAP.N) # This now uses the m s$^{-1}$ bins
+SS_NORM = BoundaryNorm(SS_BINS, SS_CMAP.N)  # This now uses the m s$^{-1}$ bins
 
 
 # --- Plotting Function ---
+
 
 def plot_all_tc_tracks_on_mesh(
     all_storms_ds: xr.Dataset,
     mesh_path: str,
     output_path: str,
-    test_single: bool = False
+    test_single: bool = False,
 ) -> None:
     """
     Plots TC tracks from IBTrACS on the ADCIRC mesh.
@@ -90,22 +93,27 @@ def plot_all_tc_tracks_on_mesh(
     """
     print(f"Loading mesh from {mesh_path}...")
     try:
-        with nc.Dataset(mesh_path, 'r') as ds:
-            x_nodes = ds.variables['x'][:]
-            y_nodes = ds.variables['y'][:]
-            triangles = ds.variables['element'][:]  -1  # adcircpy elements are 0-based
+        with nc.Dataset(mesh_path, "r") as ds:
+            x_nodes = ds.variables["x"][:]
+            y_nodes = ds.variables["y"][:]
+            triangles = ds.variables["element"][:] - 1  # adcircpy elements are 0-based
     except Exception as e:
         print(f"Error loading mesh: {e}. Cannot plot mesh background.")
         return
 
     print("Setting up plot...")
-    fig, ax = plt.subplots() #figsize=(15, 12))
+    fig, ax = plt.subplots()  # figsize=(15, 12))
 
     # Plot the mesh (faintly)
     print("Plotting mesh background...")
     ax.triplot(
-        x_nodes, y_nodes, triangles,
-        color='blue', alpha=0.3, linewidth=0.1, label='ADCIRC Mesh'
+        x_nodes,
+        y_nodes,
+        triangles,
+        color="blue",
+        alpha=0.3,
+        linewidth=0.1,
+        label="ADCIRC Mesh",
     )
 
     # Determine storms to plot
@@ -128,13 +136,12 @@ def plot_all_tc_tracks_on_mesh(
         storm_ds = all_storms_ds.isel(storm=i)
 
         # Extract and clean data
-        lat = storm_ds['usa_lat'].values
-        lon = storm_ds['usa_lon'].values
-        wind = storm_ds['usa_wind'].values * KNOTS_TO_MS  # Convert to m s$^{-1}$
+        lat = storm_ds["usa_lat"].values
+        lon = storm_ds["usa_lon"].values
+        wind = storm_ds["usa_wind"].values * KNOTS_TO_MS  # Convert to m s$^{-1}$
 
         valid_mask = ~np.isnan(lat) & ~np.isnan(lon) & ~np.isnan(wind)
         lat, lon, wind = lat[valid_mask], lon[valid_mask], wind[valid_mask]
-
 
         if len(lat) < 2:
             # print(f"Skipping {storm_name} (insufficient data).")
@@ -154,22 +161,22 @@ def plot_all_tc_tracks_on_mesh(
             cmap=SS_CMAP,
             norm=SS_NORM,
             linewidths=0.5,
-            alpha=0.7  # Thinner, semi-transparent lines
+            alpha=0.7,  # Thinner, semi-transparent lines
         )
-        lc.set_array(segment_winds) # Set array with m s$^{-1}$ values
+        lc.set_array(segment_winds)  # Set array with m s$^{-1}$ values
         ax.add_collection(lc)
         tracks_plotted += 1
 
     print(f"Plotted {tracks_plotted} tracks.")
 
     # --- Final plot formatting ---
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
     ax.set_xlabel("Longitude [$^{\circ}$E]")
     ax.set_ylabel("Latitude [$^{\circ}$N]")
     # title = "Historical U.S. Landfalling TC Tracks on ADCIRC Mesh"
-    #if test_single:
+    # if test_single:
     #    title = "TC Track for Katrina (2005) on ADCIRC Mesh"
-    #ax.set_title(title)
+    # ax.set_title(title)
 
     # Set plot limits to the mesh extent
     ax.set_xlim(x_nodes.min(), x_nodes.max())
@@ -184,15 +191,15 @@ def plot_all_tc_tracks_on_mesh(
         ax=ax,
         boundaries=SS_BINS,
         # Center ticks in each color block
-        ticks=[b + (SS_BINS[i+1]-b)/2 for i, b in enumerate(SS_BINS[:-1])],
+        ticks=[b + (SS_BINS[i + 1] - b) / 2 for i, b in enumerate(SS_BINS[:-1])],
         # spacing='proportional'
     )
-    cbar.ax.set_yticklabels(SS_LABELS, fontsize='small')
-    cbar.set_label("Wind Speed (m s$^{-1}$) - Saffir-Simpson Scale") # Updated label
+    cbar.ax.set_yticklabels(SS_LABELS, fontsize="small")
+    cbar.set_label("Wind Speed (m s$^{-1}$) - Saffir-Simpson Scale")  # Updated label
 
     # Save the figure
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    plt.savefig(output_path, bbox_inches='tight', dpi=300)
+    plt.savefig(output_path, bbox_inches="tight", dpi=300)
     plt.close(fig)
     print(f"✅ Successfully plotted tracks to {output_path}")
 
@@ -201,19 +208,17 @@ def plot_all_tc_tracks_on_mesh(
 
 if __name__ == "__main__":
     # python -m adforce.plotting --test-single
-    parser = argparse.ArgumentParser(
-        description="Plot TC tracks on the ADCIRC mesh."
-    )
+    parser = argparse.ArgumentParser(description="Plot TC tracks on the ADCIRC mesh.")
     parser.add_argument(
         "--test-single",
         action="store_true",
-        help="If set, only process Katrina 2005 for testing."
+        help="If set, only process Katrina 2005 for testing.",
     )
     parser.add_argument(
         "--output-name",
         type=str,
         default="all_tc_tracks.pdf",
-        help="Name for the output plot file in the figures/tc_tracks directory."
+        help="Name for the output plot file in the figures/tc_tracks directory.",
     )
     args = parser.parse_args()
 
@@ -240,5 +245,5 @@ if __name__ == "__main__":
         all_storms_ds=all_storms_ds,
         mesh_path=os.path.join(DATA_PATH, "exp_0049", "fort.63.nc"),
         output_path=output_plot_path,
-        test_single=args.test_single
+        test_single=args.test_single,
     )

@@ -166,9 +166,7 @@ def calculate_ps_ufunc(
         coriolis_parameter_25 = abs(coriolis_parameter_from_lat(25))
         lower_r = 200_000 * coriolis_parameter_25 / coriolis_parameter
         upper_r = 3_000_000 * coriolis_parameter_25 / coriolis_parameter
-        r0 = bisection(
-            try_for_r0, lower_r, upper_r, R0_BISECTION_TOLERANCE
-        )
+        r0 = bisection(try_for_r0, lower_r, upper_r, R0_BISECTION_TOLERANCE)
 
         # 4. Final calculation with the solved r0
         pm, rmax, pc = run_cle15(
@@ -331,9 +329,7 @@ def calculate_ps13_ufunc(
         def try_for_r0_1(r0):
             return try_for_r0_v(r0, vmax_1)
 
-        r0_1 = bisection(
-            try_for_r0_1, lower_r, upper_r, R0_BISECTION_TOLERANCE
-        )
+        r0_1 = bisection(try_for_r0_1, lower_r, upper_r, R0_BISECTION_TOLERANCE)
         # 4. Final calculation with the solved r0
         pm_1, rmax_1, pc_1 = run_cle15(
             inputs={
@@ -352,9 +348,7 @@ def calculate_ps13_ufunc(
         def try_for_r0_3(r0):
             return try_for_r0_v(r0, vmax_3)
 
-        r0_3 = bisection(
-            try_for_r0_3, lower_r, upper_r, R0_BISECTION_TOLERANCE
-        )
+        r0_3 = bisection(try_for_r0_3, lower_r, upper_r, R0_BISECTION_TOLERANCE)
         pm_3, rmax_3, pc_3 = run_cle15(
             inputs={
                 "r0": r0_3,

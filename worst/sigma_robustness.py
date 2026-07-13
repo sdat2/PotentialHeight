@@ -30,12 +30,16 @@ from .vary_nonstationary import FIT_LABELS, FIT_NAMES, run_single_experiment
 TREND = 0.01
 SIGMAS = [0.0, 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0]
 _COLORS = {
-    "stationary_unbounded": "#d95f02", "stationary_bounded": "#7570b3",
-    "nonstationary_unbounded": "#1f77b4", "nonstationary_bounded": "#2ca02c",
+    "stationary_unbounded": "#d95f02",
+    "stationary_bounded": "#7570b3",
+    "nonstationary_unbounded": "#1f77b4",
+    "nonstationary_bounded": "#2ca02c",
 }
 _LS = {
-    "stationary_unbounded": ":", "stationary_bounded": ":",
-    "nonstationary_unbounded": "-", "nonstationary_bounded": "-",
+    "stationary_unbounded": ":",
+    "stationary_bounded": ":",
+    "nonstationary_unbounded": "-",
+    "nonstationary_bounded": "-",
 }
 
 
@@ -61,10 +65,16 @@ def get_sigma_ds(n_seed: int = 120, maxiter: int = 600) -> xr.Dataset:
             except Exception as exc:  # pragma: no cover - occasional TF fit failure
                 print(f"  fail sigma={sig} seed={seed}: {exc}")
     ds = xr.Dataset(
-        {"rv_est": (("sigma", "fit", "rp", "seed"), est),
-         "rv_true": (("sigma", "rp", "seed"), tru)},
-        coords={"sigma": SIGMAS, "fit": FIT_NAMES,
-                "rp": [int(1 / q) for q in quantiles], "seed": np.arange(n_seed)},
+        {
+            "rv_est": (("sigma", "fit", "rp", "seed"), est),
+            "rv_true": (("sigma", "rp", "seed"), tru),
+        },
+        coords={
+            "sigma": SIGMAS,
+            "fit": FIT_NAMES,
+            "rp": [int(1 / q) for q in quantiles],
+            "seed": np.arange(n_seed),
+        },
     )
     ds.to_netcdf(out)
     return ds
@@ -77,19 +87,27 @@ def plot_sigma_ds(ds: xr.Dataset) -> None:
     sizing via ``get_dim``, (a)--(d) panel labels) and the sibling
     ``vary_nonstationary`` bias/range figure it accompanies."""
     import matplotlib.pyplot as plt
+
     plot_defaults()
 
     err = ds.rv_est - ds.rv_true
     bias = err.mean("seed", skipna=True)
-    width = (ds.rv_est.quantile(0.95, "seed", skipna=True)
-             - ds.rv_est.quantile(0.05, "seed", skipna=True))
+    width = ds.rv_est.quantile(0.95, "seed", skipna=True) - ds.rv_est.quantile(
+        0.05, "seed", skipna=True
+    )
     rps = ds.rp.values.tolist()
-    fig, axs = plt.subplots(2, len(rps), figsize=get_dim(ratio=0.85), sharex=True,
-                            squeeze=False)
+    fig, axs = plt.subplots(
+        2, len(rps), figsize=get_dim(ratio=0.85), sharex=True, squeeze=False
+    )
     for j, rp in enumerate(rps):
         for f in FIT_NAMES:
-            kw = dict(color=_COLORS[f], ls=_LS[f], lw=1.6,
-                      marker=("o" if "nonstationary" in f else None), markersize=3)
+            kw = dict(
+                color=_COLORS[f],
+                ls=_LS[f],
+                lw=1.6,
+                marker=("o" if "nonstationary" in f else None),
+                markersize=3,
+            )
             axs[0, j].plot(ds.sigma, bias.sel(fit=f, rp=rp), label=FIT_LABELS[f], **kw)
             axs[1, j].plot(ds.sigma, width.sel(fit=f, rp=rp), **kw)
         axs[0, j].axhline(0, color="grey", ls="--", lw=0.8)
@@ -99,7 +117,7 @@ def plot_sigma_ds(ds: xr.Dataset) -> None:
             ax.grid(alpha=0.3)
     axs[0, 0].set_ylabel("Bias [m]")
     axs[1, 0].set_ylabel("5--95% range [m]")
-    legend_below(fig, axs[0, 0], ncol=2)        # shared legend below -> no data overlap
+    legend_below(fig, axs[0, 0], ncol=2)  # shared legend below -> no data overlap
     label_subplots(axs.ravel().tolist(), override="outside")
     fig.tight_layout(rect=[0, 0.08, 1, 1])
     out = os.path.join(FIGURE_PATH, "sigma_robustness.pdf")

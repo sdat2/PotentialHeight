@@ -67,8 +67,13 @@ import os
 # append below fails with an HDF5 locking error. BLAS/loky caps are harmless
 # here (no heavy math, no joblib) but kept for a uniform environment.
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
-for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
-           "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS"):
+for _v in (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
     os.environ.setdefault(_v, "1")
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", "4")
 
@@ -82,22 +87,31 @@ DST = "/Volumes/s/tcpips/fixed_ibtracs"
 # rerun/ibtracs/resolve_exceedance.py to .../exact_resolve/). Overridable via
 # EXACT_NPZ_DIR; default must match resolve_exceedance.py's OUT and
 # figures_tracks.py's EXACT_DIR.
-NPZ_DIR = os.environ.get("EXACT_NPZ_DIR", "/Volumes/s/tcpips/fixed_ibtracs/exact_resolve")
+NPZ_DIR = os.environ.get(
+    "EXACT_NPZ_DIR", "/Volumes/s/tcpips/fixed_ibtracs/exact_resolve"
+)
 
 os.makedirs(DST, exist_ok=True)
 npz = {m: np.load(os.path.join(NPZ_DIR, f"exact_{m}.npz")) for m in ("r1", "r2", "r3")}
 # measure -> (track file, npz key)
-patch = {"IBTrACS.since1980.v04r01.pi_ps.nc": "r3",
-         "IBTrACS.since1980.v04r01.cps.nc": "r2",
-         "IBTrACS.since1980.v04r01.ps_cat1.nc": "r1"}
+patch = {
+    "IBTrACS.since1980.v04r01.pi_ps.nc": "r3",
+    "IBTrACS.since1980.v04r01.cps.nc": "r2",
+    "IBTrACS.since1980.v04r01.ps_cat1.nc": "r1",
+}
 for fn, meas in patch.items():
-    src = os.path.join(SRC, fn); dst = os.path.join(DST, fn)
-    print(f"copying {fn} ...", flush=True); shutil.copy2(src, dst)
-    d = npz[meas]; W = d["W"].astype(bool); rf = d["rmax_fixed"]  # flat S*D
+    src = os.path.join(SRC, fn)
+    dst = os.path.join(DST, fn)
+    print(f"copying {fn} ...", flush=True)
+    shutil.copy2(src, dst)
+    d = npz[meas]
+    W = d["W"].astype(bool)
+    rf = d["rmax_fixed"]  # flat S*D
     use = W & np.isfinite(rf)
     nc = Dataset(dst, "a")
     rm = nc.variables["rmax"]
-    orig = np.asarray(rm[:], dtype="float64"); shape = orig.shape
+    orig = np.asarray(rm[:], dtype="float64")
+    shape = orig.shape
     flat = orig.ravel().copy()
     assert flat.size == use.size, f"{fn}: rmax size {flat.size} != mask {use.size}"
     flat[use] = rf[use]
@@ -105,12 +119,19 @@ for fn, meas in patch.items():
     nc.close()
     print(f"  patched {int(use.sum())} rmax values in {fn}", flush=True)
 # symlink the other files get_normalized_data / plotters need
-for fn in ("IBTrACS.since1980.v04r01.nc", "IBTrACS.since1980.v04r01.normalized.nc",
-           "IBTrACS.since1980.v04r01.unique.nc", "IBTrACS.since1980.v04r01.cps_inputs.nc"):
+for fn in (
+    "IBTrACS.since1980.v04r01.nc",
+    "IBTrACS.since1980.v04r01.normalized.nc",
+    "IBTrACS.since1980.v04r01.unique.nc",
+    "IBTrACS.since1980.v04r01.cps_inputs.nc",
+):
     l = os.path.join(DST, fn)
-    if os.path.lexists(l): os.remove(l)
-    if os.path.exists(os.path.join(SRC, fn)): os.symlink(os.path.join(SRC, fn), l)
+    if os.path.lexists(l):
+        os.remove(l)
+    if os.path.exists(os.path.join(SRC, fn)):
+        os.symlink(os.path.join(SRC, fn), l)
 print("\nDST contents:")
 for f in sorted(os.listdir(DST)):
-    p = os.path.join(DST, f); print(f"  {'->' if os.path.islink(p) else '  '} {f}")
+    p = os.path.join(DST, f)
+    print(f"  {'->' if os.path.islink(p) else '  '} {f}")
 print("DONE")

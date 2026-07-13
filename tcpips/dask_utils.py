@@ -24,11 +24,14 @@ def dask_cluster_wrapper(
     # trying new option for Archer2
     if "/work/" in str(os.getcwd()):  # assume Archer2
         print("Using Archer2 Dask cluster configuration for a single node.")
-        print(f"cluster options: n_workers=16, threads_per_worker=8, memory_limit='15GB'")
-        cluster = LocalCluster(n_workers=16,
+        print(
+            f"cluster options: n_workers=16, threads_per_worker=8, memory_limit='15GB'"
+        )
+        cluster = LocalCluster(
+            n_workers=16,
             threads_per_worker=8,
-            interface='lo',
-            memory_limit='15GB',
+            interface="lo",
+            memory_limit="15GB",
         )
     else:
         print("Using default Dask cluster configuration.")
@@ -50,11 +53,13 @@ if __name__ == "__main__":
     # python -m  tcpips.dask_utils
 
     time_per_operation = 1
-    lats = 180*4 / 2
-    lons = 360*4
+    lats = 180 * 4 / 2
+    lons = 360 * 4
     times = 10
     total_operations = lats * lons * times
-    workers = 16*4
+    workers = 16 * 4
 
     total_time = total_operations * time_per_operation / workers
-    print(f"Estimated time for {total_operations} operations across {workers} workers: {hr_time(total_time)}")
+    print(
+        f"Estimated time for {total_operations} operations across {workers} workers: {hr_time(total_time)}"
+    )

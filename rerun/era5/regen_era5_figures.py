@@ -20,11 +20,14 @@ import warnings
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 warnings.filterwarnings("ignore")
 
-_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+_REPO = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
 import matplotlib
+
 matplotlib.use("Agg")
 
 from tcpips import era5
@@ -37,6 +40,7 @@ def step(label, fn):
         print(f"    OK {label}", flush=True)
     except Exception as e:  # keep going; one broken plot shouldn't sink the rest
         import traceback
+
         print(f"    FAIL {label}: {type(e).__name__}: {e}", flush=True)
         traceback.print_exc()
 

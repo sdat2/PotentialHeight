@@ -12,12 +12,15 @@ from pathlib import Path
 SRC_PATH = Path(__file__).parent
 PROJ_PATH = SRC_PATH.parent
 DATA_PATH = os.path.join(PROJ_PATH, "data")
-COMP_DATA_PATH = os.path.join(DATA_PATH, "comp")          # caches (git-ignored)
+COMP_DATA_PATH = os.path.join(DATA_PATH, "comp")  # caches (git-ignored)
 HF_STORM_CACHE = os.path.join(COMP_DATA_PATH, "hf_storms")  # downloaded storm netCDFs
-COOPS_CACHE = os.path.join(COMP_DATA_PATH, "coops_cache")   # raw CO-OPS responses
-TS_CACHE = os.path.join(COMP_DATA_PATH, "ts_cache")        # per-storm de-tided time series (Parquet)
-FIGURE_PATH = os.path.join(PROJ_PATH, "img", "comp")       # quick-look PNGs (tracked)
-OUT_PATH = os.path.join(COMP_DATA_PATH, "out")             # summary tables / metrics
+COOPS_CACHE = os.path.join(COMP_DATA_PATH, "coops_cache")  # raw CO-OPS responses
+TS_CACHE = os.path.join(
+    COMP_DATA_PATH, "ts_cache"
+)  # per-storm de-tided time series (Parquet)
+FIGURE_PATH = os.path.join(PROJ_PATH, "img", "comp")  # quick-look PNGs (tracked)
+OUT_PATH = os.path.join(COMP_DATA_PATH, "out")  # summary tables / metrics
+
 
 # Paper artifacts. The worstsurge code repo is symlinked into the thesis tree
 # (thesis/worstsurge -> worstsurge), so the module's own parent is NOT the thesis
@@ -30,19 +33,30 @@ OUT_PATH = os.path.join(COMP_DATA_PATH, "out")             # summary tables / me
 def _find_paper_root():
     env = os.environ.get("WORSTSURGE_PAPER_ROOT")
     candidates = ([Path(env)] if env else []) + [
-        Path.home() / "thesis", PROJ_PATH.parent, PROJ_PATH,
+        Path.home() / "thesis",
+        PROJ_PATH.parent,
+        PROJ_PATH,
     ]
     for c in candidates:
         if (c / "paper" / "appendix.tex").is_file():
             return c
     return None
 
+
 PAPER_ROOT = _find_paper_root()
 PAPER_IMG_PATH = str(PAPER_ROOT / "img") if PAPER_ROOT else FIGURE_PATH
 PAPER_TEX_PATH = str(PAPER_ROOT / "paper") if PAPER_ROOT else OUT_PATH
 
-for _p in (COMP_DATA_PATH, HF_STORM_CACHE, COOPS_CACHE, TS_CACHE, FIGURE_PATH, OUT_PATH,
-           PAPER_IMG_PATH, PAPER_TEX_PATH):
+for _p in (
+    COMP_DATA_PATH,
+    HF_STORM_CACHE,
+    COOPS_CACHE,
+    TS_CACHE,
+    FIGURE_PATH,
+    OUT_PATH,
+    PAPER_IMG_PATH,
+    PAPER_TEX_PATH,
+):
     os.makedirs(_p, exist_ok=True)
 
 # --- data sources ----------------------------------------------------------
@@ -82,8 +96,8 @@ STORMS = {
 # model captures the surge that broke the gauge (appears as spurious over-prediction).
 # (storm display-name, CO-OPS station id)
 KNOWN_FAILED = {
-    ("Ida 2021", "8761724"),   # Grand Isle, LA
-    ("Ida 2021", "8762075"),   # Port Fourchon, Belle Pass, LA
+    ("Ida 2021", "8761724"),  # Grand Isle, LA
+    ("Ida 2021", "8762075"),  # Port Fourchon, Belle Pass, LA
 }
 
 # Events that are poor surge tests (rainfall / inland-flood dominated, small surge).
@@ -97,17 +111,17 @@ EXAMPLE_PANELS = [
     ("Katrina 2005", "Pilots Station East"),
     ("Ida 2021", "Shell Beach"),
     ("Ida 2021", "Grand Isle"),
-    ("Ida 2021", "Amerada Pass"),       # LAWMA, left-of-track set-down
+    ("Ida 2021", "Amerada Pass"),  # LAWMA, left-of-track set-down
     ("Laura 2020", "Calcasieu Pass"),
 ]
 
 # --- node selection --------------------------------------------------------
-MAX_NODE_DEG = 0.12   # max distance (deg) from gauge to an acceptable mesh node
-WET_MIN_M = 0.3       # node must stay wetter than this all storm (avoids drying spikes)
-KNN = 60              # nearest-node candidates to search through
+MAX_NODE_DEG = 0.12  # max distance (deg) from gauge to an acceptable mesh node
+WET_MIN_M = 0.3  # node must stay wetter than this all storm (avoids drying spikes)
+KNN = 60  # nearest-node candidates to search through
 
 # --- "clean" gauge-storm pair filter --------------------------------------
-MAX_TIMING_HR = 6.0   # |sim peak time - obs peak time| must be within this
+MAX_TIMING_HR = 6.0  # |sim peak time - obs peak time| must be within this
 MIN_OBS_PEAK_M = 0.4  # observed peak residual must exceed this (meaningful surge)
 
 # --- time-series skill -----------------------------------------------------
@@ -118,21 +132,23 @@ MIN_OBS_PEAK_M = 0.4  # observed peak residual must exceed this (meaningful surg
 TS_MIN_OVERLAP = 24
 
 # --- uncertainty -----------------------------------------------------------
-N_BOOTSTRAP = 2000    # resamples for percentile CIs on pooled bias/RMSE/r
-BOOTSTRAP_SEED = 0    # fixed so reported CIs are reproducible
+N_BOOTSTRAP = 2000  # resamples for percentile CIs on pooled bias/RMSE/r
+BOOTSTRAP_SEED = 0  # fixed so reported CIs are reproducible
 
 # Minimum hourly samples in a calendar year for a stable utide harmonic fit.
 UTIDE_MIN_SAMPLES = 2000
 
 # --- annual-maximum pipeline (comp.annual_max) ------------------------------
-ANNUAL_MAX_CACHE = os.path.join(COMP_DATA_PATH, "annual_max")  # residuals + annual maxima
+ANNUAL_MAX_CACHE = os.path.join(
+    COMP_DATA_PATH, "annual_max"
+)  # residuals + annual maxima
 os.makedirs(ANNUAL_MAX_CACHE, exist_ok=True)
-AM_START_YEAR = 1980   # default year range for annual-maximum extraction
+AM_START_YEAR = 1980  # default year range for annual-maximum extraction
 AM_END_YEAR = 2025
 # A year only contributes an annual maximum if at least this fraction of its
 # hours have data. Below this the annual maximum is likely biased low (the true
 # peak may fall in a gap) and the harmonic fit degrades. 0.8 keeps most usable
 # years at long-record Gulf gauges while excluding badly broken ones.
 MIN_YEAR_COVERAGE = 0.8
-COOPS_RETRIES = 3      # re-requests for a year whose cached response is a transport failure
-COOPS_SLEEP_S = 0.5    # polite pause after each live (non-cached) CO-OPS request
+COOPS_RETRIES = 3  # re-requests for a year whose cached response is a transport failure
+COOPS_SLEEP_S = 0.5  # polite pause after each live (non-cached) CO-OPS request

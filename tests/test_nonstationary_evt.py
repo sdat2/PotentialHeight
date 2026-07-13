@@ -47,7 +47,9 @@ def test_stationary_unbounded_fit_returns_finite_weibull_like_params():
 
 def test_stationary_bounded_fit_respects_known_upper_bound():
     z_star = 2.2
-    data = _sample_gev(alpha=z_star + 0.5 / (-0.12), beta=0.25, gamma=-0.12, n=140, seed=2)
+    data = _sample_gev(
+        alpha=z_star + 0.5 / (-0.12), beta=0.25, gamma=-0.12, n=140, seed=2
+    )
 
     alpha_hat, beta_hat, gamma_hat = fit_gev_upper_bound_known(
         data,
@@ -77,12 +79,16 @@ def test_nonstationary_bounded_fit_returns_finite_weibull_params():
                 loc=alpha_t_i,
                 scale=beta_true,
                 concentration=gamma_true,
-            ).sample(1).numpy()[0]
+            )
+            .sample(1)
+            .numpy()[0]
             for alpha_t_i in alpha_t
         ]
     )
 
-    cfg = OmegaConf.create({"steps": 100, "lr": 0.01, "beta_guess": 0.5, "gamma_guess": -0.1})
+    cfg = OmegaConf.create(
+        {"steps": 100, "lr": 0.01, "beta_guess": 0.5, "gamma_guess": -0.1}
+    )
     beta_hat, gamma_hat = fit_nonstationary_bounded(data, z_star_t, cfg)
 
     assert np.isfinite(beta_hat) and beta_hat > 0.0
@@ -99,7 +105,9 @@ def test_nonstationary_unbounded_fit_recovers_positive_trend():
     mu_t = alpha0 + alpha1 * t
     data = np.array(
         [
-            tfd.GeneralizedExtremeValue(loc=mu_i, scale=beta, concentration=gamma).sample(1).numpy()[0]
+            tfd.GeneralizedExtremeValue(loc=mu_i, scale=beta, concentration=gamma)
+            .sample(1)
+            .numpy()[0]
             for mu_i in mu_t
         ]
     )
@@ -114,7 +122,9 @@ def test_nonstationary_unbounded_fit_recovers_positive_trend():
             "force_weibull": True,
         }
     )
-    alpha0_hat, alpha1_hat, beta_hat, gamma_hat = fit_nonstationary_unbounded(data, t, cfg)
+    alpha0_hat, alpha1_hat, beta_hat, gamma_hat = fit_nonstationary_unbounded(
+        data, t, cfg
+    )
 
     assert np.isfinite(alpha0_hat)
     assert np.isfinite(alpha1_hat)

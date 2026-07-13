@@ -104,7 +104,11 @@ class CustomAdcircRun(AdcircRun):
 
 
 def generate_adcirc_inputs(
-    storm: Storm, storm_ds: xr.Dataset, output_dir: str, recalculate_timestep=False, recommended_dt = 1.0
+    storm: Storm,
+    storm_ds: xr.Dataset,
+    output_dir: str,
+    recalculate_timestep=False,
+    recommended_dt=1.0,
 ) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.

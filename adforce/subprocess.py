@@ -87,7 +87,15 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
                 try:
                     with open(aswip_log, "w") as awip_log:
                         proc_aswip = subprocess.run(
-                            [f"{exe_path}/aswip", "-m", "4", "-z", "2", "-w", "pre_aswip_fort.22"],
+                            [
+                                f"{exe_path}/aswip",
+                                "-m",
+                                "4",
+                                "-z",
+                                "2",
+                                "-w",
+                                "pre_aswip_fort.22",
+                            ],
                             stdout=awip_log,
                             stderr=subprocess.STDOUT,
                         )
@@ -111,7 +119,6 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
                     log_file.write(
                         "ASWIP processing done. "
                     )  # indicates ASWIP step completed before adcprep
-
 
             # 5. Run ADCIRC preparation steps using adcprep
             # Step 5a: Partition the mesh (`adcprep --np <np> --partmesh`)

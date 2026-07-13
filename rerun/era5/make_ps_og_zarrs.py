@@ -29,7 +29,9 @@ import warnings
 os.environ.setdefault("HDF5_USE_FILE_LOCKING", "FALSE")
 warnings.filterwarnings("ignore")
 
-_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+_REPO = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+)
 if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
@@ -49,16 +51,44 @@ PS_FIXED = "/Volumes/s/tcpips/data/era5/ps_fixed"
 DECADES = [(1980, 1989), (1990, 1999), (2000, 2009), (2010, 2019), (2020, 2024)]
 ENV_EXTRAS = ["otl", "ifl", "pmin"]  # figure code wants these; merge if available
 
+# Canonical variable attributes, transplanted from the original ARCHER2 zarrs
+# (ps_og_buggy_archer2) — the per-year rerun files carry none, and the figure
+# code labels panels/colorbars from these.
+ATTRS = {
+    "r0_1": {"long_name": "Outer radius of tropical cyclone, $r_{a1}$", "units": "m"},
+    "r0_3": {"long_name": "Outer radius of tropical cyclone, $r_{a3}$", "units": "m"},
+    "rmax_1": {"long_name": "Radius of maximum winds, $r_{1}$", "units": "m"},
+    "rmax_3": {"long_name": "Radius of maximum winds, $r_{3}$", "units": "m"},
+    "pm_1": {"long_name": "Pressure at maximum winds, $p_{m1}$", "units": "Pa"},
+    "pm_3": {"long_name": "Pressure at maximum winds, $p_{m3}$", "units": "Pa"},
+    "pc_1": {"long_name": "Central pressure for CLE15 profile", "units": "Pa"},
+    "pc_3": {"long_name": "Central pressure for CLE15 profile", "units": "Pa"},
+    "vmax_1": {"long_name": "Category-1 gradient wind", "units": "m/s"},
+    "vmax_3": {"long_name": "Potential Intensity", "units": "m/s"},
+    "sst": {"long_name": "Sea Surface Temperature", "units": "Celsius"},
+    "msl": {"long_name": "Mean Sea Level Pressure", "units": "hPa"},
+    "rh": {"long_name": "Relative Humidity", "units": "fraction"},
+    "t0": {"long_name": "Outflow Temperature", "units": "K"},
+    "otl": {"long_name": "Outflow Temperature Level", "units": "hPa"},
+    "pmin": {"long_name": "Minimum Central Pressure", "units": "hPa"},
+    "ifl": {"long_name": "tcpyPI Flag"},
+}
+
 
 def main() -> None:
     for start, end in DECADES:
         out = os.path.join(ERA5_PS_OG_PATH, f"era5_potential_sizes_{start}_{end}.zarr")
         if os.path.exists(out):
-            print(f"[{start}-{end}] {out} exists — refusing to overwrite "
-                  "(archive ps_og first)", flush=True)
+            print(
+                f"[{start}-{end}] {out} exists — refusing to overwrite "
+                "(archive ps_og first)",
+                flush=True,
+            )
             continue
-        files = [os.path.join(PS_FIXED, f"era5_ps_fixed_{y}.nc")
-                 for y in range(start, end + 1)]
+        files = [
+            os.path.join(PS_FIXED, f"era5_ps_fixed_{y}.nc")
+            for y in range(start, end + 1)
+        ]
         missing = [f for f in files if not os.path.exists(f)]
         if missing:
             raise SystemExit(f"missing inputs: {missing[:3]}")
@@ -76,6 +106,9 @@ def main() -> None:
         extras = [v for v in ENV_EXTRAS if v in env]
         if extras:
             ds = xr.merge([ds, env[extras]], join="left", compat="override")
+        for v, a in ATTRS.items():
+            if v in ds:
+                ds[v].attrs.update(a)
         print(f"[{start}-{end}] vars: {sorted(ds.data_vars)}", flush=True)
         ds.chunk({"year": 1, "latitude": -1, "longitude": -1}).to_zarr(out)
         print(f"[{start}-{end}] wrote {out}", flush=True)

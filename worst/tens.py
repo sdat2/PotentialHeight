@@ -26,7 +26,9 @@ from .utils import alpha_from_z_star_beta_gamma
 # ---------------------------------------------------------------------------
 
 
-def _gev_neg_log_lik(alpha: float, beta: float, gamma: float, data: np.ndarray) -> float:
+def _gev_neg_log_lik(
+    alpha: float, beta: float, gamma: float, data: np.ndarray
+) -> float:
     """Negative GEV log-likelihood (matches ``tfd.GeneralizedExtremeValue``).
 
     A large *finite* penalty (not ``inf``) is returned for infeasible parameters so
@@ -97,6 +99,7 @@ def _fit_lbfgs_known(
         return float("nan"), float("nan"), float("nan")
     beta, gamma = float(np.exp(res.x[0])), float(-np.exp(res.x[1]))
     return float(alpha_from_z_star_beta_gamma(z_star, beta, gamma)), beta, gamma
+
 
 # logger = logging.getLogger(__name__)
 # logging.basicConfig(filename="log.log", level=logging.INFO)
@@ -187,7 +190,9 @@ def fit_gev_upper_bound_not_known(
     if alpha_guess is None:
         alpha_guess = float(np.mean(data))
     if method == "lbfgs":
-        return _fit_lbfgs_not_known(data, alpha_guess, beta_guess, gamma_guess, force_weibull)
+        return _fit_lbfgs_not_known(
+            data, alpha_guess, beta_guess, gamma_guess, force_weibull
+        )
     if method != "adam":
         raise ValueError(f"unknown method {method!r}; use 'adam' or 'lbfgs'")
     if verbose:

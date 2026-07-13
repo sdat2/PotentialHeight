@@ -58,7 +58,9 @@ import time
 import traceback
 
 # --- Environment safety guards (macOS / exFAT). Must run before dask/xarray import. ---
-os.environ["LOKY_MAX_CPU_COUNT"] = "3"  # cap joblib workers (repo funcs may default to all cores)
+os.environ["LOKY_MAX_CPU_COUNT"] = (
+    "3"  # cap joblib workers (repo funcs may default to all cores)
+)
 os.environ["HDF5_USE_FILE_LOCKING"] = "FALSE"  # required for netCDF/HDF5 on exFAT/macOS
 for v in (
     "OMP_NUM_THREADS",
@@ -73,7 +75,9 @@ warnings.filterwarnings("ignore")
 
 import dask
 
-dask.config.set(scheduler="synchronous")  # not "processes": avoids BrokenProcessPool on macOS
+dask.config.set(
+    scheduler="synchronous"
+)  # not "processes": avoids BrokenProcessPool on macOS
 
 from w22.constants import DATA_PATH
 from w22.ps_runs import point_timeseries, point_era5_timeseries

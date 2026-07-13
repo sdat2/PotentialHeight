@@ -113,9 +113,7 @@ def test_rebuild_empty_and_missing_dir(tmp_path) -> None:
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
     for direc in (str(empty_dir), str(tmp_path / "does_not_exist")):
-        queries, observations = exp.rebuild_initial_data(
-            direc, constraints=CONSTRAINTS
-        )
+        queries, observations = exp.rebuild_initial_data(direc, constraints=CONSTRAINTS)
         assert queries.shape == (0, 2)
         assert observations.shape == (0, 1)
 

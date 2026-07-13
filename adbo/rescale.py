@@ -31,7 +31,9 @@ def rescale(inputs: np.ndarray, constraints: dict, verbose: bool = False) -> np.
         [constraints[i]["max"] - constraints[i]["min"] for i in order]
     )  # .reshape(inputs.shape[0], 1)
     # print("diffs", diffs)
-    mins = np.array([constraints[i]["min"] for i in order])  # .reshape(inputs.shape[0], 1)
+    mins = np.array(
+        [constraints[i]["min"] for i in order]
+    )  # .reshape(inputs.shape[0], 1)
     # print("mins", mins)
     if verbose:
         print(diffs.shape, mins.shape, inputs.shape, ones.shape)

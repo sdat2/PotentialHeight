@@ -1,6 +1,4 @@
-"""fort.22.nc file creation functions.
-
-"""
+"""fort.22.nc file creation functions."""
 
 import os
 from typing import Union, Optional, Callable, Tuple, Literal
