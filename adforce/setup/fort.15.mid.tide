@@ -21,7 +21,7 @@ tide ex     ! 32 CHARACTER ALPHANUMERIC RUN DESCRIPTION
  0.00                    ! STATIM - STARTING TIME (IN DAYS)
  0.00                    ! REFTIM - REFERENCE TIME (IN DAYS)
  900
- 7.0                     ! RNDAY - TOTAL LENGTH OF SIMULATION (IN DAYS)
+13.0                    ! RNDAY - TOTAL LENGTH OF SIMULATION (IN DAYS)
  1.000 0.000 0.000 0.000 1.000 1.000 1.000 0.000 1.000                     ! DRAMP - DURATION OF RAMP FUNCTION (IN DAYS)
 0.5 0.5 0             ! TIME WEIGHTING FACTORS FOR THE GWCE EQUATION
  0.01 0 0 0.01           ! H0, NODEDRYMIN, NODEWETMIN, VELMIN
@@ -1075,4 +1075,4 @@ sdat2@cam.ac.uk
 2005-08-27 00:00:00
 &SWANOutputControl SWAN_OutputHS=.true., SWAN_OutputDIR=.true., SWAN_OutputTPS=.true. /
 &metControl WindDragLimit=0.0020 DragLawString='Powell' /
-&owiWindNetcdf NWS13ColdStartString='20050819.000000' NWS13GroupForPowell='3' /
+&owiWindNetcdf NWS13ColdStartString='20050819.000000' NWS13GroupForPowell='2' /
