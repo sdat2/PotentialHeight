@@ -24,6 +24,7 @@ from trieste.acquisition import (
     MinValueEntropySearch,
     NegativeLowerConfidenceBound,
 )
+from trieste.acquisition.function import GIBBON
 from omegaconf import OmegaConf
 from trieste.data import Dataset
 from trieste.acquisition.rule import EfficientGlobalOptimization
@@ -39,7 +40,7 @@ from sithom.misc import get_git_revision_hash
 from sithom.plot import plot_defaults
 from sithom.io import write_json
 import matplotlib.pyplot as plt
-from adforce.wrap import idealized_tc_observe
+from adforce.wrap import idealized_tc_observe, DryObservationPoint
 from adforce.constants import NEW_ORLEANS
 from .wrap_utils import build_wrap_config
 from .ani import plot_gps
@@ -220,16 +221,19 @@ def objective_f(
                 # wrap_cfg.tc["displacement"].value = x
                 try:
                     real_result = idealized_tc_observe(wrap_cfg)
-                except ValueError as e:
-                    # A NaN/fill max water level usually means the observation
-                    # node stayed DRY for this query (e.g. slow oblique storms
-                    # in the wider 4D space) — the honest objective there is
-                    # zero surge, which is informative to the GP, unlike a
-                    # crashed loop. Log loudly, score the point at 0.0, and
-                    # keep optimizing. (Previously this re-raised, which
-                    # killed multi-day 4D campaigns one dry query at a time.)
+                except DryObservationPoint as e:
+                    # The run is verified healthy (zeta_max valid across the
+                    # mesh) but the observation node never wetted (e.g. slow
+                    # oblique storms in the wider 4D space) — the honest
+                    # objective there is zero surge, which is informative to
+                    # the GP, unlike a crashed loop. Log loudly, score 0.0,
+                    # and keep optimizing. Run FAILURES (AdcircRunFailure,
+                    # missing maxele, etc.) deliberately still propagate and
+                    # kill the loop: scoring them 0.0 feeds false observations
+                    # to the GP (this corrupted no3d-mes-s42 when the worker
+                    # disk filled — 7 evals near the incumbent scored 0.0).
                     print(
-                        f"Dry/invalid run scored as 0.0 m: "
+                        f"Dry observation point scored as 0.0 m: "
                         f"call_number={call_number}, run_folder={tmp_dir}, "
                         f"query={inputs}, error={e}"
                     )
@@ -769,7 +773,8 @@ def run_bayesopt_exp(
     obs_lat: float = NEW_ORLEANS.lat,
     init_steps: int = 10,
     daf_steps: int = 10,
-    daf: str = "mes",  # mes, ei, ucb
+    daf: str = "mes",  # mes, ei, ucb, gibbon
+    batch_size: int = 1,  # >1 requires daf="gibbon" (greedy batch builder)
     kernel: str = "Matern52",  # Matern32, Matern52, SE
     wrap_test: bool = False,
     resume: bool = True,
@@ -791,7 +796,15 @@ def run_bayesopt_exp(
         obs_lon (float, optional): Longitude of the observation point. Defaults to NEW_ORLEANS.lon.
         obs_lat (float, optional): Latitude of the observation point. Defaults to NEW_ORLEANS.lat.
         resolution (str, optional): Resolution of the model. Defaults to "mid".
-        daf (str, optional): Type of acquisition function. Defaults to "mes".
+        daf (str, optional): Type of acquisition function: "mes", "ei",
+            "ucb", or "gibbon" (batch max-value entropy search, Moss et al.
+            2021 — the only choice that supports batch_size > 1).
+            Defaults to "mes".
+        batch_size (int, optional): Query points proposed per BO step. All
+            points of a batch are chosen jointly (greedy with repulsion)
+            BEFORE any of them is evaluated, so on a multi-machine setup the
+            batch can run in parallel; within this driver they are evaluated
+            sequentially in ledger order. Defaults to 1.
         kernel (str, optional): Kernel to use. Defaults to "Matern52".
         wrap_test (bool, optional): Whether to prevent. Defaults to False.
         resume (bool, optional): Whether to resume a partially-completed
@@ -857,6 +870,8 @@ def run_bayesopt_exp(
         "exp_name": exp_name,
         "init_steps": init_steps,
         "daf_steps": daf_steps,
+        "daf": daf,
+        "batch_size": batch_size,
         "obs_lon": obs_lon,
         "obs_lat": obs_lat,
         "wrap_test": wrap_test,
@@ -972,25 +987,46 @@ def run_bayesopt_exp(
                 f"{checkpoint_manager.latest_checkpoint} ({e}); "
                 "continuing with a freshly initialised GP."
             )
-    # choices mves,
-    # TODO: make another choice for this.
     if daf == "mes":
-        acquisition_func = MinValueEntropySearch(
-            search_space
-        )  # should add in acquisition function choice here.
+        acquisition_func = MinValueEntropySearch(search_space)
     elif daf == "ei":
         acquisition_func = ExpectedImprovement(
             search_space  # , best_observation=initial_data.maximum()
         )
     elif daf == "ucb":
         acquisition_func = NegativeLowerConfidenceBound(search_space)
+    elif daf == "gibbon":
+        # Batch max-value entropy search (Moss et al. 2021): an analytic
+        # lower bound on the MES information gain plus a determinantal
+        # repulsion term, built greedily one batch point at a time — so the
+        # q points of a batch are informative AND mutually diverse. With
+        # batch_size=1 it is simply a cheaper MES approximation.
+        acquisition_func = GIBBON(search_space)
     else:
         raise ValueError(f"Unknown acquisition function {daf}")
-    acquisition_rule = EfficientGlobalOptimization(acquisition_func)
+    if batch_size > 1 and daf != "gibbon":
+        raise ValueError(
+            f"batch_size={batch_size} requires a batch-capable acquisition "
+            f"(daf='gibbon'); '{daf}' proposes one point per step."
+        )
+    acquisition_rule = EfficientGlobalOptimization(
+        acquisition_func, num_query_points=batch_size
+    )
     bo = trieste.bayesian_optimizer.BayesianOptimizer(observer, search_space)
+    # Each optimize step proposes batch_size points, so run enough steps to
+    # cover the remaining evaluation budget; the final step may overshoot
+    # daf_steps by at most batch_size - 1 evaluations (logged, and counted in
+    # the ledger like any other run).
+    num_steps = -(-num_daf_remaining // batch_size)  # ceil division
+    if num_steps * batch_size != num_daf_remaining:
+        print(
+            f"batch_size {batch_size} does not divide remaining budget "
+            f"{num_daf_remaining}: running {num_steps} steps = "
+            f"{num_steps * batch_size} evaluations."
+        )
     # run bayesopt loop
     result = bo.optimize(
-        num_daf_remaining,
+        num_steps,
         initial_data,
         model,
         acquisition_rule,

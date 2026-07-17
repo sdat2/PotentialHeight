@@ -14,6 +14,25 @@ from .mesh import xr_loader
 from .config import save_config
 
 
+class DryObservationPoint(ValueError):
+    """The ADCIRC run succeeded (zeta_max valid over essentially the whole
+    mesh) but the observation node itself never wetted. Surge optimizers may
+    legitimately score this as 0.0 m."""
+
+
+class AdcircRunFailure(RuntimeError):
+    """zeta_max is invalid across (most of) the mesh: the run crashed, blew
+    up, or its output was truncated (e.g. disk full). Must never be scored as
+    a physical result. Deliberately not a ValueError so that callers catching
+    DryObservationPoint cannot swallow it by accident."""
+
+
+# healthy runs on the mid mesh have valid zeta_max at ~100% of nodes (measured
+# 1.000 on 31435-node runs); a crashed/truncated run leaves fill values nearly
+# everywhere, so 0.5 separates the two regimes with a wide margin either side
+MIN_VALID_ZETA_FRACTION = 0.5
+
+
 def observe_max_point(cfg: DictConfig) -> float:
     """Observe the ADCIRC model.
 
@@ -24,9 +43,10 @@ def observe_max_point(cfg: DictConfig) -> float:
         float: max water level at the node nearest the observation point.
 
     Raises:
-        ValueError: If the max water level is NaN or unphysically large
-            (e.g. a netCDF fill value like 9.96921e36), indicating a
-            failed or dry ADCIRC run.
+        DryObservationPoint: the run is healthy but the observation node
+            stayed dry (zeta_max is NaN/fill there only).
+        AdcircRunFailure: zeta_max is NaN/fill over most of the mesh, i.e.
+            the ADCIRC run itself failed.
     """
     mele_ds = xr_loader(os.path.join(cfg.files.run_folder, "maxele.63.nc"))
     # print("mele_ds", mele_ds)
@@ -51,11 +71,24 @@ def observe_max_point(cfg: DictConfig) -> float:
 
     # guard against NaN/netCDF fill values (e.g. 9.96921e36) from failed or dry runs
     if not np.isfinite(maxele) or abs(maxele) >= 100:
-        raise ValueError(
-            f"Invalid max water level {maxele} m at node {min_p} "
+        zeta_all = np.asarray(mele_ds.zeta_max.values).ravel()
+        valid_fraction = float(
+            np.mean(np.isfinite(zeta_all) & (np.abs(zeta_all) < 100))
+        )
+        where = (
+            f"invalid max water level {maxele} m at node {min_p} "
             f"(lon, lat) = ({point[0]}, {point[1]}) "
-            f"for run folder {cfg.files.run_folder}: "
-            "ADCIRC run probably failed or the observation point stayed dry."
+            f"for run folder {cfg.files.run_folder} "
+            f"(zeta_max valid at {valid_fraction:.1%} of nodes)"
+        )
+        if valid_fraction < MIN_VALID_ZETA_FRACTION:
+            raise AdcircRunFailure(
+                f"{where}: the ADCIRC run failed (crash/blow-up/truncated "
+                "output) — refusing to treat this as a physical result."
+            )
+        raise DryObservationPoint(
+            f"{where}: the run is healthy but the observation node never "
+            "wetted; zero surge at the point is the honest interpretation."
         )
 
     return maxele
@@ -112,7 +145,30 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
         plot_heights_and_winds(os.path.join(cfg.files.run_folder), step_size=10)
 
     if cfg.files.low_storage:
-        os.remove(os.path.join(cfg.files.run_folder, "fort.22.nc"))
+        # Delete the bulky input + full-field time-series outputs (~1 GB per
+        # run) and the PE* partition dirs, keeping maxele.63.nc & other max*
+        # summaries (the science) and the small setup/log files. Doing this
+        # here, after a *successful* observe, is race-free — an external
+        # janitor loop sweeping exp dirs on a timer once deleted the ACTIVE
+        # run's PE dirs mid-startup and produced all-NaN maxele files (see
+        # AdcircRunFailure / rerun/results/acquisition_mes_vs_ei.md). A raised
+        # observe_max_point above skips this, leaving failures for forensics.
+        freed = 0
+        for name in ("fort.22.nc", "fort.63.nc", "fort.64.nc", "fort.73.nc", "fort.74.nc"):
+            path = os.path.join(cfg.files.run_folder, name)
+            if os.path.exists(path):
+                freed += os.path.getsize(path)
+                os.remove(path)
+        n_pe = 0
+        for entry in os.listdir(cfg.files.run_folder):
+            path = os.path.join(cfg.files.run_folder, entry)
+            if entry.startswith("PE") and os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+                n_pe += 1
+        print(
+            f"low_storage: freed {freed / 1e9:.2f} GB + {n_pe} PE dirs "
+            f"in {cfg.files.run_folder}"
+        )
     return maxele
 
 

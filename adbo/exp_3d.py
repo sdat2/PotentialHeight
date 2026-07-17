@@ -28,7 +28,10 @@ def run_3d_exp() -> None:
     parser.add_argument("--resolution", type=str, default="mid")
     parser.add_argument("--exp_name", type=str, default="bo")
     parser.add_argument("--kernel", type=str, default="Matern52")
-    parser.add_argument("--daf", type=str, default="mes")  # data acquisition function
+    # data acquisition function: mes, ei, ucb, or gibbon (batch MES)
+    parser.add_argument("--daf", type=str, default="mes")
+    # query points proposed jointly per BO step (>1 requires --daf gibbon)
+    parser.add_argument("--batch", type=int, default=1)
 
     # adding ability to override constraints in the command line
     cs = DEFAULT_CONSTRAINTS
@@ -70,6 +73,7 @@ def run_3d_exp() -> None:
         wrap_test=args.test,
         kernel=args.kernel,
         daf=args.daf,
+        batch_size=args.batch,
     )
     print(args)
 
