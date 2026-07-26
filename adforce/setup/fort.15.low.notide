@@ -20,7 +20,7 @@ Run_001
 20    	 	 ! DTDP # 20 second timestep
 0  	 	 ! STATIM 
 0   	 	 ! REFTIM 
-10800            
+10800                   ! WTIMINC - met data time increment [s] (RSTIMINC appended when SWAN-coupled)
 14   	 	 ! RNDY 
 2   	 	 ! DRAMP 
 0 1 0   	  ! A00, B00, C00 

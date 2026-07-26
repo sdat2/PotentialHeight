@@ -1,0 +1,10 @@
+    4                                   version of initialisation file
+Delft University of Technology      name of institute
+    3                                   command file ref. number
+fort.26                             command file name
+    4                                   print file ref. number
+PRINT                               print file name
+    4                                   test file ref. number
+                                    test file name
+    3                                   unit number of screen
+   99                                   highest file unit number

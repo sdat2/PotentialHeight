@@ -1,6 +1,7 @@
 """Run ADCIRC with subprocess rather than slurmpy."""
 
 import os
+import shutil
 import subprocess
 from omegaconf import DictConfig
 
@@ -161,7 +162,29 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
                     "done!\n"
                 )  # completes the "Prepping case..." line with done!
 
-            # 6. Run the main ADCIRC simulation using padcirc via srun
+            # 5c. SWAN coupling: each PE subdomain needs its own copy of the
+            # SWAN command file (adcprep does not distribute fort.26), and the
+            # main executable becomes padcswan (from a SWAN-coupled build).
+            swan = bool(
+                getattr(config.adcirc, "swan", None) and config.adcirc.swan.value
+            )
+            main_exe = "padcswan" if swan else "padcirc"
+            if swan:
+                if not os.path.exists(f"{exe_path}/padcswan"):
+                    raise RuntimeError(
+                        f"adcirc.swan is on but {exe_path}/padcswan does not "
+                        "exist -- use a SWAN-coupled ADCIRC build (padcswan + "
+                        "coupled adcprep), e.g. the adcirc-swan image."
+                    )
+                import glob as _glob
+
+                fort26 = os.path.join(direc, "fort.26")
+                pe_dirs = sorted(_glob.glob(os.path.join(direc, "PE*")))
+                for pe in pe_dirs:
+                    shutil.copy(fort26, os.path.join(pe, "fort.26"))
+                log_file.write(f"(fort.26 -> {len(pe_dirs)} PE dirs) ")
+
+            # 6. Run the main simulation (padcirc, or padcswan when coupled)
             log_file.write(
                 "    Running case..."
             )  # similar to echo -n "Running case..."
@@ -176,7 +199,7 @@ def setoff_subprocess_job_and_wait(direc: str, config: DictConfig) -> int:
                         "--distribution=block:block",
                         "--hint=nomultithread",  # set number of processes to np
                         "--ntasks=" + str(np),
-                        f"{exe_path}/padcirc",
+                        f"{exe_path}/{main_exe}",
                     ],
                     stdout=run_log,
                     stderr=subprocess.STDOUT,

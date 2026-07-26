@@ -67,7 +67,7 @@ def run_3d_exp() -> None:
         obs_lon=args.obs_lon,
         obs_lat=args.obs_lat,
         exp_name=args.exp_name,  # f"{args.setup}-{args.year}-i-{args.init_steps}",
-        resolution="mid",
+        resolution=args.resolution,
         init_steps=args.init_steps,
         daf_steps=args.daf_steps,
         wrap_test=args.test,

@@ -7,6 +7,10 @@ tide:
   value: false
   description: "Whether to turn tides on"
   units: "dimensionless"
+swan:
+  value: false
+  description: "Couple SWAN waves via padcswan (fort.15 NWS += 300, WTIMINC line gains RSTIMINC; fort.26 + swaninit staged, per-PE fort.26 copies). Requires a SWAN-coupled ADCIRC build (padcswan + coupled adcprep)."
+  units: dimensionless
 attempted_observation_location:
   value:
     - -90.0715

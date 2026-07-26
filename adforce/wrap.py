@@ -94,6 +94,73 @@ def observe_max_point(cfg: DictConfig) -> float:
     return maxele
 
 
+RSTIMINC_S = 1200  # SWAN coupling interval [s]; must equal fort.26 COMPUTE dt
+
+
+def _enable_swan_in_fort15(path: str, rstiminc: int = RSTIMINC_S) -> None:
+    """Patch a fort.15 for SWAN coupling in place: NWS += 300 (e.g. 13 -> 313,
+    20 -> 320) and append RSTIMINC to the WTIMINC line (coupling interval,
+    seconds; RSTIMINC/DT must be a positive integer or ADCIRC SIGFPEs at the
+    first wave call). Idempotent: an NWS already >= 300 is left alone."""
+    with open(path) as f:
+        lines = f.readlines()
+    out = []
+    for line in lines:
+        if "! NWS" in line and "WTIMINC" not in line:
+            head, _, comment = line.partition("!")
+            nws = int(head.split()[0])
+            if nws < 300:
+                head = head.replace(str(nws), str(nws + 300), 1)
+            line = head + "!" + comment
+        elif "! WTIMINC" in line:
+            head, _, comment = line.partition("!")
+            tokens = head.split()
+            if str(rstiminc) not in tokens[1:]:
+                pad = len(head) - len(head.rstrip()) - len(f" {rstiminc}")
+                head = head.rstrip() + f" {rstiminc}" + " " * max(pad, 1)
+            line = head + "!" + comment
+        out.append(line)
+    with open(path, "w") as f:
+        f.writelines(out)
+
+
+def stage_input_files(
+    run_folder: str, resolution: str = "mid", tide: bool = False, swan: bool = False
+) -> None:
+    """Copy the per-option ADCIRC input deck into ``run_folder``.
+
+    * ``resolution``: chooses ``fort.14.{res}``/``fort.13.{res}`` and the
+      ``fort.15.{res}.{tide|notide}`` template (only "low" and "mid" ship in
+      the repo; "high" lived on ARCHER2).
+    * ``tide``: picks the tidal template. NOTE: the tidal templates carry a
+      fixed cold-start/RNDAY window (2005-08-19 + 13 days); the forcing grid
+      (cfg.grid) must cover it.
+    * ``swan``: patches fort.15 for coupling (NWS += 300, RSTIMINC) and
+      stages ``fort.26`` + ``swaninit`` (which must name fort.26, not the
+      SWAN default INPUT). The run must then use ``padcswan`` from a
+      SWAN-coupled build (adforce.subprocess selects it from this flag).
+    """
+    templates = {
+        "fort.15": f"fort.15.{resolution}.{'tide' if tide else 'notide'}",
+        "fort.13": f"fort.13.{resolution}",
+        "fort.14": f"fort.14.{resolution}",
+    }
+    if swan:
+        templates["fort.26"] = "fort.26"
+        templates["swaninit"] = "swaninit"
+    for dst, src in templates.items():
+        src_path = os.path.join(SETUP_PATH, src)
+        if not os.path.exists(src_path):
+            raise FileNotFoundError(
+                f"ADCIRC setup file {src} not found in {SETUP_PATH} "
+                f"(resolution={resolution!r}, tide={tide}, swan={swan}); "
+                "only low/mid templates ship with the repo."
+            )
+        shutil.copy(src_path, os.path.join(run_folder, dst))
+    if swan:
+        _enable_swan_in_fort15(os.path.join(run_folder, "fort.15"))
+
+
 @timeit
 def idealized_tc_observe(cfg: DictConfig) -> float:
     """Wrap the adcirc call.
@@ -105,21 +172,13 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
         float: max water level at observation point.
     """
     os.makedirs(cfg.files.run_folder, exist_ok=True)
-    # transfer relevant ADCIRC setup files
-    assert cfg.adcirc.tide.value == False
-    assert cfg.adcirc.resolution.value == "mid"
-    # other options not yet implemented
-    shutil.copy(
-        os.path.join(SETUP_PATH, "fort.15.mid.notide"),
-        os.path.join(cfg.files.run_folder, "fort.15"),
-    )
-    shutil.copy(
-        os.path.join(SETUP_PATH, "fort.13.mid"),
-        os.path.join(cfg.files.run_folder, "fort.13"),
-    )
-    shutil.copy(
-        os.path.join(SETUP_PATH, "fort.14.mid"),
-        os.path.join(cfg.files.run_folder, "fort.14"),
+    # transfer relevant ADCIRC setup files per the adcirc options
+    # (resolution / tide / swan -- see stage_input_files)
+    stage_input_files(
+        cfg.files.run_folder,
+        resolution=cfg.adcirc.resolution.value,
+        tide=bool(cfg.adcirc.tide.value),
+        swan=bool(getattr(cfg.adcirc, "swan", None) and cfg.adcirc.swan.value),
     )
 
     print("ADFORCE cfg:", cfg)
@@ -154,7 +213,13 @@ def idealized_tc_observe(cfg: DictConfig) -> float:
         # AdcircRunFailure / rerun/results/acquisition_mes_vs_ei.md). A raised
         # observe_max_point above skips this, leaving failures for forensics.
         freed = 0
-        for name in ("fort.22.nc", "fort.63.nc", "fort.64.nc", "fort.73.nc", "fort.74.nc"):
+        for name in (
+            "fort.22.nc",
+            "fort.63.nc",
+            "fort.64.nc",
+            "fort.73.nc",
+            "fort.74.nc",
+        ):
             path = os.path.join(cfg.files.run_folder, name)
             if os.path.exists(path):
                 freed += os.path.getsize(path)

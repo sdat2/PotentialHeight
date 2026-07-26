@@ -20,7 +20,7 @@ notide-example     ! 32 CHARACTER ALPHANUMERIC RUN DESCRIPTION
  5.0                     ! DT - TIME STEP (IN SECONDS)
  0.00                    ! STATIM - STARTING TIME (IN DAYS)
  0.00                    ! REFTIM - REFERENCE TIME (IN DAYS)
- 900
+ 900                    ! WTIMINC - met data time increment [s] (RSTIMINC appended when SWAN-coupled)
  7.0                     ! RNDAY - TOTAL LENGTH OF SIMULATION (IN DAYS)
  1.000 0.000 0.000 0.000 1.000 1.000 1.000 0.000 1.000                     ! DRAMP - DURATION OF RAMP FUNCTION (IN DAYS)
 0.5 0.5 0             ! TIME WEIGHTING FACTORS FOR THE GWCE EQUATION
