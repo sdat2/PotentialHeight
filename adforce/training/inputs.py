@@ -12,10 +12,11 @@ paths.
 
 from typing import Dict
 import os
+import re
 import math
 from pathlib import Path
 import shutil
-from datetime import timedelta
+from datetime import datetime, timedelta
 import xarray as xr
 from adcircpy import AdcircMesh, AdcircRun
 from adcircpy.forcing.winds import BestTrackForcing
@@ -103,6 +104,75 @@ class CustomAdcircRun(AdcircRun):
         return nlists
 
 
+def _pad_track_to(path: str, stamp: str) -> None:
+    """Prepend copies of the first track record at 6-hourly stamps from
+    ``stamp`` (YYYYMMDDHH) up to the record's own time, if the file starts
+    later. A single back-dated record is NOT enough: GAHM's coverage check
+    (nws20get) evidently assumes regularly spaced records, so a lone record
+    6 days before the next one still fails with "not enough data". Each pad
+    line string-replaces the unique 10-digit datetime token, so fixed-width
+    (aswip) and comma (ATCF) formats both keep their layout."""
+    with open(path) as f:
+        lines = f.readlines()
+    if not lines:
+        return
+    m = re.search(r"\b(\d{10})\b", lines[0])
+    if m is None or m.group(1) <= stamp:
+        return  # malformed or already covers the window start
+    first_stamp = m.group(1)
+    t = datetime.strptime(stamp, "%Y%m%d%H")
+    t0 = datetime.strptime(first_stamp, "%Y%m%d%H")
+    stamps = []
+    while t < t0:
+        stamps.append(t.strftime("%Y%m%d%H"))
+        t += timedelta(hours=6)
+    # ASWIP groups consecutive identical-position records into one "cycle"
+    # (that is how multi-isotach cycles are encoded), so identical pads all
+    # merge into cycle 1 and trip GAHM's 4-isotach limit. March the padded
+    # storm eastward by 0.1 deg per record into its genesis point so every
+    # pad is its own cycle; width-preserving replace keeps the fixed-format
+    # aswip file aligned.
+    mlon = re.search(r"\b(\d{2,4})([EW])\b", lines[0])
+    pads = []
+    n = len(stamps)
+    for k, sstamp in enumerate(stamps):
+        line = lines[0].replace(first_stamp, sstamp)
+        if mlon:
+            off = n - k  # earliest pad is furthest from the genesis point
+            val = int(mlon.group(1)) + (-off if mlon.group(2) == "W" else off)
+            token = str(val).rjust(len(mlon.group(1))) + mlon.group(2)
+            line = line.replace(mlon.group(0), token)
+        pads.append(line)
+    lines[:0] = pads
+    with open(path, "w") as f:
+        f.writelines(lines)
+    return len(pads)
+
+
+def _renumber_aswip_tau(path: str, n_pads: int, pad_hours_step: int = 6) -> None:
+    """Rewrite the TAU column (cols 31-33, aswip FORMAT ``2x,i3`` after
+    castType) as hours since the (padded) file start. ASWIP keys BOTH its
+    cycle grouping and its time axis on this column
+    (``cycleTime = iFcstInc*3600``; wind/aswip.F): verbatim-copied pads with
+    TAU=0 collapse into one >4-"isotach" cycle, and an unshifted TAU range
+    under-covers the run window (the real cause of every nws20get error in
+    this saga). Multi-isotach records (identical original TAU) keep sharing
+    a TAU, preserving their grouping."""
+    with open(path) as f:
+        lines = f.readlines()
+    out = []
+    shift = n_pads * pad_hours_step
+    for i, line in enumerate(lines):
+        if i < n_pads:
+            tau = i * pad_hours_step  # each pad is its own single-line cycle
+        else:
+            # original records: shift, preserving shared TAUs (multi-isotach)
+            tau = int(line[30:33]) + shift
+        out.append(line[:30] + f"{tau:3d}" + line[33:])
+    with open(path, "w") as f:
+        f.writelines(out)
+
+
 def generate_adcirc_inputs(
     storm: Storm,
     storm_ds: xr.Dataset,
@@ -185,6 +255,13 @@ def generate_adcirc_inputs(
             tidal_forcing.use_constituent(c)
         mesh.add_forcing(tidal_forcing)
 
+    # Simulation window first: the wind block needs sim_start to pad the
+    # track files back over the tidal spinup (GAHM refuses a run window not
+    # fully covered by fort.22 -- "nws20get: There aren't enough data").
+    sim_start, sim_end = calculate_simulation_window(
+        storm, extra_days=0, spinup_days=spinup_days
+    )
+
     # 2b. Wind forcing (GAHM). Omitted for tide-only runs -> NWS=0 fort.15.
     if wind:
         convert_ibtracs_storm_to_aswip_input(
@@ -197,18 +274,23 @@ def generate_adcirc_inputs(
             output_atcf_path=os.path.join(output_dir, "atcf.txt"),
         )
         # adcircpy reads atcf.txt to get metadata for fort.15
+        if spinup_days > 0:
+            # prepend genesis-record copies over the spinup (6-hourly,
+            # walking into the genesis point) so GAHM has met coverage of
+            # the full run window, then renumber the aswip file's TAU column
+            # -- aswip's cycle grouping AND time axis (see _renumber_aswip_tau)
+            stamp = sim_start.strftime("%Y%m%d%H")
+            aswip_path = os.path.join(output_dir, "pre_aswip_fort.22")
+            n_pads = _pad_track_to(aswip_path, stamp)
+            _pad_track_to(os.path.join(output_dir, "atcf.txt"), stamp)
+            if n_pads:
+                _renumber_aswip_tau(aswip_path, n_pads)
         wind_forcing = BestTrackForcing(
             Path(os.path.join(output_dir, "atcf.txt")), nws=20
         )  # NWS=20 for GAHM
         mesh.add_forcing(wind_forcing)
 
-    # 3. Calculate Simulation Window (spinup extends the window BACKWARD so
-    # tides equilibrate before the storm; the GAHM fort.22 only covers the
-    # storm lifetime, so verify met behaviour with spinup on a single storm
-    # before fleet use)
-    sim_start, sim_end = calculate_simulation_window(
-        storm, extra_days=0, spinup_days=spinup_days
-    )
+    # 3. (simulation window computed above, before the wind forcing)
 
     # 4. Configure AdcircRun Driver
     driver = CustomAdcircRun(
