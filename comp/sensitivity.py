@@ -110,11 +110,11 @@ def node_sweep(
             (0.30, 0.12, 30),
         ]
     items = {k: C.STORMS[k] for k in (storms or C.STORMS)}
-    gauges = gulf_gauges()
     # accumulate per-combo lists of (sim_peak, obs_peak, storm, timing) over clean-ish pairs
     acc: Dict[Tuple[float, float, int], list] = {cmb: [] for cmb in combos}
     for storm, fname in items.items():
         year = int(storm.split()[-1])
+        gauges = gulf_gauges(C.box_for(storm))  # per-storm region (Gulf/Florida)
         try:
             ds = xr.open_dataset(download_storm(fname))
         except Exception as e:  # pragma: no cover

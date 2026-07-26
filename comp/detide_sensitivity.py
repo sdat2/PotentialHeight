@@ -276,7 +276,12 @@ def run(
     clean = df[df["clean"].astype(bool)].copy()
     if limit:
         clean = clean.head(limit)
-    lat_of = {str(sid): lat for sid, name, lat, lon in gulf_gauges()}
+    # gauge-latitude lookup over BOTH regions (Gulf + Florida boxes)
+    lat_of = {
+        str(sid): lat
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
     windows = _storm_windows()
 
     # recompute the observed peak per (pair, method); the skew surge reuses the robust fit
@@ -346,7 +351,12 @@ def run_skew(limit: Optional[int] = None) -> pd.DataFrame:
     clean = df[df["clean"].astype(bool)].copy()
     if limit:
         clean = clean.head(limit)
-    lat_of = {str(sid): lat for sid, name, lat, lon in gulf_gauges()}
+    # gauge-latitude lookup over BOTH regions (Gulf + Florida boxes)
+    lat_of = {
+        str(sid): lat
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
     windows = _storm_windows()
     rows = []
     for _, row in clean.iterrows():

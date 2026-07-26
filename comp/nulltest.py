@@ -138,11 +138,11 @@ def lag_curve(
     c = load_clean()
     keys = _clean_keys(c)
     items = {k: C.STORMS[k] for k in (storms or C.STORMS) if k in keys}
-    gauges = gulf_gauges()
     per_lag: Dict[float, List[float]] = {L: [] for L in lags_days}
     for storm, fname in items.items():
         try:
-            _, series = validate_storm(storm, fname, gauges)
+            # per-storm gauge region (Gulf vs Florida), matching comp.validate
+            _, series = validate_storm(storm, fname, gulf_gauges(C.box_for(storm)))
         except Exception as e:  # pragma: no cover
             print(f"!! {storm}: {e}")
             continue

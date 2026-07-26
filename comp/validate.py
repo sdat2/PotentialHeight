@@ -125,15 +125,18 @@ def timeseries_skill(sim: pd.Series, obs: pd.Series) -> Tuple[float, float, int]
 # from the node-selection + de-tiding parameters, so the cache self-invalidates if any
 # change; ``refresh=True`` forces a recompute.
 # --------------------------------------------------------------------------- #
-def _ts_cache_tag() -> str:
+def _ts_cache_tag(storm: str) -> str:
     """Version tag from every parameter that affects the cached series.
 
     The leading ``v1`` is a manual schema/algorithm version: bump it if the de-tiding or
     node-selection *code* (not just these constants) changes, to invalidate stale caches.
+    The gauge-selection box is per-storm (Gulf vs Florida, ``C.box_for``); for the
+    original Gulf storms the tag string is byte-identical to the single-box era, so
+    their caches stay valid.
     """
     return (
         f"v1|deg{C.MAX_NODE_DEG}|wet{C.WET_MIN_M}|knn{C.KNN}"
-        f"|ut{C.UTIDE_MIN_SAMPLES}|box{C.GAUGE_BOX}"
+        f"|ut{C.UTIDE_MIN_SAMPLES}|box{C.box_for(storm)}"
     )
 
 
@@ -161,7 +164,7 @@ def _save_series_cache(storm: str, series: Dict[str, tuple]) -> None:
             if frames
             else pd.DataFrame(columns=["gauge", "kind", "time", "value"])
         )
-        df["tag"] = _ts_cache_tag()
+        df["tag"] = _ts_cache_tag(storm)
         df.to_parquet(_series_cache_path(storm), index=False)
     except Exception as e:  # pragma: no cover - caching must never break the pipeline
         print(f"  (warning: could not cache {storm} series: {e})")
@@ -174,7 +177,7 @@ def _load_series_cache(storm: str) -> Optional[Dict[str, tuple]]:
         return None
     try:
         df = pd.read_parquet(path)
-        if df.empty or df["tag"].iloc[0] != _ts_cache_tag():
+        if df.empty or df["tag"].iloc[0] != _ts_cache_tag(storm):
             return None  # parameters changed -> recompute
         series: Dict[str, tuple] = {}
         for name, grp in df.groupby("gauge", sort=False):
@@ -426,6 +429,7 @@ def plot_examples(
     paths: List[str],
     ncol: int = 2,
     refresh: bool = False,
+    extra_titles: Optional[Dict[Tuple[str, str], str]] = None,
 ) -> None:
     """Plot simulated surge vs de-tided observed residual for chosen (storm, gauge).
 
@@ -437,16 +441,19 @@ def plot_examples(
     import matplotlib.dates as mdates
     from sithom.plot import get_dim, OX_BLUE
 
-    gauges = gulf_gauges()
     cache: Dict[str, Dict[str, tuple]] = {}
     nrow = int(np.ceil(len(panels) / ncol))
     # taller (ratio ~1) for the stacked rows; wider 2-col panels give the date axis room.
     fig, axes = plt.subplots(nrow, ncol, figsize=get_dim(ratio=0.95), squeeze=False)
+    extra_titles = extra_titles or {}
     for i, (ax, (storm, gname)) in enumerate(zip(axes.ravel(), panels)):
         letter = f"({chr(97 + i)}) "  # panel id in the (left) title -> no label clash
         if storm not in cache:
             cache[storm] = load_storm_series(
-                storm, C.STORMS[storm], gauges, refresh=refresh
+                storm,
+                C.STORMS[storm],
+                gulf_gauges(C.box_for(storm)),  # per-storm region (Gulf/Florida)
+                refresh=refresh,
             )
         match = [k for k in cache[storm] if gname.lower() in k.lower()]
         if not match:
@@ -459,6 +466,7 @@ def plot_examples(
         ax.plot(sim.index, sim.values, color="tab:orange", lw=1.3, label="ADCIRC surge")
         ax.plot(obs.index, obs.values, color="black", lw=0.9, label="NOAA residual")
         rtxt = "" if np.isnan(tsr) else f" ($r={tsr:.2f}$)"
+        rtxt += extra_titles.get((storm, gname), "")
         gauge = match[0][:24].rstrip(", ")  # trim long names without a dangling comma
         ax.set_title(f"{letter}{storm}: {gauge}{rtxt}", fontsize=7, loc="left")
         ax.set_ylabel("Surge [m]")
@@ -524,12 +532,16 @@ def latex_table(df: pd.DataFrame, path: str) -> None:
 
 def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
     items = {k: C.STORMS[k] for k in (storms or C.STORMS)}
-    gauges = gulf_gauges()
-    print(f"{len(gauges)} candidate gauges in box; {len(items)} storms")
+    print(
+        f"{len(gulf_gauges())} candidate gauges in Gulf box, "
+        f"{len(gulf_gauges(C.FLORIDA_BOX))} in Florida box; {len(items)} storms"
+    )
     rows: List[dict] = []
     for storm, fname in items.items():
         try:
-            r, _ = validate_storm(storm, fname, gauges)
+            # per-storm gauge region: Gulf storms keep the original box (and
+            # their cached series); Florida storms score the Miami-region coast
+            r, _ = validate_storm(storm, fname, gulf_gauges(C.box_for(storm)))
         except Exception as e:  # pragma: no cover
             print(f"!! {storm}: {e}")
             continue
@@ -566,6 +578,86 @@ def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
     return df
 
 
+CITY_POINTS = {
+    # (lon, lat) of the three study cities (adforce.constants Points); each
+    # gauge-storm pair is assigned to the nearest city for the failure panels.
+    "new_orleans": (-90.0715, 29.9511),
+    "galveston": (-94.7977, 29.3013),
+    "miami": (-80.1918, 25.7617),
+}
+
+
+def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
+    """Per-city worst-case example panels (robustness view).
+
+    For each study city (New Orleans, Galveston, Miami) select the ``n_panels``
+    *valid* gauge-storm pairs (meaningful observed surge, not a documented
+    gauge failure -- but NOT restricted to the simultaneous-peak "clean"
+    subset, so timing misses count) with the largest absolute difference
+    between simulated and observed peak surge, and render their hydrographs
+    with the standard example-panel plotter. Requires a completed sweep
+    (``val_summary.csv`` + populated time-series cache).
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m comp.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    # gauge coordinates over both region boxes
+    coord = {
+        str(sid): (lon, lat)
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
+    df = df[df.sid.isin(coord)].copy()
+    lons = df.sid.map(lambda s: coord[s][0])
+    lats = df.sid.map(lambda s: coord[s][1])
+    df["city"] = [
+        min(
+            CITY_POINTS,
+            key=lambda c: (CITY_POINTS[c][0] - lo) ** 2 + (CITY_POINTS[c][1] - la) ** 2,
+        )
+        for lo, la in zip(lons, lats)
+    ]
+    df["peak_diff"] = (df.sim_peak - df.obs_peak).abs()
+    for city in CITY_POINTS:
+        # |peak_dt| guard: rank only same-event misses -- overlapping simulation
+        # windows can otherwise pair one storm's simulated peak with ANOTHER
+        # storm's observed peak (e.g. Gustav's surge inside Ike's window),
+        # which is an artifact of the window, not a model failure. 48 h is
+        # generous enough to keep genuine timing misses in.
+        sub = (
+            df[
+                df.valid.astype(bool)
+                & (df.city == city)
+                & (df.peak_dt_hr.abs() <= 48.0)
+            ]
+            .sort_values("peak_diff", ascending=False)
+            .head(n_panels)
+        )
+        if sub.empty:
+            print(f"(no valid pairs for {city})")
+            continue
+        panels = list(zip(sub.storm, sub.name))
+        extra = {
+            (r.storm, r.name): f" $\\Delta$peak {r.sim_peak - r.obs_peak:+.2f} m"
+            for r in sub.itertuples()
+        }
+        print(
+            f"{city}: "
+            + "; ".join(f"{s}/{g} ({e.strip()})" for (s, g), e in extra.items())
+        )
+        plot_examples(
+            panels,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_failures_{city}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_failures_{city}.pdf"),
+            ],
+            refresh=refresh,
+            extra_titles=extra,
+        )
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -582,7 +674,19 @@ def main() -> None:
         action="store_true",
         help="force-recompute the cached time series instead of reading it",
     )
+    ap.add_argument(
+        "--failures",
+        action="store_true",
+        help="per-city worst-case panels (largest |sim-obs| peak difference) "
+        "from the cached sweep -- no re-run",
+    )
+    ap.add_argument(
+        "--n-failures", type=int, default=6, help="panels per city for --failures"
+    )
     a = ap.parse_args()
+    if a.failures:
+        plot_failures(n_panels=a.n_failures, refresh=a.refresh_cache)
+        return
     if a.examples_only:
         plot_examples(
             C.EXAMPLE_PANELS,

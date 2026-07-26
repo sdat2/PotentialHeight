@@ -70,17 +70,47 @@ COOPS_MDAPI = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.
 
 # --- gauge panel -----------------------------------------------------------
 # NW Gulf of Mexico box (Texas coast -> Florida panhandle): lon (min,max), lat (min,max).
+# Covers the New Orleans and Galveston study regions of the three-city paper.
 GAUGE_BOX = dict(lon=(-97.6, -84.0), lat=(27.3, 30.9))
+# Florida-peninsula box (Key West -> Fernandina Beach, both coasts), covering
+# the Miami study region, for the Atlantic/Florida storms added when the paper
+# moved from the single New Orleans site to the three-city comparison
+# (New Orleans / Galveston / Miami). A separate box (rather than widening
+# GAUGE_BOX) keeps the Gulf storms' time-series cache valid: the box is part of
+# the cache tag (see comp.validate._ts_cache_tag).
+FLORIDA_BOX = dict(lon=(-82.3, -79.7), lat=(24.4, 30.8))
+
+# Storms scored against FLORIDA_BOX instead of the (default Gulf) GAUGE_BOX.
+FLORIDA_STORMS = {
+    "Frances 2004",
+    "Jeanne 2004",
+    "Matthew 2016",
+    "Irma 2017",
+    "Nicole 2022",
+}
+
+
+def box_for(storm: str) -> dict:
+    """Gauge-selection box for a storm (Florida storms use FLORIDA_BOX)."""
+    return FLORIDA_BOX if storm in FLORIDA_STORMS else GAUGE_BOX
+
 
 # Storm display-name -> Hugging Face filename within HF_REPO.
-# Well-observed, surge-relevant Gulf landfalls 2005-2023.
+# Well-observed, surge-relevant Gulf landfalls 2005-2023, plus Florida
+# peninsula/Atlantic events 2004-2022 for the Miami region (the 228-storm
+# archive contains no Andrew 1992, Wilma 2005 or Ian 2022). Keep this dict in
+# chronological order: the report table iterates it in insertion order.
 STORMS = {
+    "Frances 2004": "86_FRANCES_2004.nc",
+    "Jeanne 2004": "99_JEANNE_2004.nc",
     "Katrina 2005": "152_KATRINA_2005.nc",
     "Rita 2005": "166_RITA_2005.nc",
     "Gustav 2008": "25_GUSTAV_2008.nc",
     "Ike 2008": "29_IKE_2008.nc",
     "Isaac 2012": "245_ISAAC_2012.nc",
+    "Matthew 2016": "202_MATTHEW_2016.nc",
     "Harvey 2017": "239_HARVEY_2017.nc",
+    "Irma 2017": "242_IRMA_2017.nc",
     "Nate 2017": "249_NATE_2017.nc",
     "Michael 2018": "22_MICHAEL_2018.nc",
     "Barry 2019": "53_BARRY_2019.nc",
@@ -88,6 +118,7 @@ STORMS = {
     "Delta 2020": "161_DELTA_2020.nc",
     "Ida 2021": "220_IDA_2021.nc",
     "Nicholas 2021": "227_NICHOLAS_2021.nc",
+    "Nicole 2022": "290_NICOLE_2022.nc",
     "Idalia 2023": "32_IDALIA_2023.nc",
 }
 
@@ -111,6 +142,8 @@ EXAMPLE_PANELS = [
     ("Katrina 2005", "Pilots Station East"),
     ("Ida 2021", "Shell Beach"),
     ("Ida 2021", "Grand Isle"),
+    ("Ike 2008", "Galveston Pier 21"),  # Galveston study region
+    ("Irma 2017", "Virginia Key"),  # Miami study region
     ("Ida 2021", "Amerada Pass"),  # LAWMA, left-of-track set-down
     ("Laura 2020", "Calcasieu Pass"),
 ]

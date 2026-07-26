@@ -16,7 +16,10 @@ For each storm:
 
 1. download the storm netCDF from Hugging Face;
 2. extract simulated surge `SSH = WD + DEM` at the nearest *wet* mesh node to each
-   NOAA CO-OPS water-level gauge in a NW-Gulf box (Texas → Florida panhandle);
+   NOAA CO-OPS water-level gauge in the storm's region box — NW Gulf (Texas → Florida
+   panhandle; the New Orleans and Galveston study regions) for Gulf storms, or the
+   Florida peninsula (Key West → Fernandina Beach; the Miami study region) for the
+   Atlantic/Florida storms (`FLORIDA_STORMS` in `comp/constants.py`);
 3. de-tide the gauge record with a robust [`utide`](https://github.com/wesleybowman/UTide)
    harmonic fit on the storm's calendar year (falls back to CO-OPS `predictions`);
 4. score skill on three axes:
@@ -32,7 +35,7 @@ For each storm:
 ## Run
 
 ```bash
-python -m comp.validate                       # full 14-storm sweep
+python -m comp.validate                       # full 19-storm sweep (Gulf + Florida)
 python -m comp.validate --storms "Ida 2021"   # one storm (skips example panels + table)
 python -m comp.validate --examples-only       # just the example figure, from cache (fast)
 python -m comp.validate --examples-only --refresh-cache   # recompute the cached series first
