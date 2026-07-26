@@ -109,6 +109,10 @@ def generate_adcirc_inputs(
     output_dir: str,
     recalculate_timestep=False,
     recommended_dt=1.0,
+    resolution: str = "mid",
+    wind: bool = True,
+    tides: bool = False,
+    spinup_days: float = 0.0,
 ) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
@@ -134,8 +138,13 @@ def generate_adcirc_inputs(
     Returns:
         None
     """
-    # 1. Load Mesh
-    mesh = AdcircMesh.open(FORT14_PATH, crs="epsg:4326")
+    # 1. Load Mesh (per-resolution: fort.14.{mid,low}; fort.13.low is the
+    # nearest-neighbour resample of fort.13.mid -- see
+    # rerun/adcirc/make_fort13_low.py -- so friction/datum physics are held
+    # fixed across the mesh-resolution sensitivity sweep)
+    fort14_path = os.path.join(os.path.dirname(FORT14_PATH), f"fort.14.{resolution}")
+    fort13_path = os.path.join(os.path.dirname(FORT13_PATH), f"fort.13.{resolution}")
+    mesh = AdcircMesh.open(fort14_path, crs="epsg:4326")
     if recalculate_timestep:
         try:
             # You might adjust maxvel based on the storm's intensity if needed
@@ -160,33 +169,46 @@ def generate_adcirc_inputs(
     else:
         recommended_dt = recommended_dt  # Default timestep
 
-    # 2. Add Forcings -- no tides
-    # tidal_forcing = Tides()
-    # tidal_forcing.use_all()
-    # mesh.add_forcing() #tidal_forcing)
-
-    # 1. Use the parent class to find the storm and create a track object
     os.makedirs(output_dir, exist_ok=True)
 
-    convert_ibtracs_storm_to_aswip_input(
-        ds=storm_ds,
-        output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
-    )
-    # This is the file adcircpy will read
-    convert_ibtracs_storm_to_atcf(
-        ds=storm_ds,
-        output_atcf_path=os.path.join(output_dir, "atcf.txt"),
-    )
-    # adcircpy reads atcf.txt to get metadata for fort.15
-    wind_forcing = BestTrackForcing(
-        Path(os.path.join(output_dir, "atcf.txt")), nws=20
-    )  # NWS=20 for GAHM
+    # 2a. Tidal forcing (for the tide-surge-interaction runs). HAMTIDE is the
+    # only adcircpy tidal database that needs no local file (fetched over
+    # OPeNDAP at write time); the eight major constituents match the
+    # fort.15.*.tide templates used by the idealized decks. Nodal factors and
+    # equilibrium arguments are computed by adcircpy for this run's window.
+    if tides:
+        from adcircpy.forcing.tides import Tides
+        from adcircpy.forcing.tides.tides import TidalSource
 
-    # 2. Pass the track object to the BestTrackForcing constructor
-    mesh.add_forcing(wind_forcing)
+        tidal_forcing = Tides(tidal_source=TidalSource.HAMTIDE)
+        for c in ("M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1"):
+            tidal_forcing.use_constituent(c)
+        mesh.add_forcing(tidal_forcing)
 
-    # 3. Calculate Simulation Window
-    sim_start, sim_end = calculate_simulation_window(storm, extra_days=0, spinup_days=0)
+    # 2b. Wind forcing (GAHM). Omitted for tide-only runs -> NWS=0 fort.15.
+    if wind:
+        convert_ibtracs_storm_to_aswip_input(
+            ds=storm_ds,
+            output_atcf_path=os.path.join(output_dir, "pre_aswip_fort.22"),
+        )
+        # This is the file adcircpy will read
+        convert_ibtracs_storm_to_atcf(
+            ds=storm_ds,
+            output_atcf_path=os.path.join(output_dir, "atcf.txt"),
+        )
+        # adcircpy reads atcf.txt to get metadata for fort.15
+        wind_forcing = BestTrackForcing(
+            Path(os.path.join(output_dir, "atcf.txt")), nws=20
+        )  # NWS=20 for GAHM
+        mesh.add_forcing(wind_forcing)
+
+    # 3. Calculate Simulation Window (spinup extends the window BACKWARD so
+    # tides equilibrate before the storm; the GAHM fort.22 only covers the
+    # storm lifetime, so verify met behaviour with spinup on a single storm
+    # before fleet use)
+    sim_start, sim_end = calculate_simulation_window(
+        storm, extra_days=0, spinup_days=spinup_days
+    )
 
     # 4. Configure AdcircRun Driver
     driver = CustomAdcircRun(
@@ -201,7 +223,9 @@ def generate_adcirc_inputs(
     driver.ICS = 20  # coordinate system (24 seems to have a big instability bug?)
     driver.ITITER = -1
     driver.CONVCR = 1.0e-7
-    driver.DRAMP = 1.0
+    # longer ramp when tides are on: ramps the boundary/potential forcing
+    # over the spinup window instead of shocking the basin
+    driver.DRAMP = 2.0 if tides else 1.0
     driver.NRAMP = 1
 
     # set the output timestep in the netcdfs
@@ -220,7 +244,7 @@ def generate_adcirc_inputs(
 
     # 6. Copy static files
     # fort.14 is copied by driver.write()
-    shutil.copy(FORT13_PATH, os.path.join(output_dir, "fort.13"))
+    shutil.copy(fort13_path, os.path.join(output_dir, "fort.13"))
 
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"

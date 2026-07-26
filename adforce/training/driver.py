@@ -45,6 +45,10 @@ def drive_all_adcirc(
     test_nosubprocess=False,
     runs_parent_name: Optional[str] = None,
     recommended_dt: float = None,
+    resolution: str = "mid",
+    storm_names: Optional[list] = None,
+    mode: str = "storm",
+    spinup_days: float = 0.0,
 ) -> None:
     """
     Generate all storm inputs using NWS=20.
@@ -128,6 +132,20 @@ def drive_all_adcirc(
     # outputs_df = pd.DataFrame(outputs)
     # outputs_df.to_csv("debug_storms.csv", index=False)
 
+    if storm_names:
+        # filter AFTER enumeration so run-directory indices still match the
+        # full-list numbering used by the published archive (e.g.
+        # 152_KATRINA_2005 keeps index 152 in any subset).
+        # names may carry an optional _YEAR suffix (e.g. MATTHEW_2016) to
+        # disambiguate repeated storm names in the archive
+        wanted = {n.upper() for n in storm_names}
+
+        def _match(st) -> bool:
+            return st.name.upper() in wanted or f"{st.name.upper()}_{st.year}" in wanted
+
+        target_storms = [(i, st) for i, st in target_storms if _match(st)]
+        print(f"Storm-name filter: {sorted(wanted)} -> {len(target_storms)} storms")
+
     print(f"Found {len(target_storms)} U.S. landfalling storms in IBTrACS.")
 
     # 2. Loop and generate inputs for each storm
@@ -174,6 +192,10 @@ def drive_all_adcirc(
                 target_storms_ds.isel(storm=i),
                 run_directory,
                 recommended_dt=recommended_dt,
+                resolution=resolution,
+                wind=mode in ("storm", "both"),
+                tides=mode in ("tide", "both"),
+                spinup_days=spinup_days,
             )
 
             # 2. Create a storm-specific config to pass to subprocess
@@ -185,8 +207,9 @@ def drive_all_adcirc(
             OmegaConf.update(storm_cfg, "name", f"{storm_name_safe}_{storm.year}")
 
             # Tell the subprocess runner to execute ASWIP
-            # This converts 'pre_aswip_fort.22' to 'fort.22' with the NWS=20 format
-            OmegaConf.update(storm_cfg, "use_aswip", True)
+            # This converts 'pre_aswip_fort.22' to 'fort.22' with the NWS=20
+            # format. Tide-only runs have no met forcing -> no ASWIP.
+            OmegaConf.update(storm_cfg, "use_aswip", mode in ("storm", "both"))
 
             # Ensure we're NOT using SLURM for this subprocess
             # (The main script is one SLURM job, but each storm is a local subprocess)
@@ -242,6 +265,35 @@ def main() -> None:
         default=None,
         help="Name of the parent directory for runs inside the project path. Defaults to the constant RUNS_PARENT_DIR.",
     )
+    parser.add_argument(
+        "--resolution",
+        type=str,
+        default="mid",
+        choices=["low", "mid"],
+        help="Mesh resolution: fort.14.{low,mid} (+ matching fort.13).",
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="storm",
+        choices=["storm", "tide", "both"],
+        help="Forcing mode: storm (wind only, archive parity), tide "
+        "(tide-only control), both (storm+tide) -- the tide-surge "
+        "interaction triple.",
+    )
+    parser.add_argument(
+        "--spinup-days",
+        type=float,
+        default=0.0,
+        help="Days of pre-storm spinup (use ~6 for tidal runs).",
+    )
+    parser.add_argument(
+        "--storms",
+        nargs="*",
+        default=None,
+        help="Subset of storm names, e.g. --storms KATRINA RITA IKE "
+        "(default: all landfalling storms).",
+    )
     args = parser.parse_args()
 
     drive_all_adcirc(
@@ -249,6 +301,10 @@ def main() -> None:
         test_nosubprocess=args.test_nosubprocess,
         recommended_dt=args.recommended_dt,
         runs_parent_name=args.runs_parent_name,
+        resolution=args.resolution,
+        storm_names=args.storms,
+        mode=args.mode,
+        spinup_days=args.spinup_days,
     )
     # python -m adforce.generate_training_data --test-single --test-nosubprocess
     # python -m adforce.generate_training_data --recommended-dt 5.0 --test-nosubprocess --test-single --runs-parent-name test_runs

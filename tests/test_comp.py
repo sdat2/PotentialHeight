@@ -274,16 +274,19 @@ def test_regression_headline_numbers():
     df = pd.read_csv(SUMMARY_CSV)
     df["sid"] = df["sid"].astype(str)
     clean = df[df.clean]
-    # Pins regenerated 2026-07-05 after fixing the utide date2num bug in
-    # comp/coops.py (the old sweep's "de-tided" residuals still contained the
-    # tide; the fix improved bias -0.30 -> -0.20, RMSE 0.54 -> 0.50, and
-    # median time-series r 0.65 -> 0.80).
+    # Pins regenerated 2026-07-26 for the three-city extension: 5 Florida
+    # storms added (Frances/Jeanne/Matthew/Irma/Nicole) for the Miami study
+    # region. The original 14 Gulf storms' pairs are BYTE-IDENTICAL to the
+    # 2026-07-05 sweep (126 clean; per-storm anchors below unchanged); the
+    # +20 Florida clean pairs run cold on the wave-exposed Atlantic coast
+    # (regional bias -0.36 m), moving the pooled numbers from
+    # bias -0.20 -> -0.22, r 0.885 -> 0.87.
     bias, rmse, r = metrics(clean)
-    assert len(clean) == 126
-    assert bias == pytest.approx(-0.20, abs=0.02)
+    assert len(clean) == 146
+    assert bias == pytest.approx(-0.22, abs=0.02)
     assert rmse == pytest.approx(0.50, abs=0.02)
-    assert r == pytest.approx(0.885, abs=0.01)
-    assert within_storm_r(clean) == pytest.approx(0.885, abs=0.02)
+    assert r == pytest.approx(0.871, abs=0.01)
+    assert within_storm_r(clean) == pytest.approx(0.871, abs=0.02)
     assert clean.ts_r.median() == pytest.approx(0.80, abs=0.03)
 
 
@@ -435,8 +438,8 @@ def test_nearest_wet_strict_threshold():
 
 def test_latex_table_row_order_and_name_reformat(tmp_path):
     # two storms out of chronological order in the df; table must follow C.STORMS order.
-    late = list(C.STORMS)[-1]  # Idalia 2023
-    early = list(C.STORMS)[0]  # Katrina 2005
+    late = list(C.STORMS)[-1]  # last storm chronologically (Idalia 2023)
+    early = list(C.STORMS)[0]  # first storm chronologically (Frances 2004)
     rows = []
     for storm in (late, early):  # deliberately reversed
         for k in range(3):
@@ -458,7 +461,8 @@ def test_latex_table_row_order_and_name_reformat(tmp_path):
     i_early = text.index(early.replace(" ", " (") + ")")
     i_late = text.index(late.replace(" ", " (") + ")")
     assert i_early < i_late  # chronological, not df order
-    assert "Katrina (2005)" in text  # "Name YYYY" -> "Name (YYYY)"
+    name, year = early.rsplit(" ", 1)
+    assert f"{name} ({year})" in text  # "Name YYYY" -> "Name (YYYY)"
 
 
 @pytest.mark.skipif(
@@ -468,15 +472,15 @@ def test_latex_table_row_order_and_name_reformat(tmp_path):
 def test_regression_population_and_methods():
     df = pd.read_csv(SUMMARY_CSV)
     df["sid"] = df["sid"].astype(str)
-    assert len(df) == 432
-    assert df.storm.nunique() == 14
-    # regenerated 2026-07-05 with the fixed utide de-tiding: real de-tiding
-    # shifts which (storm, gauge) pairs pass the validity/clean gates
-    assert df.valid.sum() == 279
-    assert df.clean.sum() == 126
+    # 2026-07-26 three-city extension: 432 Gulf pairs (unchanged) + 35
+    # Florida pairs over the 5 added storms
+    assert len(df) == 467
+    assert df.storm.nunique() == 19
+    assert df.valid.sum() == 302
+    assert df.clean.sum() == 146
     assert df.failed.sum() == 2
     methods = dict(df.method.value_counts())
-    assert methods.get("utide") == 410 and methods.get("pred") == 22
+    assert methods.get("utide") == 445 and methods.get("pred") == 22
 
 
 # --------------------------------------------------------------------------- #
