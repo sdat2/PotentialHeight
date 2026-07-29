@@ -55,23 +55,32 @@ fi
 [ "${PREP_ONLY:-0}" = "1" ] && { echo PREP-ONLY-DONE; exit 0; }
 
 mkdir -p $RUNS_DIR 2>/dev/null || mkdir -p ${W}$(echo $RUNS_DIR | sed s#^/work##)
-echo "=== sweep RES=$RES MODE=$MODE SPINUP=$SPINUP -> $RUNS_DIR ==="
-docker run --rm --shm-size=8g --cap-add=SYS_PTRACE $MNT -e ADCIRC_NP=16 \
-  $IMG micromamba run -n ws \
-  python -m adforce.generate_training_data --resolution $RES --mode $MODE \
-    --spinup-days $SPINUP --recommended-dt 5.0 --runs-parent-name $RUNS_DIR \
-    --storms $STORMS > /root/sweep_${RES}_${MODE}.log 2>&1
-rc=$?
-n=$(grep -c "Successfully completed run" /root/sweep_${RES}_${MODE}.log)
-echo "SWEEP-EXIT:$rc completed:$n"
-if [ "$n" -gt 0 ]; then
+echo "=== sweep RES=$RES MODE=$MODE SPINUP=$SPINUP -> $RUNS_DIR (per-storm loop) ==="
+# One storm per driver invocation, extracting and stripping heavy outputs
+# (fort.6x, PE*) immediately after each run: the tidal decks write 5-8 GB per
+# mid-resolution storm and a whole-sweep-then-extract design filled all three
+# workers' disks on 2026-07-26. maxele + slurm.out are kept (resume receipts).
+for S in $STORMS; do
+  docker run --rm --shm-size=8g --cap-add=SYS_PTRACE $MNT -e ADCIRC_NP=16 \
+    $IMG micromamba run -n ws \
+    python -m adforce.generate_training_data --resolution $RES --mode $MODE \
+      --spinup-days $SPINUP --recommended-dt 5.0 --runs-parent-name $RUNS_DIR \
+      --storms $S >> /root/sweep_${RES}_${MODE}.log 2>&1
   docker run --rm $MNT \
     -v /root/lowres/extract_gauge_series.py:/opt/extract.py:ro \
     -v /root/lowres/gauges_both_boxes.csv:/work/gauges_both_boxes.csv:ro \
     $IMG micromamba run -n ws python /opt/extract.py \
       --runs-dir $RUNS_DIR --gauges /work/gauges_both_boxes.csv \
-      --out ${RUNS_DIR}_gauge_series.parquet \
-      > /root/extract_${RES}_${MODE}.log 2>&1
-  echo "EXTRACT-EXIT:$?"
-fi
+      --out ${RUNS_DIR}_gs_${S}.parquet \
+      >> /root/extract_${RES}_${MODE}.log 2>&1
+  # NOTE: RUNS_DIR is the CONTAINER path (/work/...); this loop runs on the
+  # HOST, so strip via the host-side bind location (/root/work/...) -- the
+  # original /work glob silently no-opped and refilled the disk (2026-07-28)
+  HOST_RUNS_DIR="${W}${RUNS_DIR#/work}"
+  for d in $HOST_RUNS_DIR/*/; do
+    rm -f $d/fort.63.nc $d/fort.64.nc $d/fort.73.nc $d/fort.74.nc
+    rm -rf $d/PE*
+  done
+  echo "  [$S] done, disk: $(df -h / | tail -1 | awk '{print $5}')"
+done
 echo "HIST-SWEEP-DONE ${RES}_${MODE}"
