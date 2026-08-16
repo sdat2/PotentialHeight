@@ -1,0 +1,6 @@
+# Completed adforce run directories as the simulation source.
+# Consumed by adforce.eval.sources.RunDirSource.
+kind: run_dirs
+runs_root: ??? # parent of the per-storm run directories (required)
+prefer: [gauge_ts, fort61, fort63] # artifact preference; gauges fall through to the next
+verify_config: true # provenance check vs <run>/config.yaml (see eval.status)

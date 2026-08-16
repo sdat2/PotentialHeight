@@ -1,5 +1,9 @@
 """Score the low-resolution historical sweep against the mid (EC95d) archive.
 
+SUPERSEDED by ``adforce.eval.pairs.resolution_bias_table`` (which reproduces
+``rerun/results/resolution_bias.csv`` exactly -- pinned by
+``tests/test_eval.py``); kept as the frozen record of the published run.
+
 Joins the low-res gauge series (rerun/adcirc/extract_gauge_series.py output)
 with comp.validate's val_summary.csv (mid-resolution sim peaks + de-tided
 observed peaks + clean flags), keyed by (storm "Name YYYY", gauge sid). The

@@ -1,0 +1,13 @@
+# low/mid resolution x tide on/off comparison matrix.
+# Axis keys are WRAP config paths (hence the .value nesting -- the wrap
+# tree's convention; eval's own keys stay flat).
+axes:
+  adcirc.resolution.value: [low, mid]
+  adcirc.tide.value: [false, true]
+name_keys:
+  adcirc.resolution.value: res
+  adcirc.tide.value: tide
+exclude: [] # partial-match dicts over axis paths, e.g. {adcirc.resolution.value: low}
+include: [] # extra fully-explicit {name, overrides} cells appended to the grid
+cells: [] # alternative: fully explicit named cells instead of axes
+baseline: res-mid_tide-off # model-vs-model reference cell

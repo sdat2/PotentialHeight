@@ -723,6 +723,133 @@ def test_rundir_source_prefers_cheapest_artifact(tmp_path):
     assert src == "gauge_ts" and series.max() == 3.0
 
 
+# --------------------------------------------------------------------------- #
+# Matrix grammar + model-vs-model (Commit D). The reproduction tests pin the
+# ported pairs.py against the published rerun/results artifacts and are
+# skipped when the cached sweep data is absent.
+# --------------------------------------------------------------------------- #
+def test_expand_matrix_grammar():
+    from adforce.eval.cells import expand_matrix
+
+    cells = expand_matrix(
+        dict(
+            axes={
+                "adcirc.resolution.value": ["low", "mid"],
+                "adcirc.tide.value": [False, True],
+            },
+            name_keys={
+                "adcirc.resolution.value": "res",
+                "adcirc.tide.value": "tide",
+            },
+            exclude=[{"adcirc.resolution.value": "low", "adcirc.tide.value": True}],
+            include=[
+                {"name": "swan", "overrides": {"adcirc.swan.value": True}}
+            ],
+            baseline="res-mid_tide-off",
+        )
+    )
+    names = [n for n, _ in cells]
+    assert names == ["res-low_tide-off", "res-mid_tide-off", "res-mid_tide-on", "swan"]
+    assert dict(cells)["res-mid_tide-on"] == {
+        "adcirc.resolution.value": "mid",
+        "adcirc.tide.value": True,
+    }
+    with pytest.raises(ValueError, match="baseline"):
+        expand_matrix(dict(axes={}, cells=[], baseline="nope"))
+    with pytest.raises(ValueError, match="duplicate"):
+        expand_matrix(
+            dict(
+                cells=[
+                    {"name": "a", "overrides": {}},
+                    {"name": "a", "overrides": {}},
+                ]
+            )
+        )
+
+
+def test_compare_cells_synthetic():
+    from adforce.eval.pairs import compare_cells
+
+    t = pd.date_range("2020-01-01", periods=3, freq="h")
+
+    def frame(peak):
+        return pd.DataFrame(
+            dict(storm="1_TEST_2020", sid="42", gauge="G", time=t, zeta=[0.0, peak, 0.1])
+        )
+
+    df = compare_cells({"base": frame(1.0), "cand": frame(1.5)}, baseline="base")
+    assert len(df) == 1
+    r = df.iloc[0]
+    assert (r.cell, r.key, r.peak, r.base_peak, r.peak_diff) == (
+        "cand",
+        "TEST_2020",
+        1.5,
+        1.0,
+        0.5,
+    )
+    with pytest.raises(ValueError, match="baseline"):
+        compare_cells({"a": frame(1.0)}, baseline="missing")
+
+
+_LOWRES = os.path.join(
+    str(REPO_ROOT), "data", "comp", "lowres", "low_storm_gauge_series.parquet"
+)
+_RERUN_RB = os.path.join(str(REPO_ROOT), "rerun", "results", "resolution_bias.csv")
+_RERUN_TSI = os.path.join(
+    str(REPO_ROOT), "rerun", "results", "tide_surge_interaction.csv"
+)
+
+
+@pytest.mark.skipif(
+    not (os.path.exists(_LOWRES) and os.path.exists(_RERUN_RB) and os.path.exists(SUMMARY_CSV)),
+    reason="cached low-res sweep / published artifact not present",
+)
+def test_resolution_bias_reproduces_published():
+    """pairs.resolution_bias_table must reproduce rerun/results/resolution_bias.csv
+    (the published low-vs-mid resolution comparison) from the cached extract."""
+    import io
+
+    from adforce.eval.pairs import resolution_bias_table
+
+    new = resolution_bias_table(_LOWRES)
+    buf = io.StringIO()
+    new.to_csv(buf, index=False)
+    buf.seek(0)
+    new_rt = pd.read_csv(buf)
+    old = pd.read_csv(_RERUN_RB)
+    assert list(new_rt.columns) == list(old.columns)
+    assert new_rt.shape == old.shape
+    np.testing.assert_allclose(
+        new_rt.select_dtypes("number").fillna(-999).values,
+        old.select_dtypes("number").fillna(-999).values,
+    )
+
+
+@pytest.mark.skipif(
+    not (os.path.exists(_LOWRES) and os.path.exists(_RERUN_TSI)),
+    reason="cached low-res sweep / published artifact not present",
+)
+def test_tide_surge_interaction_low_reproduces_published():
+    """The low-res forcing triple must reproduce every published row exactly
+    (storm/tide/both peaks, interaction, and series-vs-archive provenance)."""
+    from adforce.eval.pairs import tide_surge_interaction
+
+    lowres = os.path.dirname(_LOWRES)
+    new = tide_surge_interaction(
+        pd.read_parquet(_LOWRES),
+        pd.read_parquet(os.path.join(lowres, "low_tide_runs_gauge_series.parquet")),
+        pd.read_parquet(os.path.join(lowres, "low_both_full.parquet")),
+        "low",
+    )
+    old = pd.read_csv(_RERUN_TSI, dtype={"sid": str})
+    old = old[old.res == "low"]
+    m = new.merge(old, on=["res", "key", "sid"], suffixes=("_n", "_o"))
+    assert len(m) == len(old) == len(new) == 683
+    for col in ("zeta_storm", "zeta_tide", "zeta_both", "interaction"):
+        np.testing.assert_allclose(m[f"{col}_n"], m[f"{col}_o"])
+    assert (m.storm_src_n == m.storm_src_o).all()
+
+
 def test_validate_storm_source_seam(tmp_path, monkeypatch):
     """validate_storm scores an injected FieldSource without touching HF/CO-OPS."""
     import adforce.eval.validate as cv

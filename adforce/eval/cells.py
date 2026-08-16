@@ -80,6 +80,52 @@ def storm_to_slug(storm: str, fname: str) -> str:
     return fname[:-3] if fname.endswith(".nc") else fname
 
 
+def expand_matrix(matrix_cfg) -> list:
+    """Expand the matrix-YAML grammar into ``[(cell_name, overrides), ...]``.
+
+    Grammar (see ``adforce/eval/config/matrix/``): ``axes`` maps WRAP config
+    paths (``adcirc.resolution.value`` etc.) to value lists whose cartesian
+    product, minus partial-match ``exclude`` dicts, forms the grid;
+    ``cells``/``include`` append fully explicit ``{name, overrides}`` entries.
+    Cell names come from ``name_keys`` aliases in axes order (bools render
+    ``on``/``off``), e.g. ``res-low_tide-off``.
+
+    Raises:
+        ValueError: On duplicate cell names or a ``baseline`` naming no cell.
+    """
+    from itertools import product
+
+    axes = dict(matrix_cfg.get("axes") or {})
+    name_keys = dict(matrix_cfg.get("name_keys") or {})
+    excludes = [dict(e) for e in (matrix_cfg.get("exclude") or [])]
+
+    def render(path, val) -> str:
+        alias = name_keys.get(path, path.split(".")[-1])
+        v = ("on" if val else "off") if isinstance(val, bool) else str(val)
+        return f"{alias}-{v}"
+
+    cells = []
+    if axes:
+        paths = list(axes)
+        for combo in product(*(list(axes[p]) for p in paths)):
+            ov = dict(zip(paths, combo))
+            if any(all(ov.get(k) == v for k, v in ex.items()) for ex in excludes):
+                continue
+            cells.append(("_".join(render(p, ov[p]) for p in paths), ov))
+    for group in ("cells", "include"):
+        for item in matrix_cfg.get(group) or []:
+            cells.append((str(item["name"]), dict(item["overrides"])))
+
+    names = [n for n, _ in cells]
+    dups = sorted({n for n in names if names.count(n) > 1})
+    if dups:
+        raise ValueError(f"duplicate cell names in matrix: {dups}")
+    baseline = matrix_cfg.get("baseline")
+    if baseline and baseline not in names:
+        raise ValueError(f"baseline {baseline!r} is not one of the cells {names}")
+    return cells
+
+
 def provenance_match(run_cfg, cell: ConfigCell) -> bool:
     """Does a run's dumped ``config.yaml`` match this cell's physical axes?
 
