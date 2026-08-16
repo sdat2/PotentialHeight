@@ -813,6 +813,33 @@ def test_twl_table_synthetic(monkeypatch):
     assert abs(r.skew_bias - 0.15) < 0.15 and r.skew_sim > 1.0
 
 
+def test_tideconst_recovers_planted_ratio(monkeypatch):
+    """Constituent fits recover a planted M2-only 1.4x amplification."""
+    import adforce.eval.tideconst as tc
+
+    t = pd.date_range("2020-08-01", periods=24 * 15, freq="h")  # 15 days
+    hrs = np.arange(len(t))
+    m2 = np.sin(2 * np.pi * hrs / M2_HR)
+    k1 = np.sin(2 * np.pi * hrs / 23.93)
+    pred = pd.Series(0.30 * m2 + 0.10 * k1, index=t)
+    sim = pd.Series(0.42 * m2 + 0.10 * k1, index=t)  # M2 x1.4, K1 x1.0
+
+    monkeypatch.setattr(tc, "noaa_predictions", lambda sid, t0, t1: pred)
+    monkeypatch.setattr(
+        tc,
+        "gauge_frame",
+        lambda: pd.DataFrame([dict(sid="42", name="G", lat=29.0, lon=-90.0)]),
+    )
+    series = pd.DataFrame(
+        dict(storm="1_TEST_2020", sid="42", gauge="G", time=t, zeta=sim.values)
+    )
+    df = tc.constituent_table(series, constituents=("M2", "K1"))
+    r = df.set_index("constituent")
+    assert abs(r.ratio["M2"] - 1.4) < 0.05
+    assert abs(r.ratio["K1"] - 1.0) < 0.05
+    assert abs(r.dphase_deg["M2"]) < 5
+
+
 def test_noaa_predictions_uses_cache(tmp_path, monkeypatch):
     import adforce.eval.coops as coops_mod
     from adforce.eval import detide
