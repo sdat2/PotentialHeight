@@ -1,4 +1,8 @@
-# comp — historical surge validation against tide gauges
+# adforce.eval — ADCIRC configuration evaluation against tide gauges
+
+(Formerly the top-level `comp/` package; on-disk caches stay under
+`data/comp/` because the raw CO-OPS responses are not reproducibly
+re-downloadable and the utide fits are expensive.)
 
 Validates the historical ADCIRC storm-surge simulations (the SurgeNet training set,
 228 IBTrACS North-Atlantic landfalling TCs on the EC95d mesh, published on Hugging
@@ -19,7 +23,7 @@ For each storm:
    NOAA CO-OPS water-level gauge in the storm's region box — NW Gulf (Texas → Florida
    panhandle; the New Orleans and Galveston study regions) for Gulf storms, or the
    Florida peninsula (Key West → Fernandina Beach; the Miami study region) for the
-   Atlantic/Florida storms (`FLORIDA_STORMS` in `comp/constants.py`);
+   Atlantic/Florida storms (`FLORIDA_STORMS` in [`constants.py`](constants.py));
 3. de-tide the gauge record with a robust [`utide`](https://github.com/wesleybowman/UTide)
    harmonic fit on the storm's calendar year (falls back to CO-OPS `predictions`);
 4. score skill on three axes:
@@ -79,12 +83,12 @@ sharply at lag 0 and decays to zero within two days). `adforce.eval.sensitivity`
 is stable across the clean-filter cut-offs (r 0.81–0.89) and the node-selection knobs
 (r changes <0.001 with the wet-depth threshold).
 
-Unit + regression tests live in [`../tests/test_comp.py`](../tests/test_comp.py) (skill
+Unit + regression tests live in [`../../tests/test_eval.py`](../../tests/test_eval.py) (skill
 metrics, time-series alignment, the valid/clean gating, the LaTeX table, and pinned
 headline numbers + negative-control separations):
 
 ```bash
-python -m pytest tests/test_comp.py -o addopts=""
+python -m pytest tests/test_eval.py -o addopts=""
 ```
 
 ## Configuration
@@ -111,6 +115,57 @@ primal mesh node; the triangle averaging mildly smooths the simulated peak.
 The slight low bias is consistent with the omitted wave setup/runup and medium mesh
 resolution (datum and node-sampling effects checked and found minor); over-predictions
 concentrate at shallow semi-enclosed bay/pass gauges during direct landfalls.
+
+## Comparing adforce configurations (general framework)
+
+Beyond the historical HF-archive validation above, the submodule compares
+**any** adforce configurations (resolution low/mid/high, tides on/off, SWAN)
+against gauges and against each other, driven entirely by YAML under
+[`config/`](config/):
+
+- **matrix** ([`config/matrix/`](config/matrix/)) — the comparison grid:
+  cartesian `axes` over wrap-config paths (`adcirc.resolution.value`,
+  `adcirc.tide.value`, ...) minus `exclude`, plus explicit `cells`, with a
+  designated `baseline` for model-vs-model.
+- **launch** (`python -m adforce.eval.launch`) — expands the matrix into
+  per-(cell, storm) runs under `<runs_root>/<study>/<cell>/<slug>/`, routes
+  every historical run through the training driver's per-storm input
+  generation (correct tidal windows — never the Katrina-pinned static
+  decks), skips completed runs, refuses FOREIGN directories, and records a
+  full-config sha256 per run in `eval_manifest.json`. `dry_run=true` is the
+  default: it prints the plan table and fires nothing. `controls=true` adds
+  the tide-only runs of the tide-surge-interaction triple.
+- **extract** (`python -m adforce.eval.extract`) — remote-side reducer:
+  `fort.63.nc` (5–8 GB) → `gauge_ts.parquet` per run (long format
+  `storm, sid, gauge, time, zeta`), same node selection as the validation.
+- **harvest** (`python -m adforce.eval.harvest`) — rsyncs the minimal
+  artifact set (`config.yaml`, `gauge_ts.parquet`, `fort.61.nc`,
+  `maxele.63.nc`, `slurm.out`, manifest) to the laptop.
+- **pairs** (`python -m adforce.eval.pairs`) — model-vs-model:
+  `resolution_bias_table` (reproduces `rerun/results/resolution_bias.csv`
+  exactly) and `tide_surge_interaction`
+  (`peak(both) − peak(storm) − peak(tide)`; reproduces the published
+  low-res rows of `rerun/results/tide_surge_interaction.csv` 683/683).
+  Both reproductions are pinned by tests.
+
+Example — low vs mid × tide on/off for two storms:
+
+```bash
+# remote (ARCHER2/GCP): preview, then launch
+python -m adforce.eval.launch study=kat-ida matrix=res_x_tide \
+    'storms=["Katrina 2005","Ida 2021"]'                    # dry run (default)
+python -m adforce.eval.launch study=kat-ida matrix=res_x_tide \
+    'storms=["Katrina 2005","Ida 2021"]' dry_run=false controls=true
+# laptop:
+python -m adforce.eval.harvest remote=archer2:/work/.../exp/eval study=kat-ida dry_run=false
+python -m adforce.eval.pairs action=interaction res=mid \
+    tide_series=... both_series=... out=data/comp/out/kat-ida_tsi.csv
+```
+
+Caveat (tide-on scoring): comparing a tide-on run against raw gauge water
+level needs the datum/steric offset handled (pre-storm-mean alignment) and
+skew surge as the headline metric; that obs-side path is staged follow-up
+work — do not publish tide-on skill numbers before it lands.
 
 ## Dependencies
 
