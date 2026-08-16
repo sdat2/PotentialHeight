@@ -19,18 +19,20 @@ storm netCDFs):
                                     recompute the time-series correlation; real skill
                                     peaks sharply at lag 0.
 
-Run::
+Run (hydra overrides; config root adforce/eval/config/eval_config.yaml)::
 
-    python -m adforce.eval.nulltest                 # peak-level nulls + lag curve (+ figure)
-    python -m adforce.eval.nulltest --no-lag        # skip the netCDF-heavy lag test
+    python -m adforce.eval.nulltest                    # peak-level nulls + lag curve (+ figure)
+    python -m adforce.eval.nulltest nulltest.lag=false # skip the netCDF-heavy lag test
 """
 
 from __future__ import annotations
 
-import argparse
 import os
 import warnings
 from typing import Dict, List, Optional, Tuple
+
+import hydra
+from omegaconf import DictConfig
 
 import numpy as np
 import pandas as pd
@@ -215,6 +217,7 @@ def plot(g: Dict, w: Dict, lag: Optional[pd.DataFrame], paths: List[str]) -> Non
 
 
 def run(do_lag: bool = True) -> None:
+    C.ensure_dirs()
     c = load_clean()
     print(f"clean pairs: n={len(c)}\n")
     g = perm_global(c)
@@ -249,13 +252,16 @@ def run(do_lag: bool = True) -> None:
     )
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--no-lag", action="store_true", help="skip the netCDF-heavy lag test"
-    )
-    run(do_lag=not ap.parse_args().no_lag)
+_LEGACY_FLAGS = {"--no-lag": "nulltest.lag=false"}
+
+
+@hydra.main(version_base=None, config_path="config", config_name="eval_config")
+def main(cfg: DictConfig) -> None:
+    run(do_lag=cfg.nulltest.lag)
 
 
 if __name__ == "__main__":
+    from ._cli import reject_legacy_flags
+
+    reject_legacy_flags(_LEGACY_FLAGS, "adforce.eval.nulltest")
     main()

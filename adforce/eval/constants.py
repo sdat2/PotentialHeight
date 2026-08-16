@@ -47,17 +47,28 @@ PAPER_ROOT = _find_paper_root()
 PAPER_IMG_PATH = str(PAPER_ROOT / "img") if PAPER_ROOT else FIGURE_PATH
 PAPER_TEX_PATH = str(PAPER_ROOT / "paper") if PAPER_ROOT else OUT_PATH
 
-for _p in (
-    COMP_DATA_PATH,
-    HF_STORM_CACHE,
-    COOPS_CACHE,
-    TS_CACHE,
-    FIGURE_PATH,
-    OUT_PATH,
-    PAPER_IMG_PATH,
-    PAPER_TEX_PATH,
-):
-    os.makedirs(_p, exist_ok=True)
+
+def ensure_dirs() -> None:
+    """Create every cache/output directory (idempotent, cheap).
+
+    Called lazily by the entry points and the low-level writers rather than at
+    import time: importing adforce.eval must stay side-effect-free, because
+    ``pytest --doctest-modules`` imports it on clean CI machines and the
+    launch/orchestration path will import it on HPC nodes (where creating
+    thesis-tree directories would be wrong).
+    """
+    for _p in (
+        COMP_DATA_PATH,
+        HF_STORM_CACHE,
+        COOPS_CACHE,
+        TS_CACHE,
+        FIGURE_PATH,
+        OUT_PATH,
+        PAPER_IMG_PATH,
+        PAPER_TEX_PATH,
+        ANNUAL_MAX_CACHE,
+    ):
+        os.makedirs(_p, exist_ok=True)
 
 # --- data sources ----------------------------------------------------------
 # Historical ADCIRC simulations (228 IBTrACS N-Atlantic landfalling TCs, 1980-2024,
@@ -174,8 +185,7 @@ UTIDE_MIN_SAMPLES = 2000
 # --- annual-maximum pipeline (adforce.eval.annual_max) ------------------------------
 ANNUAL_MAX_CACHE = os.path.join(
     COMP_DATA_PATH, "annual_max"
-)  # residuals + annual maxima
-os.makedirs(ANNUAL_MAX_CACHE, exist_ok=True)
+)  # residuals + annual maxima (created lazily via ensure_dirs)
 AM_START_YEAR = 1980  # default year range for annual-maximum extraction
 AM_END_YEAR = 2025
 # A year only contributes an annual maximum if at least this fraction of its

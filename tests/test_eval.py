@@ -516,3 +516,43 @@ def test_series_cache_roundtrip_and_staleness(tmp_path, monkeypatch):
     monkeypatch.setattr(cv, "_ts_cache_tag", lambda: "DIFFERENT-PARAMS")
     assert cv._load_series_cache("Test 2021") is None  # stale tag -> recompute
     assert cv._load_series_cache("Never Cached 1999") is None  # missing -> recompute
+
+
+# --------------------------------------------------------------------------- #
+# Hydra config vs constants anti-drift, and cache-tag byte-stability.
+# The scoring YAML mirrors constants.py; the ts-cache tag string keys the
+# utide-expensive Parquet caches, so its byte-stability IS the cache validity.
+# --------------------------------------------------------------------------- #
+def test_scoring_config_matches_constants():
+    from hydra import compose, initialize
+
+    with initialize(version_base=None, config_path="../adforce/eval/config"):
+        cfg = compose(config_name="eval_config")
+        am = compose(config_name="annual_max_config")
+    s = cfg.scoring
+    assert s.max_node_deg == C.MAX_NODE_DEG
+    assert s.wet_min_m == C.WET_MIN_M
+    assert s.knn == C.KNN
+    assert s.max_timing_hr == C.MAX_TIMING_HR
+    assert s.min_obs_peak_m == C.MIN_OBS_PEAK_M
+    assert s.ts_min_overlap == C.TS_MIN_OVERLAP
+    assert s.n_bootstrap == C.N_BOOTSTRAP
+    assert s.bootstrap_seed == C.BOOTSTRAP_SEED
+    assert s.utide_min_samples == C.UTIDE_MIN_SAMPLES
+    assert am.start == C.AM_START_YEAR
+    assert am.end == C.AM_END_YEAR
+
+
+def test_cache_tag_matches_legacy_literal():
+    """The tag must stay byte-identical to the comp/-era string: a formatting
+    slip would silently invalidate every cached utide fit and re-hammer CO-OPS."""
+    from adforce.eval.validate import _ts_cache_tag
+
+    assert _ts_cache_tag("Katrina 2005") == (
+        "v1|deg0.12|wet0.3|knn60|ut2000"
+        "|box{'lon': (-97.6, -84.0), 'lat': (27.3, 30.9)}"
+    )
+    assert _ts_cache_tag("Irma 2017") == (  # Florida-box storm
+        "v1|deg0.12|wet0.3|knn60|ut2000"
+        "|box{'lon': (-82.3, -79.7), 'lat': (24.4, 30.8)}"
+    )

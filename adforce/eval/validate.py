@@ -18,19 +18,21 @@ de-tiding parameters so the cache self-invalidates if those change. ``--examples
 then regenerates the example-panel figure from that cache without re-running the (slow)
 utide de-tiding.
 
-Run::
+Run (hydra overrides; config root adforce/eval/config/eval_config.yaml)::
 
     python -m adforce.eval.validate                # full sweep, all STORMS (populates the cache)
-    python -m adforce.eval.validate --storms "Ida 2021" "Katrina 2005"
-    python -m adforce.eval.validate --examples-only         # just the example figure, from cache (fast)
-    python -m adforce.eval.validate --examples-only --refresh-cache   # recompute the series first
+    python -m adforce.eval.validate 'storms=["Ida 2021","Katrina 2005"]'
+    python -m adforce.eval.validate validate.examples_only=true   # example figure, from cache (fast)
+    python -m adforce.eval.validate validate.examples_only=true validate.refresh=true
 """
 
 from __future__ import annotations
 
-import argparse
 import os
 from typing import Dict, List, Optional, Tuple
+
+import hydra
+from omegaconf import DictConfig
 
 import numpy as np
 import pandas as pd
@@ -146,6 +148,7 @@ def _series_cache_path(storm: str) -> str:
 
 def _save_series_cache(storm: str, series: Dict[str, tuple]) -> None:
     try:
+        C.ensure_dirs()  # cache dirs are created lazily, not at import
         frames = []
         for name, (sim, obs) in series.items():
             for kind, s in (("sim", sim), ("obs", obs)):
@@ -531,6 +534,7 @@ def latex_table(df: pd.DataFrame, path: str) -> None:
 
 
 def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
+    C.ensure_dirs()
     items = {k: C.STORMS[k] for k in (storms or C.STORMS)}
     print(
         f"{len(gulf_gauges())} candidate gauges in Gulf box, "
@@ -658,47 +662,37 @@ def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
         )
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--storms", nargs="*", default=None, help="subset of storm names (default: all)"
-    )
-    ap.add_argument(
-        "--examples-only",
-        action="store_true",
-        help="regenerate only the example-panel figure from the cached "
-        "time series (no sweep) -- instant once the cache exists",
-    )
-    ap.add_argument(
-        "--refresh-cache",
-        action="store_true",
-        help="force-recompute the cached time series instead of reading it",
-    )
-    ap.add_argument(
-        "--failures",
-        action="store_true",
-        help="per-city worst-case panels (largest |sim-obs| peak difference) "
-        "from the cached sweep -- no re-run",
-    )
-    ap.add_argument(
-        "--n-failures", type=int, default=6, help="panels per city for --failures"
-    )
-    a = ap.parse_args()
-    if a.failures:
-        plot_failures(n_panels=a.n_failures, refresh=a.refresh_cache)
+_LEGACY_FLAGS = {
+    "--storms": "'storms=[\"Ida 2021\"]'",
+    "--examples-only": "validate.examples_only=true",
+    "--refresh-cache": "validate.refresh=true",
+    "--failures": "validate.failures=true",
+    "--n-failures": "validate.n_failures=6",
+}
+
+
+@hydra.main(version_base=None, config_path="config", config_name="eval_config")
+def main(cfg: DictConfig) -> None:
+    C.ensure_dirs()
+    v = cfg.validate
+    if v.failures:
+        plot_failures(n_panels=v.n_failures, refresh=v.refresh)
         return
-    if a.examples_only:
+    if v.examples_only:
         plot_examples(
             C.EXAMPLE_PANELS,
             [
                 os.path.join(C.FIGURE_PATH, "val_examples.png"),
                 os.path.join(C.PAPER_IMG_PATH, "comp_val_examples.pdf"),
             ],
-            refresh=a.refresh_cache,
+            refresh=v.refresh,
         )
         return
-    run(a.storms)
+    run(list(cfg.storms) if cfg.storms else None)
 
 
 if __name__ == "__main__":
+    from ._cli import reject_legacy_flags
+
+    reject_legacy_flags(_LEGACY_FLAGS, "adforce.eval.validate")
     main()

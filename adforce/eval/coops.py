@@ -24,6 +24,7 @@ from .constants import (
     COOPS_MDAPI,
     GAUGE_BOX,
     UTIDE_MIN_SAMPLES,
+    ensure_dirs,
 )
 
 Gauge = Tuple[str, str, float, float]  # (station_id, name, lat, lon)
@@ -31,6 +32,7 @@ Gauge = Tuple[str, str, float, float]  # (station_id, name, lat, lon)
 
 def gulf_gauges(box: dict = GAUGE_BOX) -> List[Gauge]:
     """Return CO-OPS water-level stations within ``box`` (cached metadata)."""
+    ensure_dirs()  # cache dirs are created lazily, not at import
     cache = os.path.join(COOPS_CACHE, "stations.json")
     if os.path.exists(cache):
         stations = json.load(open(cache))
@@ -51,6 +53,7 @@ def _coops(
     station: str, begin: str, end: str, product: str, datum: str = "MSL"
 ) -> pd.Series:
     """Fetch one hourly CO-OPS series (GMT, metric), cached on disk by request."""
+    ensure_dirs()  # cache dirs are created lazily, not at import
     key = f"{station}_{product}_{begin}_{end}_{datum}.csv"
     fp = os.path.join(COOPS_CACHE, key)
     if os.path.exists(fp):

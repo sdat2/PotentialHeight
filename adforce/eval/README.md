@@ -36,9 +36,9 @@ For each storm:
 
 ```bash
 python -m adforce.eval.validate                       # full 19-storm sweep (Gulf + Florida)
-python -m adforce.eval.validate --storms "Ida 2021"   # one storm (skips example panels + table)
-python -m adforce.eval.validate --examples-only       # just the example figure, from cache (fast)
-python -m adforce.eval.validate --examples-only --refresh-cache   # recompute the cached series first
+python -m adforce.eval.validate 'storms=["Ida 2021"]'   # one storm (skips example panels + table)
+python -m adforce.eval.validate validate.examples_only=true   # example figure, from cache (fast)
+python -m adforce.eval.validate validate.examples_only=true validate.refresh=true   # recompute first
 ```
 
 A full sweep regenerates **everything the paper uses**, in one step, so the figures, the
@@ -54,8 +54,8 @@ table and the prose cannot drift apart:
 The slow step is the per-gauge `utide` de-tiding. A full sweep **caches** each storm's
 de-tided `(sim, obs)` series as Parquet under `data/comp/ts_cache/` (write-through), keyed by
 the node-selection + de-tiding parameters so the cache self-invalidates if any of those change.
-`--examples-only` then re-renders `comp_val_examples.pdf` from that cache in seconds (vs minutes)
-— use it to iterate on the figure's layout without re-detiding; `--refresh-cache` forces a recompute.
+`validate.examples_only=true` then re-renders `comp_val_examples.pdf` from that cache in seconds (vs minutes)
+— use it to iterate on the figure's layout without re-detiding; `validate.refresh=true` forces a recompute.
 
 The thesis tree is located by searching for `paper/appendix.tex`; override with the
 `WORSTSURGE_PAPER_ROOT` env var. Downloads/caches live under `data/comp/` (git-ignored).
@@ -66,9 +66,9 @@ The thesis tree is located by searching for `paper/appendix.tex`; override with 
 
 ```bash
 python -m adforce.eval.nulltest            # permutation, cross-storm, and temporal-lag nulls
-python -m adforce.eval.nulltest --no-lag   # peak-level nulls only (no netCDF)
+python -m adforce.eval.nulltest nulltest.lag=false   # peak-level nulls only (no netCDF)
 python -m adforce.eval.sensitivity         # threshold + node-selection robustness
-python -m adforce.eval.sensitivity --no-node
+python -m adforce.eval.sensitivity sensitivity.node=false
 ```
 
 `adforce.eval.nulltest` writes `img/comp_val_nulltests.pdf` and reports: a label-permutation null
