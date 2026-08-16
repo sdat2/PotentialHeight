@@ -35,10 +35,10 @@ For each storm:
 ## Run
 
 ```bash
-python -m comp.validate                       # full 19-storm sweep (Gulf + Florida)
-python -m comp.validate --storms "Ida 2021"   # one storm (skips example panels + table)
-python -m comp.validate --examples-only       # just the example figure, from cache (fast)
-python -m comp.validate --examples-only --refresh-cache   # recompute the cached series first
+python -m adforce.eval.validate                       # full 19-storm sweep (Gulf + Florida)
+python -m adforce.eval.validate --storms "Ida 2021"   # one storm (skips example panels + table)
+python -m adforce.eval.validate --examples-only       # just the example figure, from cache (fast)
+python -m adforce.eval.validate --examples-only --refresh-cache   # recompute the cached series first
 ```
 
 A full sweep regenerates **everything the paper uses**, in one step, so the figures, the
@@ -65,17 +65,17 @@ The thesis tree is located by searching for `paper/appendix.tex`; override with 
 `val_summary.csv` is enough to falsify the result without re-running ADCIRC:
 
 ```bash
-python -m comp.nulltest            # permutation, cross-storm, and temporal-lag nulls
-python -m comp.nulltest --no-lag   # peak-level nulls only (no netCDF)
-python -m comp.sensitivity         # threshold + node-selection robustness
-python -m comp.sensitivity --no-node
+python -m adforce.eval.nulltest            # permutation, cross-storm, and temporal-lag nulls
+python -m adforce.eval.nulltest --no-lag   # peak-level nulls only (no netCDF)
+python -m adforce.eval.sensitivity         # threshold + node-selection robustness
+python -m adforce.eval.sensitivity --no-node
 ```
 
-`comp.nulltest` writes `img/comp_val_nulltests.pdf` and reports: a label-permutation null
+`adforce.eval.nulltest` writes `img/comp_val_nulltests.pdf` and reports: a label-permutation null
 (observed r=0.89 vs null max 0.31 over 5000 shuffles, p<1e-3); a within-storm permutation
 (observed spatial r=0.86 vs null max 0.61) showing real *spatial* skill; a cross-storm
 same-gauge null (collapses to r~0.1–0.2); and a temporal-lag curve (time-series r peaks
-sharply at lag 0 and decays to zero within two days). `comp.sensitivity` shows the headline
+sharply at lag 0 and decays to zero within two days). `adforce.eval.sensitivity` shows the headline
 is stable across the clean-filter cut-offs (r 0.81–0.89) and the node-selection knobs
 (r changes <0.001 with the wet-depth threshold).
 

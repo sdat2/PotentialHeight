@@ -21,8 +21,8 @@ storm netCDFs):
 
 Run::
 
-    python -m comp.nulltest                 # peak-level nulls + lag curve (+ figure)
-    python -m comp.nulltest --no-lag        # skip the netCDF-heavy lag test
+    python -m adforce.eval.nulltest                 # peak-level nulls + lag curve (+ figure)
+    python -m adforce.eval.nulltest --no-lag        # skip the netCDF-heavy lag test
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def lag_curve(
     per_lag: Dict[float, List[float]] = {L: [] for L in lags_days}
     for storm, fname in items.items():
         try:
-            # per-storm gauge region (Gulf vs Florida), matching comp.validate
+            # per-storm gauge region (Gulf vs Florida), matching adforce.eval.validate
             _, series = validate_storm(storm, fname, gulf_gauges(C.box_for(storm)))
         except Exception as e:  # pragma: no cover
             print(f"!! {storm}: {e}")

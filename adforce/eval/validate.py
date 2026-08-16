@@ -4,7 +4,7 @@ Pipeline, per storm:
   1. download the storm's netCDF from Hugging Face (``HF_REPO``);
   2. extract the simulated surge (SSH = WD + DEM) at the nearest *wet* mesh element
      centroid (the archived dual-graph node) to each NOAA CO-OPS gauge in the box;
-  3. fetch + de-tide the gauge record (:func:`comp.coops.observed_residual`);
+  3. fetch + de-tide the gauge record (:func:`adforce.eval.coops.observed_residual`);
   4. score peak surge (bias/RMSE/correlation, with bootstrap CIs and a within-storm
      spatial correlation), the full hydrograph (:func:`timeseries_skill`), and peak
      timing; tag "clean" pairs and regenerate the paper figures + LaTeX table.
@@ -20,10 +20,10 @@ utide de-tiding.
 
 Run::
 
-    python -m comp.validate                # full sweep, all STORMS (populates the cache)
-    python -m comp.validate --storms "Ida 2021" "Katrina 2005"
-    python -m comp.validate --examples-only         # just the example figure, from cache (fast)
-    python -m comp.validate --examples-only --refresh-cache   # recompute the series first
+    python -m adforce.eval.validate                # full sweep, all STORMS (populates the cache)
+    python -m adforce.eval.validate --storms "Ida 2021" "Katrina 2005"
+    python -m adforce.eval.validate --examples-only         # just the example figure, from cache (fast)
+    python -m adforce.eval.validate --examples-only --refresh-cache   # recompute the series first
 """
 
 from __future__ import annotations
@@ -600,7 +600,7 @@ def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
     """
     csv = os.path.join(C.OUT_PATH, "val_summary.csv")
     if not os.path.exists(csv):
-        raise SystemExit(f"{csv} not found: run `python -m comp.validate` first")
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
     df = pd.read_csv(csv)
     df["sid"] = df["sid"].astype(str)
     # gauge coordinates over both region boxes

@@ -4,20 +4,20 @@ For a station and a year range this module downloads hourly water levels
 (one calendar-year request at a time -- the CO-OPS ``hourly_height`` product
 accepts up to a year per request), de-tides each calendar year separately with
 a robust ``utide`` harmonic fit (mean + trend included, following
-:func:`comp.coops.observed_residual`), and records the ANNUAL MAXIMUM of the
+:func:`adforce.eval.coops.observed_residual`), and records the ANNUAL MAXIMUM of the
 surge residual for every year with adequate data.
 
 Missing-data policy: a year is skipped unless (a) it has at least
 ``UTIDE_MIN_SAMPLES`` hourly samples (stable harmonic fit, same threshold as
-``comp.coops``) and (b) at least ``MIN_YEAR_COVERAGE`` (80%) of the year's
+``adforce.eval.coops``) and (b) at least ``MIN_YEAR_COVERAGE`` (80%) of the year's
 hours are present, since with large gaps the true annual maximum may fall in a
 gap and the recorded maximum would be biased low. Even in accepted years the
 maximum can be truncated if the gauge failed *during* the peak (e.g. Grand
-Isle in Ida 2021, see ``comp.constants.KNOWN_FAILED``); such years are flagged
+Isle in Ida 2021, see ``adforce.eval.constants.KNOWN_FAILED``); such years are flagged
 with ``max_at_gap_edge`` rather than dropped.
 
 Everything is cached under ``data/comp/``: the raw CO-OPS responses land in
-``COOPS_CACHE`` (via :mod:`comp.coops`), the per-year de-tided residuals and
+``COOPS_CACHE`` (via :mod:`adforce.eval.coops`), the per-year de-tided residuals and
 the annual-maxima table are Parquet files under ``ANNUAL_MAX_CACHE``, keyed by
 the de-tiding parameters so the cache self-invalidates if those change.
 Reruns are therefore free.
@@ -28,8 +28,8 @@ linear trend, which also removes most local sea-level rise within a year).
 
 Run::
 
-    python -m comp.annual_max --station 8761724                 # Grand Isle, LA
-    python -m comp.annual_max --station 8735180 --start 1980    # Dauphin Island, AL
+    python -m adforce.eval.annual_max --station 8761724                 # Grand Isle, LA
+    python -m adforce.eval.annual_max --station 8735180 --start 1980    # Dauphin Island, AL
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ def _hours_in_year(year: int) -> int:
 def station_meta(station: str) -> Optional[dict]:
     """Name/lat/lon for a CO-OPS station from the cached station list.
 
-    Reuses the same ``stations.json`` cache as :func:`comp.coops.gulf_gauges`
+    Reuses the same ``stations.json`` cache as :func:`adforce.eval.coops.gulf_gauges`
     (all water-level stations, no bounding box), fetching it once if absent.
 
     Args:
@@ -96,7 +96,7 @@ def station_meta(station: str) -> Optional[dict]:
 
 
 # --------------------------------------------------------------------------- #
-# Fetching. comp.coops._coops caches every response, including transport
+# Fetching. adforce.eval.coops._coops caches every response, including transport
 # failures (as zero-byte files). A genuine "no data" year is a NON-empty API
 # error message and is accepted at once; a zero-byte cache entry is deleted and
 # the year re-requested a few times, so a one-off network blip cannot
@@ -127,7 +127,7 @@ def fetch_year_wl(
 ) -> pd.Series:
     """Hourly water level (MSL, GMT) for one calendar year, cached + polite.
 
-    Delegates to :func:`comp.coops.fetch_year` (verified ``hourly_height``,
+    Delegates to :func:`adforce.eval.coops.fetch_year` (verified ``hourly_height``,
     falling back to preliminary ``water_level``); on an empty result caused by
     a cached transport failure the bad cache entry is cleared and the request
     retried with a growing sleep. Tests monkeypatch this function.
@@ -164,7 +164,7 @@ def fetch_year_wl(
 def detide_year(wl: pd.Series, lat: float, method: str = "robust") -> pd.Series:
     """De-tide one calendar year of hourly water levels with ``utide``.
 
-    Mirrors :func:`comp.coops.observed_residual` (harmonic fit with mean and
+    Mirrors :func:`adforce.eval.coops.observed_residual` (harmonic fit with mean and
     linear trend over the full year, residual = observed - reconstruction),
     with one deliberate difference: the DatetimeIndex is passed to ``utide``
     directly instead of via ``matplotlib.dates.date2num``. With matplotlib's

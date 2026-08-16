@@ -118,7 +118,7 @@ def observed_residual(
             # selects ZERO constituents (residual keeps the full tide).
             # Verified on Grand Isle 2020: date2num path -> empty constituent
             # list, tide std 0.03 m; DatetimeIndex -> SA/K1/O1 amplitudes
-            # 0.16/0.12/0.12 m, tide std 0.17 m. Same fix as comp.annual_max.
+            # 0.16/0.12/0.12 m, tide std 0.17 m. Same fix as adforce.eval.annual_max.
             coef = utide.solve(
                 wl.index,
                 wl.values,

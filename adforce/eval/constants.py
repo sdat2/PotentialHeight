@@ -1,8 +1,8 @@
-"""Constants and configuration for the ``comp`` (observational comparison) module.
+"""Constants and configuration for the ``adforce.eval`` (observational comparison) module.
 
 This module validates the historical ADCIRC storm-surge simulations (the SurgeNet
 training set, published on Hugging Face) against de-tided NOAA CO-OPS tide-gauge
-observations. See :mod:`comp.validate`.
+observations. See :mod:`adforce.eval.validate`.
 """
 
 import os
@@ -10,7 +10,7 @@ from pathlib import Path
 
 # --- paths -----------------------------------------------------------------
 SRC_PATH = Path(__file__).parent
-PROJ_PATH = SRC_PATH.parent
+PROJ_PATH = SRC_PATH.parent.parent  # adforce/eval/ -> repo root
 DATA_PATH = os.path.join(PROJ_PATH, "data")
 COMP_DATA_PATH = os.path.join(DATA_PATH, "comp")  # caches (git-ignored)
 HF_STORM_CACHE = os.path.join(COMP_DATA_PATH, "hf_storms")  # downloaded storm netCDFs
@@ -26,7 +26,7 @@ OUT_PATH = os.path.join(COMP_DATA_PATH, "out")  # summary tables / metrics
 # (thesis/worstsurge -> worstsurge), so the module's own parent is NOT the thesis
 # root: the Environmental Data Science paper builds from a separate <thesis> that
 # holds paper/appendix.tex and img/. We write the final PDFs and the generated
-# LaTeX table straight there, so ``python -m comp.validate`` reproduces exactly
+# LaTeX table straight there, so ``python -m adforce.eval.validate`` reproduces exactly
 # what the paper \includegraphics/\inputs -- no manual copy/convert step that
 # could silently drift. The root is located by looking for paper/appendix.tex
 # (override with WORSTSURGE_PAPER_ROOT); absent it, we fall back to module dirs.
@@ -77,7 +77,7 @@ GAUGE_BOX = dict(lon=(-97.6, -84.0), lat=(27.3, 30.9))
 # moved from the single New Orleans site to the three-city comparison
 # (New Orleans / Galveston / Miami). A separate box (rather than widening
 # GAUGE_BOX) keeps the Gulf storms' time-series cache valid: the box is part of
-# the cache tag (see comp.validate._ts_cache_tag).
+# the cache tag (see adforce.eval.validate._ts_cache_tag).
 FLORIDA_BOX = dict(lon=(-82.3, -79.7), lat=(24.4, 30.8))
 
 # Storms scored against FLORIDA_BOX instead of the (default Gulf) GAUGE_BOX.
@@ -171,7 +171,7 @@ BOOTSTRAP_SEED = 0  # fixed so reported CIs are reproducible
 # Minimum hourly samples in a calendar year for a stable utide harmonic fit.
 UTIDE_MIN_SAMPLES = 2000
 
-# --- annual-maximum pipeline (comp.annual_max) ------------------------------
+# --- annual-maximum pipeline (adforce.eval.annual_max) ------------------------------
 ANNUAL_MAX_CACHE = os.path.join(
     COMP_DATA_PATH, "annual_max"
 )  # residuals + annual maxima

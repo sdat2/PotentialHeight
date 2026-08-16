@@ -13,8 +13,8 @@ robust rather than tuned. Two groups of knobs:
 
 Run::
 
-    python -m comp.sensitivity              # cheap filter sweep + node-selection sweep
-    python -m comp.sensitivity --no-node    # cheap filter sweep only (no netCDF)
+    python -m adforce.eval.sensitivity              # cheap filter sweep + node-selection sweep
+    python -m adforce.eval.sensitivity --no-node    # cheap filter sweep only (no netCDF)
 """
 
 from __future__ import annotations

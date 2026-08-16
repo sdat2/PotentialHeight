@@ -12,14 +12,14 @@ after a sweep -- except the utide variants, which re-solve a year-long harmonic 
 
 A full run also writes the appendix table ``<thesis>/paper/comp_detide_table.tex`` (the
 ``tabular`` that ``tab:detide-robustness`` ``\\input``s), so the paper table regenerates with
-the data and cannot drift -- like the per-storm table from :func:`comp.validate.latex_table`.
+the data and cannot drift -- like the per-storm table from :func:`adforce.eval.validate.latex_table`.
 
 Run::
 
-    python -m comp.detide_sensitivity                 # all methods + skew, all pairs, writes the table
-    python -m comp.detide_sensitivity --methods godin_lowpass noaa_predictions
-    python -m comp.detide_sensitivity --limit 40      # quick subset (no table written)
-    python -m comp.detide_sensitivity --skew          # instantaneous vs skew-surge metric only
+    python -m adforce.eval.detide_sensitivity                 # all methods + skew, all pairs, writes the table
+    python -m adforce.eval.detide_sensitivity --methods godin_lowpass noaa_predictions
+    python -m adforce.eval.detide_sensitivity --limit 40      # quick subset (no table written)
+    python -m adforce.eval.detide_sensitivity --skew          # instantaneous vs skew-surge metric only
 """
 
 from __future__ import annotations
@@ -243,7 +243,7 @@ def _latex_table(pooled: Dict[str, dict], path: str) -> None:
     """Emit the de-tiding-robustness ``tabular`` the appendix \\inputs.
 
     Only the ``tabular`` (the ``table`` float, caption and label live in
-    ``paper/appendix.tex``), matching :func:`comp.validate.latex_table`, so the prose stays
+    ``paper/appendix.tex``), matching :func:`adforce.eval.validate.latex_table`, so the prose stays
     hand-edited while every number is generated -- the table cannot drift from the data.
     """
     lines = [

@@ -1,6 +1,6 @@
-"""Unit + regression tests for the comp (tide-gauge validation) module.
+"""Unit + regression tests for the adforce.eval (tide-gauge validation) module.
 
-Covers the pure, network-free functions in comp.validate (skill metrics, time-series
+Covers the pure, network-free functions in adforce.eval.validate (skill metrics, time-series
 alignment, the valid/clean gating, the LaTeX-table generator) and pins the headline
 numbers from a completed sweep so they cannot silently drift. The regression test is
 skipped when the summary CSV is absent (e.g. a fresh checkout with no cached data), so
@@ -19,8 +19,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from comp import constants as C
-from comp.validate import (
+from adforce.eval import constants as C
+from adforce.eval.validate import (
     add_flags,
     bootstrap_ci,
     classify_setting,
@@ -313,7 +313,7 @@ def test_regression_per_storm_counts():
     reason="val_summary.csv not present (no cached sweep)",
 )
 def test_global_permutation_separates_signal_from_null():
-    from comp.nulltest import perm_global, load_clean
+    from adforce.eval.nulltest import perm_global, load_clean
 
     res = perm_global(load_clean(), n=1000, seed=0)
     # the real correlation must sit far above every shuffled (null) correlation
@@ -328,7 +328,7 @@ def test_global_permutation_separates_signal_from_null():
     reason="val_summary.csv not present (no cached sweep)",
 )
 def test_within_storm_permutation_shows_real_spatial_skill():
-    from comp.nulltest import perm_within_storm, load_clean
+    from adforce.eval.nulltest import perm_within_storm, load_clean
 
     res = perm_within_storm(load_clean(), n=1000, seed=0)
     # spatial skill (storm means removed) beats the within-storm-shuffled null
@@ -341,7 +341,7 @@ def test_within_storm_permutation_shows_real_spatial_skill():
     reason="val_summary.csv not present (no cached sweep)",
 )
 def test_cross_storm_pairing_collapses_skill():
-    from comp.nulltest import cross_storm, load_clean
+    from adforce.eval.nulltest import cross_storm, load_clean
 
     res = cross_storm(load_clean(), seed=0)
     # pairing a gauge's sim with a DIFFERENT storm's obs must lose most of the skill
@@ -488,7 +488,7 @@ def test_regression_population_and_methods():
 # Network-free -- uses synthetic ragged (sim, obs) series in a tmp cache dir.
 # --------------------------------------------------------------------------- #
 def test_series_cache_roundtrip_and_staleness(tmp_path, monkeypatch):
-    import comp.validate as cv
+    import adforce.eval.validate as cv
 
     monkeypatch.setattr(C, "TS_CACHE", str(tmp_path))  # isolate from the real cache
     h = pd.date_range("2021-08-27", periods=48, freq="h")

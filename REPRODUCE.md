@@ -78,7 +78,7 @@ Bayesian optimization (`adbo.exp*`) → EVT with an upper bound (`worst`)**
 | 6. ADCIRC forcing | `python -m adforce.wrap` | ARCHER2 only (needs `padcirc`/`adcprep` binaries, see `adforce/config/files/`) | `wrap.slurm`, `n01_wrap.slurm` |
 | 7. Bayesian optimization | `python -m adbo.exp_1d/_2d/_3d ...` | ARCHER2 only (drives ADCIRC via `adforce`) | `[bo]` extra; `bo_*.slurm`, `exp.slurm`, per-city scripts, `n01_bo_first..fourth` |
 | 8. EVT with upper bound | `python -m worst.vary_samples_ns`, `worst.vary_noise`, `worst.vary_nonstationary`, `worst.sigma_robustness`, `worst.ns_evt_figs` | local (CPU; `[bo]` extra for TensorFlow fits) | synthetic experiments — no ADCIRC needed |
-| Validation (side chain) | `python -m comp.validate` / `comp.nulltest` / `comp.detide_sensitivity` / `comp.sensitivity` | local (needs internet + `[comp]` extra) | Hugging Face archived runs vs NOAA gauges |
+| Validation (side chain) | `python -m adforce.eval.validate` / `adforce.eval.nulltest` / `adforce.eval.detide_sensitivity` / `adforce.eval.sensitivity` | local (needs internet + `[eval]` extra) | Hugging Face archived runs vs NOAA gauges |
 | Observations (side chain, thesis) | `python -m tcpips.ibtracs` | local or ARCHER2 (`ibtracs.slurm`) | IBTrACS vs ERA5-derived PI/PS |
 
 Stages 6–7 require ARCHER2 (or another HPC machine with a ported
@@ -107,17 +107,17 @@ Some plotting entry points are driven from commented-out calls in the module
 | **Fig. 10** — AEP with known vs unknown upper bound, GEV resampling (Nr=600) (`worst:fig:evt`) | `python -m worst.vary_samples_ns` (hydra config `worst/config/`) | synthetic GEV draws (TensorFlow fit) | `img/worst/evt_fig_tens_*.pdf` | — (local) |
 | **Fig. 11** — effect of upper-bound uncertainty σ_ẑ* on return-value estimates (`worst:fig:vary_z_star_sigma`) | `python -m worst.vary_noise` | synthetic GEV draws; cache `data/worst/vary_z_star_*.nc` | `img/worst/vary_z_star_sigma.pdf` | — (local) |
 
-### Appendix A — historical surge validation (`comp`; see [`comp/README.md`](comp/README.md))
+### Appendix A — historical surge validation (`adforce.eval`; see [`adforce/eval/README.md`](adforce/eval/README.md))
 
 | Paper item | Command | Key inputs | Output | SLURM job |
 | --- | --- | --- | --- | --- |
-| **Table 3** — de-tiding-method sensitivity (`tab:detide-robustness`) | `python -m comp.detide_sensitivity` | de-tided gauge cache (`data/comp/ts_cache/`) | `<thesis>/paper/comp_detide_table.tex` (`\input` by the appendix) | — (local) |
-| **Table 4** — per-storm skill vs de-tided NOAA gauges (`tab:gauge-validation`) | `python -m comp.validate` | Hugging Face [`sdat2/surgenet-train`](https://huggingface.co/datasets/sdat2/surgenet-train); NOAA CO-OPS gauges (de-tided with `utide`) | `<thesis>/paper/comp_val_table.tex` | — (local) |
-| **Fig. 12** — peak-skill scatter (`fig:gauge-validation-scatter`) | `python -m comp.validate` (full 14-storm sweep) | as above | `img/comp/val_scatter.png` · `<thesis>/img/comp_val_scatter.pdf` | — (local) |
-| **Fig. 13** — example de-tided surge time series (`fig:gauge-validation-examples`) | `python -m comp.validate` (or `--examples-only` from cache) | as above (cache: `data/comp/ts_cache/`) | `img/comp/val_examples.png` · `<thesis>/img/comp_val_examples.pdf` | — (local) |
-| **Fig. 14** — negative-control null tests (`fig:gauge-validation-null`) | `python -m comp.nulltest` | `data/comp/out/val_summary.csv` (+ netCDFs for the lag null) | `<thesis>/img/comp_val_nulltests.pdf` · `img/comp/val_nulltests.png` | — (local) |
-| Summary metrics (support; pinned by `tests/test_comp.py`) | `python -m comp.validate` | as above | `data/comp/out/val_summary.csv` | — (local) |
-| Threshold/node-selection sensitivity (text numbers) | `python -m comp.sensitivity` | `val_summary.csv` | console report (headline r stability) | — (local) |
+| **Table 3** — de-tiding-method sensitivity (`tab:detide-robustness`) | `python -m adforce.eval.detide_sensitivity` | de-tided gauge cache (`data/comp/ts_cache/`) | `<thesis>/paper/comp_detide_table.tex` (`\input` by the appendix) | — (local) |
+| **Table 4** — per-storm skill vs de-tided NOAA gauges (`tab:gauge-validation`) | `python -m adforce.eval.validate` | Hugging Face [`sdat2/surgenet-train`](https://huggingface.co/datasets/sdat2/surgenet-train); NOAA CO-OPS gauges (de-tided with `utide`) | `<thesis>/paper/comp_val_table.tex` | — (local) |
+| **Fig. 12** — peak-skill scatter (`fig:gauge-validation-scatter`) | `python -m adforce.eval.validate` (full 14-storm sweep) | as above | `img/comp/val_scatter.png` · `<thesis>/img/comp_val_scatter.pdf` | — (local) |
+| **Fig. 13** — example de-tided surge time series (`fig:gauge-validation-examples`) | `python -m adforce.eval.validate` (or `--examples-only` from cache) | as above (cache: `data/comp/ts_cache/`) | `img/comp/val_examples.png` · `<thesis>/img/comp_val_examples.pdf` | — (local) |
+| **Fig. 14** — negative-control null tests (`fig:gauge-validation-null`) | `python -m adforce.eval.nulltest` | `data/comp/out/val_summary.csv` (+ netCDFs for the lag null) | `<thesis>/img/comp_val_nulltests.pdf` · `img/comp/val_nulltests.png` | — (local) |
+| Summary metrics (support; pinned by `tests/test_eval.py`) | `python -m adforce.eval.validate` | as above | `data/comp/out/val_summary.csv` | — (local) |
+| Threshold/node-selection sensitivity (text numbers) | `python -m adforce.eval.sensitivity` | `val_summary.csv` | console report (headline r stability) | — (local) |
 
 ### Appendix B — non-stationary EVT
 

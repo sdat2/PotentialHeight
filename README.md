@@ -80,9 +80,9 @@ Key scripts:
 python -m adbo.exp_1d --test True --exp_name test
 ```
 
-### `comp`
+### `adforce.eval`
 
-Validates the historical ADCIRC surge simulations (the SurgeNet training set, published on Hugging Face) against de-tided NOAA CO-OPS tide-gauge observations, scoring peak skill, time-series skill, and peak timing, with permutation/negative-control null tests and sensitivity checks. See [`comp/README.md`](https://github.com/sdat2/worstsurge/blob/main/comp/README.md) for the validation methodology, negative controls, and results.
+Validates the historical ADCIRC surge simulations (the SurgeNet training set, published on Hugging Face) against de-tided NOAA CO-OPS tide-gauge observations, scoring peak skill, time-series skill, and peak timing, with permutation/negative-control null tests and sensitivity checks. See [`adforce/eval/README.md`](https://github.com/sdat2/worstsurge/blob/main/adforce/eval/README.md) for the validation methodology, negative controls, and results. (Formerly the top-level `comp/` package; caches remain under `data/comp/`.)
 
 ### `worst`
 
@@ -104,8 +104,8 @@ A motivating toy example (`toy_example.py`): a single small Keras ReLU MLP is tr
 ```
 adbo/        Bayesian optimization loop (trieste)
 adforce/     ADCIRC wrapper and forcing utilities
+adforce/eval/  Historical surge validation against NOAA tide gauges (see adforce/eval/README.md)
 cle15/       CLE15 wind profile implementations (pure-Python & Numba)
-comp/        Historical surge validation against NOAA tide gauges (see comp/README.md)
 data/        Key input data (fort.22.nc, IBTrACS, ERA5, CMIP6, etc.)
 docs/        ReadTheDocs source
 img/         Key figures
@@ -152,7 +152,7 @@ dependency groups are available as extras:
 pip install -e .[bo]    # trieste/TensorFlow Bayesian optimization (adbo, worst)
 pip install -e .[cmip]  # intake/xESMF CMIP6 download + regridding (tcpips)
 pip install -e .[mpi]   # dask_mpi/mpi4py HPC parallelism (tcpips)
-pip install -e .[comp]  # utide/huggingface_hub tide-gauge validation (comp)
+pip install -e .[eval]  # utide/huggingface_hub tide-gauge validation (adforce.eval; [comp] is a deprecated alias)
 pip install -e .[all]   # everything
 ```
 
