@@ -36,7 +36,6 @@ from omegaconf import DictConfig
 
 import numpy as np
 import pandas as pd
-import xarray as xr
 from scipy.spatial import cKDTree
 
 from . import constants as C
@@ -210,27 +209,34 @@ def load_storm_series(
 
 
 def validate_storm(
-    storm: str, fname: str, gauges: List[Gauge]
+    storm: str, fname: str, gauges: List[Gauge], source=None
 ) -> Tuple[List[dict], Dict[str, tuple]]:
-    """Return (rows, series) for one storm. ``series[name] = (sim, obs)``."""
+    """Return (rows, series) for one storm. ``series[name] = (sim, obs)``.
+
+    ``source`` is a :class:`adforce.eval.sources.FieldSource` supplying
+    ``(x, y, wet, elev, t)``; the default HF-archive source reproduces the
+    original inline extraction exactly (``wet = WD``, ``elev = WD + DEM``).
+    The nearest-wet sampling and scoring below are source-agnostic.
+    """
     year = int(storm.split()[-1])
-    ds = xr.open_dataset(download_storm(fname))
-    x, y, DEM, WD = ds.x.values, ds.y.values, ds.DEM.values, ds.WD.values
-    ssh = WD + DEM[None, :]
-    t = pd.to_datetime(ds.time.values)
+    if source is None:
+        from .sources import HFArchiveSource
+
+        source = HFArchiveSource()
+    x, y, wet, elev, t = source.load(storm, fname)
     s0, s1 = t[0], t[-1]
     tree = cKDTree(np.column_stack([x, y]))
 
     rows: List[dict] = []
     series: Dict[str, tuple] = {}
     for sid, name, lat, lon in gauges:
-        idx, dist = _nearest_wet(tree, WD, lon, lat)
+        idx, dist = _nearest_wet(tree, wet, lon, lat)
         if idx is None:
             continue
         obs, method = observed_residual(sid, lat, year, s0, s1)
         if obs.empty or obs.size < 12:
             continue
-        sim = pd.Series(ssh[:, idx], index=t)
+        sim = pd.Series(elev[:, idx], index=t)
         series[name] = (sim, obs)
         timing = (sim.idxmax() - obs.idxmax()).total_seconds() / 3600.0
         ts_r, ts_rmse, ts_n = timeseries_skill(sim, obs)

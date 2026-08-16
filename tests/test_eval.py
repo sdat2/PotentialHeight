@@ -556,3 +556,195 @@ def test_cache_tag_matches_legacy_literal():
         "v1|deg0.12|wet0.3|knn60|ut2000"
         "|box{'lon': (-82.3, -79.7), 'lat': (24.4, 30.8)}"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Cell identity, run-dir status, sources, fort.61/63 readers (Commit C).
+# All synthetic / tmp_path -- no network, no real run dirs.
+# --------------------------------------------------------------------------- #
+def test_cell_id_and_dir_to_storm():
+    from adforce.eval.cells import ConfigCell, cell_id, dir_to_storm, storm_to_slug
+
+    assert cell_id(ConfigCell()) == "res-mid_tide-off_swan-off_f-storm"
+    assert (
+        cell_id(ConfigCell(resolution="low", tide=True, forcing="both"))
+        == "res-low_tide-on_swan-off_f-both"
+    )
+    assert cell_id(ConfigCell(physics_tag="rh08")).endswith("_p-rh08")
+    assert dir_to_storm("22_MICHAEL_2018") == "Michael 2018"
+    assert dir_to_storm("152_KATRINA_2005") == "Katrina 2005"
+    assert dir_to_storm("not-a-run-dir") is None
+    assert storm_to_slug("Katrina 2005", "152_KATRINA_2005.nc") == "152_KATRINA_2005"
+
+
+def test_run_status_lifecycle(tmp_path):
+    from omegaconf import OmegaConf
+
+    from adforce.eval.cells import ConfigCell
+    from adforce.eval.status import SUCCESS_MARKER, RunStatus, run_status
+
+    cell = ConfigCell(resolution="mid", tide=False, swan=False)
+    run = tmp_path / "152_KATRINA_2005"
+    assert run_status(str(run), cell) is RunStatus.MISSING  # no dir
+    run.mkdir()
+    assert run_status(str(run), cell) is RunStatus.MISSING  # no config.yaml
+    cfg = OmegaConf.create(
+        {"adcirc": {"resolution": {"value": "mid"}, "tide": {"value": False}, "swan": {"value": False}}}
+    )
+    OmegaConf.save(cfg, str(run / "config.yaml"))
+    assert run_status(str(run), cell) is RunStatus.FAILED  # no receipt yet
+    (run / "slurm.out").write_text(f"stuff\n{SUCCESS_MARKER}\n")
+    assert run_status(str(run), cell) is RunStatus.SUCCESS
+    (run / "gauge_ts.parquet").write_bytes(b"")
+    assert run_status(str(run), cell) is RunStatus.EXTRACTED
+    foreign = ConfigCell(resolution="low")
+    assert run_status(str(run), foreign) is RunStatus.FOREIGN
+    assert run_status(str(run), None) is RunStatus.EXTRACTED  # no provenance check
+
+
+def _write_fort63(path, x, y, depth, zeta, times):
+    """Synthetic node-based fort.63.nc via xarray."""
+    import xarray as xr
+
+    ds = xr.Dataset(
+        dict(
+            x=("node", np.asarray(x, dtype=float)),
+            y=("node", np.asarray(y, dtype=float)),
+            depth=("node", np.asarray(depth, dtype=float)),
+            zeta=(("time", "node"), np.asarray(zeta, dtype=float)),
+        ),
+        coords=dict(time=times),
+    )
+    ds.to_netcdf(path)
+
+
+def test_extract_run_node_selection(tmp_path):
+    """Nearest node that never dries wins; drying (NaN) nodes are rejected."""
+    from adforce.eval.extract import extract_run
+
+    run = tmp_path / "22_MICHAEL_2018"
+    run.mkdir()
+    t = pd.date_range("2018-10-09", periods=6, freq="h")
+    # node 0: nearest to the gauge but dries (NaN); node 1: wet throughout;
+    # node 2: far away (> max_deg).
+    zeta = np.array(
+        [
+            [np.nan, 0.5, 0.1],
+            [0.2, 0.6, 0.1],
+            [0.3, 0.9, 0.1],
+            [0.2, 0.7, 0.1],
+            [np.nan, 0.5, 0.1],
+            [0.1, 0.4, 0.1],
+        ]
+    )
+    _write_fort63(
+        run / "fort.63.nc",
+        x=[-90.00, -90.02, -91.5],
+        y=[29.00, 29.02, 29.5],
+        depth=[5.0, 5.0, 5.0],
+        zeta=zeta,
+        times=t,
+    )
+    gauges = pd.DataFrame(
+        [dict(sid="8761724", name="Grand Isle", lat=29.0, lon=-90.0)]
+    )
+    df = extract_run(str(run), gauges, max_deg=0.12, wet_min=0.3, knn=3)
+    assert list(df.columns) == ["storm", "sid", "gauge", "time", "zeta"]
+    assert df.storm.unique().tolist() == ["22_MICHAEL_2018"]
+    assert df.sid.unique().tolist() == ["8761724"]
+    np.testing.assert_allclose(df.zeta.values, zeta[:, 1])  # picked the wet node
+
+    # An all-drying mesh yields no rows.
+    run2 = tmp_path / "all_dry"
+    run2.mkdir()
+    _write_fort63(
+        run2 / "fort.63.nc",
+        x=[-90.0],
+        y=[29.0],
+        depth=[5.0],
+        zeta=np.full((6, 1), np.nan),
+        times=t,
+    )
+    assert extract_run(str(run2), gauges).empty
+
+
+def test_read_fort61_roundtrip(tmp_path):
+    import xarray as xr
+
+    from adforce.fort61 import read_fort61
+
+    t = pd.date_range("2018-10-09", periods=4, freq="h")
+    zeta = np.array([[0.1, 1.0], [0.2, 1.1], [0.3, 1.2], [0.2, 1.3]])
+    ds = xr.Dataset(
+        dict(
+            x=("station", [-90.0, -89.5]),
+            y=("station", [29.0, 29.5]),
+            zeta=(("time", "station"), zeta),
+        ),
+        coords=dict(time=t),
+    )
+    ds.to_netcdf(tmp_path / "fort.61.nc")
+    df = read_fort61(str(tmp_path / "fort.61.nc"))
+    assert set(df.columns) == {"station", "name", "x", "y", "time", "zeta"}
+    assert df.station.nunique() == 2
+    np.testing.assert_allclose(
+        df[df.station == 1].sort_values("time").zeta.values, zeta[:, 1]
+    )
+    # directory form resolves fort.61.nc inside
+    assert len(read_fort61(str(tmp_path))) == len(df)
+
+
+def test_rundir_source_prefers_cheapest_artifact(tmp_path):
+    from adforce.eval.sources import RunDirSource
+
+    run = tmp_path / "run"
+    run.mkdir()
+    t = pd.date_range("2018-10-09", periods=4, freq="h")
+    gauges = pd.DataFrame(
+        [dict(sid="1", name="A", lat=29.0, lon=-90.0)]
+    )
+    # only fort.63 present -> fort63 sampling
+    _write_fort63(
+        run / "fort.63.nc",
+        x=[-90.0],
+        y=[29.0],
+        depth=[5.0],
+        zeta=np.array([[0.5], [0.6], [0.7], [0.6]]),
+        times=t,
+    )
+    out = RunDirSource(str(run)).sim_series(gauges)
+    assert out["1"][3] == "fort63"
+    # gauge_ts.parquet appears -> preferred over fort63
+    pd.DataFrame(
+        dict(storm="run", sid="1", gauge="A", time=t, zeta=[1.0, 2.0, 3.0, 2.0])
+    ).to_parquet(run / "gauge_ts.parquet", index=False)
+    out = RunDirSource(str(run)).sim_series(gauges)
+    name, series, deg, src = out["1"]
+    assert src == "gauge_ts" and series.max() == 3.0
+
+
+def test_validate_storm_source_seam(tmp_path, monkeypatch):
+    """validate_storm scores an injected FieldSource without touching HF/CO-OPS."""
+    import adforce.eval.validate as cv
+
+    monkeypatch.setattr(C, "TS_CACHE", str(tmp_path))
+    t = pd.date_range("2021-08-28", periods=48, freq="h")
+    surge = np.concatenate([np.linspace(0, 2.0, 24), np.linspace(2.0, 0, 24)])
+
+    class FakeSource:
+        def load(self, storm, fname=None):
+            x = np.array([-90.0])
+            y = np.array([29.0])
+            wet = np.full((48, 1), 5.0)  # always wet
+            elev = surge[:, None]
+            return x, y, wet, elev, pd.DatetimeIndex(t)
+
+    obs = pd.Series(surge * 0.9, index=t)
+    monkeypatch.setattr(cv, "observed_residual", lambda *a, **k: (obs, "utide"))
+    rows, series = cv.validate_storm(
+        "Fake 2021", "fake.nc", [("42", "Fake Gauge", 29.0, -90.0)], source=FakeSource()
+    )
+    assert len(rows) == 1 and rows[0]["sid"] == "42"
+    assert rows[0]["sim_peak"] == 2.0
+    assert abs(rows[0]["peak_dt_hr"]) < 1e-9  # aligned peaks
+    assert "Fake Gauge" in series
