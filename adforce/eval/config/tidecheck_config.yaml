@@ -1,0 +1,10 @@
+# Root config for python -m adforce.eval.tidecheck (tide-only run validation
+# vs CO-OPS astronomical predictions -- the gate before tide-on surge skill).
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+series: ??? # gauge-series parquet path or glob (tide-only runs)
+label: tide # names the default output data/comp/out/tidecheck_<label>.csv
+out: null # explicit CSV path (null -> the label default)

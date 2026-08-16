@@ -724,6 +724,110 @@ def test_rundir_source_prefers_cheapest_artifact(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# Tide-on Phase 2a: obs-side utilities (detide.py) + tide-only validation
+# (tidecheck.py). All synthetic -- no network.
+# --------------------------------------------------------------------------- #
+M2_HR = 12.42  # principal lunar semidiurnal period
+
+
+def test_tide_skill_recovers_amp_lag_offset():
+    from adforce.eval.tidecheck import tide_skill
+
+    t_pred = pd.date_range("2020-08-01", periods=24 * 6, freq="h")  # 6 days hourly
+    hrs = np.arange(len(t_pred))
+    pred = pd.Series(0.5 * np.sin(2 * np.pi * hrs / M2_HR), index=t_pred)
+    t_sim = pd.date_range("2020-08-01", periods=24 * 6 * 18, freq="200s")  # model cadence
+    hs = (t_sim - t_sim[0]).total_seconds() / 3600.0
+    sim = pd.Series(
+        0.4 * np.sin(2 * np.pi * (hs - 0.5) / M2_HR) + 0.15, index=t_sim
+    )  # 80% amplitude, 30-min lag, +15 cm datum offset
+    out = tide_skill(sim, pred)
+    assert out["n_hr"] >= 24 * 5
+    assert abs(out["amp_ratio"] - 0.8) < 0.05
+    assert abs(out["lag_min"] - 30) <= 6  # one grid step
+    assert abs(out["datum_offset_m"] - 0.15) < 0.02
+    assert out["r"] > 0.9  # lag-0 r under a 30-min M2 shift ~ cos(14.5 deg)
+
+    # too-short overlap -> NaNs, not garbage
+    short = tide_skill(sim.iloc[: 18 * 24], pred.iloc[:24])
+    assert np.isnan(short["amp_ratio"])
+
+
+def test_align_pair_reports_offset():
+    from adforce.eval.detide import align_pair
+
+    t = pd.date_range("2021-08-25", periods=24 * 6, freq="h")
+    obs = pd.Series(np.sin(np.arange(len(t)) / 5.0), index=t)
+    sim = obs + 0.3  # pure datum shift
+    s2, o2, off = align_pair(sim, obs, forcing_start=t[0], window_hr=48)
+    assert abs(off - 0.3) < 1e-9
+    np.testing.assert_allclose(s2.values, o2.values, atol=1e-12)
+
+
+def test_skew_surge_promoted_and_phase_insensitive():
+    import adforce.eval.detide_sensitivity as ds
+    from adforce.eval.detide import skew_surge_peak
+
+    assert ds._skew_surge_peak is skew_surge_peak  # re-export, not a copy
+    t = pd.date_range("2020-08-01", periods=24 * 4, freq="h")
+    hrs = np.arange(len(t))
+    tide = pd.Series(0.5 * np.sin(2 * np.pi * hrs / M2_HR), index=t)
+    # observed = phase-shifted tide + 0.8 m: instantaneous residual is phase-
+    # contaminated, the skew surge is not.
+    wl = pd.Series(0.5 * np.sin(2 * np.pi * (hrs - 2) / M2_HR) + 0.8, index=t)
+    skew = skew_surge_peak(wl, tide, (t[0], t[-1]))
+    assert abs(skew - 0.8) < 0.05
+
+
+def test_twl_table_synthetic(monkeypatch):
+    """Tide-on scoring end-to-end on synthetic series: recovers the datum
+    offset, the peak bias, and a phase-insensitive skew-surge bias."""
+    import adforce.eval.twl as twl
+
+    t = pd.date_range("2020-08-01", periods=24 * 8, freq="h")  # 8-day run
+    hrs = np.arange(len(t))
+    tide = 0.5 * np.sin(2 * np.pi * hrs / M2_HR)
+    bump = 1.5 * np.exp(-0.5 * ((hrs - 24 * 6) / 6.0) ** 2)  # landfall day 6
+    sim = pd.Series(tide + bump + 0.2, index=t)  # +20 cm model datum offset
+    obs = pd.Series(tide + 0.9 * bump, index=t)  # model over-predicts 10%
+    obs = obs.drop(obs.index[50:60]).drop(obs.index[100:103])  # gauge gaps
+    # (ragged obs vs full-length prediction is what crashed the first real
+    # run: skew_surge_peak slices positionally -> inner-join at the call site)
+
+    def frame(vals):
+        return pd.DataFrame(
+            dict(storm="154_TEST_2020", sid="42", gauge="G", time=t, zeta=vals)
+        )
+
+    monkeypatch.setattr(twl, "fetch_year", lambda sid, year: obs)
+    monkeypatch.setattr(
+        twl, "noaa_predictions", lambda sid, t0, t1: pd.Series(tide, index=t)
+    )
+    df = twl.twl_table(frame(sim.values), tide_series=frame(tide + 0.2))
+    assert len(df) == 1
+    r = df.iloc[0]
+    assert r.key == "TEST_2020" and r.n_hr >= 24 * 7
+    assert abs(r.datum_offset_m - 0.2) < 0.02
+    assert abs(r.peak_bias - 0.15) < 0.1
+    assert r.ts_r > 0.95
+    assert abs(r.skew_bias - 0.15) < 0.15 and r.skew_sim > 1.0
+
+
+def test_noaa_predictions_uses_cache(tmp_path, monkeypatch):
+    import adforce.eval.coops as coops_mod
+    from adforce.eval import detide
+
+    monkeypatch.setattr(coops_mod, "COOPS_CACHE", str(tmp_path))
+    monkeypatch.setattr(detide.C, "COOPS_CACHE", str(tmp_path))
+    csv = "Date Time, Prediction\n" + "\n".join(
+        f"2020-08-{d:02d} 00:00,{0.1 * d:.2f}" for d in range(1, 6)
+    )
+    (tmp_path / "1234567_predictions_20200801_20200805_MSL.csv").write_text(csv)
+    s = detide.noaa_predictions("1234567", "2020-08-01", "2020-08-05")
+    assert len(s) == 5 and abs(s.iloc[-1] - 0.5) < 1e-9
+
+
+# --------------------------------------------------------------------------- #
 # Launch planning + harvest (Commit E). plan() is pure -- no ADCIRC, no
 # network; everything runs against tmp_path run dirs.
 # --------------------------------------------------------------------------- #

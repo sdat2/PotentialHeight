@@ -171,28 +171,9 @@ def _utide_tide(wl: pd.Series, lat: float) -> pd.Series:
     return pd.Series(utide.reconstruct(wl.index, coef, verbose=False).h, index=wl.index)
 
 
-def _skew_surge_peak(wl: pd.Series, tide: pd.Series, win: Tuple) -> float:
-    """Storm skew-surge peak = max over tidal cycles of (max observed - max predicted tide).
-
-    The skew surge (Horsburgh & Wilson 2007) compares the peak observed level in each tidal
-    cycle to the peak predicted tide in the same cycle, so it is insensitive to tidal-phase
-    error -- the defensible peak target for a tide-excluding model. Cycles are split at the
-    predicted-tide low waters.
-    """
-    from scipy.signal import find_peaks
-
-    o = wl.loc[win[0] : win[1]]
-    td = tide.loc[win[0] : win[1]]
-    if len(o) < 12:
-        return np.nan
-    troughs, _ = find_peaks(-td.values, distance=8)  # tide low waters, >= 8 h apart
-    bounds = np.r_[0, troughs, len(td) - 1]
-    skews = [
-        float(o.values[a:b].max() - td.values[a:b].max())
-        for a, b in zip(bounds[:-1], bounds[1:])
-        if b - a >= 4
-    ]
-    return max(skews) if skews else np.nan
+# Promoted to adforce.eval.detide (shared with the tide-on scoring path);
+# re-exported here so run_skew and its cached CSVs behave identically.
+from .detide import skew_surge_peak as _skew_surge_peak  # noqa: E402
 
 
 def _storm_windows() -> Dict[str, Tuple]:
