@@ -1,0 +1,12 @@
+# Root config for python -m adforce.eval.annual_max (obs-side annual-maximum
+# de-tided residual pipeline; feeds the gauge-EVT fits in worst/gauge_fit*.py).
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+station: "8761724" # CO-OPS station id (default: Grand Isle, LA)
+start: 1980 # first year; = C.AM_START_YEAR (drift-tested)
+end: 2025 # last year; = C.AM_END_YEAR (drift-tested)
+method: robust # utide.solve method: robust | ols
+refresh: false # recompute instead of reading the Parquet caches
