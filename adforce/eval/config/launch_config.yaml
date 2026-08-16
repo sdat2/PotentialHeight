@@ -1,0 +1,26 @@
+# Root config for python -m adforce.eval.launch (sweep orchestrator).
+defaults:
+  - matrix: res_x_tide
+  - _self_
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+study: default # namespaces <runs_root>/<study>/<cell>/<slug> and the manifest
+runs_root: ${oc.env:WORSTSURGE_RUNS_ROOT,runs/eval} # relative -> under the repo root
+storms: null # subset of storm display names (null = all 19)
+controls: false # auto-add tide-only control cells (interaction triples)
+spinup_days: auto # auto: 6.0 for tidal cells, else 0.0 (hist_sweep SPINUP)
+recommended_dt: 5.0 # ADCIRC timestep [s] passed to input generation
+dry_run: true # DEFAULT: print the plan table, launch nothing
+skip_completed: true # resume semantics: skip runs with a success receipt
+overwrite: false # refuse FOREIGN run dirs (config.yaml mismatch) unless true
+extract_after_run: true # reduce each run to gauge_ts.parquet right after it finishes
+strip_after_extract: # then delete the bulky outputs (hist_sweep disk lesson)
+  - fort.63.nc
+  - fort.64.nc
+  - fort.73.nc
+  - fort.74.nc
+  - "PE*"

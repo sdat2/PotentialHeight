@@ -724,6 +724,118 @@ def test_rundir_source_prefers_cheapest_artifact(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# Launch planning + harvest (Commit E). plan() is pure -- no ADCIRC, no
+# network; everything runs against tmp_path run dirs.
+# --------------------------------------------------------------------------- #
+def _launch_cfg(tmp_path, **over):
+    from hydra import compose, initialize
+
+    overrides = [f"runs_root={tmp_path}", "study=t", 'storms=["Katrina 2005","Ida 2021"]']
+    overrides += [f"{k}={v}" for k, v in over.items()]
+    with initialize(version_base=None, config_path="../adforce/eval/config"):
+        return compose(config_name="launch_config", overrides=overrides)
+
+
+def test_launch_plan_statuses_and_actions(tmp_path):
+    from omegaconf import OmegaConf
+
+    from adforce.eval.launch import plan
+    from adforce.eval.status import SUCCESS_MARKER
+
+    cfg = _launch_cfg(tmp_path)
+    table = plan(cfg)
+    # res_x_tide: 4 cells x 2 storms; low/mid decks ship in adforce/setup
+    assert len(table) == 8
+    assert set(table.cell) == {
+        "res-low_tide-off",
+        "res-low_tide-on",
+        "res-mid_tide-off",
+        "res-mid_tide-on",
+    }
+    assert (table.status == "missing").all() and (table.action == "run").all()
+
+    # fabricate a successful run -> skipped on the next plan
+    run = tmp_path / "t" / "res-mid_tide-off" / "152_KATRINA_2005"
+    run.mkdir(parents=True)
+    OmegaConf.save(
+        OmegaConf.create(
+            {"adcirc": {"resolution": {"value": "mid"}, "tide": {"value": False}, "swan": {"value": False}}}
+        ),
+        str(run / "config.yaml"),
+    )
+    (run / "slurm.out").write_text(SUCCESS_MARKER + "\n")
+    table = plan(cfg)
+    row = table[(table.cell == "res-mid_tide-off") & (table.slug == "152_KATRINA_2005")]
+    assert row.action.item() == "skip" and row.status.item() == "success"
+
+    # a FOREIGN dir (wrong resolution inside) blocks unless overwrite
+    OmegaConf.save(
+        OmegaConf.create(
+            {"adcirc": {"resolution": {"value": "low"}, "tide": {"value": False}, "swan": {"value": False}}}
+        ),
+        str(run / "config.yaml"),
+    )
+    table = plan(cfg)
+    row = table[(table.cell == "res-mid_tide-off") & (table.slug == "152_KATRINA_2005")]
+    assert row.action.item() == "blocked" and row.status.item() == "foreign"
+
+
+def test_launch_plan_controls_and_blocked_cells(tmp_path):
+    from adforce.eval.launch import plan
+
+    # controls add one tide-only cell per resolution with a tide-on cell
+    table = plan(_launch_cfg(tmp_path, controls=True))
+    assert "res-low_tide-on_swan-off_f-tide" in set(table.cell)
+    assert "res-mid_tide-on_swan-off_f-tide" in set(table.cell)
+    assert len(table) == (4 + 2) * 2
+
+    # high resolution (no local deck) and swan cells are blocked, loudly
+    cfg = _launch_cfg(tmp_path, matrix="archive_default")
+    cfg.matrix.cells = [
+        dict(name="hi", overrides={"adcirc.resolution.value": "high"}),
+        dict(name="sw", overrides={"adcirc.swan.value": True}),
+    ]
+    cfg.matrix.baseline = "hi"
+    table = plan(cfg)
+    assert (table.action == "blocked").all()
+    reasons = " ".join(table.reason)
+    assert "fort.14.high" in reasons and "SWAN" in reasons
+
+
+def test_config_hash_and_harvest_command(tmp_path):
+    from omegaconf import OmegaConf
+
+    from adforce.eval.harvest import rsync_command
+    from adforce.eval.launch import config_hash
+
+    a = OmegaConf.create({"x": 1, "y": {"z": "s"}})
+    assert config_hash(a) == config_hash(OmegaConf.create({"x": 1, "y": {"z": "s"}}))
+    assert config_hash(a) != config_hash(OmegaConf.create({"x": 2, "y": {"z": "s"}}))
+
+    cmd = rsync_command("host:/work/exp/eval", "study1", str(tmp_path))
+    assert cmd[0] == "rsync" and cmd[-2] == "host:/work/exp/eval/study1/"
+    assert "--include=gauge_ts.parquet" in cmd and "--exclude=*" in cmd
+
+
+def test_driver_seam_importable():
+    """The extracted per-storm seam exists with the expected signature.
+
+    Skipped where the training driver's HPC-only deps (adcircpy/stormevents)
+    are not installed -- the same reason pytest.ini --ignores the module."""
+    import inspect
+
+    try:
+        from adforce.training.driver import drive_storm, is_run_successful
+    except ModuleNotFoundError as e:
+        pytest.skip(f"training-driver dependency absent locally: {e.name}")
+
+    params = list(inspect.signature(drive_storm).parameters)
+    assert params[:4] == ["storm", "storm_ds", "run_directory", "cfg"]
+    assert "mode" in params and "spinup_days" in params
+    assert is_run_successful("/nonexistent") is False
+
+
+# --------------------------------------------------------------------------- #
 # Matrix grammar + model-vs-model (Commit D). The reproduction tests pin the
 # ported pairs.py against the published rerun/results artifacts and are
 # skipped when the cached sweep data is absent.
