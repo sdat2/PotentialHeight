@@ -145,6 +145,23 @@ def plan(cfg: DictConfig) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _strip(run_dir: str, patterns) -> None:
+    """Remove bulky outputs after extraction. ``PE*`` are adcprep partition
+    DIRECTORIES (hist_sweep used ``rm -rf``); plain files are unlinked."""
+    import glob as _glob
+    import shutil as _shutil
+
+    for pat in patterns:
+        for f in _glob.glob(os.path.join(run_dir, str(pat))):
+            if os.path.isdir(f):
+                _shutil.rmtree(f, ignore_errors=True)
+            else:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+
+
 def config_hash(resolved_cfg) -> str:
     """sha256 of the full resolved run config: the provenance fingerprint
     stored in the manifest so model-vs-model can detect drift in
@@ -176,8 +193,6 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
     reduced to ``gauge_ts.parquet`` and stripped before the next starts when
     ``extract_after_run`` is set.
     """
-    import glob as _glob
-
     from adforce.wrap import get_default_config  # runner imports stay local
 
     table = plan(cfg)
@@ -249,9 +264,7 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
                     df.to_parquet(
                         os.path.join(row.run_dir, "gauge_ts.parquet"), index=False
                     )
-                for pat in cfg.strip_after_extract:
-                    for f in _glob.glob(os.path.join(row.run_dir, str(pat))):
-                        os.remove(f)
+                _strip(row.run_dir, cfg.strip_after_extract)
                 status = run_status(row.run_dir, cell)
         except Exception as e:  # per-storm failures never stop the sweep
             print(f"!!! FAILED {row.cell}/{row.slug}: {e}")
