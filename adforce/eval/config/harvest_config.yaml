@@ -4,7 +4,7 @@ hydra:
   run:
     dir: .
 
-remote: ??? # host:/path/to/exp/eval (parent of study dirs), e.g. archer2:/work/n02/n02/sithom/exp/eval
+remote: ??? # host:/path/to/exp/eval (parent of study dirs), e.g. gcp-vm:/work/exp/eval
 study: ??? # study subtree to pull
 dest: null # local mirror root (null -> data/comp/runs/<study>)
 dry_run: true # print the rsync command without running it

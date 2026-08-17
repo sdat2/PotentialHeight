@@ -34,6 +34,7 @@ class ConfigCell:
     swan: bool = False  # SWAN wave coupling (padcswan)
     forcing: str = "storm"  # storm | tide | both (tide = wind-off control run)
     physics_tag: str = "default"  # opaque label for future physics variants
+    mannings_n: Optional[float] = None  # fort.13 default override (None = shipped 0.022)
 
 
 def _onoff(b: bool) -> str:
@@ -52,6 +53,8 @@ def cell_id(c: ConfigCell) -> str:
         f"swan-{_onoff(c.swan)}",
         f"f-{c.forcing}",
     ]
+    if c.mannings_n is not None:
+        parts.append(f"n{c.mannings_n:g}")
     if c.physics_tag != "default":
         parts.append(f"p-{c.physics_tag}")
     return "_".join(parts)
@@ -135,15 +138,28 @@ def provenance_match(run_cfg, cell: ConfigCell) -> bool:
         cell (ConfigCell): The cell the directory is expected to hold.
 
     Returns:
-        bool: True when resolution/tide/swan all agree. Missing keys count as
-        a mismatch (FOREIGN) -- a run without provenance is never trusted.
+        bool: True when resolution/tide/swan all agree, and -- for cells that
+        carry non-default eval-side axes (mannings_n set, or a tide-only
+        control) -- when the run's ``eval_axes`` block matches too. Legacy
+        run dirs predate ``eval_axes``, so those checks only fire for
+        non-default cells. Missing wrap keys count as a mismatch (FOREIGN)
+        -- a run without provenance is never trusted.
     """
     try:
         adcirc = run_cfg.adcirc
-        return (
+        if not (
             str(adcirc.resolution.value) == cell.resolution
             and bool(adcirc.tide.value) == cell.tide
             and bool(adcirc.swan.value) == cell.swan
-        )
+        ):
+            return False
+        axes = run_cfg.get("eval_axes") or {}
+        if cell.mannings_n is not None:
+            got = axes.get("mannings_n")
+            if got is None or abs(float(got) - cell.mannings_n) > 1e-9:
+                return False
+        if cell.forcing == "tide" and axes.get("forcing") != "tide":
+            return False
+        return True
     except Exception:
         return False

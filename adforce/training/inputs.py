@@ -183,6 +183,7 @@ def generate_adcirc_inputs(
     wind: bool = True,
     tides: bool = False,
     spinup_days: float = 0.0,
+    mannings_n=None,
 ) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
@@ -326,7 +327,16 @@ def generate_adcirc_inputs(
 
     # 6. Copy static files
     # fort.14 is copied by driver.write()
-    shutil.copy(fort13_path, os.path.join(output_dir, "fort.13"))
+    if mannings_n is not None:
+        # friction-sensitivity cells (see adforce/eval/tidal_diagnosis.md):
+        # rewrite the uniform default Manning's n, keep per-node overrides
+        from adforce.fort13 import write_mannings_default
+
+        write_mannings_default(
+            fort13_path, os.path.join(output_dir, "fort.13"), float(mannings_n)
+        )
+    else:
+        shutil.copy(fort13_path, os.path.join(output_dir, "fort.13"))
 
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"

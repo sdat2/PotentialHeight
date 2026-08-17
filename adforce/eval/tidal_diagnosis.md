@@ -65,17 +65,38 @@ excluded, but it would not naturally produce band-selective amplification
 with this phase structure; M2 sitting near 1.0 argues the boundary input is
 roughly right.
 
-## Recommended next experiment (cheap, decisive)
+## The experiment (plumbed and ready — run on GCP)
 
-Manning's-n sensitivity on tide-only runs — exactly what the eval matrix is
-for, once a friction axis is plumbed into input generation:
+The friction axis is wired end-to-end: `mannings_n` is an eval-side
+pseudo-axis (with `forcing`) in matrix cells; launch passes it through
+`drive_storm` → `generate_adcirc_inputs`, which writes a fort.13 whose
+uniform default is rewritten in place (per-node overrides untouched —
+verified: the n=0.028 variant differs from the shipped deck by exactly one
+line); provenance lands in the run's `config.yaml` under `eval_axes`, so a
+friction cell can never be confused with a control.
 
-1. regenerate fort.13 with n ∈ {0.022 (control), 0.028, 0.035}
-   (see `rerun/adcirc/make_fort13_low.py` lineage);
-2. tide-only runs, mid resolution, 2–3 storm windows (e.g. Katrina, Ida,
-   Matthew for a Florida semidiurnal check);
-3. `python -m adforce.eval.tidecheck` + `tideconst` per cell — success =
-   O1/K1 ratios → 1 and the phase lead shrinking without destroying M2.
+On the GCP VM (worstsurge container; ADCIRC-only allocation — ARCHER2 is
+retired):
+
+```bash
+python -m adforce.eval.launch study=mannings matrix=mannings_tide \
+    'storms=["Katrina 2005","Ida 2021","Matthew 2016"]'              # plan (9 runs)
+python -m adforce.eval.launch study=mannings matrix=mannings_tide \
+    'storms=["Katrina 2005","Ida 2021","Matthew 2016"]' dry_run=false
+# each run auto-reduces to gauge_ts.parquet and strips fort.63 afterwards
+```
+
+Locally, after `python -m adforce.eval.harvest remote=gcp-vm:... study=mannings dry_run=false`:
+
+```bash
+for n in 0.022 0.028 0.035; do
+  python -m adforce.eval.tidecheck "series=data/comp/runs/mannings/tide-n$n/*/gauge_ts.parquet" label=n$n
+  python -m adforce.eval.tideconst "series=data/comp/runs/mannings/tide-n$n/*/gauge_ts.parquet" label=n$n
+done
+```
+
+Success = O1/K1 amp ratios → 1 and the phase lead shrinking without
+destroying M2 (Matthew guards the Florida semidiurnal side).
 
 Also: exclude the TX-bay gauges from any tide-on skill panel (mesh, not
 physics — unfixable without inlet refinement), and treat `datum_offset_m`

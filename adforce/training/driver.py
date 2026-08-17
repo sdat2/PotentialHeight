@@ -67,6 +67,7 @@ def drive_storm(
     spinup_days: float = 0.0,
     recommended_dt: Optional[float] = None,
     no_subprocess: bool = False,
+    mannings_n: Optional[float] = None,
 ) -> str:
     """Generate inputs for ONE historical storm and (optionally) run it.
 
@@ -87,6 +88,8 @@ def drive_storm(
         spinup_days (float): Tidal spinup (6.0 for tidal modes in the sweeps).
         recommended_dt (Optional[float]): ADCIRC timestep [s].
         no_subprocess (bool): Only generate inputs; do not run ADCIRC.
+        mannings_n (Optional[float]): Override the fort.13 default Manning's
+            n (friction-sensitivity cells; None = the shipped deck's 0.022).
 
     Returns:
         str: ``run_directory``.
@@ -101,6 +104,7 @@ def drive_storm(
         wind=mode in ("storm", "both"),
         tides=mode in ("tide", "both"),
         spinup_days=spinup_days,
+        mannings_n=mannings_n,
     )
 
     storm_cfg = cfg.copy()

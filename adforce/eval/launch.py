@@ -46,14 +46,21 @@ from .status import RunStatus, run_status
 
 
 def _cell_from_overrides(overrides: dict, forcing: str = None) -> ConfigCell:
-    """Matrix overrides (wrap-tree paths) -> ConfigCell."""
+    """Matrix overrides -> ConfigCell.
+
+    Wrap-tree paths (``adcirc.*.value``) map onto the physical axes; the
+    pseudo-axes ``forcing`` (storm|tide|both) and ``mannings_n`` (fort.13
+    default override) are eval-side and never touch the wrap config.
+    """
     get = lambda axis, default: overrides.get(AXIS_PATHS[axis], default)
     tide = bool(get("tide", False))
+    mannings = overrides.get("mannings_n")
     return ConfigCell(
         resolution=str(get("resolution", "mid")),
         tide=tide,
         swan=bool(get("swan", False)),
-        forcing=forcing or ("both" if tide else "storm"),
+        forcing=str(forcing or overrides.get("forcing") or ("both" if tide else "storm")),
+        mannings_n=float(mannings) if mannings is not None else None,
     )
 
 
@@ -118,7 +125,7 @@ def plan(cfg: DictConfig) -> pd.DataFrame:
             elif not _deck_exists(cell.resolution):
                 action, reason = (
                     "blocked",
-                    f"no fort.14.{cell.resolution} deck in adforce/setup (ARCHER2-only?)",
+                    f"no fort.14.{cell.resolution} deck in adforce/setup",
                 )
             elif status is RunStatus.FOREIGN and not cfg.overwrite:
                 action, reason = "blocked", "run dir holds a different config (FOREIGN)"
@@ -204,6 +211,14 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
             OmegaConf.update(wrap_cfg, path, getattr(cell, axis), merge=False)
         os.makedirs(row.run_dir, exist_ok=True)
         OmegaConf.update(wrap_cfg.files, "run_folder", row.run_dir)
+        # eval-side axes recorded alongside the wrap config: provenance for
+        # friction cells and tide-only controls (see cells.provenance_match)
+        OmegaConf.update(
+            wrap_cfg,
+            "eval_axes",
+            {"forcing": cell.forcing, "mannings_n": cell.mannings_n},
+            force_add=True,
+        )
         OmegaConf.save(wrap_cfg, os.path.join(row.run_dir, "config.yaml"))
         entry = {
             f"{row.cell}/{row.slug}": dict(
@@ -222,6 +237,7 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
                 mode=cell.forcing,
                 spinup_days=_spinup(cfg, cell),
                 recommended_dt=cfg.recommended_dt,
+                mannings_n=cell.mannings_n,
             )
             status = run_status(row.run_dir, cell)
             if cfg.extract_after_run and status is RunStatus.SUCCESS:

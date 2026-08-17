@@ -933,6 +933,75 @@ def test_launch_plan_controls_and_blocked_cells(tmp_path):
     assert "fort.14.high" in reasons and "SWAN" in reasons
 
 
+def test_fort13_mannings_edit(tmp_path):
+    """Default-line rewrite: only that line changes; overrides untouched."""
+    from adforce.fort13 import read_mannings_default, write_mannings_default
+
+    src = tmp_path / "fort.13"
+    src.write_text(
+        "test mesh\n"
+        "5\n"
+        "2\n"
+        "sea_surface_height_above_geoid\n m\n 1\n 0.000000\n"
+        "mannings_n_at_sea_floor\n m\n 1\n 0.022000\n"
+        "sea_surface_height_above_geoid\n0\n"
+        "mannings_n_at_sea_floor\n2\n3 0.050000\n4 0.030000\n"
+    )
+    assert read_mannings_default(str(src)) == 0.022
+    dst = tmp_path / "fort.13.n0035"
+    write_mannings_default(str(src), str(dst), 0.035)
+    assert read_mannings_default(str(dst)) == 0.035
+    a, b = src.read_text().splitlines(), dst.read_text().splitlines()
+    assert [i for i, (x, y) in enumerate(zip(a, b)) if x != y] == [10]
+    assert "3 0.050000" in b  # per-node overrides preserved
+
+    # the shipped decks read as the documented control value
+    mid = os.path.join(str(REPO_ROOT), "adforce", "setup", "fort.13.mid")
+    if os.path.exists(mid):
+        assert read_mannings_default(mid) == 0.022
+
+
+def test_mannings_matrix_plan_and_provenance(tmp_path):
+    from omegaconf import OmegaConf
+
+    from adforce.eval.cells import ConfigCell, cell_id
+    from adforce.eval.launch import plan
+    from adforce.eval.status import SUCCESS_MARKER, RunStatus, run_status
+
+    assert cell_id(ConfigCell(tide=True, forcing="tide", mannings_n=0.028)) == (
+        "res-mid_tide-on_swan-off_f-tide_n0.028"
+    )
+
+    cfg = _launch_cfg(tmp_path, matrix="mannings_tide")
+    table = plan(cfg)
+    assert set(table.cell) == {"tide-n0.022", "tide-n0.028", "tide-n0.035"}
+    assert (table.action == "run").all()
+
+    # provenance: a run with matching eval_axes is SUCCESS for its own cell,
+    # FOREIGN for a different-n cell; a LEGACY dir (no eval_axes) can never
+    # satisfy a mannings/tide-only cell
+    cell = ConfigCell(resolution="mid", tide=True, forcing="tide", mannings_n=0.028)
+    run = tmp_path / "t" / "tide-n0.028" / "152_KATRINA_2005"
+    run.mkdir(parents=True)
+    base = {
+        "adcirc": {
+            "resolution": {"value": "mid"},
+            "tide": {"value": True},
+            "swan": {"value": False},
+        }
+    }
+    OmegaConf.save(
+        OmegaConf.create({**base, "eval_axes": {"forcing": "tide", "mannings_n": 0.028}}),
+        str(run / "config.yaml"),
+    )
+    (run / "slurm.out").write_text(SUCCESS_MARKER + "\n")
+    assert run_status(str(run), cell) is RunStatus.SUCCESS
+    other = ConfigCell(resolution="mid", tide=True, forcing="tide", mannings_n=0.035)
+    assert run_status(str(run), other) is RunStatus.FOREIGN
+    OmegaConf.save(OmegaConf.create(base), str(run / "config.yaml"))  # legacy dir
+    assert run_status(str(run), cell) is RunStatus.FOREIGN
+
+
 def test_config_hash_and_harvest_command(tmp_path):
     from omegaconf import OmegaConf
 

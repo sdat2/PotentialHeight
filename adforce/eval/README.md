@@ -151,13 +151,13 @@ against gauges and against each other, driven entirely by YAML under
 Example — low vs mid × tide on/off for two storms:
 
 ```bash
-# remote (ARCHER2/GCP): preview, then launch
+# remote (GCP spot VM): preview, then launch
 python -m adforce.eval.launch study=kat-ida matrix=res_x_tide \
     'storms=["Katrina 2005","Ida 2021"]'                    # dry run (default)
 python -m adforce.eval.launch study=kat-ida matrix=res_x_tide \
     'storms=["Katrina 2005","Ida 2021"]' dry_run=false controls=true
 # laptop:
-python -m adforce.eval.harvest remote=archer2:/work/.../exp/eval study=kat-ida dry_run=false
+python -m adforce.eval.harvest remote=gcp-vm:/work/exp/eval study=kat-ida dry_run=false
 python -m adforce.eval.pairs action=interaction res=mid \
     tide_series=... both_series=... out=data/comp/out/kat-ida_tsi.csv
 ```

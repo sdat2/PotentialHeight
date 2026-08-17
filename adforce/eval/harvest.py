@@ -1,6 +1,6 @@
 """Harvest the minimal artifact set of a remote sweep to the laptop.
 
-Runs execute on ARCHER2/GCP; scoring runs locally. Per run only the small
+Runs execute on GCP (spot VMs, docker); scoring runs locally. Per run only the small
 artifacts travel (~MBs instead of the 5-8 GB ``fort.63.nc``):
 ``config.yaml`` (provenance), ``gauge_ts.parquet`` (the science),
 ``fort.61.nc`` (station cross-check), ``maxele.63.nc`` (run health),
@@ -8,7 +8,7 @@ artifacts travel (~MBs instead of the 5-8 GB ``fort.63.nc``):
 
 Run (hydra; config root adforce/eval/config/harvest_config.yaml)::
 
-    python -m adforce.eval.harvest remote=archer2:/work/n02/n02/sithom/exp/eval study=kat-ida
+    python -m adforce.eval.harvest remote=gcp-vm:/work/exp/eval study=kat-ida
     python -m adforce.eval.harvest remote=... study=... dry_run=false
 """
 
