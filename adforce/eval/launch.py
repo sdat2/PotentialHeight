@@ -193,7 +193,15 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
     reduced to ``gauge_ts.parquet`` and stripped before the next starts when
     ``extract_after_run`` is set.
     """
+    from hydra.core.global_hydra import GlobalHydra
+
     from adforce.wrap import get_default_config  # runner imports stay local
+
+    # eval.launch is itself a @hydra.main app, but get_default_config() does
+    # its own hydra.initialize() for the WRAP config tree and throws
+    # "GlobalHydra is already initialized" otherwise. Our cfg object is fully
+    # composed by now, so clearing the app's hydra state is safe.
+    GlobalHydra.instance().clear()
 
     table = plan(cfg)
     todo = table[table.action == "run"]

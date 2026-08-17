@@ -1002,6 +1002,29 @@ def test_mannings_matrix_plan_and_provenance(tmp_path):
     assert run_status(str(run), cell) is RunStatus.FOREIGN
 
 
+def test_wrap_compose_inside_hydra_app_needs_clear():
+    """eval.launch (a @hydra.main app) calls wrap.get_default_config(), which
+    re-initializes hydra and threw "GlobalHydra is already initialized" on
+    the first real GCP launch (the dry-run path never composes the wrap
+    config, so local gates missed it). Reproduce the app state and pin the
+    clear-then-compose fix."""
+    from hydra import initialize
+    from hydra.core.global_hydra import GlobalHydra
+
+    from adforce.wrap import get_default_config
+
+    ctx = initialize(version_base=None, config_path="../adforce/eval/config")
+    ctx.__enter__()  # emulate being inside a running hydra app
+    try:
+        with pytest.raises(ValueError, match="GlobalHydra"):
+            get_default_config()
+        GlobalHydra.instance().clear()  # the launch() fix
+        cfg = get_default_config()
+        assert str(cfg.adcirc.resolution.value) in ("low", "mid", "high")
+    finally:
+        GlobalHydra.instance().clear()
+
+
 def test_config_hash_and_harvest_command(tmp_path):
     from omegaconf import OmegaConf
 
