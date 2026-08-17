@@ -1,0 +1,34 @@
+# Bottom-friction sensitivity on tide-only runs (mid resolution), take 2.
+# The Manning's-n sweep was a verified no-op: the decks carry NWP=0, so
+# fort.13 is never read and friction is fort.15's NOLIBF=2 hybrid line
+# `CF HBREAK FTHETA FGAMMA = 0.0025 1 10 0.333333` -- a uniform quadratic
+# coefficient with Manning-like scaling only below 1 m depth. friction_cf
+# rewrites that CF (control regenerated identically for apples-to-apples).
+# Hypothesis (adforce/eval/tidal_diagnosis.md): the near-resonant GoM
+# diurnal band (O1 +34%, K1 +18%, uniform phase lead) is under-damped at
+# CF=0.0025; doubling/tripling CF should pull O1/K1 toward 1 and shrink the
+# lead without destroying M2.
+axes: {}
+name_keys: {}
+exclude: []
+include: []
+cells:
+  - name: tide-cf0.0025 # control (= generated deck default)
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: true
+      forcing: tide
+      friction_cf: 0.0025
+  - name: tide-cf0.005
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: true
+      forcing: tide
+      friction_cf: 0.005
+  - name: tide-cf0.0075
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: true
+      forcing: tide
+      friction_cf: 0.0075
+baseline: tide-cf0.0025

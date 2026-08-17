@@ -65,33 +65,57 @@ excluded, but it would not naturally produce band-selective amplification
 with this phase structure; M2 sitting near 1.0 argues the boundary input is
 roughly right.
 
-## The experiment (plumbed and ready — run on GCP)
+## Update (2026-08-17): the Manning's-n sweep was a verified NO-OP — NWP=0
 
-The friction axis is wired end-to-end: `mannings_n` is an eval-side
+The 9-run GCP sweep (n ∈ {0.022, 0.028, 0.035} × {Katrina, Ida, Matthew})
+completed 9/9 and produced **byte-identical `gauge_ts.parquet`s across the
+three friction cells** (identical md5s). Root cause, read off the harvested
+decks: the generated fort.15 (and the static idealized decks alike) carry
+**`NWP = 0`** — ADCIRC is told there are no nodal attributes, so the copied
+fort.13 (and its Manning field) has NEVER been read by any run in this
+project. The live friction is fort.15's `NOLIBF=2` hybrid line:
+
+```
+CF HBREAK FTHETA FGAMMA = 0.0025 1 10 0.333333
+```
+
+i.e. a **uniform quadratic Cd = 0.0025 over the whole basin**, with the
+Manning-like depth scaling only engaging below HBREAK = 1 m — the Gulf
+shelf effectively runs at the deep-water default. This *strengthens* the
+under-damped-basin interpretation and redirects the experiment to fort.15's
+CF (`friction_cf` axis; the `mannings_n` axis is now blocked at plan time
+with a pointer here). Consolation prize: three byte-identical runs from
+three independent launches is a clean end-to-end determinism proof of the
+pipeline.
+
+## The experiment, take 2: friction_cf (fort.15 CF) — run on GCP
+
+The friction axis is wired end-to-end: `friction_cf` is an eval-side
 pseudo-axis (with `forcing`) in matrix cells; launch passes it through
-`drive_storm` → `generate_adcirc_inputs`, which writes a fort.13 whose
-uniform default is rewritten in place (per-node overrides untouched —
-verified: the n=0.028 variant differs from the shipped deck by exactly one
-line); provenance lands in the run's `config.yaml` under `eval_axes`, so a
-friction cell can never be confused with a control.
+`drive_storm` → `generate_adcirc_inputs`, which rewrites the generated
+fort.15's `CF HBREAK FTHETA FGAMMA` line in place (CF only, the other three
+kept — `adforce/fort15.py`, verified single-line diff on the harvested
+decks); provenance lands in the run's `config.yaml` under `eval_axes`, so a
+friction cell can never be confused with a control. `mannings_n` cells are
+refused at plan time AND at input generation (defense in depth).
 
 On the GCP VM (worstsurge container; ADCIRC-only allocation — ARCHER2 is
 retired):
 
 ```bash
-python -m adforce.eval.launch study=mannings matrix=mannings_tide \
+python -m adforce.eval.launch study=friction matrix=friction_tide \
     'storms=["Katrina 2005","Ida 2021","Matthew 2016"]'              # plan (9 runs)
-python -m adforce.eval.launch study=mannings matrix=mannings_tide \
+python -m adforce.eval.launch study=friction matrix=friction_tide \
     'storms=["Katrina 2005","Ida 2021","Matthew 2016"]' dry_run=false
 # each run auto-reduces to gauge_ts.parquet and strips fort.63 afterwards
 ```
 
-Locally, after `python -m adforce.eval.harvest remote=gcp-vm:... study=mannings dry_run=false`:
+Locally, after `python -m adforce.eval.harvest remote=gcp-vm:... study=friction dry_run=false`:
 
 ```bash
-for n in 0.022 0.028 0.035; do
-  python -m adforce.eval.tidecheck "series=data/comp/runs/mannings/tide-n$n/*/gauge_ts.parquet" label=n$n
-  python -m adforce.eval.tideconst "series=data/comp/runs/mannings/tide-n$n/*/gauge_ts.parquet" label=n$n
+for n in 0.0025 0.005 0.0075; do
+  python -m adforce.eval.tidecheck "series=data/comp/runs/friction/tide-cf$n/*/gauge_ts.parquet" label=cf$n
+  python -m adforce.eval.tideconst "series=data/comp/runs/friction/tide-cf$n/*/gauge_ts.parquet" label=cf$n
 done
 ```
 

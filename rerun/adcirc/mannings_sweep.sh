@@ -11,7 +11,7 @@
 # run_on_gcp.sh steps 1-2; spot VM is fine, the sweep resumes):
 #   BRANCH=refactor/adforce-eval bash mannings_sweep.sh
 # Then from the laptop:
-#   python -m adforce.eval.harvest remote=<vm>:/root/work/eval study=mannings dry_run=false
+#   python -m adforce.eval.harvest remote=<vm>:/root/work/eval study=${STUDY:-friction} dry_run=false
 #
 # Conventions inherited from hist_sweep.sh: the adcirc-ws:lowres prep image
 # (adcircpy + IBTrACS baked + aswip) and read-only subtree mounts of the fresh
@@ -57,19 +57,21 @@ MNT="-v /root/work:/work \
   -v $WS/adforce/eval:/opt/worstsurge/adforce/eval:ro \
   -v $WS/adforce/training:/opt/worstsurge/adforce/training:ro \
   -v $WS/adforce/fort13.py:/opt/worstsurge/adforce/fort13.py:ro \
+  -v $WS/adforce/fort15.py:/opt/worstsurge/adforce/fort15.py:ro \
   -v $WS/adforce/fort61.py:/opt/worstsurge/adforce/fort61.py:ro"
 
+MATRIX=${MATRIX:-friction_tide}; STUDY=${STUDY:-friction}
 mkdir -p /root/work/eval
 
 echo "=== dry-run plan ==="
 docker run --rm $MNT $IMG micromamba run -n ws \
-  python -m adforce.eval.launch study=mannings matrix=mannings_tide \
+  python -m adforce.eval.launch study=${STUDY:-friction} matrix=${MATRIX:-friction_tide} \
     "storms=$STORMS" runs_root=/work/eval || exit 1
 
 echo "=== launching (sequential; ~9 tidal runs) ==="
 docker run --rm --shm-size=8g --cap-add=SYS_PTRACE -e ADCIRC_NP=$NP $MNT \
   $IMG micromamba run -n ws \
-  python -m adforce.eval.launch study=mannings matrix=mannings_tide \
+  python -m adforce.eval.launch study=${STUDY:-friction} matrix=${MATRIX:-friction_tide} \
     "storms=$STORMS" runs_root=/work/eval dry_run=false \
   2>&1 | tee -a /root/mannings_sweep.log
 echo "MANNINGS-SWEEP-DONE disk: $(df -h / | tail -1 | awk '{print $5}')"

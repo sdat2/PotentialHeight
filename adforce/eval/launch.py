@@ -55,12 +55,14 @@ def _cell_from_overrides(overrides: dict, forcing: str = None) -> ConfigCell:
     get = lambda axis, default: overrides.get(AXIS_PATHS[axis], default)
     tide = bool(get("tide", False))
     mannings = overrides.get("mannings_n")
+    cf = overrides.get("friction_cf")
     return ConfigCell(
         resolution=str(get("resolution", "mid")),
         tide=tide,
         swan=bool(get("swan", False)),
         forcing=str(forcing or overrides.get("forcing") or ("both" if tide else "storm")),
         mannings_n=float(mannings) if mannings is not None else None,
+        friction_cf=float(cf) if cf is not None else None,
     )
 
 
@@ -120,7 +122,14 @@ def plan(cfg: DictConfig) -> pd.DataFrame:
             run_dir = os.path.join(_runs_root(cfg), str(cfg.study), name, slug)
             status = run_status(run_dir, cell)
             action, reason = "run", ""
-            if cell.swan:
+            if cell.mannings_n is not None:
+                action, reason = (
+                    "blocked",
+                    "mannings_n is a verified no-op (NWP=0 decks never read "
+                    "fort.13; 2026-08-17 sweep produced byte-identical cells) "
+                    "-- use friction_cf",
+                )
+            elif cell.swan:
                 action, reason = "blocked", "driver input generation has no SWAN staging"
             elif not _deck_exists(cell.resolution):
                 action, reason = (
@@ -239,7 +248,11 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
         OmegaConf.update(
             wrap_cfg,
             "eval_axes",
-            {"forcing": cell.forcing, "mannings_n": cell.mannings_n},
+            {
+                "forcing": cell.forcing,
+                "mannings_n": cell.mannings_n,
+                "friction_cf": cell.friction_cf,
+            },
             force_add=True,
         )
         OmegaConf.save(wrap_cfg, os.path.join(row.run_dir, "config.yaml"))
@@ -261,6 +274,7 @@ def launch(cfg: DictConfig) -> pd.DataFrame:
                 spinup_days=_spinup(cfg, cell),
                 recommended_dt=cfg.recommended_dt,
                 mannings_n=cell.mannings_n,
+                friction_cf=cell.friction_cf,
             )
             status = run_status(row.run_dir, cell)
             if cfg.extract_after_run and status is RunStatus.SUCCESS:

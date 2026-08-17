@@ -34,7 +34,8 @@ class ConfigCell:
     swan: bool = False  # SWAN wave coupling (padcswan)
     forcing: str = "storm"  # storm | tide | both (tide = wind-off control run)
     physics_tag: str = "default"  # opaque label for future physics variants
-    mannings_n: Optional[float] = None  # fort.13 default override (None = shipped 0.022)
+    mannings_n: Optional[float] = None  # fort.13 override -- VERIFIED NO-OP (NWP=0), blocked at plan time
+    friction_cf: Optional[float] = None  # fort.15 hybrid-friction CF override (None = generated 0.0025)
 
 
 def _onoff(b: bool) -> str:
@@ -55,6 +56,8 @@ def cell_id(c: ConfigCell) -> str:
     ]
     if c.mannings_n is not None:
         parts.append(f"n{c.mannings_n:g}")
+    if c.friction_cf is not None:
+        parts.append(f"cf{c.friction_cf:g}")
     if c.physics_tag != "default":
         parts.append(f"p-{c.physics_tag}")
     return "_".join(parts)
@@ -154,10 +157,12 @@ def provenance_match(run_cfg, cell: ConfigCell) -> bool:
         ):
             return False
         axes = run_cfg.get("eval_axes") or {}
-        if cell.mannings_n is not None:
-            got = axes.get("mannings_n")
-            if got is None or abs(float(got) - cell.mannings_n) > 1e-9:
-                return False
+        for field in ("mannings_n", "friction_cf"):
+            want = getattr(cell, field)
+            if want is not None:
+                got = axes.get(field)
+                if got is None or abs(float(got) - want) > 1e-9:
+                    return False
         if cell.forcing == "tide" and axes.get("forcing") != "tide":
             return False
         return True

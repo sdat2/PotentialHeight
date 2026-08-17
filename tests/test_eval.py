@@ -961,27 +961,39 @@ def test_fort13_mannings_edit(tmp_path):
         assert read_mannings_default(mid) == 0.022
 
 
-def test_mannings_matrix_plan_and_provenance(tmp_path):
+def test_mannings_cells_are_blocked_as_noop(tmp_path):
+    """The Manning's-n axis is a VERIFIED no-op (NWP=0 decks never read
+    fort.13 -- the 2026-08-17 GCP sweep produced byte-identical cells);
+    plan() must refuse it loudly instead of burning compute."""
+    from adforce.eval.launch import plan
+
+    table = plan(_launch_cfg(tmp_path, matrix="mannings_tide"))
+    assert set(table.cell) == {"tide-n0.022", "tide-n0.028", "tide-n0.035"}
+    assert (table.action == "blocked").all()
+    assert "friction_cf" in table.reason.iloc[0]
+
+
+def test_friction_matrix_plan_and_provenance(tmp_path):
     from omegaconf import OmegaConf
 
     from adforce.eval.cells import ConfigCell, cell_id
     from adforce.eval.launch import plan
     from adforce.eval.status import SUCCESS_MARKER, RunStatus, run_status
 
-    assert cell_id(ConfigCell(tide=True, forcing="tide", mannings_n=0.028)) == (
-        "res-mid_tide-on_swan-off_f-tide_n0.028"
+    assert cell_id(ConfigCell(tide=True, forcing="tide", friction_cf=0.005)) == (
+        "res-mid_tide-on_swan-off_f-tide_cf0.005"
     )
 
-    cfg = _launch_cfg(tmp_path, matrix="mannings_tide")
+    cfg = _launch_cfg(tmp_path, matrix="friction_tide")
     table = plan(cfg)
-    assert set(table.cell) == {"tide-n0.022", "tide-n0.028", "tide-n0.035"}
+    assert set(table.cell) == {"tide-cf0.0025", "tide-cf0.005", "tide-cf0.0075"}
     assert (table.action == "run").all()
 
-    # provenance: a run with matching eval_axes is SUCCESS for its own cell,
-    # FOREIGN for a different-n cell; a LEGACY dir (no eval_axes) can never
-    # satisfy a mannings/tide-only cell
-    cell = ConfigCell(resolution="mid", tide=True, forcing="tide", mannings_n=0.028)
-    run = tmp_path / "t" / "tide-n0.028" / "152_KATRINA_2005"
+    # provenance: matching eval_axes -> SUCCESS for its own cell, FOREIGN for
+    # a different-CF cell; a LEGACY dir (no eval_axes) can never satisfy a
+    # friction/tide-only cell
+    cell = ConfigCell(resolution="mid", tide=True, forcing="tide", friction_cf=0.005)
+    run = tmp_path / "t" / "tide-cf0.005" / "152_KATRINA_2005"
     run.mkdir(parents=True)
     base = {
         "adcirc": {
@@ -991,15 +1003,43 @@ def test_mannings_matrix_plan_and_provenance(tmp_path):
         }
     }
     OmegaConf.save(
-        OmegaConf.create({**base, "eval_axes": {"forcing": "tide", "mannings_n": 0.028}}),
+        OmegaConf.create(
+            {**base, "eval_axes": {"forcing": "tide", "friction_cf": 0.005}}
+        ),
         str(run / "config.yaml"),
     )
     (run / "slurm.out").write_text(SUCCESS_MARKER + "\n")
     assert run_status(str(run), cell) is RunStatus.SUCCESS
-    other = ConfigCell(resolution="mid", tide=True, forcing="tide", mannings_n=0.035)
+    other = ConfigCell(resolution="mid", tide=True, forcing="tide", friction_cf=0.0075)
     assert run_status(str(run), other) is RunStatus.FOREIGN
     OmegaConf.save(OmegaConf.create(base), str(run / "config.yaml"))  # legacy dir
     assert run_status(str(run), cell) is RunStatus.FOREIGN
+
+
+def test_fort15_friction_edit(tmp_path):
+    """CF rewrite keeps HBREAK/FTHETA/FGAMMA and the rest of the deck."""
+    from adforce.fort15 import read_friction_cf, write_friction_cf
+
+    src = tmp_path / "fort.15"
+    src.write_text(
+        "RUNDES\nRUNID\n"
+        "2   ! NOLIBF\n"
+        "0   ! NWP\n"
+        "0.0025 1 10 0.333333   ! CF HBREAK FTHETA FGAMMA\n"
+        "0.005   ! TAU0\n"
+    )
+    assert read_friction_cf(str(src)) == 0.0025
+    write_friction_cf(str(src), str(src), 0.0075)
+    assert read_friction_cf(str(src)) == 0.0075
+    line = src.read_text().splitlines()[4]
+    assert line.startswith("0.0075 1 10 0.333333")
+
+    # the shipped static deck reads as the documented default
+    static = os.path.join(
+        str(REPO_ROOT), "adforce", "setup", "fort.15.mid.notide"
+    )
+    if os.path.exists(static):
+        assert read_friction_cf(static) == 0.0025
 
 
 def test_wrap_compose_inside_hydra_app_needs_clear():
