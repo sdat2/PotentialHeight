@@ -745,6 +745,132 @@ def plot_city_key(
         )
 
 
+def plot_gauge_map(max_deg: float = 2.0) -> None:
+    """Geographic overview of the validation gauge panel.
+
+    One map: coastline, every CO-OPS gauge in the two selection boxes (open
+    = in the panel; filled = contributes >= 1 *valid* pair to
+    ``val_summary.csv``; red cross = documented KNOWN_FAILED instrument
+    loss), the Gulf/Florida selection boxes, and the three study cities with
+    the ``max_deg`` catchment circles used by :func:`plot_city_key`.
+    Distances are Euclidean in degrees, matching the selection metric.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    valid_sids = set(df[df.valid.astype(bool)].sid)
+    failed_sids = {sid for _, sid in C.KNOWN_FAILED}
+
+    plt = _setup_plt()
+    from sithom.plot import get_dim
+
+    try:  # coastline via cartopy when available; plain axes otherwise
+        import cartopy.crs as ccrs
+        import cartopy.feature as cfeature
+
+        fig = plt.figure(figsize=get_dim(ratio=0.45))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.add_feature(cfeature.LAND.with_scale("50m"), facecolor="0.92", zorder=0)
+        ax.add_feature(
+            cfeature.COASTLINE.with_scale("50m"), lw=0.5, edgecolor="0.4", zorder=1
+        )
+        gl = ax.gridlines(draw_labels=True, lw=0.3, alpha=0.4)
+        gl.top_labels = gl.right_labels = False
+        gl.xlabel_style = gl.ylabel_style = {"size": 6}
+    except Exception as e:  # pragma: no cover - cartopy/data availability
+        print(f"(no cartopy coastline: {e})")
+        fig, ax = plt.subplots(figsize=get_dim(ratio=0.45))
+        ax.set_xlabel("Longitude [$^\\circ$E]")
+        ax.set_ylabel("Latitude [$^\\circ$N]")
+        ax.grid(alpha=0.3)
+
+    for box, label, color in (
+        (C.GAUGE_BOX, "Gulf box", "tab:blue"),
+        (C.FLORIDA_BOX, "Florida box", "tab:green"),
+    ):
+        (lo0, lo1), (la0, la1) = box["lon"], box["lat"]
+        ax.plot(
+            [lo0, lo1, lo1, lo0, lo0],
+            [la0, la0, la1, la1, la0],
+            color=color,
+            lw=0.8,
+            ls=":",
+            label=label,
+            zorder=2,
+        )
+
+    seen = set()
+    for box in (C.GAUGE_BOX, C.FLORIDA_BOX):
+        for sid, name, lat, lon in gulf_gauges(box):
+            sid = str(sid)
+            if sid in seen:
+                continue
+            seen.add(sid)
+            if sid in valid_sids:
+                ax.plot(lon, lat, "o", ms=3.5, color="tab:orange", mec="k", mew=0.3, zorder=4)
+            else:
+                ax.plot(lon, lat, "o", ms=3, mfc="none", mec="0.5", mew=0.6, zorder=3)
+            if sid in failed_sids:
+                ax.plot(lon, lat, "x", ms=5, color="tab:red", mew=1.0, zorder=5)
+
+    theta = np.linspace(0, 2 * np.pi, 100)
+    for city, (clo, cla) in CITY_POINTS.items():
+        ax.plot(clo, cla, "*", ms=11, color="k", mec="w", mew=0.5, zorder=6)
+        ax.plot(
+            clo + max_deg * np.cos(theta),
+            cla + max_deg * np.sin(theta),
+            color="k",
+            lw=0.6,
+            ls="--",
+            alpha=0.6,
+            zorder=2,
+        )
+        # per-city offsets keep labels off the gauge dots (over open water /
+        # Lake Pontchartrain); New Orleans anchors right-aligned to its star
+        xytext, ha = {
+            "galveston": ((7, -12), "left"),
+            "new_orleans": ((-7, 9), "right"),
+            "miami": ((7, 6), "left"),
+        }[city]
+        ax.annotate(
+            city.replace("_", " ").title(),
+            (clo, cla),
+            textcoords="offset points",
+            xytext=xytext,
+            ha=ha,
+            fontsize=7,
+        )
+
+    # legend proxies (marker styles used above)
+    from matplotlib.lines import Line2D
+
+    handles = [
+        Line2D([], [], marker="o", ls="", ms=4, color="tab:orange", mec="k", mew=0.3,
+               label="Gauge with valid pairs"),
+        Line2D([], [], marker="o", ls="", ms=3.5, mfc="none", mec="0.5", label="Panel gauge (no valid pair)"),
+        Line2D([], [], marker="x", ls="", ms=5, color="tab:red", label="Known instrument failure"),
+        Line2D([], [], marker="*", ls="", ms=9, color="k", mec="w",
+               label=f"Study city (r={max_deg:g}$^\\circ$)"),
+    ]
+    handles += ax.get_legend_handles_labels()[0]
+    ax.legend(handles=handles, fontsize=5.5, loc="lower left", framealpha=0.9)
+    if hasattr(ax, "set_extent"):  # cartopy GeoAxes
+        ax.set_extent([-98.5, -78.5, 23.5, 31.8])
+    else:
+        ax.set_xlim(-98.5, -78.5)
+        ax.set_ylim(23.5, 31.8)
+    _savefig(
+        fig,
+        [
+            os.path.join(C.FIGURE_PATH, "val_gauge_map.png"),
+            os.path.join(C.PAPER_IMG_PATH, "comp_val_gauge_map.pdf"),
+        ],
+    )
+    plt.close(fig)
+
+
 _LEGACY_FLAGS = {
     "--storms": "'storms=[\"Ida 2021\"]'",
     "--examples-only": "validate.examples_only=true",
@@ -758,6 +884,9 @@ _LEGACY_FLAGS = {
 def main(cfg: DictConfig) -> None:
     C.ensure_dirs()
     v = cfg.validate
+    if v.gauge_map:
+        plot_gauge_map(max_deg=v.city_radius_deg)
+        return
     if v.city_key:
         plot_city_key(
             n_panels=v.n_city, refresh=v.refresh, max_deg=v.city_radius_deg
