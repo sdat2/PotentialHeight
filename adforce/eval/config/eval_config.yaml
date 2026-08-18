@@ -28,6 +28,7 @@ validate:
   gauge_map: false # geographic overview: gauges, selection boxes, city catchments
   city_maps: false # per-city zoomed maps with every gauge named (reference)
   gauge_key: null # list of gauge names -> per-gauge key-storm panels (no valid gate)
+  sharey: true # one y-axis scale across all panels of a figure (coauthor request)
 
 nulltest:
   lag: true # temporal-lag null (netCDF-heavy); --no-lag -> nulltest.lag=false

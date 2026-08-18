@@ -282,7 +282,7 @@ def test_regression_headline_numbers():
     # (regional bias -0.36 m), moving the pooled numbers from
     # bias -0.20 -> -0.22, r 0.885 -> 0.87.
     bias, rmse, r = metrics(clean)
-    assert len(clean) == 146
+    assert len(clean) == 147  # 146 + Katrina/Virginia Key (coast-to-coast Katrina, 2026-08)
     assert bias == pytest.approx(-0.22, abs=0.02)
     assert rmse == pytest.approx(0.50, abs=0.02)
     assert r == pytest.approx(0.871, abs=0.01)
@@ -301,7 +301,7 @@ def test_regression_per_storm_counts():
     # (regenerated 2026-07-05 with the fixed utide de-tiding)
     assert counts["Delta 2020"] == 21
     assert counts["Nicholas 2021"] == 10
-    assert counts["Katrina 2005"] == 4
+    assert counts["Katrina 2005"] == 5  # + Virginia Key (coast-to-coast Katrina)
 
 
 # --------------------------------------------------------------------------- #
@@ -474,13 +474,13 @@ def test_regression_population_and_methods():
     df["sid"] = df["sid"].astype(str)
     # 2026-07-26 three-city extension: 432 Gulf pairs (unchanged) + 35
     # Florida pairs over the 5 added storms
-    assert len(df) == 467
+    assert len(df) == 473  # 467 + 6 Katrina Florida-panel gauges
     assert df.storm.nunique() == 19
-    assert df.valid.sum() == 302
-    assert df.clean.sum() == 146
+    assert df.valid.sum() == 304  # +2 Katrina FL pairs (Virginia Key clean, one timing-missed)
+    assert df.clean.sum() == 147
     assert df.failed.sum() == 2
     methods = dict(df.method.value_counts())
-    assert methods.get("utide") == 445 and methods.get("pred") == 22
+    assert methods.get("utide") == 451 and methods.get("pred") == 22  # +6 Katrina FL gauges
 
 
 # --------------------------------------------------------------------------- #
@@ -1198,11 +1198,19 @@ def test_resolution_bias_reproduces_published():
     new_rt = pd.read_csv(buf)
     old = pd.read_csv(_RERUN_RB)
     assert list(new_rt.columns) == list(old.columns)
-    assert new_rt.shape == old.shape
-    np.testing.assert_allclose(
-        new_rt.select_dtypes("number").fillna(-999).values,
-        old.select_dtypes("number").fillna(-999).values,
-    )
+    # Katrina joined BOTH_BOX_STORMS after the artifact was published: the
+    # committed rows must survive byte-for-byte as a subset; the only
+    # additions allowed are Katrina Florida-panel gauges.
+    new_rt["sid"] = new_rt.sid.astype(str)
+    old["sid"] = old.sid.astype(str)
+    m = old.merge(new_rt, on=["storm", "sid"], suffixes=("_o", "_n"))
+    assert len(m) == len(old)
+    for col in old.select_dtypes("number").columns:
+        np.testing.assert_allclose(
+            m[f"{col}_n"].fillna(-999), m[f"{col}_o"].fillna(-999)
+        )
+    extra = new_rt.merge(old[["storm", "sid"]], on=["storm", "sid"], how="left", indicator=True)
+    assert set(extra[extra._merge == "left_only"].storm) <= {"Katrina 2005"}
 
 
 @pytest.mark.skipif(

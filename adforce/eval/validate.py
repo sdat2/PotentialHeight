@@ -395,9 +395,16 @@ def _setup_plt():
 
 def _savefig(fig, paths: List[str]) -> None:
     """Save one figure to several paths (e.g. a quick-look PNG and a paper PDF).
+    Every ``.png`` quick-look also gets a vector ``.pdf`` sibling beside it in
+    the repo, in addition to any thesis-tree copy already in ``paths``.
     Figures are sized via sithom.get_dim to the LaTeX text width, so they are
     included at width=\\linewidth with no rescaling (and thus no font-size drift)."""
+    all_paths = []
     for p in paths:
+        all_paths.append(p)
+        if p.endswith(".png") and p[:-4] + ".pdf" not in paths:
+            all_paths.append(p[:-4] + ".pdf")
+    for p in all_paths:
         fig.savefig(p, bbox_inches="tight")
         print(f"wrote {p}")
 
@@ -456,12 +463,15 @@ def plot_examples(
     ncol: int = 2,
     refresh: bool = False,
     extra_titles: Optional[Dict[Tuple[str, str], str]] = None,
+    sharey: bool = True,
 ) -> None:
     """Plot simulated surge vs de-tided observed residual for chosen (storm, gauge).
 
     ``panels`` is a list of ``(storm, gauge_name)`` tuples. The per-storm series are
     loaded from the time-series cache (:func:`load_storm_series`), so regenerating this
     figure is instant once the cache exists; pass ``refresh=True`` to rebuild it.
+    ``sharey`` (default) puts every panel on one y scale so amplitudes compare
+    across panels; disable via ``validate.sharey=false`` for detail views.
     """
     plt = _setup_plt()
     import matplotlib.dates as mdates
@@ -470,7 +480,9 @@ def plot_examples(
     cache: Dict[str, Dict[str, tuple]] = {}
     nrow = int(np.ceil(len(panels) / ncol))
     # taller (ratio ~1) for the stacked rows; wider 2-col panels give the date axis room.
-    fig, axes = plt.subplots(nrow, ncol, figsize=get_dim(ratio=0.95), squeeze=False)
+    fig, axes = plt.subplots(
+        nrow, ncol, figsize=get_dim(ratio=0.95), squeeze=False, sharey=sharey
+    )
     extra_titles = extra_titles or {}
     for i, (ax, (storm, gname)) in enumerate(zip(axes.ravel(), panels)):
         letter = f"({chr(97 + i)}) "  # panel id in the (left) title -> no label clash
@@ -495,7 +507,8 @@ def plot_examples(
         rtxt += extra_titles.get((storm, gname), "")
         gauge = match[0][:24].rstrip(", ")  # trim long names without a dangling comma
         ax.set_title(f"{letter}{storm}: {gauge}{rtxt}", fontsize=7, loc="left")
-        ax.set_ylabel("Surge [m]")
+        if not sharey or i % ncol == 0:  # shared scale: label the left column only
+            ax.set_ylabel("Surge [m]")
         ax.grid(alpha=0.3)
         # few, short date ticks ("Aug 24") instead of ~10 crowded "2005-08-24" labels
         ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=3, maxticks=5))
@@ -1197,6 +1210,7 @@ def main(cfg: DictConfig) -> None:
                 os.path.join(C.PAPER_IMG_PATH, "comp_val_examples.pdf"),
             ],
             refresh=v.refresh,
+            sharey=v.sharey,
         )
         return
     run(list(cfg.storms) if cfg.storms else None)

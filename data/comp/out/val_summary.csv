@@ -273,16 +273,22 @@ Katrina 2005,8760922,"Pilots Station East, S.W. Pass",open-coast,0.013,1.15,1.87
 Katrina 2005,8735180,Dauphin Island,open-coast,0.009,0.91,1.64,-0.9,0.932,0.267,178,utide,178,False,False,True,True
 Katrina 2005,8729840,Pensacola,open-coast,0.01,0.69,1.61,0.1,0.937,0.349,178,utide,178,False,False,True,True
 Katrina 2005,8761724,Grand Isle,open-coast,0.037,0.46,1.4,-2.9,-0.129,0.419,178,utide,178,False,False,True,True
+Katrina 2005,8723214,Virginia Key,open-coast,0.027,0.29,0.53,1.1,0.766,0.056,178,utide,178,False,False,True,True
 Katrina 2005,8729210,Panama City Beach,open-coast,0.006,0.41,0.97,-7.9,0.893,0.292,178,utide,178,False,False,True,False
 Katrina 2005,8728690,Apalachicola,open-coast,0.005,0.33,0.85,-23.9,0.875,0.292,178,utide,178,False,False,True,False
 Katrina 2005,8729108,Panama City,open-coast,0.002,0.41,0.83,-6.9,0.869,0.258,178,utide,178,False,False,True,False
 Katrina 2005,8770971,Rollover Pass,open-coast,0.048,0.13,0.53,8.1,-0.088,0.226,174,pred,212,False,False,True,False
+Katrina 2005,8720030,Fernandina Beach,open-coast,0.048,0.08,0.44,96.1,0.081,0.148,178,utide,178,False,False,True,False
 Katrina 2005,8768094,Calcasieu Pass,open-coast,0.035,0.15,0.43,28.1,-0.164,0.198,178,utide,178,False,False,True,False
 Katrina 2005,8771450,Galveston Pier 21,open-coast,0.051,0.11,0.42,20.1,0.014,0.17,178,utide,178,False,False,True,False
 Katrina 2005,8771341,"Galveston Bay Entrance, North Jetty",semi-enclosed,0.018,0.11,0.38,10.1,-0.046,0.161,178,utide,178,False,False,False,False
 Katrina 2005,8766072,Freshwater Canal Locks,semi-enclosed,0.029,0.18,0.37,29.1,0.2,0.173,149,pred,168,False,False,False,False
+Katrina 2005,8723970,"Vaca Key, Florida Bay",semi-enclosed,0.038,0.14,0.36,8.1,-0.121,0.105,178,utide,178,False,False,False,False
+Katrina 2005,8724580,Key West,open-coast,0.021,0.21,0.36,-5.9,-0.396,0.15,178,utide,178,False,False,False,False
+Katrina 2005,8720218,Mayport (Bar Pilots Dock),semi-enclosed,0.039,0.07,0.35,96.1,0.089,0.12,178,utide,178,False,False,False,False
 Katrina 2005,8775237,Port Aransas,open-coast,0.069,0.08,0.34,21.1,0.696,0.126,178,pred,216,False,False,False,False
 Katrina 2005,8773701,Port O'Connor,open-coast,0.114,0.09,0.24,22.1,0.758,0.078,133,pred,167,False,False,False,False
+Katrina 2005,8721604,"Trident Pier, Port Canaveral",open-coast,0.053,0.05,0.24,77.1,0.19,0.091,178,utide,178,False,False,False,False
 Katrina 2005,8775792,Packery Channel,semi-enclosed,0.083,0.08,0.19,27.1,0.729,0.07,176,pred,213,False,False,False,False
 Katrina 2005,8762075,"Port Fourchon, Belle Pass",open-coast,0.056,0.37,0.08,91.1,0.52,0.047,48,utide,48,False,False,False,False
 Laura 2020,8768094,Calcasieu Pass,open-coast,0.035,2.41,2.45,0.1,0.796,0.215,220,utide,220,False,False,True,True
