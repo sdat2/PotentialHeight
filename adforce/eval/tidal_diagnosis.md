@@ -122,6 +122,41 @@ done
 Success = O1/K1 amp ratios → 1 and the phase lead shrinking without
 destroying M2 (Matthew guards the Florida semidiurnal side).
 
+## Take-2 results (2026-08-18): friction is the semidiurnal knob, not the diurnal one
+
+9/9 runs (CF verified in each harvested deck; the cf0.0025 control's Katrina
+parquet is byte-identical to the mannings-sweep runs — a fourth independent
+determinism check). 153 scored pairs per cell:
+
+| CF | bulk amp | bulk lag | M2 | S2 | N2 | K1 | O1 | r |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.0025 (control) | 1.43 | −36 min | 1.15 | 1.44 | 1.60 | 1.20 | 1.39 | 0.884 |
+| 0.005 | 1.32 | −24 min | **1.05** | 1.34 | 1.59 | 1.13 | 1.34 | 0.880 |
+| 0.0075 | 1.30 | −18 min | **0.98** | 1.24 | 1.56 | 1.11 | **1.34** | 0.872 |
+
+Friction acts exactly as the under-damped hypothesis predicted — amplitudes
+down, phase leads shrink, correlation unharmed — **but band-selectively**:
+
+* the **semidiurnal band is friction-controlled**: M2 is fully corrected at
+  3×CF (1.15 → 0.98; q25 already 0.77 — over-damping begins), S2 −0.20,
+  all phase leads roughly halved;
+* the **diurnal band saturates**: O1 drops 1.39 → 1.34 on the first doubling
+  and then stops; K1 similarly (1.20 → 1.11). The residual ≈ +30% O1 /
+  +11% K1 is **friction-insensitive** — consistent with the GoM's diurnal
+  amplitude being set by the basin's admittance through the Yucatan/Florida
+  straits (Helmholtz-like) and/or HAMTIDE's diurnal boundary amplitudes,
+  not by shelf dissipation.
+
+**Verdict.** (1) CF ≈ 0.005 is the tide-side sweet spot (M2 ≈ 1.05, leads
+halved, nothing over-damped). (2) The remaining diurnal bias needs a
+boundary-side check — compare HAMTIDE O1/K1 boundary amplitudes against
+TPXO/observations, or run one cell with an alternative tidal database —
+and until then should be treated as a known, quantified bias (~+34% O1).
+(3) **Do not change CF for surge runs without re-validating surge**: the
+published surge skill (bias −0.22 m, r 0.871) was obtained at CF = 0.0025;
+any friction change perturbs it, so a surge cell (storm-only, cf0.005) must
+go through `adforce.eval.validate`-equivalent scoring before adoption.
+
 Also: exclude the TX-bay gauges from any tide-on skill panel (mesh, not
 physics — unfixable without inlet refinement), and treat `datum_offset_m`
 as a reported result everywhere (never absorb it silently).
