@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 
 from . import constants as C
-from .validate import metrics, timeseries_skill, validate_storm, within_storm_r
+from .validate import metrics, storm_gauges, timeseries_skill, validate_storm, within_storm_r
 from .coops import gulf_gauges
 
 warnings.filterwarnings("ignore")
@@ -144,7 +144,7 @@ def lag_curve(
     for storm, fname in items.items():
         try:
             # per-storm gauge region (Gulf vs Florida), matching adforce.eval.validate
-            _, series = validate_storm(storm, fname, gulf_gauges(C.box_for(storm)))
+            _, series = validate_storm(storm, fname, storm_gauges(storm))
         except Exception as e:  # pragma: no cover
             print(f"!! {storm}: {e}")
             continue

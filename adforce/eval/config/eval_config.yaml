@@ -27,6 +27,7 @@ validate:
   city_radius_deg: 2.0 # gauges within this distance of the city qualify for its panel
   gauge_map: false # geographic overview: gauges, selection boxes, city catchments
   city_maps: false # per-city zoomed maps with every gauge named (reference)
+  gauge_key: null # list of gauge names -> per-gauge key-storm panels (no valid gate)
 
 nulltest:
   lag: true # temporal-lag null (netCDF-heavy); --no-lag -> nulltest.lag=false

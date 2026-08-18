@@ -101,8 +101,16 @@ FLORIDA_STORMS = {
 }
 
 
+# Storms whose track crosses BOTH study regions (Katrina: Cat-1 across Miami
+# before the Gulf landfall): scored against the union of the two gauge panels
+# (see validate.storm_gauges; their cache tag carries box "both").
+BOTH_BOX_STORMS = {"Katrina 2005"}
+
+
 def box_for(storm: str) -> dict:
-    """Gauge-selection box for a storm (Florida storms use FLORIDA_BOX)."""
+    """Gauge-selection box for a storm (Florida storms use FLORIDA_BOX).
+    BOTH_BOX_STORMS are handled upstream (validate.storm_gauges) -- this
+    returns their PRIMARY (Gulf) box for any single-box caller."""
     return FLORIDA_BOX if storm in FLORIDA_STORMS else GAUGE_BOX
 
 

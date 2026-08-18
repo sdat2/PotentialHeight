@@ -133,11 +133,13 @@ def _ts_cache_tag(storm: str) -> str:
     node-selection *code* (not just these constants) changes, to invalidate stale caches.
     The gauge-selection box is per-storm (Gulf vs Florida, ``C.box_for``); for the
     original Gulf storms the tag string is byte-identical to the single-box era, so
-    their caches stay valid.
+    their caches stay valid. BOTH_BOX_STORMS (Katrina) carry the tag "both" --
+    a deliberate cache rotation when the storm gained the union panel (2026-08).
     """
+    box = "both" if storm in C.BOTH_BOX_STORMS else C.box_for(storm)
     return (
         f"v1|deg{C.MAX_NODE_DEG}|wet{C.WET_MIN_M}|knn{C.KNN}"
-        f"|ut{C.UTIDE_MIN_SAMPLES}|box{C.box_for(storm)}"
+        f"|ut{C.UTIDE_MIN_SAMPLES}|box{box}"
     )
 
 
@@ -206,6 +208,21 @@ def load_storm_series(
             return cached
     _, series = validate_storm(storm, fname, gauges)
     return series
+
+
+def storm_gauges(storm: str) -> List[Gauge]:
+    """Gauge panel for a storm: its region box, or the union of both panels
+    for ``C.BOTH_BOX_STORMS`` (Katrina crossed Miami before the Gulf
+    landfall, so it is scored coast-to-coast)."""
+    if storm in C.BOTH_BOX_STORMS:
+        seen, out = set(), []
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX):
+            for g in gulf_gauges(box):
+                if g[0] not in seen:
+                    seen.add(g[0])
+                    out.append(g)
+        return out
+    return gulf_gauges(C.box_for(storm))
 
 
 def validate_storm(
@@ -461,7 +478,7 @@ def plot_examples(
             cache[storm] = load_storm_series(
                 storm,
                 C.STORMS[storm],
-                gulf_gauges(C.box_for(storm)),  # per-storm region (Gulf/Florida)
+                storm_gauges(storm),  # per-storm region (or both for Katrina)
                 refresh=refresh,
             )
         match = [k for k in cache[storm] if gname.lower() in k.lower()]
@@ -551,7 +568,7 @@ def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
         try:
             # per-storm gauge region: Gulf storms keep the original box (and
             # their cached series); Florida storms score the Miami-region coast
-            r, _ = validate_storm(storm, fname, gulf_gauges(C.box_for(storm)))
+            r, _ = validate_storm(storm, fname, storm_gauges(storm))
         except Exception as e:  # pragma: no cover
             print(f"!! {storm}: {e}")
             continue
@@ -1027,9 +1044,10 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
                 str(k),
                 (lo, la),
                 textcoords="offset points",
-                xytext=(3, 3),
+                xytext=(1.5, 1.5),
                 fontsize=5.5,
                 fontweight="bold",
+                alpha=0.7,
                 zorder=7,
                 path_effects=[pe.withStroke(linewidth=1.4, foreground="white")],
             )
@@ -1091,6 +1109,56 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
         plt.close(fig)
 
 
+def plot_gauge_key(
+    gauge_names, n_panels: int = 6, refresh: bool = False
+) -> None:
+    """Per-gauge KEY-event panels: the largest observed surges at chosen
+    city-analogue gauges (e.g. Shell Beach / Virginia Key / Galveston Pier
+    21), one panel per storm, rendered with the standard example-panel
+    plotter. Unlike the skill scoring this does NOT apply the valid gate --
+    small-surge storms are shown (Virginia Key would otherwise keep a
+    single storm) -- but the 48 h window-artifact guard still applies.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    for gname in gauge_names:
+        sub = (
+            df[
+                df.name.str.contains(gname, case=False, regex=False)
+                & ~df.failed.astype(bool)
+                & (df.peak_dt_hr.abs() <= 48.0)
+            ]
+            .sort_values("obs_peak", ascending=False)
+            .drop_duplicates("storm")
+            .head(n_panels)
+        )
+        if sub.empty:
+            print(f"(no pairs for gauge {gname!r})")
+            continue
+        panels = list(zip(sub.storm, sub.name))
+        extra = {
+            (r.storm, r.name): f" $\\Delta${r.sim_peak - r.obs_peak:+.2f} m"
+            for r in sub.itertuples()
+        }
+        print(
+            f"{gname}: "
+            + "; ".join(f"{st} (obs {o:.2f} m)" for (st, _), o in zip(panels, sub.obs_peak))
+        )
+        slug = gname.lower().replace(" ", "_").replace(",", "")
+        plot_examples(
+            panels,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_gauge_key_{slug}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_gauge_key_{slug}.pdf"),
+            ],
+            refresh=refresh,
+            extra_titles=extra,
+        )
+
+
 _LEGACY_FLAGS = {
     "--storms": "'storms=[\"Ida 2021\"]'",
     "--examples-only": "validate.examples_only=true",
@@ -1104,6 +1172,9 @@ _LEGACY_FLAGS = {
 def main(cfg: DictConfig) -> None:
     C.ensure_dirs()
     v = cfg.validate
+    if v.gauge_key:
+        plot_gauge_key(list(v.gauge_key), n_panels=v.n_city, refresh=v.refresh)
+        return
     if v.gauge_map:
         plot_gauge_map(max_deg=v.city_radius_deg)
         return

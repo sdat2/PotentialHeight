@@ -548,13 +548,18 @@ def test_cache_tag_matches_legacy_literal():
     slip would silently invalidate every cached utide fit and re-hammer CO-OPS."""
     from adforce.eval.validate import _ts_cache_tag
 
-    assert _ts_cache_tag("Katrina 2005") == (
+    assert _ts_cache_tag("Ida 2021") == (  # Gulf-box storm
         "v1|deg0.12|wet0.3|knn60|ut2000"
         "|box{'lon': (-97.6, -84.0), 'lat': (27.3, 30.9)}"
     )
     assert _ts_cache_tag("Irma 2017") == (  # Florida-box storm
         "v1|deg0.12|wet0.3|knn60|ut2000"
         "|box{'lon': (-82.3, -79.7), 'lat': (24.4, 30.8)}"
+    )
+    # Katrina joined BOTH_BOX_STORMS (coast-to-coast panel, 2026-08): its tag
+    # deliberately rotated to "both" so the single-box-era cache cannot serve
+    assert _ts_cache_tag("Katrina 2005") == (
+        "v1|deg0.12|wet0.3|knn60|ut2000|boxboth"
     )
 
 
