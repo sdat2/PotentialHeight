@@ -864,8 +864,17 @@ def plot_gauge_map(max_deg: float = 2.0) -> None:
                 ax.plot(lon, lat, "x", ms=5, color="tab:red", mew=1.0, zorder=5)
 
     theta = np.linspace(0, 2 * np.pi, 100)
+    try:  # the mesh node each city point snaps to (wrap.observe_max_point)
+        _mlon, _mlat, _, _ = _read_fort14()
+        _tree = cKDTree(np.c_[_mlon, _mlat])
+    except Exception:
+        _tree = None
     for city, (clo, cla) in CITY_POINTS.items():
-        ax.plot(clo, cla, "*", ms=11, color="k", mec="w", mew=0.5, zorder=6)
+        ax.plot(clo, cla, "*", ms=11, color="k", mec="w", mew=0.5, alpha=0.7, zorder=6)
+        if _tree is not None:
+            _i = int(_tree.query([clo, cla])[1])
+            ax.plot(_mlon[_i], _mlat[_i], "^", ms=6, color="tab:purple",
+                    mec="k", mew=0.3, alpha=0.7, zorder=6)
         ax.plot(
             clo + max_deg * np.cos(theta),
             cla + max_deg * np.sin(theta),
@@ -899,8 +908,10 @@ def plot_gauge_map(max_deg: float = 2.0) -> None:
                label="Gauge with valid pairs"),
         Line2D([], [], marker="o", ls="", ms=3.5, mfc="none", mec="0.5", label="Panel gauge (no valid pair)"),
         Line2D([], [], marker="x", ls="", ms=5, color="tab:red", label="Known instrument failure"),
-        Line2D([], [], marker="*", ls="", ms=9, color="k", mec="w",
+        Line2D([], [], marker="*", ls="", ms=9, color="k", mec="w", alpha=0.7,
                label=f"Study city (r={max_deg:g}$^\\circ$)"),
+        Line2D([], [], marker="^", ls="", ms=6, color="tab:purple", mec="k",
+               alpha=0.7, label="Model observation node"),
     ]
     handles += ax.get_legend_handles_labels()[0]
     ax.legend(handles=handles, fontsize=5.5, loc="lower left", framealpha=0.9)
@@ -967,7 +978,14 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
             cs = _draw_mesh_bathymetry(ax, plt, edges=True)
 
         m = max_deg + 0.45
-        ax.plot(clo, cla, "*", ms=13, color="k", mec="w", mew=0.5, zorder=6)
+        ax.plot(clo, cla, "*", ms=13, color="k", mec="w", mew=0.5, alpha=0.7, zorder=6)
+        try:  # the mesh node this city point snaps to (wrap.observe_max_point)
+            _mlon, _mlat, _, _ = _read_fort14()
+            _i = int(cKDTree(np.c_[_mlon, _mlat]).query([clo, cla])[1])
+            ax.plot(_mlon[_i], _mlat[_i], "^", ms=8, color="tab:purple",
+                    mec="k", mew=0.4, alpha=0.7, zorder=6)
+        except Exception:
+            pass
         theta = np.linspace(0, 2 * np.pi, 100)
         ax.plot(
             clo + max_deg * np.cos(theta),
@@ -1014,6 +1032,25 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
                 fontsize=5,
                 zorder=7,
             )
+        from matplotlib.lines import Line2D
+
+        ax.legend(
+            handles=[
+                Line2D([], [], marker="o", ls="", ms=4, color="tab:orange", mec="k",
+                       mew=0.3, alpha=0.7, label="Valid pairs"),
+                Line2D([], [], marker="o", ls="", ms=3.5, mfc="none", mec="0.5",
+                       alpha=0.7, label="No valid pair"),
+                Line2D([], [], marker="x", ls="", ms=5, color="tab:red",
+                       label="Instrument failure"),
+                Line2D([], [], marker="*", ls="", ms=10, color="k", mec="w",
+                       alpha=0.7, label="City point"),
+                Line2D([], [], marker="^", ls="", ms=6, color="tab:purple", mec="k",
+                       alpha=0.7, label="Model obs node"),
+            ],
+            fontsize=5.5,
+            loc="lower left",
+            framealpha=0.9,
+        )
         ax.set_title(
             f"{city.replace('_', ' ').title()} gauge panel "
             f"(r={max_deg:g}$^\\circ$; filled = valid pairs)",
