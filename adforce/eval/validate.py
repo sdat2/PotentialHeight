@@ -509,6 +509,7 @@ def plot_examples(
         ax.set_title(f"{letter}{storm}: {gauge}{rtxt}", fontsize=7, loc="left")
         if not sharey or i % ncol == 0:  # shared scale: label the left column only
             ax.set_ylabel("Surge [m]")
+        ax.margins(x=0)  # x-limits tight to the data, no margin
         ax.grid(alpha=0.3)
         # few, short date ticks ("Aug 24") instead of ~10 crowded "2005-08-24" labels
         ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=3, maxticks=5))
