@@ -635,7 +635,7 @@ def _draw_mesh_bathymetry(ax, plt, transform=None, edges: bool = True):
     ax.tricontourf(  # model land
         tri, depth, levels=[depth.min() - 1.0, 0.0], colors=["0.92"], zorder=0, **kw
     )
-    levels = [0, 5, 10, 20, 50, 100, 250, 500, 1000, 2000, 4500]
+    levels = [0, 2, 5, 10, 15, 20, 30, 50, 75, 100, 150, 250, 500, 1000, 2000, 3000, 4500]
     cs = ax.tricontourf(
         tri, depth, levels=levels, cmap="Blues", extend="max", zorder=0.4, alpha=0.85, **kw
     )
@@ -962,8 +962,11 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
             import cartopy.crs as ccrs
             import cartopy.feature as cfeature
 
-            fig = plt.figure(figsize=get_dim(ratio=0.85))
-            ax = plt.axes(projection=ccrs.PlateCarree())
+            fig = plt.figure(figsize=get_dim(ratio=1.05))
+            gs = fig.add_gridspec(2, 1, height_ratios=(4.0, 1.05), hspace=0.14)
+            ax = fig.add_subplot(gs[0], projection=ccrs.PlateCarree())
+            ax_key = fig.add_subplot(gs[1])
+            ax_key.axis("off")
             ax.add_feature(
                 cfeature.COASTLINE.with_scale("10m"), lw=0.5, edgecolor="0.35", zorder=1
             )
@@ -973,7 +976,11 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
             cs = _draw_mesh_bathymetry(ax, plt, transform=ccrs.PlateCarree(), edges=True)
         except Exception as e:  # pragma: no cover
             print(f"(no cartopy coastline: {e})")
-            fig, ax = plt.subplots(figsize=get_dim(ratio=0.85))
+            fig, (ax, ax_key) = plt.subplots(
+                2, 1, figsize=get_dim(ratio=1.05),
+                gridspec_kw={"height_ratios": (4.0, 1.05), "hspace": 0.14},
+            )
+            ax_key.axis("off")
             ax.grid(alpha=0.3)
             cs = _draw_mesh_bathymetry(ax, plt, edges=True)
 
@@ -996,42 +1003,53 @@ def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
             zorder=2,
         )
 
-        # gauges in extent, sorted by latitude for the label stagger
+        # gauges in extent, numbered west -> east: tiny numbers at the dots
+        # and a full-name index key under the map (long names never collide)
+        import matplotlib.patheffects as pe
+
         local = sorted(
             (
                 (sid, n, la, lo)
                 for sid, (n, la, lo) in gauges.items()
                 if abs(lo - clo) <= m and abs(la - cla) <= m
             ),
-            key=lambda t: -t[2],
+            key=lambda t: t[3],
         )
-        # cluster-indexed offset ladder: the k-th label inside a congested
-        # patch gets the k-th vertical offset, so e.g. the six Mobile-Bay
-        # gauges fan out instead of overprinting
-        DY = (3, 12, -11, 21, -20, 30, -29, 39)
-        placed = []
-        for sid, name, la, lo in local:
+        key_lines = []
+        for k, (sid, name, la, lo) in enumerate(local, start=1):
             if sid in valid_sids:
                 ax.plot(lo, la, "o", ms=4, color="tab:orange", mec="k", mew=0.3, alpha=0.7, zorder=4)
             else:
                 ax.plot(lo, la, "o", ms=3.5, mfc="none", mec="0.5", mew=0.6, alpha=0.7, zorder=3)
             if sid in failed_sids:
                 ax.plot(lo, la, "x", ms=6, color="tab:red", mew=1.0, zorder=5)
-            near = sum(
-                1 for pla, plo in placed if abs(pla - la) < 0.16 and abs(plo - lo) < 1.6
-            )
-            dy = DY[min(near, len(DY) - 1)]
-            ha = "right" if lo > clo + m - 0.75 else "left"  # keep inside the frame
-            placed.append((la, lo))
             ax.annotate(
-                name[:28].rstrip(", "),
+                str(k),
                 (lo, la),
                 textcoords="offset points",
-                xytext=(-5 if ha == "right" else 5, dy),
-                ha=ha,
-                fontsize=5,
+                xytext=(3, 3),
+                fontsize=5.5,
+                fontweight="bold",
                 zorder=7,
+                path_effects=[pe.withStroke(linewidth=1.4, foreground="white")],
             )
+            key_lines.append(f"{k:>2} {name[:30].rstrip(', ')}")
+        # index key in up to three columns in its own axes row
+        ncol_key = 3
+        per = int(np.ceil(len(key_lines) / ncol_key)) or 1
+        for c in range(ncol_key):
+            chunk = key_lines[c * per : (c + 1) * per]
+            if chunk:
+                ax_key.text(
+                    0.02 + 0.34 * c,
+                    1.0,
+                    "\n".join(chunk),
+                    fontsize=5.4,
+                    family="serif",
+                    va="top",
+                    ha="left",
+                    transform=ax_key.transAxes,
+                )
         from matplotlib.lines import Line2D
 
         ax.legend(
