@@ -668,6 +668,83 @@ def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
         )
 
 
+def plot_city_key(
+    n_panels: int = 4, refresh: bool = False, max_deg: float = 2.0
+) -> None:
+    """Per-city KEY-event panels: history vs the model at each study city.
+
+    For New Orleans, Galveston and Miami, select the ``n_panels`` *valid*
+    gauge-storm pairs with the largest OBSERVED peak surge within
+    ``max_deg`` degrees of that city (one panel per distinct storm -- the
+    region's defining historical events), and render observed de-tided
+    residual vs simulated surge with the standard example-panel plotter.
+    The headline "did the model capture this city's storm history" figure;
+    the complement of :func:`plot_failures` (which ranks by mismatch).
+
+    The radius matters: without it the nearest-city split assigns the whole
+    Atlantic seaboard to Miami, so "Miami" panels showed Fernandina Beach
+    (~500 km away). Note the panels are gauge-record-limited, not
+    meteorology-limited: Katrina's extreme-surge gauges failed or predate
+    the network, and Ida's two nearest gauges are documented KNOWN_FAILED
+    instrument losses, so those storms cannot headline their own city.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    coord = {
+        str(sid): (lon, lat)
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
+    df = df[df.sid.isin(coord)].copy()
+    lons = df.sid.map(lambda s: coord[s][0])
+    lats = df.sid.map(lambda s: coord[s][1])
+    for city, (clo, cla) in CITY_POINTS.items():
+        # gauges within max_deg of THIS city (cities may share none: the
+        # nearest-city split of plot_failures would hand the whole Atlantic
+        # coast to Miami); same |peak_dt| window-artifact guard as
+        # plot_failures; one panel per storm (the max-surge gauge of each)
+        # so the figure spans the region's distinct key events rather than
+        # four gauges of one landfall
+        dist = np.hypot(lons - clo, lats - cla)
+        sub = (
+            df[
+                df.valid.astype(bool)
+                & (dist <= max_deg)
+                & (df.peak_dt_hr.abs() <= 48.0)
+            ]
+            .sort_values("obs_peak", ascending=False)
+            .drop_duplicates("storm")
+            .head(n_panels)
+        )
+        if sub.empty:
+            print(f"(no valid pairs for {city})")
+            continue
+        panels = list(zip(sub.storm, sub.name))
+        extra = {
+            (r.storm, r.name): f" $\\Delta${r.sim_peak - r.obs_peak:+.2f} m"
+            for r in sub.itertuples()
+        }
+        print(
+            f"{city}: "
+            + "; ".join(
+                f"{s}/{g} (obs {o:.2f} m)"
+                for (s, g), o in zip(panels, sub.obs_peak)
+            )
+        )
+        plot_examples(
+            panels,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_city_key_{city}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_city_key_{city}.pdf"),
+            ],
+            refresh=refresh,
+            extra_titles=extra,
+        )
+
+
 _LEGACY_FLAGS = {
     "--storms": "'storms=[\"Ida 2021\"]'",
     "--examples-only": "validate.examples_only=true",
@@ -681,6 +758,11 @@ _LEGACY_FLAGS = {
 def main(cfg: DictConfig) -> None:
     C.ensure_dirs()
     v = cfg.validate
+    if v.city_key:
+        plot_city_key(
+            n_panels=v.n_city, refresh=v.refresh, max_deg=v.city_radius_deg
+        )
+        return
     if v.failures:
         plot_failures(n_panels=v.n_failures, refresh=v.refresh)
         return

@@ -22,6 +22,9 @@ validate:
   examples_only: false # only the example-panel figure, from cache (was --examples-only)
   failures: false # per-city worst-case panels from the cached sweep (was --failures)
   n_failures: 6 # panels per city for validate.failures=true (was --n-failures)
+  city_key: false # per-city KEY-event panels (largest observed surges; history vs model)
+  n_city: 4 # panels per city for validate.city_key=true
+  city_radius_deg: 2.0 # gauges within this distance of the city qualify for its panel
 
 nulltest:
   lag: true # temporal-lag null (netCDF-heavy); --no-lag -> nulltest.lag=false
