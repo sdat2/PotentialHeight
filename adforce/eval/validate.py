@@ -596,6 +596,53 @@ CITY_POINTS = {
     "miami": (-80.1918, 25.7617),
 }
 
+_MESH_CACHE: Dict[str, tuple] = {}
+
+
+def _read_fort14(resolution: str = "mid"):
+    """EC95d mesh from ``adforce/setup/fort.14.<res>`` as
+    ``(lon, lat, depth, triangles)`` (depth positive down; 0-based tris)."""
+    if resolution in _MESH_CACHE:
+        return _MESH_CACHE[resolution]
+    from adforce.constants import SETUP_PATH
+
+    path = os.path.join(SETUP_PATH, f"fort.14.{resolution}")
+    with open(path) as f:
+        f.readline()  # description
+        ne, npt = (int(v) for v in f.readline().split()[:2])
+        nodes = np.loadtxt((next(f) for _ in range(npt)), usecols=(1, 2, 3))
+        tris = (
+            np.loadtxt((next(f) for _ in range(ne)), dtype=int, usecols=(2, 3, 4)) - 1
+        )
+    _MESH_CACHE[resolution] = (nodes[:, 0], nodes[:, 1], nodes[:, 2], tris)
+    return _MESH_CACHE[resolution]
+
+
+def _draw_mesh_bathymetry(ax, plt, transform=None, edges: bool = True):
+    """Model bathymetry as the map base: tricontourf of fort.14 depth (Blues,
+    shallow light -> deep dark), model land (depth <= 0) in gray, and faint
+    element edges so mesh resolution is visible. Returns the contour set for
+    a colorbar, or None when the mesh is unavailable."""
+    try:
+        lon, lat, depth, tris = _read_fort14()
+    except Exception as e:  # pragma: no cover - deck availability
+        print(f"(no fort.14 mesh layer: {e})")
+        return None
+    import matplotlib.tri as mtri
+
+    kw = {"transform": transform} if transform is not None else {}
+    tri = mtri.Triangulation(lon, lat, tris)
+    ax.tricontourf(  # model land
+        tri, depth, levels=[depth.min() - 1.0, 0.0], colors=["0.92"], zorder=0, **kw
+    )
+    levels = [0, 5, 10, 20, 50, 100, 250, 500, 1000, 2000, 4500]
+    cs = ax.tricontourf(
+        tri, depth, levels=levels, cmap="Blues", extend="max", zorder=0.4, alpha=0.85, **kw
+    )
+    if edges:
+        ax.triplot(tri, color="0.5", lw=0.08, alpha=0.25, zorder=0.6, **kw)
+    return cs
+
 
 def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
     """Per-city worst-case example panels (robustness view).
@@ -772,19 +819,20 @@ def plot_gauge_map(max_deg: float = 2.0) -> None:
 
         fig = plt.figure(figsize=get_dim(ratio=0.45))
         ax = plt.axes(projection=ccrs.PlateCarree())
-        ax.add_feature(cfeature.LAND.with_scale("50m"), facecolor="0.92", zorder=0)
         ax.add_feature(
-            cfeature.COASTLINE.with_scale("50m"), lw=0.5, edgecolor="0.4", zorder=1
+            cfeature.COASTLINE.with_scale("50m"), lw=0.4, edgecolor="0.35", zorder=1
         )
         gl = ax.gridlines(draw_labels=True, lw=0.3, alpha=0.4)
         gl.top_labels = gl.right_labels = False
         gl.xlabel_style = gl.ylabel_style = {"size": 6}
+        cs = _draw_mesh_bathymetry(ax, plt, transform=ccrs.PlateCarree(), edges=False)
     except Exception as e:  # pragma: no cover - cartopy/data availability
         print(f"(no cartopy coastline: {e})")
         fig, ax = plt.subplots(figsize=get_dim(ratio=0.45))
         ax.set_xlabel("Longitude [$^\\circ$E]")
         ax.set_ylabel("Latitude [$^\\circ$N]")
         ax.grid(alpha=0.3)
+        cs = _draw_mesh_bathymetry(ax, plt, edges=False)
 
     for box, label, color in (
         (C.GAUGE_BOX, "Gulf box", "tab:blue"),
@@ -809,9 +857,9 @@ def plot_gauge_map(max_deg: float = 2.0) -> None:
                 continue
             seen.add(sid)
             if sid in valid_sids:
-                ax.plot(lon, lat, "o", ms=3.5, color="tab:orange", mec="k", mew=0.3, zorder=4)
+                ax.plot(lon, lat, "o", ms=3.5, color="tab:orange", mec="k", mew=0.3, alpha=0.7, zorder=4)
             else:
-                ax.plot(lon, lat, "o", ms=3, mfc="none", mec="0.5", mew=0.6, zorder=3)
+                ax.plot(lon, lat, "o", ms=3, mfc="none", mec="0.5", mew=0.6, alpha=0.7, zorder=3)
             if sid in failed_sids:
                 ax.plot(lon, lat, "x", ms=5, color="tab:red", mew=1.0, zorder=5)
 
@@ -861,6 +909,8 @@ def plot_gauge_map(max_deg: float = 2.0) -> None:
     else:
         ax.set_xlim(-98.5, -78.5)
         ax.set_ylim(23.5, 31.8)
+    if cs is not None:
+        fig.colorbar(cs, ax=ax, shrink=0.75, pad=0.02, label="Model depth [m]")
     _savefig(
         fig,
         [
@@ -869,6 +919,121 @@ def plot_gauge_map(max_deg: float = 2.0) -> None:
         ],
     )
     plt.close(fig)
+
+
+def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
+    """Per-city zoomed gauge maps with every gauge NAMED (reference figures).
+
+    One map per study city, extent = catchment circle + margin, each gauge
+    labelled with its CO-OPS name (orange = contributes valid pairs, open =
+    panel gauge without one, red cross = KNOWN_FAILED). Labels use a simple
+    greedy vertical stagger so dense clusters (e.g. the Mississippi coast)
+    stay legible.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    valid_sids = set(df[df.valid.astype(bool)].sid)
+    failed_sids = {sid for _, sid in C.KNOWN_FAILED}
+    gauges = {
+        str(sid): (name, lat, lon)
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
+
+    plt = _setup_plt()
+    from sithom.plot import get_dim
+
+    for city, (clo, cla) in CITY_POINTS.items():
+        try:
+            import cartopy.crs as ccrs
+            import cartopy.feature as cfeature
+
+            fig = plt.figure(figsize=get_dim(ratio=0.85))
+            ax = plt.axes(projection=ccrs.PlateCarree())
+            ax.add_feature(
+                cfeature.COASTLINE.with_scale("10m"), lw=0.5, edgecolor="0.35", zorder=1
+            )
+            gl = ax.gridlines(draw_labels=True, lw=0.3, alpha=0.4)
+            gl.top_labels = gl.right_labels = False
+            gl.xlabel_style = gl.ylabel_style = {"size": 6}
+            cs = _draw_mesh_bathymetry(ax, plt, transform=ccrs.PlateCarree(), edges=True)
+        except Exception as e:  # pragma: no cover
+            print(f"(no cartopy coastline: {e})")
+            fig, ax = plt.subplots(figsize=get_dim(ratio=0.85))
+            ax.grid(alpha=0.3)
+            cs = _draw_mesh_bathymetry(ax, plt, edges=True)
+
+        m = max_deg + 0.45
+        ax.plot(clo, cla, "*", ms=13, color="k", mec="w", mew=0.5, zorder=6)
+        theta = np.linspace(0, 2 * np.pi, 100)
+        ax.plot(
+            clo + max_deg * np.cos(theta),
+            cla + max_deg * np.sin(theta),
+            "k--",
+            lw=0.6,
+            alpha=0.6,
+            zorder=2,
+        )
+
+        # gauges in extent, sorted by latitude for the label stagger
+        local = sorted(
+            (
+                (sid, n, la, lo)
+                for sid, (n, la, lo) in gauges.items()
+                if abs(lo - clo) <= m and abs(la - cla) <= m
+            ),
+            key=lambda t: -t[2],
+        )
+        # cluster-indexed offset ladder: the k-th label inside a congested
+        # patch gets the k-th vertical offset, so e.g. the six Mobile-Bay
+        # gauges fan out instead of overprinting
+        DY = (3, 12, -11, 21, -20, 30, -29, 39)
+        placed = []
+        for sid, name, la, lo in local:
+            if sid in valid_sids:
+                ax.plot(lo, la, "o", ms=4, color="tab:orange", mec="k", mew=0.3, alpha=0.7, zorder=4)
+            else:
+                ax.plot(lo, la, "o", ms=3.5, mfc="none", mec="0.5", mew=0.6, alpha=0.7, zorder=3)
+            if sid in failed_sids:
+                ax.plot(lo, la, "x", ms=6, color="tab:red", mew=1.0, zorder=5)
+            near = sum(
+                1 for pla, plo in placed if abs(pla - la) < 0.16 and abs(plo - lo) < 1.6
+            )
+            dy = DY[min(near, len(DY) - 1)]
+            ha = "right" if lo > clo + m - 0.75 else "left"  # keep inside the frame
+            placed.append((la, lo))
+            ax.annotate(
+                name[:28].rstrip(", "),
+                (lo, la),
+                textcoords="offset points",
+                xytext=(-5 if ha == "right" else 5, dy),
+                ha=ha,
+                fontsize=5,
+                zorder=7,
+            )
+        ax.set_title(
+            f"{city.replace('_', ' ').title()} gauge panel "
+            f"(r={max_deg:g}$^\\circ$; filled = valid pairs)",
+            fontsize=8,
+        )
+        if hasattr(ax, "set_extent"):
+            ax.set_extent([clo - m, clo + m, cla - m, cla + m])
+        else:
+            ax.set_xlim(clo - m, clo + m)
+            ax.set_ylim(cla - m, cla + m)
+        if cs is not None:
+            fig.colorbar(cs, ax=ax, shrink=0.8, pad=0.02, label="Model depth [m]")
+        _savefig(
+            fig,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_gauge_map_{city}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_gauge_map_{city}.pdf"),
+            ],
+        )
+        plt.close(fig)
 
 
 _LEGACY_FLAGS = {
@@ -886,6 +1051,9 @@ def main(cfg: DictConfig) -> None:
     v = cfg.validate
     if v.gauge_map:
         plot_gauge_map(max_deg=v.city_radius_deg)
+        return
+    if v.city_maps:
+        plot_city_gauge_maps(max_deg=v.city_radius_deg)
         return
     if v.city_key:
         plot_city_key(
