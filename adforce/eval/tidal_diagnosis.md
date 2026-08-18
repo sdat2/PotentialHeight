@@ -160,3 +160,37 @@ go through `adforce.eval.validate`-equivalent scoring before adoption.
 Also: exclude the TX-bay gauges from any tide-on skill panel (mesh, not
 physics — unfixable without inlet refinement), and treat `datum_offset_m`
 as a reported result everywhere (never absorb it silently).
+
+## Final pieces (2026-08-18): boundary exonerated; surge vetoes the CF change
+
+**Surge sensitivity (friction_storm sweep; Laura + Ida paired, 22
+meaningful-surge gauges — Katrina storm-mode runs failed on a GAHM
+">4 isotachs per cycle" error from prep-image environment drift, a known
+issue):** doubling CF to 0.005 damps surge peaks by a **median −24%
+(−0.19 m)**, worsening peak bias from −0.09 to −0.20 m on this subset and
+degrading hydrograph skill (r 0.50 → 0.43). **The tide-side sweet spot is
+surge-side harmful: keep CF = 0.0025 for the surge/potential-height
+configuration.** Reconciling tides and surge in one deck needs
+spatially-varying friction — i.e. finally implementing NWP = 1 — or
+accepting the documented tide bias. (`data/comp/out/friction_surge_sensitivity.csv`)
+
+**Boundary check (`adforce.eval.tidedb`; model vs HAMTIDE vs NOAA harcon at
+39–49 gauges):** HAMTIDE's own Gulf field sits at **~+8% vs NOAA for every
+constituent** — the forcing database is exonerated. The model amplifies O1
+by +25% *relative to the HAMTIDE field that forces it* (model/ham: M2 1.00,
+K1 0.91, O1 1.25), and that amplification is friction-insensitive ⇒ it is
+the **EC95d basin response** (coarse Yucatan/Florida straits setting the
+diurnal Helmholtz admittance), fixable only by mesh/domain work. Two
+metric caveats sharpened here: harcon-K1 shows the model K1 is actually
+fine (≈0.95) — tideconst's K1 ≈ 1.2 was partly P1 leakage in 13-day fits —
+and S2 comparisons carry NOAA's radiational-S2 component.
+(`data/comp/out/tidedb_threeway.csv`)
+
+**Closing verdict.** The tidal error decomposes into: (a) a
+friction-controlled semidiurnal part — correctable (CF≈0.005) but vetoed by
+surge skill; (b) a friction-insensitive O1 basin response from the EC95d
+domain (~+25%) — a mesh property, to be reported as a known bias; (c) TX-bay
+gauges structurally unusable. For the paper's tide-excluded surge
+methodology none of this changes the published configuration — it
+*justifies* it: tides-off + de-tided-residual comparison sidesteps a tidal
+model whose basin response cannot be made accurate without mesh work.

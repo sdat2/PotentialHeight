@@ -1,0 +1,10 @@
+# Root config for python -m adforce.eval.tidedb (model vs HAMTIDE vs NOAA
+# harmonic-constituent three-way amplitude check).
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+model_csv: data/comp/out/tideconst_cf0.0025.csv # tideconst fits of the control tide-only cell
+constituents: [M2, S2, K1, O1]
+out: null # CSV path (null -> data/comp/out/tidedb_threeway.csv)
