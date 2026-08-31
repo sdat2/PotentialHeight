@@ -1,0 +1,20 @@
+# Root config for python -m adforce.eval.pairs (model-vs-model comparison).
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+action: resolution_bias # resolution_bias | interaction
+
+# resolution_bias inputs
+series: ??? # candidate-cell gauge-series parquet (long format)
+val_summary: null # baseline val_summary.csv (null -> data/comp/out/val_summary.csv)
+out: null # CSV to write
+min_obs_peak: 1.0 # pooled-ratio report threshold on observed peak [m]
+
+# interaction inputs
+res: low # resolution label for the output rows
+storm_series: null # storm-only gauge-series parquet (null -> archive fallback only)
+tide_series: null # tide-only gauge-series parquet
+both_series: null # storm+tide gauge-series parquet
+use_archive: true # fall back to HF-archive val_summary peaks for storm-only

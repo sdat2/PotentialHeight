@@ -1,0 +1,13 @@
+# Root config for python -m adforce.eval.tideconst (per-constituent tidal
+# diagnosis: model tide-only runs vs CO-OPS predictions).
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+series: ??? # tide-only gauge-series parquet path or glob
+constituents: [M2, S2, N2, K1, O1] # fixed list fitted to BOTH sides
+limit_storms: null # only the first N storms (utide fits are slow; 5 is a good diagnosis)
+min_pred_std: 0.05 # skip near-tideless gauges [m]
+label: const # names the default output data/comp/out/tideconst_<label>.csv
+out: null # explicit CSV path (null -> the label default)

@@ -142,7 +142,7 @@ def analyze_station_ns(
     method: str = "robust",
     make_figure: bool = True,
 ) -> dict:
-    from comp.annual_max import annual_maxima
+    from adforce.eval.annual_max import annual_maxima
 
     df = annual_maxima(station, start, end, method=method)
     if df.empty:

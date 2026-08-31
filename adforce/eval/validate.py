@@ -4,7 +4,7 @@ Pipeline, per storm:
   1. download the storm's netCDF from Hugging Face (``HF_REPO``);
   2. extract the simulated surge (SSH = WD + DEM) at the nearest *wet* mesh element
      centroid (the archived dual-graph node) to each NOAA CO-OPS gauge in the box;
-  3. fetch + de-tide the gauge record (:func:`comp.coops.observed_residual`);
+  3. fetch + de-tide the gauge record (:func:`adforce.eval.coops.observed_residual`);
   4. score peak surge (bias/RMSE/correlation, with bootstrap CIs and a within-storm
      spatial correlation), the full hydrograph (:func:`timeseries_skill`), and peak
      timing; tag "clean" pairs and regenerate the paper figures + LaTeX table.
@@ -18,23 +18,24 @@ de-tiding parameters so the cache self-invalidates if those change. ``--examples
 then regenerates the example-panel figure from that cache without re-running the (slow)
 utide de-tiding.
 
-Run::
+Run (hydra overrides; config root adforce/eval/config/eval_config.yaml)::
 
-    python -m comp.validate                # full sweep, all STORMS (populates the cache)
-    python -m comp.validate --storms "Ida 2021" "Katrina 2005"
-    python -m comp.validate --examples-only         # just the example figure, from cache (fast)
-    python -m comp.validate --examples-only --refresh-cache   # recompute the series first
+    python -m adforce.eval.validate                # full sweep, all STORMS (populates the cache)
+    python -m adforce.eval.validate 'storms=["Ida 2021","Katrina 2005"]'
+    python -m adforce.eval.validate validate.examples_only=true   # example figure, from cache (fast)
+    python -m adforce.eval.validate validate.examples_only=true validate.refresh=true
 """
 
 from __future__ import annotations
 
-import argparse
 import os
 from typing import Dict, List, Optional, Tuple
 
+import hydra
+from omegaconf import DictConfig
+
 import numpy as np
 import pandas as pd
-import xarray as xr
 from scipy.spatial import cKDTree
 
 from . import constants as C
@@ -132,11 +133,13 @@ def _ts_cache_tag(storm: str) -> str:
     node-selection *code* (not just these constants) changes, to invalidate stale caches.
     The gauge-selection box is per-storm (Gulf vs Florida, ``C.box_for``); for the
     original Gulf storms the tag string is byte-identical to the single-box era, so
-    their caches stay valid.
+    their caches stay valid. BOTH_BOX_STORMS (Katrina) carry the tag "both" --
+    a deliberate cache rotation when the storm gained the union panel (2026-08).
     """
+    box = "both" if storm in C.BOTH_BOX_STORMS else C.box_for(storm)
     return (
         f"v1|deg{C.MAX_NODE_DEG}|wet{C.WET_MIN_M}|knn{C.KNN}"
-        f"|ut{C.UTIDE_MIN_SAMPLES}|box{C.box_for(storm)}"
+        f"|ut{C.UTIDE_MIN_SAMPLES}|box{box}"
     )
 
 
@@ -146,6 +149,7 @@ def _series_cache_path(storm: str) -> str:
 
 def _save_series_cache(storm: str, series: Dict[str, tuple]) -> None:
     try:
+        C.ensure_dirs()  # cache dirs are created lazily, not at import
         frames = []
         for name, (sim, obs) in series.items():
             for kind, s in (("sim", sim), ("obs", obs)):
@@ -206,28 +210,50 @@ def load_storm_series(
     return series
 
 
+def storm_gauges(storm: str) -> List[Gauge]:
+    """Gauge panel for a storm: its region box, or the union of both panels
+    for ``C.BOTH_BOX_STORMS`` (Katrina crossed Miami before the Gulf
+    landfall, so it is scored coast-to-coast)."""
+    if storm in C.BOTH_BOX_STORMS:
+        seen, out = set(), []
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX):
+            for g in gulf_gauges(box):
+                if g[0] not in seen:
+                    seen.add(g[0])
+                    out.append(g)
+        return out
+    return gulf_gauges(C.box_for(storm))
+
+
 def validate_storm(
-    storm: str, fname: str, gauges: List[Gauge]
+    storm: str, fname: str, gauges: List[Gauge], source=None
 ) -> Tuple[List[dict], Dict[str, tuple]]:
-    """Return (rows, series) for one storm. ``series[name] = (sim, obs)``."""
+    """Return (rows, series) for one storm. ``series[name] = (sim, obs)``.
+
+    ``source`` is a :class:`adforce.eval.sources.FieldSource` supplying
+    ``(x, y, wet, elev, t)``; the default HF-archive source reproduces the
+    original inline extraction exactly (``wet = WD``, ``elev = WD + DEM``).
+    The nearest-wet sampling and scoring below are source-agnostic.
+    """
     year = int(storm.split()[-1])
-    ds = xr.open_dataset(download_storm(fname))
-    x, y, DEM, WD = ds.x.values, ds.y.values, ds.DEM.values, ds.WD.values
-    ssh = WD + DEM[None, :]
-    t = pd.to_datetime(ds.time.values)
+    if source is None:
+        from .sources import HFArchiveSource
+
+        source = HFArchiveSource()
+    x, y, wet, elev, t = source.load(storm, fname)
     s0, s1 = t[0], t[-1]
     tree = cKDTree(np.column_stack([x, y]))
 
     rows: List[dict] = []
     series: Dict[str, tuple] = {}
     for sid, name, lat, lon in gauges:
-        idx, dist = _nearest_wet(tree, WD, lon, lat)
+        idx, dist = _nearest_wet(tree, wet, lon, lat)
         if idx is None:
             continue
         obs, method = observed_residual(sid, lat, year, s0, s1)
         if obs.empty or obs.size < 12:
             continue
-        sim = pd.Series(ssh[:, idx], index=t)
+        sim = pd.Series(elev[:, idx], index=t)
         series[name] = (sim, obs)
         timing = (sim.idxmax() - obs.idxmax()).total_seconds() / 3600.0
         ts_r, ts_rmse, ts_n = timeseries_skill(sim, obs)
@@ -369,9 +395,16 @@ def _setup_plt():
 
 def _savefig(fig, paths: List[str]) -> None:
     """Save one figure to several paths (e.g. a quick-look PNG and a paper PDF).
+    Every ``.png`` quick-look also gets a vector ``.pdf`` sibling beside it in
+    the repo, in addition to any thesis-tree copy already in ``paths``.
     Figures are sized via sithom.get_dim to the LaTeX text width, so they are
     included at width=\\linewidth with no rescaling (and thus no font-size drift)."""
+    all_paths = []
     for p in paths:
+        all_paths.append(p)
+        if p.endswith(".png") and p[:-4] + ".pdf" not in paths:
+            all_paths.append(p[:-4] + ".pdf")
+    for p in all_paths:
         fig.savefig(p, bbox_inches="tight")
         print(f"wrote {p}")
 
@@ -430,12 +463,15 @@ def plot_examples(
     ncol: int = 2,
     refresh: bool = False,
     extra_titles: Optional[Dict[Tuple[str, str], str]] = None,
+    sharey: bool = True,
 ) -> None:
     """Plot simulated surge vs de-tided observed residual for chosen (storm, gauge).
 
     ``panels`` is a list of ``(storm, gauge_name)`` tuples. The per-storm series are
     loaded from the time-series cache (:func:`load_storm_series`), so regenerating this
     figure is instant once the cache exists; pass ``refresh=True`` to rebuild it.
+    ``sharey`` (default) puts every panel on one y scale so amplitudes compare
+    across panels; disable via ``validate.sharey=false`` for detail views.
     """
     plt = _setup_plt()
     import matplotlib.dates as mdates
@@ -444,7 +480,9 @@ def plot_examples(
     cache: Dict[str, Dict[str, tuple]] = {}
     nrow = int(np.ceil(len(panels) / ncol))
     # taller (ratio ~1) for the stacked rows; wider 2-col panels give the date axis room.
-    fig, axes = plt.subplots(nrow, ncol, figsize=get_dim(ratio=0.95), squeeze=False)
+    fig, axes = plt.subplots(
+        nrow, ncol, figsize=get_dim(ratio=0.95), squeeze=False, sharey=sharey
+    )
     extra_titles = extra_titles or {}
     for i, (ax, (storm, gname)) in enumerate(zip(axes.ravel(), panels)):
         letter = f"({chr(97 + i)}) "  # panel id in the (left) title -> no label clash
@@ -452,7 +490,7 @@ def plot_examples(
             cache[storm] = load_storm_series(
                 storm,
                 C.STORMS[storm],
-                gulf_gauges(C.box_for(storm)),  # per-storm region (Gulf/Florida)
+                storm_gauges(storm),  # per-storm region (or both for Katrina)
                 refresh=refresh,
             )
         match = [k for k in cache[storm] if gname.lower() in k.lower()]
@@ -469,7 +507,9 @@ def plot_examples(
         rtxt += extra_titles.get((storm, gname), "")
         gauge = match[0][:24].rstrip(", ")  # trim long names without a dangling comma
         ax.set_title(f"{letter}{storm}: {gauge}{rtxt}", fontsize=7, loc="left")
-        ax.set_ylabel("Surge [m]")
+        if not sharey or i % ncol == 0:  # shared scale: label the left column only
+            ax.set_ylabel("Surge [m]")
+        ax.margins(x=0)  # x-limits tight to the data, no margin
         ax.grid(alpha=0.3)
         # few, short date ticks ("Aug 24") instead of ~10 crowded "2005-08-24" labels
         ax.xaxis.set_major_locator(mdates.AutoDateLocator(minticks=3, maxticks=5))
@@ -531,6 +571,7 @@ def latex_table(df: pd.DataFrame, path: str) -> None:
 
 
 def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
+    C.ensure_dirs()
     items = {k: C.STORMS[k] for k in (storms or C.STORMS)}
     print(
         f"{len(gulf_gauges())} candidate gauges in Gulf box, "
@@ -541,7 +582,7 @@ def run(storms: Optional[List[str]] = None) -> pd.DataFrame:
         try:
             # per-storm gauge region: Gulf storms keep the original box (and
             # their cached series); Florida storms score the Miami-region coast
-            r, _ = validate_storm(storm, fname, gulf_gauges(C.box_for(storm)))
+            r, _ = validate_storm(storm, fname, storm_gauges(storm))
         except Exception as e:  # pragma: no cover
             print(f"!! {storm}: {e}")
             continue
@@ -586,6 +627,53 @@ CITY_POINTS = {
     "miami": (-80.1918, 25.7617),
 }
 
+_MESH_CACHE: Dict[str, tuple] = {}
+
+
+def _read_fort14(resolution: str = "mid"):
+    """EC95d mesh from ``adforce/setup/fort.14.<res>`` as
+    ``(lon, lat, depth, triangles)`` (depth positive down; 0-based tris)."""
+    if resolution in _MESH_CACHE:
+        return _MESH_CACHE[resolution]
+    from adforce.constants import SETUP_PATH
+
+    path = os.path.join(SETUP_PATH, f"fort.14.{resolution}")
+    with open(path) as f:
+        f.readline()  # description
+        ne, npt = (int(v) for v in f.readline().split()[:2])
+        nodes = np.loadtxt((next(f) for _ in range(npt)), usecols=(1, 2, 3))
+        tris = (
+            np.loadtxt((next(f) for _ in range(ne)), dtype=int, usecols=(2, 3, 4)) - 1
+        )
+    _MESH_CACHE[resolution] = (nodes[:, 0], nodes[:, 1], nodes[:, 2], tris)
+    return _MESH_CACHE[resolution]
+
+
+def _draw_mesh_bathymetry(ax, plt, transform=None, edges: bool = True):
+    """Model bathymetry as the map base: tricontourf of fort.14 depth (Blues,
+    shallow light -> deep dark), model land (depth <= 0) in gray, and faint
+    element edges so mesh resolution is visible. Returns the contour set for
+    a colorbar, or None when the mesh is unavailable."""
+    try:
+        lon, lat, depth, tris = _read_fort14()
+    except Exception as e:  # pragma: no cover - deck availability
+        print(f"(no fort.14 mesh layer: {e})")
+        return None
+    import matplotlib.tri as mtri
+
+    kw = {"transform": transform} if transform is not None else {}
+    tri = mtri.Triangulation(lon, lat, tris)
+    ax.tricontourf(  # model land
+        tri, depth, levels=[depth.min() - 1.0, 0.0], colors=["0.92"], zorder=0, **kw
+    )
+    levels = [0, 2, 5, 10, 15, 20, 30, 50, 75, 100, 150, 250, 500, 1000, 2000, 3000, 4500]
+    cs = ax.tricontourf(
+        tri, depth, levels=levels, cmap="Blues", extend="max", zorder=0.4, alpha=0.85, **kw
+    )
+    if edges:
+        ax.triplot(tri, color="0.5", lw=0.08, alpha=0.25, zorder=0.6, **kw)
+    return cs
+
 
 def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
     """Per-city worst-case example panels (robustness view).
@@ -600,7 +688,7 @@ def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
     """
     csv = os.path.join(C.OUT_PATH, "val_summary.csv")
     if not os.path.exists(csv):
-        raise SystemExit(f"{csv} not found: run `python -m comp.validate` first")
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
     df = pd.read_csv(csv)
     df["sid"] = df["sid"].astype(str)
     # gauge coordinates over both region boxes
@@ -658,47 +746,479 @@ def plot_failures(n_panels: int = 6, refresh: bool = False) -> None:
         )
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--storms", nargs="*", default=None, help="subset of storm names (default: all)"
+def plot_city_key(
+    n_panels: int = 4, refresh: bool = False, max_deg: float = 2.0
+) -> None:
+    """Per-city KEY-event panels: history vs the model at each study city.
+
+    For New Orleans, Galveston and Miami, select the ``n_panels`` *valid*
+    gauge-storm pairs with the largest OBSERVED peak surge within
+    ``max_deg`` degrees of that city (one panel per distinct storm -- the
+    region's defining historical events), and render observed de-tided
+    residual vs simulated surge with the standard example-panel plotter.
+    The headline "did the model capture this city's storm history" figure;
+    the complement of :func:`plot_failures` (which ranks by mismatch).
+
+    The radius matters: without it the nearest-city split assigns the whole
+    Atlantic seaboard to Miami, so "Miami" panels showed Fernandina Beach
+    (~500 km away). Note the panels are gauge-record-limited, not
+    meteorology-limited: Katrina's extreme-surge gauges failed or predate
+    the network, and Ida's two nearest gauges are documented KNOWN_FAILED
+    instrument losses, so those storms cannot headline their own city.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    coord = {
+        str(sid): (lon, lat)
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
+    df = df[df.sid.isin(coord)].copy()
+    lons = df.sid.map(lambda s: coord[s][0])
+    lats = df.sid.map(lambda s: coord[s][1])
+    for city, (clo, cla) in CITY_POINTS.items():
+        # gauges within max_deg of THIS city (cities may share none: the
+        # nearest-city split of plot_failures would hand the whole Atlantic
+        # coast to Miami); same |peak_dt| window-artifact guard as
+        # plot_failures; one panel per storm (the max-surge gauge of each)
+        # so the figure spans the region's distinct key events rather than
+        # four gauges of one landfall
+        dist = np.hypot(lons - clo, lats - cla)
+        sub = (
+            df[
+                df.valid.astype(bool)
+                & (dist <= max_deg)
+                & (df.peak_dt_hr.abs() <= 48.0)
+            ]
+            .sort_values("obs_peak", ascending=False)
+            .drop_duplicates("storm")
+            .head(n_panels)
+        )
+        if sub.empty:
+            print(f"(no valid pairs for {city})")
+            continue
+        panels = list(zip(sub.storm, sub.name))
+        extra = {
+            (r.storm, r.name): f" $\\Delta${r.sim_peak - r.obs_peak:+.2f} m"
+            for r in sub.itertuples()
+        }
+        print(
+            f"{city}: "
+            + "; ".join(
+                f"{s}/{g} (obs {o:.2f} m)"
+                for (s, g), o in zip(panels, sub.obs_peak)
+            )
+        )
+        plot_examples(
+            panels,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_city_key_{city}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_city_key_{city}.pdf"),
+            ],
+            refresh=refresh,
+            extra_titles=extra,
+        )
+
+
+def plot_gauge_map(max_deg: float = 2.0) -> None:
+    """Geographic overview of the validation gauge panel.
+
+    One map: coastline, every CO-OPS gauge in the two selection boxes (open
+    = in the panel; filled = contributes >= 1 *valid* pair to
+    ``val_summary.csv``; red cross = documented KNOWN_FAILED instrument
+    loss), the Gulf/Florida selection boxes, and the three study cities with
+    the ``max_deg`` catchment circles used by :func:`plot_city_key`.
+    Distances are Euclidean in degrees, matching the selection metric.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    valid_sids = set(df[df.valid.astype(bool)].sid)
+    failed_sids = {sid for _, sid in C.KNOWN_FAILED}
+
+    plt = _setup_plt()
+    from sithom.plot import get_dim
+
+    try:  # coastline via cartopy when available; plain axes otherwise
+        import cartopy.crs as ccrs
+        import cartopy.feature as cfeature
+
+        fig = plt.figure(figsize=get_dim(ratio=0.45))
+        ax = plt.axes(projection=ccrs.PlateCarree())
+        ax.add_feature(
+            cfeature.COASTLINE.with_scale("50m"), lw=0.4, edgecolor="0.35", zorder=1
+        )
+        gl = ax.gridlines(draw_labels=True, lw=0.3, alpha=0.4)
+        gl.top_labels = gl.right_labels = False
+        gl.xlabel_style = gl.ylabel_style = {"size": 6}
+        cs = _draw_mesh_bathymetry(ax, plt, transform=ccrs.PlateCarree(), edges=False)
+    except Exception as e:  # pragma: no cover - cartopy/data availability
+        print(f"(no cartopy coastline: {e})")
+        fig, ax = plt.subplots(figsize=get_dim(ratio=0.45))
+        ax.set_xlabel("Longitude [$^\\circ$E]")
+        ax.set_ylabel("Latitude [$^\\circ$N]")
+        ax.grid(alpha=0.3)
+        cs = _draw_mesh_bathymetry(ax, plt, edges=False)
+
+    for box, label, color in (
+        (C.GAUGE_BOX, "Gulf box", "tab:blue"),
+        (C.FLORIDA_BOX, "Florida box", "tab:green"),
+    ):
+        (lo0, lo1), (la0, la1) = box["lon"], box["lat"]
+        ax.plot(
+            [lo0, lo1, lo1, lo0, lo0],
+            [la0, la0, la1, la1, la0],
+            color=color,
+            lw=0.8,
+            ls=":",
+            label=label,
+            zorder=2,
+        )
+
+    seen = set()
+    for box in (C.GAUGE_BOX, C.FLORIDA_BOX):
+        for sid, name, lat, lon in gulf_gauges(box):
+            sid = str(sid)
+            if sid in seen:
+                continue
+            seen.add(sid)
+            if sid in valid_sids:
+                ax.plot(lon, lat, "o", ms=3.5, color="tab:orange", mec="k", mew=0.3, alpha=0.7, zorder=4)
+            else:
+                ax.plot(lon, lat, "o", ms=3, mfc="none", mec="0.5", mew=0.6, alpha=0.7, zorder=3)
+            if sid in failed_sids:
+                ax.plot(lon, lat, "x", ms=5, color="tab:red", mew=1.0, zorder=5)
+
+    theta = np.linspace(0, 2 * np.pi, 100)
+    try:  # the mesh node each city point snaps to (wrap.observe_max_point)
+        _mlon, _mlat, _, _ = _read_fort14()
+        _tree = cKDTree(np.c_[_mlon, _mlat])
+    except Exception:
+        _tree = None
+    for city, (clo, cla) in CITY_POINTS.items():
+        ax.plot(clo, cla, "*", ms=11, color="k", mec="w", mew=0.5, alpha=0.7, zorder=6)
+        if _tree is not None:
+            _i = int(_tree.query([clo, cla])[1])
+            ax.plot(_mlon[_i], _mlat[_i], "^", ms=6, color="tab:purple",
+                    mec="k", mew=0.3, alpha=0.7, zorder=6)
+        ax.plot(
+            clo + max_deg * np.cos(theta),
+            cla + max_deg * np.sin(theta),
+            color="k",
+            lw=0.6,
+            ls="--",
+            alpha=0.6,
+            zorder=2,
+        )
+        # per-city offsets keep labels off the gauge dots (over open water /
+        # Lake Pontchartrain); New Orleans anchors right-aligned to its star
+        xytext, ha = {
+            "galveston": ((7, -12), "left"),
+            "new_orleans": ((-7, 9), "right"),
+            "miami": ((7, 6), "left"),
+        }[city]
+        ax.annotate(
+            city.replace("_", " ").title(),
+            (clo, cla),
+            textcoords="offset points",
+            xytext=xytext,
+            ha=ha,
+            fontsize=7,
+        )
+
+    # legend proxies (marker styles used above)
+    from matplotlib.lines import Line2D
+
+    handles = [
+        Line2D([], [], marker="o", ls="", ms=4, color="tab:orange", mec="k", mew=0.3,
+               label="Gauge with valid pairs"),
+        Line2D([], [], marker="o", ls="", ms=3.5, mfc="none", mec="0.5", label="Panel gauge (no valid pair)"),
+        Line2D([], [], marker="x", ls="", ms=5, color="tab:red", label="Known instrument failure"),
+        Line2D([], [], marker="*", ls="", ms=9, color="k", mec="w", alpha=0.7,
+               label=f"Study city (r={max_deg:g}$^\\circ$)"),
+        Line2D([], [], marker="^", ls="", ms=6, color="tab:purple", mec="k",
+               alpha=0.7, label="Model observation node"),
+    ]
+    handles += ax.get_legend_handles_labels()[0]
+    ax.legend(handles=handles, fontsize=5.5, loc="lower left", framealpha=0.9)
+    if hasattr(ax, "set_extent"):  # cartopy GeoAxes
+        ax.set_extent([-98.5, -78.5, 23.5, 31.8])
+    else:
+        ax.set_xlim(-98.5, -78.5)
+        ax.set_ylim(23.5, 31.8)
+    if cs is not None:
+        fig.colorbar(cs, ax=ax, shrink=0.75, pad=0.02, label="Model depth [m]")
+    _savefig(
+        fig,
+        [
+            os.path.join(C.FIGURE_PATH, "val_gauge_map.png"),
+            os.path.join(C.PAPER_IMG_PATH, "comp_val_gauge_map.pdf"),
+        ],
     )
-    ap.add_argument(
-        "--examples-only",
-        action="store_true",
-        help="regenerate only the example-panel figure from the cached "
-        "time series (no sweep) -- instant once the cache exists",
-    )
-    ap.add_argument(
-        "--refresh-cache",
-        action="store_true",
-        help="force-recompute the cached time series instead of reading it",
-    )
-    ap.add_argument(
-        "--failures",
-        action="store_true",
-        help="per-city worst-case panels (largest |sim-obs| peak difference) "
-        "from the cached sweep -- no re-run",
-    )
-    ap.add_argument(
-        "--n-failures", type=int, default=6, help="panels per city for --failures"
-    )
-    a = ap.parse_args()
-    if a.failures:
-        plot_failures(n_panels=a.n_failures, refresh=a.refresh_cache)
+    plt.close(fig)
+
+
+def plot_city_gauge_maps(max_deg: float = 2.0) -> None:
+    """Per-city zoomed gauge maps with every gauge NAMED (reference figures).
+
+    One map per study city, extent = catchment circle + margin, each gauge
+    labelled with its CO-OPS name (orange = contributes valid pairs, open =
+    panel gauge without one, red cross = KNOWN_FAILED). Labels use a simple
+    greedy vertical stagger so dense clusters (e.g. the Mississippi coast)
+    stay legible.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    valid_sids = set(df[df.valid.astype(bool)].sid)
+    failed_sids = {sid for _, sid in C.KNOWN_FAILED}
+    gauges = {
+        str(sid): (name, lat, lon)
+        for box in (C.GAUGE_BOX, C.FLORIDA_BOX)
+        for sid, name, lat, lon in gulf_gauges(box)
+    }
+
+    plt = _setup_plt()
+    from sithom.plot import get_dim
+
+    for city, (clo, cla) in CITY_POINTS.items():
+        try:
+            import cartopy.crs as ccrs
+            import cartopy.feature as cfeature
+
+            fig = plt.figure(figsize=get_dim(ratio=1.05))
+            gs = fig.add_gridspec(2, 1, height_ratios=(4.0, 1.05), hspace=0.14)
+            ax = fig.add_subplot(gs[0], projection=ccrs.PlateCarree())
+            ax_key = fig.add_subplot(gs[1])
+            ax_key.axis("off")
+            ax.add_feature(
+                cfeature.COASTLINE.with_scale("10m"), lw=0.5, edgecolor="0.35", zorder=1
+            )
+            gl = ax.gridlines(draw_labels=True, lw=0.3, alpha=0.4)
+            gl.top_labels = gl.right_labels = False
+            gl.xlabel_style = gl.ylabel_style = {"size": 6}
+            cs = _draw_mesh_bathymetry(ax, plt, transform=ccrs.PlateCarree(), edges=True)
+        except Exception as e:  # pragma: no cover
+            print(f"(no cartopy coastline: {e})")
+            fig, (ax, ax_key) = plt.subplots(
+                2, 1, figsize=get_dim(ratio=1.05),
+                gridspec_kw={"height_ratios": (4.0, 1.05), "hspace": 0.14},
+            )
+            ax_key.axis("off")
+            ax.grid(alpha=0.3)
+            cs = _draw_mesh_bathymetry(ax, plt, edges=True)
+
+        m = max_deg + 0.45
+        ax.plot(clo, cla, "*", ms=13, color="k", mec="w", mew=0.5, alpha=0.7, zorder=6)
+        try:  # the mesh node this city point snaps to (wrap.observe_max_point)
+            _mlon, _mlat, _, _ = _read_fort14()
+            _i = int(cKDTree(np.c_[_mlon, _mlat]).query([clo, cla])[1])
+            ax.plot(_mlon[_i], _mlat[_i], "^", ms=8, color="tab:purple",
+                    mec="k", mew=0.4, alpha=0.7, zorder=6)
+        except Exception:
+            pass
+        theta = np.linspace(0, 2 * np.pi, 100)
+        ax.plot(
+            clo + max_deg * np.cos(theta),
+            cla + max_deg * np.sin(theta),
+            "k--",
+            lw=0.6,
+            alpha=0.6,
+            zorder=2,
+        )
+
+        # gauges in extent, numbered west -> east: tiny numbers at the dots
+        # and a full-name index key under the map (long names never collide)
+        import matplotlib.patheffects as pe
+
+        local = sorted(
+            (
+                (sid, n, la, lo)
+                for sid, (n, la, lo) in gauges.items()
+                if abs(lo - clo) <= m and abs(la - cla) <= m
+            ),
+            key=lambda t: t[3],
+        )
+        key_lines = []
+        for k, (sid, name, la, lo) in enumerate(local, start=1):
+            if sid in valid_sids:
+                ax.plot(lo, la, "o", ms=4, color="tab:orange", mec="k", mew=0.3, alpha=0.7, zorder=4)
+            else:
+                ax.plot(lo, la, "o", ms=3.5, mfc="none", mec="0.5", mew=0.6, alpha=0.7, zorder=3)
+            if sid in failed_sids:
+                ax.plot(lo, la, "x", ms=6, color="tab:red", mew=1.0, zorder=5)
+            ax.annotate(
+                str(k),
+                (lo, la),
+                textcoords="offset points",
+                xytext=(1.5, 1.5),
+                fontsize=5.5,
+                fontweight="bold",
+                alpha=0.7,
+                zorder=7,
+                path_effects=[pe.withStroke(linewidth=1.4, foreground="white")],
+            )
+            key_lines.append(f"{k:>2} {name[:30].rstrip(', ')}")
+        # index key in up to three columns in its own axes row
+        ncol_key = 3
+        per = int(np.ceil(len(key_lines) / ncol_key)) or 1
+        for c in range(ncol_key):
+            chunk = key_lines[c * per : (c + 1) * per]
+            if chunk:
+                ax_key.text(
+                    0.02 + 0.34 * c,
+                    1.0,
+                    "\n".join(chunk),
+                    fontsize=5.4,
+                    family="serif",
+                    va="top",
+                    ha="left",
+                    transform=ax_key.transAxes,
+                )
+        from matplotlib.lines import Line2D
+
+        ax.legend(
+            handles=[
+                Line2D([], [], marker="o", ls="", ms=4, color="tab:orange", mec="k",
+                       mew=0.3, alpha=0.7, label="Valid pairs"),
+                Line2D([], [], marker="o", ls="", ms=3.5, mfc="none", mec="0.5",
+                       alpha=0.7, label="No valid pair"),
+                Line2D([], [], marker="x", ls="", ms=5, color="tab:red",
+                       label="Instrument failure"),
+                Line2D([], [], marker="*", ls="", ms=10, color="k", mec="w",
+                       alpha=0.7, label="City point"),
+                Line2D([], [], marker="^", ls="", ms=6, color="tab:purple", mec="k",
+                       alpha=0.7, label="Model obs node"),
+            ],
+            fontsize=5.5,
+            loc="lower left",
+            framealpha=0.9,
+        )
+        ax.set_title(
+            f"{city.replace('_', ' ').title()} gauge panel "
+            f"(r={max_deg:g}$^\\circ$; filled = valid pairs)",
+            fontsize=8,
+        )
+        if hasattr(ax, "set_extent"):
+            ax.set_extent([clo - m, clo + m, cla - m, cla + m])
+        else:
+            ax.set_xlim(clo - m, clo + m)
+            ax.set_ylim(cla - m, cla + m)
+        if cs is not None:
+            fig.colorbar(cs, ax=ax, shrink=0.8, pad=0.02, label="Model depth [m]")
+        _savefig(
+            fig,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_gauge_map_{city}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_gauge_map_{city}.pdf"),
+            ],
+        )
+        plt.close(fig)
+
+
+def plot_gauge_key(
+    gauge_names, n_panels: int = 6, refresh: bool = False
+) -> None:
+    """Per-gauge KEY-event panels: the largest observed surges at chosen
+    city-analogue gauges (e.g. Shell Beach / Virginia Key / Galveston Pier
+    21), one panel per storm, rendered with the standard example-panel
+    plotter. Unlike the skill scoring this does NOT apply the valid gate --
+    small-surge storms are shown (Virginia Key would otherwise keep a
+    single storm) -- but the 48 h window-artifact guard still applies.
+    """
+    csv = os.path.join(C.OUT_PATH, "val_summary.csv")
+    if not os.path.exists(csv):
+        raise SystemExit(f"{csv} not found: run `python -m adforce.eval.validate` first")
+    df = pd.read_csv(csv)
+    df["sid"] = df["sid"].astype(str)
+    for gname in gauge_names:
+        sub = (
+            df[
+                df.name.str.contains(gname, case=False, regex=False)
+                & ~df.failed.astype(bool)
+                & (df.peak_dt_hr.abs() <= 48.0)
+            ]
+            .sort_values("obs_peak", ascending=False)
+            .drop_duplicates("storm")
+            .head(n_panels)
+        )
+        if sub.empty:
+            print(f"(no pairs for gauge {gname!r})")
+            continue
+        panels = list(zip(sub.storm, sub.name))
+        extra = {
+            (r.storm, r.name): f" $\\Delta${r.sim_peak - r.obs_peak:+.2f} m"
+            for r in sub.itertuples()
+        }
+        print(
+            f"{gname}: "
+            + "; ".join(f"{st} (obs {o:.2f} m)" for (st, _), o in zip(panels, sub.obs_peak))
+        )
+        slug = gname.lower().replace(" ", "_").replace(",", "")
+        plot_examples(
+            panels,
+            [
+                os.path.join(C.FIGURE_PATH, f"val_gauge_key_{slug}.png"),
+                os.path.join(C.PAPER_IMG_PATH, f"comp_val_gauge_key_{slug}.pdf"),
+            ],
+            refresh=refresh,
+            extra_titles=extra,
+        )
+
+
+_LEGACY_FLAGS = {
+    "--storms": "'storms=[\"Ida 2021\"]'",
+    "--examples-only": "validate.examples_only=true",
+    "--refresh-cache": "validate.refresh=true",
+    "--failures": "validate.failures=true",
+    "--n-failures": "validate.n_failures=6",
+}
+
+
+@hydra.main(version_base=None, config_path="config", config_name="eval_config")
+def main(cfg: DictConfig) -> None:
+    C.ensure_dirs()
+    v = cfg.validate
+    if v.gauge_key:
+        plot_gauge_key(list(v.gauge_key), n_panels=v.n_city, refresh=v.refresh)
         return
-    if a.examples_only:
+    if v.gauge_map:
+        plot_gauge_map(max_deg=v.city_radius_deg)
+        return
+    if v.city_maps:
+        plot_city_gauge_maps(max_deg=v.city_radius_deg)
+        return
+    if v.city_key:
+        plot_city_key(
+            n_panels=v.n_city, refresh=v.refresh, max_deg=v.city_radius_deg
+        )
+        return
+    if v.failures:
+        plot_failures(n_panels=v.n_failures, refresh=v.refresh)
+        return
+    if v.examples_only:
         plot_examples(
             C.EXAMPLE_PANELS,
             [
                 os.path.join(C.FIGURE_PATH, "val_examples.png"),
                 os.path.join(C.PAPER_IMG_PATH, "comp_val_examples.pdf"),
             ],
-            refresh=a.refresh_cache,
+            refresh=v.refresh,
+            sharey=v.sharey,
         )
         return
-    run(a.storms)
+    run(list(cfg.storms) if cfg.storms else None)
 
 
 if __name__ == "__main__":
+    from ._cli import reject_legacy_flags
+
+    reject_legacy_flags(_LEGACY_FLAGS, "adforce.eval.validate")
     main()

@@ -1,0 +1,35 @@
+# Manning's-n friction sensitivity on tide-only runs (mid resolution) --
+# the experiment recommended by adforce/eval/tidal_diagnosis.md: the diurnal
+# band (O1 +34%, K1 +18%) is over-amplified with a uniform phase lead,
+# pointing at the under-damped basin response under the shipped uniform
+# n = 0.022. Success = O1/K1 amp ratios -> 1 and the phase lead shrinking
+# without breaking M2 (score each cell with adforce.eval.tidecheck +
+# tideconst).
+#
+# forcing/mannings_n are eval-side pseudo-axes (never touch the wrap tree);
+# n0.022 regenerates the control with identical machinery so the comparison
+# is apples-to-apples.
+axes: {}
+name_keys: {}
+exclude: []
+include: []
+cells:
+  - name: tide-n0.022 # control (= shipped fort.13 default)
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: true
+      forcing: tide
+      mannings_n: 0.022
+  - name: tide-n0.028
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: true
+      forcing: tide
+      mannings_n: 0.028
+  - name: tide-n0.035
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: true
+      forcing: tide
+      mannings_n: 0.035
+baseline: tide-n0.022

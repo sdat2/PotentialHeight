@@ -4,20 +4,20 @@ For a station and a year range this module downloads hourly water levels
 (one calendar-year request at a time -- the CO-OPS ``hourly_height`` product
 accepts up to a year per request), de-tides each calendar year separately with
 a robust ``utide`` harmonic fit (mean + trend included, following
-:func:`comp.coops.observed_residual`), and records the ANNUAL MAXIMUM of the
+:func:`adforce.eval.coops.observed_residual`), and records the ANNUAL MAXIMUM of the
 surge residual for every year with adequate data.
 
 Missing-data policy: a year is skipped unless (a) it has at least
 ``UTIDE_MIN_SAMPLES`` hourly samples (stable harmonic fit, same threshold as
-``comp.coops``) and (b) at least ``MIN_YEAR_COVERAGE`` (80%) of the year's
+``adforce.eval.coops``) and (b) at least ``MIN_YEAR_COVERAGE`` (80%) of the year's
 hours are present, since with large gaps the true annual maximum may fall in a
 gap and the recorded maximum would be biased low. Even in accepted years the
 maximum can be truncated if the gauge failed *during* the peak (e.g. Grand
-Isle in Ida 2021, see ``comp.constants.KNOWN_FAILED``); such years are flagged
+Isle in Ida 2021, see ``adforce.eval.constants.KNOWN_FAILED``); such years are flagged
 with ``max_at_gap_edge`` rather than dropped.
 
 Everything is cached under ``data/comp/``: the raw CO-OPS responses land in
-``COOPS_CACHE`` (via :mod:`comp.coops`), the per-year de-tided residuals and
+``COOPS_CACHE`` (via :mod:`adforce.eval.coops`), the per-year de-tided residuals and
 the annual-maxima table are Parquet files under ``ANNUAL_MAX_CACHE``, keyed by
 the de-tiding parameters so the cache self-invalidates if those change.
 Reruns are therefore free.
@@ -26,19 +26,21 @@ Datum note: water levels are requested relative to MSL, but the residual is
 insensitive to the datum because the harmonic fit absorbs the mean (and a
 linear trend, which also removes most local sea-level rise within a year).
 
-Run::
+Run (hydra overrides; config root adforce/eval/config/annual_max_config.yaml)::
 
-    python -m comp.annual_max --station 8761724                 # Grand Isle, LA
-    python -m comp.annual_max --station 8735180 --start 1980    # Dauphin Island, AL
+    python -m adforce.eval.annual_max station=8761724             # Grand Isle, LA
+    python -m adforce.eval.annual_max station=8735180 start=1980  # Dauphin Island, AL
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 import time
 from typing import Optional
+
+import hydra
+from omegaconf import DictConfig
 
 import numpy as np
 import pandas as pd
@@ -68,7 +70,7 @@ def _hours_in_year(year: int) -> int:
 def station_meta(station: str) -> Optional[dict]:
     """Name/lat/lon for a CO-OPS station from the cached station list.
 
-    Reuses the same ``stations.json`` cache as :func:`comp.coops.gulf_gauges`
+    Reuses the same ``stations.json`` cache as :func:`adforce.eval.coops.gulf_gauges`
     (all water-level stations, no bounding box), fetching it once if absent.
 
     Args:
@@ -96,7 +98,7 @@ def station_meta(station: str) -> Optional[dict]:
 
 
 # --------------------------------------------------------------------------- #
-# Fetching. comp.coops._coops caches every response, including transport
+# Fetching. adforce.eval.coops._coops caches every response, including transport
 # failures (as zero-byte files). A genuine "no data" year is a NON-empty API
 # error message and is accepted at once; a zero-byte cache entry is deleted and
 # the year re-requested a few times, so a one-off network blip cannot
@@ -127,7 +129,7 @@ def fetch_year_wl(
 ) -> pd.Series:
     """Hourly water level (MSL, GMT) for one calendar year, cached + polite.
 
-    Delegates to :func:`comp.coops.fetch_year` (verified ``hourly_height``,
+    Delegates to :func:`adforce.eval.coops.fetch_year` (verified ``hourly_height``,
     falling back to preliminary ``water_level``); on an empty result caused by
     a cached transport failure the bad cache entry is cleared and the request
     retried with a growing sleep. Tests monkeypatch this function.
@@ -164,7 +166,7 @@ def fetch_year_wl(
 def detide_year(wl: pd.Series, lat: float, method: str = "robust") -> pd.Series:
     """De-tide one calendar year of hourly water levels with ``utide``.
 
-    Mirrors :func:`comp.coops.observed_residual` (harmonic fit with mean and
+    Mirrors :func:`adforce.eval.coops.observed_residual` (harmonic fit with mean and
     linear trend over the full year, residual = observed - reconstruction),
     with one deliberate difference: the DatetimeIndex is passed to ``utide``
     directly instead of via ``matplotlib.dates.date2num``. With matplotlib's
@@ -260,6 +262,7 @@ def year_residual(
     Returns:
         Optional[pd.Series]: Residual series, or None if the year is skipped.
     """
+    C.ensure_dirs()  # cache dirs are created lazily, not at import
     fp = _resid_path(station, year, method)
     if not refresh and os.path.exists(fp):
         df = pd.read_parquet(fp)
@@ -305,6 +308,7 @@ def annual_maxima(
             ``station, name, year, ann_max_m, t_max, n_obs, coverage,
             max_at_gap_edge``.
     """
+    C.ensure_dirs()  # cache dirs are created lazily, not at import
     tp = _table_path(station, start, end, method)
     if not refresh and os.path.exists(tp):
         df = pd.read_parquet(tp)
@@ -351,31 +355,27 @@ def annual_maxima(
     return df
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument(
-        "--station",
-        default="8761724",
-        help="CO-OPS station id (default 8761724, Grand Isle LA)",
+_LEGACY_FLAGS = {
+    "--station": "station=8761724",
+    "--start": "start=1980",
+    "--end": "end=2025",
+    "--method": "method=robust",
+    "--refresh": "refresh=true",
+}
+
+
+@hydra.main(version_base=None, config_path="config", config_name="annual_max_config")
+def main(cfg: DictConfig) -> None:
+    if cfg.method not in ("robust", "ols"):
+        raise SystemExit(f"method must be robust|ols, got {cfg.method!r}")
+    df = annual_maxima(
+        str(cfg.station), cfg.start, cfg.end, method=cfg.method, refresh=cfg.refresh
     )
-    ap.add_argument("--start", type=int, default=C.AM_START_YEAR)
-    ap.add_argument("--end", type=int, default=C.AM_END_YEAR)
-    ap.add_argument(
-        "--method",
-        default="robust",
-        choices=["robust", "ols"],
-        help="utide.solve method (default robust)",
-    )
-    ap.add_argument(
-        "--refresh", action="store_true", help="recompute instead of reading the caches"
-    )
-    a = ap.parse_args()
-    df = annual_maxima(a.station, a.start, a.end, method=a.method, refresh=a.refresh)
     if df.empty:
         print("no usable years")
         return
     print(
-        f"\n{len(df)} usable years of {a.end - a.start + 1}; "
+        f"\n{len(df)} usable years of {cfg.end - cfg.start + 1}; "
         f"max residual {df.ann_max_m.max():.2f} m in "
         f"{int(df.loc[df.ann_max_m.idxmax(), 'year'])}; "
         f"{int(df.max_at_gap_edge.sum())} year(s) flagged max-near-gap"
@@ -383,4 +383,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from ._cli import reject_legacy_flags
+
+    reject_legacy_flags(_LEGACY_FLAGS, "adforce.eval.annual_max")
     main()

@@ -1,0 +1,25 @@
+# Surge sensitivity to bottom friction (adforce/eval/tidal_diagnosis.md
+# take-2 verdict, step 2): CF=0.005 fixes the semidiurnal tide, but the
+# published surge skill (bias -0.22 m, r 0.871) was earned at CF=0.0025 and
+# is already biased LOW -- more friction may damp surge peaks further.
+# Storm-only runs (the published configuration: no tides, no spinup) at the
+# control and the tide-side sweet spot, scored against the cached de-tided
+# gauge residuals.
+axes: {}
+name_keys: {}
+exclude: []
+include: []
+cells:
+  - name: storm-cf0.0025 # control (= the published configuration, regenerated)
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: false
+      forcing: storm
+      friction_cf: 0.0025
+  - name: storm-cf0.005 # the tide-side sweet spot
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: false
+      forcing: storm
+      friction_cf: 0.005
+baseline: storm-cf0.0025

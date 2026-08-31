@@ -1,5 +1,9 @@
 """Extract simulated water-level series at NOAA gauges from ADCIRC runs.
 
+SUPERSEDED by ``adforce.eval.extract`` (hydra-driven port, same node
+selection and output schema); kept as the frozen record of the GCP sweeps
+that produced ``data/comp/{lowres,midres}`` and ``rerun/results/*``.
+
 For every run directory ``<runs_dir>/<i>_<NAME>_<YEAR>/`` containing a
 ``fort.63.nc``, find the nearest mesh node to each gauge in ``--gauges``
 (CSV: sid,name,lat,lon) that stays wet (min total depth zeta+depth >

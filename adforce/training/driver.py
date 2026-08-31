@@ -39,6 +39,91 @@ from .inputs import generate_adcirc_inputs
 RUNS_PARENT_DIR = os.path.join(PROJ_PATH, "runs")
 os.makedirs(RUNS_PARENT_DIR, exist_ok=True)
 
+#: Success line written to <run>/slurm.out (same marker check_training_runs
+#: and adforce.eval.status key on).
+SUCCESS_MARKER = "Job completed successfully."
+
+def is_run_successful(run_directory: str) -> bool:
+    """True when ``<run>/slurm.out`` carries the success marker."""
+    slurm_path = os.path.join(run_directory, "slurm.out")
+    if not os.path.exists(slurm_path):
+        return False
+    try:
+        with open(slurm_path, "r", errors="ignore") as slurm_out_file:
+            return any(SUCCESS_MARKER in line for line in slurm_out_file)
+    except (IOError, FileNotFoundError) as e:
+        print(f"Warning: Could not read {slurm_path}. Will attempt to rerun. Error: {e}")
+        return False
+
+
+def drive_storm(
+    storm,
+    storm_ds,
+    run_directory: str,
+    cfg,
+    resolution: str = "mid",
+    mode: str = "storm",
+    spinup_days: float = 0.0,
+    recommended_dt: Optional[float] = None,
+    no_subprocess: bool = False,
+    mannings_n: Optional[float] = None,
+    friction_cf: Optional[float] = None,
+) -> str:
+    """Generate inputs for ONE historical storm and (optionally) run it.
+
+    The per-storm seam extracted from :func:`drive_all_adcirc` so callers
+    (``adforce.eval.launch``) control the run-directory naming and get the
+    path back. This is the ONLY sanctioned path for tide-on historical runs:
+    ``generate_adcirc_inputs`` builds each storm's fort.15 with the correct
+    cold-start/tidal window, unlike ``wrap.stage_input_files``'s static decks
+    (which hard-pin the Katrina 2005 window).
+
+    Args:
+        storm (Storm): The storm metadata object.
+        storm_ds: The storm's IBTrACS row (``target_storms_ds.isel(storm=i)``).
+        run_directory (str): Absolute run directory to create/populate.
+        cfg: Base wrap config (``adforce.wrap.get_default_config()``).
+        resolution (str): Mesh resolution deck.
+        mode (str): ``storm`` | ``tide`` | ``both`` forcing.
+        spinup_days (float): Tidal spinup (6.0 for tidal modes in the sweeps).
+        recommended_dt (Optional[float]): ADCIRC timestep [s].
+        no_subprocess (bool): Only generate inputs; do not run ADCIRC.
+        mannings_n (Optional[float]): REFUSED (verified no-op: NWP=0 decks
+            never read fort.13; see generate_adcirc_inputs).
+        friction_cf (Optional[float]): Override the fort.15 NOLIBF=2 hybrid
+            friction coefficient CF (None = the generated deck's 0.0025).
+
+    Returns:
+        str: ``run_directory``.
+    """
+    storm_name_safe = storm.name.upper().replace(" ", "_")
+    generate_adcirc_inputs(
+        storm,
+        storm_ds,
+        run_directory,
+        recommended_dt=recommended_dt,
+        resolution=resolution,
+        wind=mode in ("storm", "both"),
+        tides=mode in ("tide", "both"),
+        spinup_days=spinup_days,
+        mannings_n=mannings_n,
+        friction_cf=friction_cf,
+    )
+
+    storm_cfg = cfg.copy()
+    OmegaConf.update(storm_cfg.files, "run_folder", run_directory)
+    OmegaConf.update(storm_cfg, "name", f"{storm_name_safe}_{storm.year}")
+    # ASWIP converts pre_aswip_fort.22 -> fort.22 (NWS=20); tide-only runs
+    # have no met forcing -> no ASWIP.
+    OmegaConf.update(storm_cfg, "use_aswip", mode in ("storm", "both"))
+    # each storm is a local subprocess even when the sweep itself is one
+    # SLURM job
+    OmegaConf.update(storm_cfg, "use_slurm", False)
+
+    if not no_subprocess:
+        setoff_subprocess_job_and_wait(run_directory, storm_cfg)
+    return run_directory
+
 
 def drive_all_adcirc(
     test_single=False,
@@ -156,22 +241,7 @@ def drive_all_adcirc(
         )
 
         # --- Check for existing successful run (implements TODO #1) ---
-        slurm_path = os.path.join(run_directory, "slurm.out")
-        is_successful = False
-        if os.path.exists(slurm_path):
-            try:
-                with open(slurm_path, "r") as slurm_out_file:
-                    for line in slurm_out_file:
-                        if "Job completed successfully.\n" in line:
-                            is_successful = True
-                            break
-            except (IOError, FileNotFoundError) as e:
-                print(
-                    f"Warning: Could not read {slurm_path}. Will attempt to rerun. Error: {e}"
-                )
-                is_successful = False
-
-        if is_successful:
+        if is_run_successful(run_directory):
             print(f"Run {run_directory} already completed successfully. Skipping.")
             continue  # Skip to the next storm
         elif os.path.exists(run_directory):
@@ -184,42 +254,19 @@ def drive_all_adcirc(
             print(
                 f"\n--- Processing Storm {i+1}/{len(target_storms)}: {storm.name} {storm.year} ---"
             )
-
-            # 1. Generate ADCIRC input files (fort.15, pre_aswip_fort.22, fort.13)
             print(f"Generating inputs in: {run_directory}")
-            generate_adcirc_inputs(
+            drive_storm(
                 storm,
                 target_storms_ds.isel(storm=i),
                 run_directory,
-                recommended_dt=recommended_dt,
+                cfg,
                 resolution=resolution,
-                wind=mode in ("storm", "both"),
-                tides=mode in ("tide", "both"),
+                mode=mode,
                 spinup_days=spinup_days,
+                recommended_dt=recommended_dt,
+                no_subprocess=test_nosubprocess,
             )
-
-            # 2. Create a storm-specific config to pass to subprocess
-            # Start with the default config
-            storm_cfg = cfg.copy()
-
-            # Set the specific run folder and name for logging
-            OmegaConf.update(storm_cfg.files, "run_folder", run_directory)
-            OmegaConf.update(storm_cfg, "name", f"{storm_name_safe}_{storm.year}")
-
-            # Tell the subprocess runner to execute ASWIP
-            # This converts 'pre_aswip_fort.22' to 'fort.22' with the NWS=20
-            # format. Tide-only runs have no met forcing -> no ASWIP.
-            OmegaConf.update(storm_cfg, "use_aswip", mode in ("storm", "both"))
-
-            # Ensure we're NOT using SLURM for this subprocess
-            # (The main script is one SLURM job, but each storm is a local subprocess)
-            OmegaConf.update(storm_cfg, "use_slurm", False)
-
-            # 3. Run the simulation (ASWIP, adcprep, padcirc)
-            print(f"Running ADCIRC simulation for {storm.name} via subprocess...")
-            # This function will chdir into run_directory
             if not test_nosubprocess:
-                setoff_subprocess_job_and_wait(run_directory, storm_cfg)
                 print(f"✅ Successfully completed run for {storm.name} {storm.year}")
             else:
                 print(f"✅ Successfully made inputs for {storm.name} {storm.year}")

@@ -40,6 +40,13 @@ ARG ADCIRC_REPO=https://github.com/sdat2/adcirc-v55.02.git
 # (a real vendored tree, so a --depth 1 clone contains it). -S must point there.
 RUN git clone --depth 1 "$ADCIRC_REPO" /opt/adcirc-src && \
     LL="-ffixed-line-length-132 -ffree-line-length-132" && \
+    # conda-forge's 2026 compiler packages ship only the target-prefixed
+    # binutils (x86_64-conda-linux-gnu-ar); cmake's static-archive steps call
+    # plain `ar`/`ranlib` and died with "Error running link command: no such
+    # file or directory" (metis + datetime_fortran). Symlink them in.
+    for t in ar ranlib nm; do \
+      [ -x "$CONDA_PREFIX/bin/$t" ] || ln -s "$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-$t" "$CONDA_PREFIX/bin/$t"; \
+    done && \
     cmake -S /opt/adcirc-src/adcirc -B /opt/adcirc-build \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_ADCPREP=ON -DBUILD_PADCIRC=ON \

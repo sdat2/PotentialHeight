@@ -12,21 +12,23 @@ after a sweep -- except the utide variants, which re-solve a year-long harmonic 
 
 A full run also writes the appendix table ``<thesis>/paper/comp_detide_table.tex`` (the
 ``tabular`` that ``tab:detide-robustness`` ``\\input``s), so the paper table regenerates with
-the data and cannot drift -- like the per-storm table from :func:`comp.validate.latex_table`.
+the data and cannot drift -- like the per-storm table from :func:`adforce.eval.validate.latex_table`.
 
-Run::
+Run (hydra overrides; config root adforce/eval/config/eval_config.yaml)::
 
-    python -m comp.detide_sensitivity                 # all methods + skew, all pairs, writes the table
-    python -m comp.detide_sensitivity --methods godin_lowpass noaa_predictions
-    python -m comp.detide_sensitivity --limit 40      # quick subset (no table written)
-    python -m comp.detide_sensitivity --skew          # instantaneous vs skew-surge metric only
+    python -m adforce.eval.detide_sensitivity        # all methods + skew, all pairs, writes the table
+    python -m adforce.eval.detide_sensitivity 'detide_sensitivity.methods=[godin_lowpass,noaa_predictions]'
+    python -m adforce.eval.detide_sensitivity detide_sensitivity.limit=40   # quick subset (no table)
+    python -m adforce.eval.detide_sensitivity detide_sensitivity.skew=true  # skew-surge metric only
 """
 
 from __future__ import annotations
 
-import argparse
 import os
 from typing import Dict, Optional, Tuple
+
+import hydra
+from omegaconf import DictConfig
 
 import numpy as np
 import pandas as pd
@@ -169,28 +171,9 @@ def _utide_tide(wl: pd.Series, lat: float) -> pd.Series:
     return pd.Series(utide.reconstruct(wl.index, coef, verbose=False).h, index=wl.index)
 
 
-def _skew_surge_peak(wl: pd.Series, tide: pd.Series, win: Tuple) -> float:
-    """Storm skew-surge peak = max over tidal cycles of (max observed - max predicted tide).
-
-    The skew surge (Horsburgh & Wilson 2007) compares the peak observed level in each tidal
-    cycle to the peak predicted tide in the same cycle, so it is insensitive to tidal-phase
-    error -- the defensible peak target for a tide-excluding model. Cycles are split at the
-    predicted-tide low waters.
-    """
-    from scipy.signal import find_peaks
-
-    o = wl.loc[win[0] : win[1]]
-    td = tide.loc[win[0] : win[1]]
-    if len(o) < 12:
-        return np.nan
-    troughs, _ = find_peaks(-td.values, distance=8)  # tide low waters, >= 8 h apart
-    bounds = np.r_[0, troughs, len(td) - 1]
-    skews = [
-        float(o.values[a:b].max() - td.values[a:b].max())
-        for a, b in zip(bounds[:-1], bounds[1:])
-        if b - a >= 4
-    ]
-    return max(skews) if skews else np.nan
+# Promoted to adforce.eval.detide (shared with the tide-on scoring path);
+# re-exported here so run_skew and its cached CSVs behave identically.
+from .detide import skew_surge_peak as _skew_surge_peak  # noqa: E402
 
 
 def _storm_windows() -> Dict[str, Tuple]:
@@ -243,7 +226,7 @@ def _latex_table(pooled: Dict[str, dict], path: str) -> None:
     """Emit the de-tiding-robustness ``tabular`` the appendix \\inputs.
 
     Only the ``tabular`` (the ``table`` float, caption and label live in
-    ``paper/appendix.tex``), matching :func:`comp.validate.latex_table`, so the prose stays
+    ``paper/appendix.tex``), matching :func:`adforce.eval.validate.latex_table`, so the prose stays
     hand-edited while every number is generated -- the table cannot drift from the data.
     """
     lines = [
@@ -400,30 +383,28 @@ def write_table_from_csv(path: Optional[str] = None) -> None:
     )
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--methods", nargs="*", default=None, help="subset of method ids")
-    ap.add_argument(
-        "--limit", type=int, default=None, help="only the first N clean pairs (quick)"
-    )
-    ap.add_argument(
-        "--skew",
-        action="store_true",
-        help="instantaneous-residual vs skew-surge peak metric (phase-insensitive)",
-    )
-    ap.add_argument(
-        "--table-only",
-        action="store_true",
-        help="regenerate the appendix table from the cached CSV (no re-detiding)",
-    )
-    a = ap.parse_args()
-    if a.table_only:
+_LEGACY_FLAGS = {
+    "--methods": "'detide_sensitivity.methods=[godin_lowpass]'",
+    "--limit": "detide_sensitivity.limit=40",
+    "--skew": "detide_sensitivity.skew=true",
+    "--table-only": "detide_sensitivity.table_only=true",
+}
+
+
+@hydra.main(version_base=None, config_path="config", config_name="eval_config")
+def main(cfg: DictConfig) -> None:
+    C.ensure_dirs()
+    d = cfg.detide_sensitivity
+    if d.table_only:
         write_table_from_csv()
-    elif a.skew:
-        run_skew(a.limit)
+    elif d.skew:
+        run_skew(d.limit)
     else:
-        run(a.methods, a.limit)
+        run(list(d.methods) if d.methods else None, d.limit)
 
 
 if __name__ == "__main__":
+    from ._cli import reject_legacy_flags
+
+    reject_legacy_flags(_LEGACY_FLAGS, "adforce.eval.detide_sensitivity")
     main()

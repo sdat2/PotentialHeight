@@ -23,7 +23,7 @@ at the University of Cambridge.
    cle15
    adforce
    adbo
-   comp
+   eval
    worst
    surgenet
    about

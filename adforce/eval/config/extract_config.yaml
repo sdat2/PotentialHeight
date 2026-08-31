@@ -1,0 +1,15 @@
+# Root config for python -m adforce.eval.extract (run dir -> gauge_ts.parquet
+# reducer; runs remote where the fort.63.nc files are).
+defaults:
+  - scoring: default
+  - _self_
+
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+runs_root: ??? # parent of the per-storm run directories (required)
+gauges_csv: null # sid,name,lat,lon CSV; null -> CO-OPS panel over both boxes (needs cache/net)
+out: null # optional combined parquet (legacy data/comp/{lowres,midres} convention)
+per_run: true # write <run>/gauge_ts.parquet beside each fort.63.nc (harvest convention)

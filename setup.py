@@ -2,7 +2,7 @@ from setuptools import setup
 from typing import Dict, List
 
 # Core dependencies: what the pure-python, paper-relevant modules
-# (cle15, worst, comp core, w22) need from a bare `pip install .`.
+# (cle15, worst, adforce.eval core, w22) need from a bare `pip install .`.
 # Heavy stacks (Bayesian optimisation, CMIP6 ingestion, MPI, surge
 # comparison data) are split into the extras_require lists below.
 REQUIRED: List[str] = [
@@ -20,7 +20,7 @@ REQUIRED: List[str] = [
     # turn imported at module level by w22.ps_runs/w22.stats2 (paper-relevant);
     # xarray[complete] would pull it in anyway.
     "dask[complete]",  # to process netCDF4 files lazily (adforce, tcpips).
-    "scipy",  # nearest-node KD-tree for gauge matching (comp)
+    "scipy",  # nearest-node KD-tree for gauge matching (adforce.eval)
     "uncertainties",  # common utility for linear error propagation
     # "sithom @ git+https://github.com/sdat2/sithom",
     "sithom >= 0.1.1",  # personal common utilities for timing, plotting, and fitting
@@ -69,20 +69,21 @@ MPI: List[str] = [
     "dask_jobqueue",  # SLURMCluster in tcpips/run_dask_calculation.py
 ]
 
-# "comp": historical surge validation against tide gauges (comp).
-COMP: List[str] = [
-    "huggingface_hub",  # to download historical surge datasets (comp)
-    "utide",  # to de-tide tide-gauge records for surge validation (comp)
-    "pyarrow",  # Parquet cache of de-tided gauge time series (comp)
+# "eval": historical surge validation against tide gauges (adforce.eval).
+EVAL: List[str] = [
+    "huggingface_hub",  # to download historical surge datasets (adforce.eval)
+    "utide",  # to de-tide tide-gauge records for surge validation (adforce.eval)
+    "pyarrow",  # Parquet cache of de-tided gauge time series (adforce.eval)
 ]
 
 EXTRAS: Dict[str, List[str]] = {
     "bo": BO,
     "cmip": CMIP,
     "mpi": MPI,
-    "comp": COMP,
+    "eval": EVAL,
+    "comp": EVAL,  # deprecated alias (comp/ moved to adforce/eval/)
 }
-EXTRAS["all"] = BO + CMIP + MPI + COMP  # union of all extras
+EXTRAS["all"] = BO + CMIP + MPI + EVAL  # union of all extras
 
 
 setup(
@@ -119,8 +120,14 @@ setup(
         "adbo",
         "worst",
         "cle15",
-        "comp",
+        "adforce.eval",
     ],
+    # include_package_data=True only ships files named in a MANIFEST.in (absent);
+    # package_data is what actually gets the hydra YAML trees into a wheel.
+    package_data={
+        "adforce": ["config/*.yaml", "config/*/*.yaml"],
+        "adforce.eval": ["config/*.yaml", "config/*/*.yaml", "README.md"],
+    },
     package_dir={
         "tcpips": "tcpips",  # Calculate potential intensity and prerequisites for potential size
         "w22": "w22",  # Calculate the Chavas, Lin and Emanuel (2015) profile using matlab (octave), calculate potential size
@@ -129,6 +136,6 @@ setup(
         "adbo": "adbo",  # All of the tensorflow/trieste Bayesian optimization stuff
         "worst": "worst",  # Extreme value theory using the upper bound limit using tensorflow for fitting.
         "cle15": "cle15",  # Chavas, Lin & Emanuel (2015) TC wind profile implementations
-        "comp": "comp",  # Compare historical ADCIRC surge against de-tided NOAA tide gauges
+        "adforce.eval": "adforce/eval",  # Compare ADCIRC surge configurations against de-tided NOAA tide gauges
     },
 )

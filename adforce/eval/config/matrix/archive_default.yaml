@@ -1,0 +1,14 @@
+# The published HF EC95d no-tide archive as a degenerate one-cell matrix:
+# scoring with this matrix reproduces the paper's validation numbers inside
+# the general framework.
+axes: {}
+name_keys: {}
+exclude: []
+include: []
+cells:
+  - name: ec95d-archive
+    overrides:
+      adcirc.resolution.value: mid
+      adcirc.tide.value: false
+      adcirc.swan.value: false
+baseline: ec95d-archive

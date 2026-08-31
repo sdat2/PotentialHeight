@@ -5,7 +5,7 @@ Validates the SurgeNet historical-storm ADCIRC dataset (Hugging Face
 
 Entry point::
 
-    python -m comp.validate
+    python -m adforce.eval.validate
 """
 
 from .validate import run, validate_storm, metrics

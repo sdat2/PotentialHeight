@@ -1,0 +1,43 @@
+# Root config for the adforce.eval analysis entry points
+# (validate, nulltest, sensitivity, detide_sensitivity).
+#
+# House style: flat keys + comments (infrastructure/analysis config, like
+# adforce/config/slurm|files); the {value, description, units} nesting is
+# reserved for physical parameters in the wrap tree.
+defaults:
+  - scoring: default
+  - _self_
+
+# hydra hygiene: every output goes to an absolute path from
+# adforce.eval.constants; keep the CWD and write no .hydra/ run dirs.
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+storms: null # subset of storm display names, e.g. 'storms=["Ida 2021","Katrina 2005"]' (null = all)
+
+validate:
+  refresh: false # force-recompute the cached time series (was --refresh-cache)
+  examples_only: false # only the example-panel figure, from cache (was --examples-only)
+  failures: false # per-city worst-case panels from the cached sweep (was --failures)
+  n_failures: 6 # panels per city for validate.failures=true (was --n-failures)
+  city_key: false # per-city KEY-event panels (largest observed surges; history vs model)
+  n_city: 4 # panels per city for validate.city_key=true
+  city_radius_deg: 2.0 # gauges within this distance of the city qualify for its panel
+  gauge_map: false # geographic overview: gauges, selection boxes, city catchments
+  city_maps: false # per-city zoomed maps with every gauge named (reference)
+  gauge_key: null # list of gauge names -> per-gauge key-storm panels (no valid gate)
+  sharey: true # one y-axis scale across all panels of a figure (coauthor request)
+
+nulltest:
+  lag: true # temporal-lag null (netCDF-heavy); --no-lag -> nulltest.lag=false
+
+sensitivity:
+  node: true # netCDF node-selection sweep; --no-node -> sensitivity.node=false
+
+detide_sensitivity:
+  methods: null # subset of method ids, e.g. '["godin_lowpass","noaa_predictions"]' (null = all)
+  limit: null # only the first N clean pairs (quick look; suppresses the table)
+  skew: false # instantaneous-residual vs skew-surge peak metric (was --skew)
+  table_only: false # regenerate the appendix table from the cached CSV (was --table-only)

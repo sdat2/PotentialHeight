@@ -11,18 +11,20 @@ robust rather than tuned. Two groups of knobs:
     sampled and therefore the simulated peak, so they require the cached storm
     netCDFs. Each storm is loaded ONCE and re-sampled for every combination.
 
-Run::
+Run (hydra overrides; config root adforce/eval/config/eval_config.yaml)::
 
-    python -m comp.sensitivity              # cheap filter sweep + node-selection sweep
-    python -m comp.sensitivity --no-node    # cheap filter sweep only (no netCDF)
+    python -m adforce.eval.sensitivity                        # filter sweep + node-selection sweep
+    python -m adforce.eval.sensitivity sensitivity.node=false # cheap filter sweep only (no netCDF)
 """
 
 from __future__ import annotations
 
-import argparse
 import os
 import warnings
 from typing import Dict, List, Optional, Tuple
+
+import hydra
+from omegaconf import DictConfig
 
 import numpy as np
 import pandas as pd
@@ -166,6 +168,7 @@ def node_sweep(
 
 
 def run(do_node: bool = True) -> None:
+    C.ensure_dirs()
     fs = filter_sweep()
     print("=== clean-filter sweep (from val_summary.csv) ===")
     print(fs.to_string(index=False, float_format=lambda v: f"{v:.3f}"))
@@ -177,11 +180,16 @@ def run(do_node: bool = True) -> None:
         ns.to_csv(os.path.join(C.OUT_PATH, "sensitivity_node.csv"), index=False)
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--no-node", action="store_true", help="skip the netCDF node sweep")
-    run(do_node=not ap.parse_args().no_node)
+_LEGACY_FLAGS = {"--no-node": "sensitivity.node=false"}
+
+
+@hydra.main(version_base=None, config_path="config", config_name="eval_config")
+def main(cfg: DictConfig) -> None:
+    run(do_node=cfg.sensitivity.node)
 
 
 if __name__ == "__main__":
+    from ._cli import reject_legacy_flags
+
+    reject_legacy_flags(_LEGACY_FLAGS, "adforce.eval.sensitivity")
     main()

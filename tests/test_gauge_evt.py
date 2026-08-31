@@ -2,7 +2,7 @@
 
 Two layers are covered without touching the CO-OPS API:
 
-1. ``comp.annual_max``: a synthetic hourly water-level series (known harmonic
+1. ``adforce.eval.annual_max``: a synthetic hourly water-level series (known harmonic
    tide + trend + one dominant storm-surge bump per year) is pushed through
    the de-tide + annual-maximum pipeline with the fetch monkeypatched. The
    recovered annual maxima must match the injected storm amplitudes, the
@@ -30,8 +30,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import comp.annual_max as am
-from comp import constants as C
+import adforce.eval.annual_max as am
+from adforce.eval import constants as C
 from worst.gauge_fit import (
     POTENTIAL_HEIGHT_M,
     bootstrap_bands,
@@ -68,7 +68,7 @@ def _synth_year(year: int, storm_peak: float, seed: int) -> pd.Series:
 
 @pytest.fixture()
 def synth_pipeline(monkeypatch, tmp_path):
-    """Route comp.annual_max at the synthetic gauge and an isolated cache."""
+    """Route adforce.eval.annual_max at the synthetic gauge and an isolated cache."""
     series = {y: _synth_year(y, p, seed=y) for y, p in STORM_PEAKS.items()}
     calls = {"fetch": 0}
 

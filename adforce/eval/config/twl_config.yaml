@@ -1,0 +1,12 @@
+# Root config for python -m adforce.eval.twl (tide-on total-water-level +
+# skew-surge scoring of storm+tide runs vs raw gauge observations).
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+both_series: ??? # storm+tide gauge-series parquet path or glob
+tide_series: null # matching tide-only runs (skew-surge reference; null -> no skew columns)
+align_window_hr: 48 # pre-forcing alignment window [h] (spinup; removes the datum offset)
+label: twl # names the default output data/comp/out/twl_<label>.csv
+out: null # explicit CSV path (null -> the label default)

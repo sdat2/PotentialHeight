@@ -1,0 +1,18 @@
+# Node-selection, clean-pair, and uncertainty gates for the gauge validation.
+#
+# Mirrors adforce/eval/constants.py EXACTLY: constants.py remains the single
+# source of truth consumed by library code (and by the ts-cache tag, whose
+# byte-stability keeps the utide-expensive caches valid), while this group
+# makes the values visible/overridable from the CLI for future sweep studies.
+# tests/test_eval.py::test_scoring_config_matches_constants pins the equality
+# so the two cannot drift (the worstsurge audit flagged constants drift as a
+# live failure mode).
+max_node_deg: 0.12 # = C.MAX_NODE_DEG
+wet_min_m: 0.3 # = C.WET_MIN_M
+knn: 60 # = C.KNN
+max_timing_hr: 6.0 # = C.MAX_TIMING_HR
+min_obs_peak_m: 0.4 # = C.MIN_OBS_PEAK_M
+ts_min_overlap: 24 # = C.TS_MIN_OVERLAP
+n_bootstrap: 2000 # = C.N_BOOTSTRAP
+bootstrap_seed: 0 # = C.BOOTSTRAP_SEED
+utide_min_samples: 2000 # = C.UTIDE_MIN_SAMPLES

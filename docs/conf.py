@@ -71,7 +71,7 @@ intersphinx_mapping = {
 #   numba                             - cle15.cle15n
 #       (not in install_requires; remove from this list if added there)
 # Not mocked because they are only imported inside functions and so cannot
-# break the docs build: utide, huggingface_hub (comp), mpi4py, oct2py.
+# break the docs build: utide, huggingface_hub (adforce.eval), mpi4py, oct2py.
 # Not mocked because they are core install_requires: imageio, datatree
 # (xarray-datatree), slurmpy, tcpyPI (tcpypi), hydra/omegaconf.
 autodoc_mock_imports = [

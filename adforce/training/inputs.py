@@ -183,6 +183,8 @@ def generate_adcirc_inputs(
     wind: bool = True,
     tides: bool = False,
     spinup_days: float = 0.0,
+    mannings_n=None,
+    friction_cf=None,
 ) -> None:
     """
     Generates a complete set of ADCIRC inputs for a single storm.
@@ -326,7 +328,23 @@ def generate_adcirc_inputs(
 
     # 6. Copy static files
     # fort.14 is copied by driver.write()
+    if mannings_n is not None:
+        # VERIFIED NO-OP (2026-08-17 GCP sweep: three cells, byte-identical
+        # outputs): the generated fort.15 has NWP=0, so ADCIRC never reads
+        # fort.13. Refuse rather than silently burn compute; the live knob is
+        # friction_cf (fort.15 CF). See adforce/eval/tidal_diagnosis.md.
+        raise ValueError(
+            "mannings_n is a no-op: decks are generated with NWP=0 (fort.13 "
+            "unread). Use friction_cf, or implement NWP=1 nodal attributes."
+        )
     shutil.copy(fort13_path, os.path.join(output_dir, "fort.13"))
+    if friction_cf is not None:
+        # bottom-friction sensitivity (adforce/eval/tidal_diagnosis.md):
+        # rewrite the NOLIBF=2 hybrid-friction CF in the generated fort.15
+        from adforce.fort15 import write_friction_cf
+
+        f15 = os.path.join(output_dir, "fort.15")
+        write_friction_cf(f15, f15, float(friction_cf))
 
     print(
         f"Successfully generated inputs for {storm.name} {storm.year} in {output_dir}"

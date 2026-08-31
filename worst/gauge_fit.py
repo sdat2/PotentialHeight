@@ -2,7 +2,7 @@
 
 Closes the loop between the paper's Bayesian-optimization potential-height
 results and its EVT theory: the annual maxima of de-tided NOAA tide-gauge
-surge residuals (from :mod:`comp.annual_max`) are fitted with
+surge residuals (from :mod:`adforce.eval.annual_max`) are fitted with
 
 * case I  -- Weibull-class GEV with the upper bound FIXED at the site's
   potential height ``z*`` (``worst.tens.fit_gev_upper_bound_known``), and
@@ -349,7 +349,7 @@ def analyze_station(
     Returns:
         dict: The results dictionary that is also written to json.
     """
-    from comp.annual_max import annual_maxima
+    from adforce.eval.annual_max import annual_maxima
 
     if station not in POTENTIAL_HEIGHT_M:
         raise ValueError(

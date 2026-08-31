@@ -1,0 +1,5 @@
+# The published SurgeNet HF archive (sdat2/surgenet-train): element-centroid
+# dual-graph fields, ssh = WD + DEM, tides excluded (pure surge).
+# Consumed by adforce.eval.sources.HFArchiveSource.
+kind: hf_archive
+repo: sdat2/surgenet-train # = constants.HF_REPO (drift would break download_storm)
