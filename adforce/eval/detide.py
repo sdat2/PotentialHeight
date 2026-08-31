@@ -68,7 +68,7 @@ def align_pair(
 ) -> Tuple[pd.Series, pd.Series, float]:
     """Remove the common datum/steric offset from a (sim, obs) pair.
 
-    Subtracts each series' mean over the ``window_hr`` hours before
+    Subtracts each series' mean over the ``window_hr`` hours starting at
     ``forcing_start`` (default: the start of the overlap) from that series.
 
     Returns:
