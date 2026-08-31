@@ -50,7 +50,7 @@ def is_run_successful(run_directory: str) -> bool:
     if not os.path.exists(slurm_path):
         return False
     try:
-        with open(slurm_path, "r") as slurm_out_file:
+        with open(slurm_path, "r", errors="ignore") as slurm_out_file:
             return any(SUCCESS_MARKER in line for line in slurm_out_file)
     except (IOError, FileNotFoundError) as e:
         print(f"Warning: Could not read {slurm_path}. Will attempt to rerun. Error: {e}")
