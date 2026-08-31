@@ -41,8 +41,7 @@ os.makedirs(RUNS_PARENT_DIR, exist_ok=True)
 
 #: Success line written to <run>/slurm.out (same marker check_training_runs
 #: and adforce.eval.status key on).
-SUCCESS_MARKER = "Job completed successfully.\n"
-
+SUCCESS_MARKER = "Job completed successfully."
 
 def is_run_successful(run_directory: str) -> bool:
     """True when ``<run>/slurm.out`` carries the success marker."""
